@@ -32,8 +32,11 @@ A dispatch layer injects `oai-authenticated-user-id`, `-user-email`, `-user-full
 
 ```bash
 # Install. DO NOT use `npm run install:ci` on Windows — see below.
-corepack prepare pnpm@11.25.0 --activate
-pnpm install --frozen-lockfile
+# `corepack enable` fails with EPERM under nvm-for-windows (it cannot write
+# shims into the Node install dir without elevation), so invoke pnpm through
+# corepack directly instead of relying on a global shim.
+export SITES_PNPM_SHARED_STORE="$PWD/.sites-runtime/pnpm-store"
+corepack pnpm@11.25.0 install --frozen-lockfile
 
 npm run dev           # vinext dev + HMR on :5173
 npm run build         # produces dist/server/wrangler.json
@@ -96,14 +99,29 @@ docs/           ARCHIVE-MAP.md, vinext-starter-README.md (authoritative runtime 
 
 > ⚠️ **Never run `npx shadcn add` in this repo.** `add sidebar` appends `--sidebar-*` variables and a `.dark` block to `app/globals.css` — after the existing `@theme inline`, so it wins the cascade and the sidebar renders stock grey. It would also overwrite `components/ui/button.tsx`, which carries an extended size set (`xs`, `icon-xs`, `icon-sm`, `icon-lg`) the app depends on, and install individual `@radix-ui/react-*` packages although this project deliberately uses the unified `radix-ui`. Fetch read-only with `npx shadcn@4.17.0 view <name>` and hand-place instead.
 
-## Known gaps
+## Hand-authored files (not from the archive, not vendored verbatim)
 
-These are imported but absent; the app does not build until they exist.
+The archive was missing everything below; each was written to satisfy a contract the existing code already depended on.
 
-1. **`data/digest.ts`** — must export `currentIssue`, `digestItems`, `githubTop10`, `archiveIssues`, `type DigestCategory` (`"local" | "research" | "companies" | "github"`), `type Language` (`"hu" | "en"`).
-2. **`components/ui/sidebar.tsx`**, **`progress.tsx`** — imported directly. Plus **`separator.tsx`** and **`skeleton.tsx`** (sidebar's registry dependencies) and **`textarea.tsx`** (imported by `components/ui/input-group.tsx`). Five files, not two.
+- **`data/digest-types.ts`** + **`data/digest.ts`** — the content contract and 24 seed items. Every `url` was verified live (HTTP 200) at authoring time. Exactly 3 items set `mustRead`, enforced by a dev-only console warning.
+- **`components/ui/progress.tsx`, `separator.tsx`, `skeleton.tsx`, `textarea.tsx`** — written in this project's house style (function components, `data-slot`, unified `radix-ui`). The registry still serves forwardRef-era source, so pasting it would have broken the convention *and* omitted `data-slot="progress-indicator"`, which the dashboard targets to paint the bar signal-orange.
+- **`components/ui/sidebar.tsx`** — fetched read-only from the registry and hand-patched (import paths, `Slot.Root`). See the header comment in the file.
 
-`progress.tsx`'s indicator **must** carry `data-slot="progress-indicator"` verbatim — the dashboard targets that exact string to paint the bar signal-orange.
+`skeleton.tsx` deliberately uses `bg-primary/10` rather than upstream's `bg-accent`, because `--accent` is the signal orange here and a stock skeleton would pulse bright orange.
+
+## Platform: the local dev loop needs x64
+
+**`workerd` has no `win32-arm64` build** — `@cloudflare/workerd-windows-arm64` does not exist on npm, and is absent from the optionalDependencies of every workerd release including current. Linux arm64 and macOS arm64 do exist.
+
+On a Windows ARM machine (Snapdragon X and similar) this means:
+
+| Task | Works on win32-arm64? |
+| --- | --- |
+| `tsc --noEmit`, `eslint`, all code authoring | ✅ yes, with `--ignore-scripts` on install |
+| `npm run build` | ❌ no — `vite.config.ts` loads `@cloudflare/vite-plugin`, which requires workerd at config-load time |
+| `npm run dev`, `npm start` | ❌ no |
+
+To install at all on arm64, add `--ignore-scripts` (workerd's postinstall hard-fails and pnpm rolls back the bin links without it). To actually run the app, use a **Windows x64** machine, or WSL2 with a real Linux distro (arm64 Linux workerd exists, and that environment also satisfies the starter's own `install:ci`, which needs `flock` and coreutils ≥ 9.3).
 
 ## Data contract
 

@@ -48,6 +48,7 @@ import {
 } from "@/data/digest";
 
 type ItemState = { read: boolean; saved: boolean };
+const EMPTY_ITEM_STATE: ItemState = { read: false, saved: false };
 type Todo = { id: number; itemId: string | null; text: string; done: boolean };
 type Filter = "all" | DigestCategory | "saved";
 
@@ -227,7 +228,7 @@ export function DigestDashboard({
   async function setItemState(itemId: string, key: "read" | "saved", value: boolean) {
     setStates((current) => ({
       ...current,
-      [itemId]: { read: false, saved: false, ...current[itemId], [key]: value },
+      [itemId]: { ...EMPTY_ITEM_STATE, ...current[itemId], [key]: value },
     }));
     try {
       await mutate({
@@ -353,7 +354,7 @@ export function DigestDashboard({
                     <span>{t.updated}: {currentIssue.updated}</span>
                   </div>
                   <h1 className="max-w-4xl font-display text-[clamp(3.4rem,9vw,8rem)] leading-[0.77] tracking-[-0.07em]">
-                    AI WEEKLY<span className="text-signal">//</span>
+                    AI WEEKLY<span className="text-signal">{"//"}</span>
                   </h1>
                   <p className="mt-5 max-w-2xl font-mono text-sm leading-6 text-paper/65">
                     Local models · research · frontier companies · repositories
