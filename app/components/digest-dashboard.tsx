@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive,
+  BookOpen,
   Bookmark,
   BookmarkCheck,
   Building2,
@@ -39,13 +41,13 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import {
-  currentIssue,
-  digestItems,
-  githubTop10,
-  type DigestCategory,
-  type Language,
-} from "@/data/digest";
+import type {
+  CurrentIssue,
+  DigestCategory,
+  DigestItem,
+  GithubTopEntry,
+  Language,
+} from "@/data/digest-types";
 
 type ItemState = { read: boolean; saved: boolean };
 const EMPTY_ITEM_STATE: ItemState = { read: false, saved: false };
@@ -64,6 +66,7 @@ const ui = {
     github: "GitHub Top 10",
     saved: "Mentve későbbre",
     archiveNav: "Heti archívum",
+    library: "Könyvtár",
     mustRead: "TOP 3 · KÖTELEZŐ",
     feed: "A HÉT ÉLŐ ADATFOLYAMA",
     why: "MIÉRT FONTOS",
@@ -75,7 +78,7 @@ const ui = {
     todoPlaceholder: "Mit olvassak el később?",
     add: "Hozzáadás",
     empty: "Ebben a nézetben még nincs elem.",
-    sample: "A bemutató tartalom az első automatikus futáskor friss hírekre cserélődik.",
+    sample: "Ez a heti kiadás még üres — a napi automatikus futás tölti fel.",
     signOut: "Kijelentkezés",
     tracked: "FIGYELT REPO",
   },
@@ -90,6 +93,7 @@ const ui = {
     github: "GitHub Top 10",
     saved: "Saved for later",
     archiveNav: "Weekly archive",
+    library: "Library",
     mustRead: "TOP 3 · MUST READ",
     feed: "THE WEEK'S LIVE SIGNAL",
     why: "WHY IT MATTERS",
@@ -101,7 +105,7 @@ const ui = {
     todoPlaceholder: "What should I read later?",
     add: "Add",
     empty: "Nothing in this view yet.",
-    sample: "Demo content is replaced by fresh findings after the first automated run.",
+    sample: "This week's issue is still empty — the daily automated run fills it.",
     signOut: "Sign out",
     tracked: "TRACKED REPO",
   },
@@ -131,13 +135,15 @@ async function mutate(payload: Record<string, unknown>) {
 }
 
 export function DigestDashboard({
-  displayName,
   email,
-  signOutPath,
+  issue: currentIssue,
+  items: digestItems,
+  githubTop10,
 }: {
-  displayName: string;
   email: string;
-  signOutPath: string;
+  issue: CurrentIssue;
+  items: DigestItem[];
+  githubTop10: GithubTopEntry[];
 }) {
   const [language, setLanguage] = useState<Language>("hu");
   const [filter, setFilter] = useState<Filter>("all");
@@ -220,10 +226,10 @@ export function DigestDashboard({
     if (filter === "all") return digestItems;
     if (filter === "saved") return digestItems.filter((item) => states[item.id]?.saved);
     return digestItems.filter((item) => item.category === filter);
-  }, [filter, states]);
+  }, [digestItems, filter, states]);
 
   const readCount = digestItems.filter((item) => states[item.id]?.read).length;
-  const progress = Math.round((readCount / digestItems.length) * 100);
+  const progress = digestItems.length ? Math.round((readCount / digestItems.length) * 100) : 0;
 
   async function setItemState(itemId: string, key: "read" | "saved", value: boolean) {
     setStates((current) => ({
@@ -303,6 +309,17 @@ export function DigestDashboard({
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    className="h-10 rounded-none border-l-2 border-transparent font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper"
+                  >
+                    <Link href="/library">
+                      <BookOpen />
+                      <span>{t.library}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -312,14 +329,13 @@ export function DigestDashboard({
             <span className="grid size-9 place-items-center rounded-full bg-paper text-ink">
               <UserRound className="size-4" />
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">{displayName}</p>
-              <p className="truncate font-mono text-[10px] text-paper/45">{email}</p>
-            </div>
+            <p className="min-w-0 flex-1 truncate font-mono text-[11px] text-paper/70">{email}</p>
           </div>
-          <a href={signOutPath} className="mt-3 block font-mono text-[11px] text-paper/45 hover:text-signal">
-            {t.signOut} →
-          </a>
+          <form action="/auth/signout" method="post">
+            <button type="submit" className="mt-3 block font-mono text-[11px] text-paper/45 hover:text-signal">
+              {t.signOut} →
+            </button>
+          </form>
         </SidebarFooter>
       </Sidebar>
 
@@ -368,9 +384,11 @@ export function DigestDashboard({
               </div>
             </section>
 
-            <div className="mt-4 border border-signal/50 bg-signal/10 px-4 py-3 font-mono text-xs leading-5 text-ink/70">
-              ※ {t.sample}
-            </div>
+            {!digestItems.length && (
+              <div className="mt-4 border border-signal/50 bg-signal/10 px-4 py-3 font-mono text-xs leading-5 text-ink/70">
+                ※ {t.sample}
+              </div>
+            )}
 
             {filter === "github" ? (
               <section className="mt-9">
@@ -533,8 +551,8 @@ export function DigestDashboard({
 
             <section className="mt-8 border-t-2 border-ink pt-5 font-mono text-[11px] leading-5 text-ink/55">
               <p className="flex items-center gap-2 text-signal"><Check className="size-3" /> INVITE-ONLY PROFILES</p>
-              <p>DAILY RUNS · 07:00 / 18:00</p>
-              <p>WEEKLY FREEZE · FRI 16:00</p>
+              <p>DAILY RUN · 07:00</p>
+              <p>WEEKLY FREEZE · SUN 24:00</p>
             </section>
           </aside>
         </div>

@@ -12,11 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Non-app siblings. supabase/functions is Deno source, so linting it as
-    // part of the Site would fail on its npm:/jsr: imports.
-    "content/**",
-    "supabase/**",
-    "drizzle/**",
     "vendor/**",
   ]),
   {

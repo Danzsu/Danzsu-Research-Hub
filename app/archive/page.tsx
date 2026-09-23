@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Archive, CalendarDays, Clock3, Radar } from "lucide-react";
-import { chatGPTSignInPath } from "@/app/chatgpt-auth";
-import { getAppUser } from "@/app/lib/user";
-import { archiveIssues } from "@/data/digest";
+import { getArchive } from "@/lib/content";
+import { createClient, getViewer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function ArchivePage() {
-  const user = await getAppUser();
-  if (!user) redirect(chatGPTSignInPath("/archive"));
+  if (!(await getViewer())) redirect("/login?next=/archive");
+  const archiveIssues = await getArchive(await createClient());
 
   return (
     <main className="min-h-screen bg-ink text-paper">
@@ -28,11 +27,14 @@ export default async function ArchivePage() {
             ARCHIVE<span className="text-signal">{"//"}</span>
           </h1>
           <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">
-            Péntekenként 16:00-kor lezárt, konszolidált AI-kiadások. A források és a sorrend a zárás után változatlan maradnak.
+            Vasárnaponként lezárt, konszolidált AI-kiadások. A források és a sorrend a zárás után változatlan maradnak.
           </p>
         </div>
       </section>
       <section className="mx-auto grid max-w-6xl gap-5 px-5 py-10 sm:px-10 lg:grid-cols-2">
+        {!archiveIssues.length && (
+          <p className="font-mono text-sm text-paper/55 lg:col-span-2">Még nincs lezárt hét. / No closed week yet.</p>
+        )}
         {archiveIssues.map((issue, index) => (
           <article key={issue.id} className="group border-2 border-paper/30 bg-[#1c1c1c] p-6 transition hover:border-signal hover:bg-signal hover:text-ink">
             <div className="flex items-start justify-between">

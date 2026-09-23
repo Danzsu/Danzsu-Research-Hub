@@ -1,19 +1,14 @@
 import { redirect } from "next/navigation";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
-import { chatGPTSignInPath, chatGPTSignOutPath } from "@/app/chatgpt-auth";
-import { getAppUser } from "@/app/lib/user";
+import { getRadar } from "@/lib/content";
+import { createClient, getViewer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const user = await getAppUser();
-  if (!user) redirect(chatGPTSignInPath("/"));
+  const viewer = await getViewer();
+  if (!viewer) redirect("/login");
 
-  return (
-    <DigestDashboard
-      displayName={user.displayName}
-      email={user.email}
-      signOutPath={chatGPTSignOutPath("/")}
-    />
-  );
+  const radar = await getRadar(await createClient());
+  return <DigestDashboard email={viewer.email} {...radar} />;
 }

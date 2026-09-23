@@ -4,88 +4,68 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-**Danzsu Research Hub** (app name: *NEON RADAR — Weekly AI Intelligence*) — a private, invite-only, bilingual (HU/EN) AI-research hub, hosted on **OpenAI ChatGPT Sites**.
+**Danzsu Research Hub** (app name: *NEON RADAR — Weekly AI Intelligence*) — a private, invite-only, bilingual (HU/EN) AI-research hub. Plain **Next.js 16** (App Router, React 19) on **Vercel**, data in **Supabase**.
 
-It was reconstructed from a flat archive of 93 files with scrambled filenames. **Filenames now match contents**; see [docs/ARCHIVE-MAP.md](docs/ARCHIVE-MAP.md) for the provenance of every file. The original archive is preserved outside the repo under `Desktop/chatgpt-oldal/Danzsu-Research-Hub` and can be discarded once this tree is trusted.
+It was reconstructed from a flat archive (see [docs/ARCHIVE-MAP.md](docs/ARCHIVE-MAP.md)) that targeted OpenAI ChatGPT Sites / Cloudflare Workers via `vinext`. It was then moved to Vercel so the site can schedule its own work. The archive map still describes files that no longer exist (`db/`, `drizzle/`, `scripts/`, `build/`); it is kept as a provenance record.
 
-## Runtime — read this before designing anything
+## How content gets in
 
-The app runs as a **Cloudflare Worker** under `vinext` (Next.js 16 App Router + React 19 RSC compiled by Vite), hosted by ChatGPT Sites. Three constraints shape every decision:
+Nothing runs on a personal machine. Two writers, both server-side with the Supabase **secret key**:
 
-1. **No git-based publish, no programmatic deploy.** Deploying means a human asks ChatGPT to redeploy the saved version. **Therefore content must never live in the bundle** — it is read from the database at request time. Anything that would require a redeploy per content change is wrong by construction.
-2. **Hosted secrets exist** (Site settings, not code; a change requires a redeploy). **Outbound HTTP/HTTPS/WebSockets work; raw TCP does not.** So Postgres is reachable only over PostgREST/HTTPS from the Worker — no `pg`, `postgres.js`, Prisma or Hyperdrive. Bulk work and migrations run from GitHub Actions, which does have TCP.
-3. **No cron and no `scheduled()` handler** — the Worker entry is `main: "vinext/server/fetch-handler"`. GitHub Actions cron is the only scheduler in the system.
+1. **Daily pipeline** — Vercel Cron (`vercel.json`, 05:00 UTC) → `app/api/cron/daily` → `lib/pipeline/daily.ts`: collects RSS + Hacker News + GitHub search (`lib/pipeline/collect.ts`, sources in `feeds.ts`), shortlists with **Groq** (optional), curates with **Gemini** into the current ISO-week issue, refreshes the top-3 via the `refresh_must_read` RPC, and retries unfinished link submissions.
+2. **Link submissions** — `/library` form → `app/api/sources` inserts a `sources` row as the reader, then `after()` runs `lib/pipeline/ingest.ts`: YouTube goes to Gemini as a video (`file_data.file_uri`), articles are extracted with linkedom + Readability, mirrored into `posts.body`, and summarized.
 
-### Reserved paths
+Manual run: `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/daily`.
 
-`/signin-with-chatgpt`, `/signout-with-chatgpt` and `/callback` are owned by the platform's dispatch layer. **Never implement app routes for them.** `/callback` is bare and generic, so an OAuth redirect must go somewhere else (e.g. `/api/auth/callback`).
+`lib/llm.ts` is two `fetch` wrappers (no SDKs) behind `generate(db, task, schema, prompt)`; every model response is validated with a zod schema (`zod/v4`, which also produces the JSON Schema sent to the model). **Which model runs which task lives in the `model_settings` table** (`daily_shortlist`, `daily_curate`, `ingest_article`, `ingest_video`), each with a fallback; editing a row takes effect on the next run, no redeploy. Pin exact versions there, not `*-latest` aliases. A route whose API key is unset is skipped.
 
-### Auth
+## Auth
 
-A dispatch layer injects `oai-authenticated-user-id`, `-user-email`, `-user-full-name` (+ `-encoding`) headers; inbound headers with that prefix are stripped, so they cannot be forged. `app/chatgpt-auth.ts` reads them via `next/headers`; the module is server-only. Sign-in must start as a **top-level navigation** (`<a target="_top">`) — never `fetch`, XHR or a prefetching link. Pages that depend on identity need `export const dynamic = "force-dynamic"`.
+Supabase Auth, magic link. **Sign-ups are disabled in the Supabase dashboard** — that is the invite allowlist; members are added with *Authentication → Invite user*. `app/auth/login` calls `signInWithOtp({ shouldCreateUser: false })` and always answers the same, so it cannot enumerate members.
 
-`userId` is the durable per-site user key; email is display-only. SIWC establishes identity but **not** membership — the invite allowlist is the app's own responsibility.
+`proxy.ts` refreshes the session on every request and redirects signed-out page views to `/login` (`/api/*` routes return 401 themselves). Pages that read identity use `getViewer()` from `lib/supabase/server.ts` and `export const dynamic = "force-dynamic"`.
 
-> ⚠️ **Known auth bypass.** `app/lib/user.ts` returns a hard-coded preview user whenever `process.env.NODE_ENV !== "production"`. This must be removed before any real data is attached to identity. The dev server already injects genuine `local_seedy` headers, so the fallback is unnecessary as well as unsafe.
+Email templates (Supabase → Authentication → Email Templates) should link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email` (Magic Link) and `…&type=invite` (Invite user). `app/auth/callback` handles both that and the default `?code=` form; the token-hash form also works when the link is opened on another device.
+
+## Database
+
+Schema lives in `supabase/migrations/` and is applied with `supabase db push` (Supabase CLI). RLS is on for every table:
+
+- Content (`issues`, `digest_items`, `github_top`, `posts`): readers `select`; only the secret key writes.
+- `sources`: readers `select` and `insert` (stamped with `auth.uid()`).
+- `item_states`, `todos`: own rows only; `user_id` defaults to `auth.uid()`, so app code never names the user.
+- `model_settings`: RLS on with no policies — only the secret key reads it.
+
+`lib/supabase/server.ts`: `createClient()` acts as the reader (RLS applies) — use it everywhere except the pipeline; `createAdminClient()` bypasses RLS — pipeline only.
 
 ## Commands
 
 ```bash
-# Install. DO NOT use `npm run install:ci` on Windows — see below.
-# `corepack enable` fails with EPERM under nvm-for-windows (it cannot write
-# shims into the Node install dir without elevation), so invoke pnpm through
-# corepack directly instead of relying on a global shim.
-export SITES_PNPM_SHARED_STORE="$PWD/.sites-runtime/pnpm-store"
 corepack pnpm@11.25.0 install --frozen-lockfile
+cp .env.example .env.local   # or: vercel env pull .env.local
 
-npm run dev           # vinext dev + HMR on :5173
-npm run build         # produces dist/server/wrangler.json
-npm start             # preview the built Worker via Wrangler on 127.0.0.1
-npm run lint          # eslint . --ignore-pattern dist --ignore-pattern .next
-npm run db:generate   # drizzle-kit generate, after editing db/schema.ts
-npx tsc --noEmit      # type check
+npm run dev        # next dev on :3000
+npm run build
+npm run lint
+npm test           # node --test lib/pipeline/*.test.ts (pure helpers)
+npx tsc --noEmit
 ```
 
-D1 migrations are applied by hand, in order, one file per command, after a build:
-
-```bash
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js \
-  d1 execute DB --local --config dist/server/wrangler.json \
-  --persist-to .wrangler/state --file drizzle/0000_cool_drax.sql
-```
-
-`.wrangler/state` (not `.wrangler/state/v3`) is shared between `dev` and `start`. Never replay an applied migration; to reset, delete `.wrangler/state` and re-run both. Requires Node `>=22.13.0`.
-
-### Local sign-in
-
-`npm run dev` prints `Sites local sign-in: seedy@sites.test`. If that line is missing, mock auth is off and nothing will work. Visit `/signin-with-chatgpt?return_to=/` to sign in as `local_seedy`. Mock auth is gated on loopback — a LAN IP or tunnel gets a 403, and `/callback` deliberately returns 501 locally.
-
-## Deviations from the pristine starter
-
-Record any new ones here.
-
-| Change | Why |
-| --- | --- |
-| `tsconfig.json` `exclude` gained `content`, `supabase`, `packages/*/dist`, `.github` | The `include` is greedy (`**/*.ts`). Deno source under `supabase/functions` would otherwise break `tsc --noEmit`. |
-| `eslint.config.mjs` `globalIgnores` gained `content/**`, `supabase/**`, `drizzle/**`, `vendor/**` | Same reason, for `npm run lint`. |
-| `.gitattributes` added | Without `eol=lf`, Windows checkouts rewrite `scripts/*.sh` to CRLF and bash fails on them. |
-
-**`npm run install:ci` does not work on Windows.** It runs `scripts/install-pnpm.sh`, which requires `flock` (absent in Git Bash) and coreutils ≥ 9.3 for `mv --update=none` (Git Bash ships 8.32). Do **not** patch the script — the Sites tooling needs it intact on its own runtime. Use corepack + `pnpm install --frozen-lockfile` locally.
+`corepack enable` fails with EPERM under nvm-for-windows, so pnpm is invoked through corepack directly. Requires Node `>=22.13.0`. Files under `lib/pipeline/` and `lib/llm.ts` use relative `.ts` imports (no `@/`) so `node --test` can load them without a bundler.
 
 ## Layout
 
-The Sites app sits at the **repo root** — `vite.config.ts` imports `./.openai/hosting.json` and `./build/sites-vite-plugin` root-relative, `scripts/sites-env.mjs` does `process.chdir(projectRoot)`, and `pnpm-workspace.yaml` states that a copied Site cannot inherit a monorepo policy. Non-app siblings (`content/`, `supabase/`, `.github/`, `packages/`) are added at root and excluded from tsconfig/eslint.
-
 ```text
-app/            Next.js App Router (page, archive, api/state, components, lib, chatgpt-auth)
-components/ui/  39 vendored shadcn components (see gaps below)
-db/             Drizzle schema + D1 access (index.ts typed, raw.ts prepared statements)
-drizzle/        Two migrations + meta
-build/          Vendored @openai/sites-vite-plugin
-scripts/        Sites toolchain (sites-env, execution-profile, run-framework, installers)
-vendor/         shadcn Tailwind 4 utility pack, imported by app/globals.css
-examples/       Starter D1 sample, excluded from tsconfig
-docs/           ARCHIVE-MAP.md, vinext-starter-README.md (authoritative runtime doc)
+app/              pages (/, /archive, /library, /library/[id], /login), auth routes, API routes
+app/api/          state (read/saved/todos), sources (link submit), cron/daily
+lib/pipeline/     collect, daily, ingest, feeds, util (+ util.test.ts)
+lib/llm.ts        Gemini + Groq
+lib/content.ts    DB rows → the UI's content types
+lib/supabase/     server + admin clients, getViewer, safeNext
+data/             digest-types.ts — the content contract and tag vocabulary
+components/ui/    39 vendored shadcn components
+supabase/         migrations
+vendor/           shadcn Tailwind 4 utility pack, imported by app/globals.css
 ```
 
 ## Design language — do not erode it
@@ -99,40 +79,21 @@ docs/           ARCHIVE-MAP.md, vinext-starter-README.md (authoritative runtime 
 
 > ⚠️ **Never run `npx shadcn add` in this repo.** `add sidebar` appends `--sidebar-*` variables and a `.dark` block to `app/globals.css` — after the existing `@theme inline`, so it wins the cascade and the sidebar renders stock grey. It would also overwrite `components/ui/button.tsx`, which carries an extended size set (`xs`, `icon-xs`, `icon-sm`, `icon-lg`) the app depends on, and install individual `@radix-ui/react-*` packages although this project deliberately uses the unified `radix-ui`. Fetch read-only with `npx shadcn@4.17.0 view <name>` and hand-place instead.
 
-## Hand-authored files (not from the archive, not vendored verbatim)
+## Hand-authored components
 
-The archive was missing everything below; each was written to satisfy a contract the existing code already depended on.
-
-- **`data/digest-types.ts`** + **`data/digest.ts`** — the content contract and 24 seed items. Every `url` was verified live (HTTP 200) at authoring time. Exactly 3 items set `mustRead`, enforced by a dev-only console warning.
 - **`components/ui/progress.tsx`, `separator.tsx`, `skeleton.tsx`, `textarea.tsx`** — written in this project's house style (function components, `data-slot`, unified `radix-ui`). The registry still serves forwardRef-era source, so pasting it would have broken the convention *and* omitted `data-slot="progress-indicator"`, which the dashboard targets to paint the bar signal-orange.
 - **`components/ui/sidebar.tsx`** — fetched read-only from the registry and hand-patched (import paths, `Slot.Root`). See the header comment in the file.
 
 `skeleton.tsx` deliberately uses `bg-primary/10` rather than upstream's `bg-accent`, because `--accent` is the signal orange here and a stock skeleton would pulse bright orange.
 
-## Platform: the local dev loop needs x64
-
-**`workerd` has no `win32-arm64` build** — `@cloudflare/workerd-windows-arm64` does not exist on npm, and is absent from the optionalDependencies of every workerd release including current. Linux arm64 and macOS arm64 do exist.
-
-On a Windows ARM machine (Snapdragon X and similar) this means:
-
-| Task | Works on win32-arm64? |
-| --- | --- |
-| `tsc --noEmit`, `eslint`, all code authoring | ✅ yes, with `--ignore-scripts` on install |
-| `npm run build` | ❌ no — `vite.config.ts` loads `@cloudflare/vite-plugin`, which requires workerd at config-load time |
-| `npm run dev`, `npm start` | ❌ no |
-
-To install at all on arm64, add `--ignore-scripts` (workerd's postinstall hard-fails and pnpm rolls back the bin links without it). To actually run the app, use a **Windows x64** machine, or WSL2 with a real Linux distro (arm64 Linux workerd exists, and that environment also satisfies the starter's own `install:ci`, which needs `flock` and coreutils ≥ 9.3).
-
 ## Data contract
 
-`DigestItem`: `id` (≤120 chars, unique), `category`, `mustRead?`, `score` (0–100), `readMinutes`, `publishedLabel`, `source`, `url`, `tags[]`, and `title`/`summary`/`why` each as `{ hu, en }`. Only those three fields are bilingual; `tags`, `source`, `score` are not.
+`DigestItem`: `id` (≤120 chars, unique), `category`, `mustRead?`, `score` (0–100), `readMinutes`, `publishedLabel`, `source`, `url`, `tags[]`, and `title`/`summary`/`why` each as `{ hu, en }`. Only those three fields are bilingual; `tags`, `source`, `score` are not. Tags come from `digestTags` in `data/digest-types.ts`; the model output schema enforces it.
 
-> ⚠️ **`item.id` is half the composite primary key of `item_states`.** Renaming an id silently orphans every reader's read/saved state. Ids are append-only forever.
+> ⚠️ **`item.id` is half the composite primary key of `item_states`.** Renaming an id silently orphans every reader's read/saved state. Ids are append-only forever: `itemId()` in `lib/pipeline/util.ts` derives them as `<category>-<isoweek>-<slug>-<urlhash>`, and inserts use `ignoreDuplicates` on `url`, so an existing row is never rewritten.
 
-`githubTop10` is an array of **positional 3-tuples** `[repo, focus, url]`, not objects. Exactly 3 items should have `mustRead: true` — the `nth-child(2)/(3)` stagger in `globals.css` only reads as deliberate at exactly three.
+`githubTop10` is an array of **positional 3-tuples** `[repo, focus, url]`, not objects. Exactly 3 items per issue have `must_read` — enforced by `refresh_must_read`; the `nth-child(2)/(3)` stagger in `globals.css` only reads as deliberate at exactly three.
 
-## Layer rules
+## Content and copyright
 
-- **Route handlers** are proven to work in the published Worker (`app/api/state/route.ts`). **Server Actions are unverified** under vinext beta — do not assume them.
-- Complex reads belong in **Postgres functions called via RPC**, not in the Worker. Query logic then changes with a migration instead of a redeploy — which matters, because a redeploy is a human.
-- The Worker never holds bulk-write credentials. Migrations and batch upserts run from GitHub Actions.
+`robots: noindex` in `app/layout.tsx` and the invite gate are load-bearing, not cosmetic — the Library mirrors article text. A `noarchive` robots signal downgrades an article to summary-only (`posts.body = null`). Deleting a `sources` row cascades to its post.

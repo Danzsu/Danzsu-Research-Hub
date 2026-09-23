@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -20,6 +20,7 @@
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
 
 # debug
@@ -28,8 +29,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — only the template is committed
 .env*
+!.env.example
+.dev.vars*
 
 # vercel
 .vercel
@@ -45,3 +48,12 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# Supabase CLI local state
+/supabase/.temp/
+/supabase/.branches/
+
+# editor / agent local state
+.vscode/*
+!.vscode/extensions.json
+.claude/settings.local.json

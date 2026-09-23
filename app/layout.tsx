@@ -4,7 +4,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "NEON RADAR — Weekly AI Intelligence",
   description: "Invite-only bilingual AI research, company, local LLM, and GitHub intelligence digest.",
-  other: { "codex-preview": "development" },
+  // Load-bearing: mirrored articles must never be indexed (see README, "Content and copyright").
+  robots: { index: false, follow: false, nocache: true },
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
 };
 

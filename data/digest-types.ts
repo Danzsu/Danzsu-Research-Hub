@@ -1,16 +1,37 @@
 /**
- * Content contract for the Radar view.
- *
- * These types are deliberately split out from `digest.ts`: when the ingest
- * pipeline starts generating issues it replaces the data module only, and never
- * has to touch the contract. The public surface consumed by the app is exactly
- * `currentIssue`, `digestItems`, `githubTop10`, `archiveIssues`, `DigestCategory`
- * and `Language`.
+ * Content contract for the Radar view. Rows come from Supabase
+ * (`lib/content.ts` maps them); the daily pipeline writes them.
  */
 
 export type Language = "hu" | "en";
 
-export type DigestCategory = "local" | "research" | "companies" | "github";
+export const digestCategories = ["local", "research", "companies", "github"] as const;
+export type DigestCategory = (typeof digestCategories)[number];
+
+/**
+ * Controlled vocabulary. Tag filtering only produces useful clusters if the
+ * vocabulary stays small — free-form tags degrade into singletons within weeks.
+ */
+export const digestTags = [
+  "inference",
+  "quantization",
+  "runtime",
+  "serving",
+  "fine-tuning",
+  "training",
+  "agents",
+  "evals",
+  "benchmarks",
+  "reasoning",
+  "multimodal",
+  "rag",
+  "safety",
+  "alignment",
+  "open-weights",
+  "tooling",
+  "policy",
+  "funding",
+] as const;
 
 /** A string that exists in both site languages. */
 export type Localized = Record<Language, string>;
@@ -43,7 +64,7 @@ export type DigestItem = {
   /** Publisher or handle, rendered as plain text. The link lives in `url`. */
   source: string;
   url: string;
-  /** Lowercase, no leading `#` — the UI prepends it. Drawn from `digestTags`. */
+  /** Lowercase, no leading `#` — the UI prepends it. Drawn from `digestTags` above. */
   tags: string[];
   title: Localized;
   summary: Localized;
