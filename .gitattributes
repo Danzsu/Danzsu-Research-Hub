@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# scripts/install-pnpm.sh and scripts/install-ci.sh exec sites-env.sh directly,
+# so a CRLF checkout breaks the shebang handling on the managed-linux profile.
+*.sh text eol=lf
+*.svg text eol=lf
+
+pnpm-lock.yaml -diff linguist-generated
