@@ -16,6 +16,19 @@ export function isoWeek(date: Date): Week {
   return { id: `${year}-W${ww}`, label: `${year} / W${ww}`, period: `${year} / ${month}`, compact: `${year}w${ww}`, monday };
 }
 
+/** Monday (UTC) of an ISO week id like '2026-W39', or null if the id is malformed or out of range. */
+export function isoWeekMonday(id: string): Date | null {
+  const match = /^(\d{4})-W(\d{2})$/.exec(id);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  const jan4 = new Date(Date.UTC(year, 0, 4)); // 4 January is always in week 1
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (week - 1) * 7);
+  // Round-trip rejects W00 and W53 in 52-week years.
+  return isoWeek(monday).id === id ? monday : null;
+}
+
 export function slugify(text: string, max = 60): string {
   return text
     .normalize("NFKD")

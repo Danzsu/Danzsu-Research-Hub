@@ -1,42 +1,49 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Archive, CalendarDays, Clock3, Radar } from "lucide-react";
+import { Archive, CalendarDays, Clock3 } from "lucide-react";
+import { LanguageToggle } from "@/app/components/language-toggle";
+import { PageHeader } from "@/app/components/page-header";
 import { getArchive } from "@/lib/content";
+import { getLanguage } from "@/lib/language";
 import { createClient, getViewer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function ArchivePage() {
   if (!(await getViewer())) redirect("/login?next=/archive");
-  const archiveIssues = await getArchive(await createClient());
+  const language = await getLanguage();
+  const archiveIssues = await getArchive(await createClient(), language);
 
   return (
-    <main className="min-h-screen bg-ink text-paper">
-      <header className="flex items-center justify-between border-b border-paper/20 px-5 py-5 sm:px-10">
-        <Link href="/" className="flex items-center gap-3 font-mono text-xs text-paper/65 hover:text-signal">
-          <ArrowLeft className="size-4" /> LIVE RADAR
-        </Link>
-        <div className="flex items-center gap-2 font-display text-2xl">
-          <Radar className="text-signal" /> NEON RADAR
-        </div>
-      </header>
-      <section className="border-b-2 border-signal bg-cream px-5 py-12 text-ink sm:px-10 sm:py-16">
+    <main className="min-h-dvh bg-ink text-paper">
+      <PageHeader backHref="/" backLabel="LIVE RADAR">
+        <LanguageToggle language={language} />
+      </PageHeader>
+      <section className="border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
         <div className="mx-auto max-w-6xl">
           <p className="font-mono text-xs tracking-[0.2em] text-signal">WEEKLY FREEZE / HETI ZÁRÁS</p>
-          <h1 className="mt-3 max-w-5xl font-display text-[clamp(3.6rem,10vw,8.8rem)] leading-[0.78] tracking-[-0.07em]">
+          <h1 className="mt-3 max-w-5xl font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em]">
             ARCHIVE<span className="text-signal">{"//"}</span>
           </h1>
           <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">
-            Vasárnaponként lezárt, konszolidált AI-kiadások. A források és a sorrend a zárás után változatlan maradnak.
+            {language === "hu"
+              ? "Vasárnaponként lezárt, konszolidált AI-kiadások. A források és a sorrend a zárás után változatlan maradnak."
+              : "Consolidated AI issues, closed every Sunday. Sources and order stay fixed after the freeze."}
           </p>
         </div>
       </section>
-      <section className="mx-auto grid max-w-6xl gap-5 px-5 py-10 sm:px-10 lg:grid-cols-2">
+      <section className="mx-auto grid max-w-6xl gap-5 px-4 py-10 sm:px-10 lg:grid-cols-2">
         {!archiveIssues.length && (
-          <p className="font-mono text-sm text-paper/55 lg:col-span-2">Még nincs lezárt hét. / No closed week yet.</p>
+          <p className="font-mono text-sm text-paper/55 lg:col-span-2">
+            {language === "hu" ? "Még nincs lezárt hét." : "No closed week yet."}
+          </p>
         )}
         {archiveIssues.map((issue, index) => (
-          <article key={issue.id} className="group border-2 border-paper/30 bg-[#1c1c1c] p-6 transition hover:border-signal hover:bg-signal hover:text-ink">
+          <Link
+            key={issue.id}
+            href={`/archive/${issue.id}`}
+            className="group border-2 border-paper/30 bg-[#1c1c1c] p-6 transition hover:border-signal hover:bg-signal hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+          >
             <div className="flex items-start justify-between">
               <Archive className="size-7 text-signal group-hover:text-ink" />
               <span className="font-display text-5xl text-paper/15 group-hover:text-ink/20">
@@ -50,7 +57,7 @@ export default async function ArchivePage() {
               <span className="flex items-center gap-2"><CalendarDays className="size-4" /> {issue.itemCount} ITEMS</span>
               <span className="flex items-center gap-2"><Clock3 className="size-4" /> {issue.readMinutes} MIN</span>
             </div>
-          </article>
+          </Link>
         ))}
       </section>
     </main>

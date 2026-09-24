@@ -3,17 +3,18 @@
 ## A. Beállítás (ez a te dolgod, kód nem kell hozzá)
 
 ### 0. Kód
-- [ ] A `vercel-supabase-pipeline` branch commitolása és beolvasztása a `main`-be (szólj, és megcsinálom)
+- [x] A `vercel-supabase-pipeline` branch commitolása, beolvasztása a `main`-be és pusholása
 
 ### 1. Supabase
 - [ ] Új projekt a [supabase.com](https://supabase.com)-on. Régiónak EU-t válassz (pl. Frankfurt).
 - [ ] *Authentication → Sign In / Providers*: az **Allow new users to sign up** legyen **KI**. Ez a meghívólista.
 - [ ] *Authentication → URL Configuration*:
-  - Site URL: egyelőre `http://localhost:3000`, a Vercel deploy után a Vercel-domain
-  - Redirect URLs: `http://localhost:3000/**` és `https://<vercel-domain>/**`
+  - Site URL: `https://neon-news-radar.vercel.app`
+  - Redirect URLs: add hozzá a `https://neon-news-radar.vercel.app/**` címet (a `http://localhost:3000/**` maradhat a helyi próbához)
 - [ ] *Authentication → Email Templates*:
   - Magic Link: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`
   - Invite user: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite`
+  - A sablonok szövegében a név legyen **NEON NEWS RADAR** (a kód már így hívja az oldalt)
 - [ ] Ajánlott: *Authentication → SMTP Settings*, saját SMTP (pl. Resend, ingyenes kerettel). A beépített levélküldés óránként csak néhány emailt enged, ez meghívásnál gyorsan elfogy.
 - [ ] *Project Settings → API Keys*: a `Publishable` és a `Secret` kulcs kimásolása
 - [ ] A séma feltöltése:
@@ -22,7 +23,8 @@
   npx supabase link --project-ref <project-ref>
   npx supabase db push
   ```
-- [ ] Ellenőrzés a *Table Editor*-ban: 7 tábla és egy `archive_issues` view, mindegyik táblán „RLS enabled”
+  CLI nélkül: *SQL Editor*, és egymás után mindkét fájl a `supabase/migrations/` mappából (`…_init.sql`, majd `…_model_settings.sql`)
+- [ ] Ellenőrzés a *Table Editor*-ban: 8 tábla (a `model_settings`-szel együtt) és egy `archive_issues` view, mindegyik táblán „RLS enabled”
 - [ ] *Authentication → Users → Invite user*: meghívod magad
 
 ### 2. API kulcsok
@@ -45,7 +47,9 @@
 ### 4. Vercel
 - [ ] [vercel.com](https://vercel.com) → *Add New → Project* → a GitHub repó importálása. A Next.js-t és a pnpm-et magától felismeri.
 - [ ] *Settings → Environment Variables*: minden változó a `.env.example`-ből (Production és Preview)
-- [ ] Deploy, utána a Supabase Site URL átírása a Vercel-domainre (lásd az 1. pontot)
+- [x] Deploy
+- [ ] A projekt átnevezése `neon-news-radar`-ra (*Settings → General*), és a cím átírása `neon-news-radar.vercel.app`-ra (*Settings → Domains*)
+- [ ] A Supabase URL Configuration átírása erre a címre (lásd az 1. pontot), utána új meghívó küldése
 - [ ] Az első futás élesben: ugyanaz a `curl`, csak `https://<vercel-domain>/api/cron/daily`-re
 - [ ] Másnap reggel: *Vercel → Project → Logs / Cron Jobs*, lefutott-e a napi job
 
@@ -54,29 +58,38 @@
 
 ---
 
-## B. Hiányzó funkciók (fontossági sorrendben)
+## B. Funkciók (fontossági sorrendben)
 
-### Hiányzik vagy félkész
-- [ ] **Archívum részletoldal.** Az archívum kártyái nem kattinthatók, a korábbi hetek hírei nem nézhetők vissza (kell egy `/archive/[week]` oldal).
-- [ ] **Library keresés.** A README kereshető könyvtárat ígér, de még nincs (Postgres full-text search, RPC-vel).
-- [ ] **Hibás beküldés kezelése.** Egy `failed` link most csak naponta próbálkozik újra, legfeljebb 3-szor. Hiányzik a kézi „Újra” és „Törlés” gomb, és a posztok eltávolítása (takedown) is.
-- [ ] **Hibajelzés.** Ha a napi futás elbukik (Gemini-limit, lejárt kulcs), senki nem kap róla értesítést. Kell egy email vagy Telegram üzenet hiba esetén.
+### Kész
+- [x] **Reszponzív UX:** mobilos chip-sáv a kategóriákhoz, a haladás és a to-do lenyíló panelben (`xl` alatt), 360 px-en sincs vízszintes görgetés, legalább 40 px-es érintési felületek, betöltési, hiba- és 404-oldal, `manifest` (kezdőképernyőre tehető)
+- [x] **Sidebar-hiba:** a Tailwind 3-as szintaxis miatt asztali nézetben hibás volt a sidebar szélessége
+- [x] **Archívum részletoldal:** `/archive/2026-W38`, ugyanazzal az olvasó felülettel
+- [x] **Nyelvválasztás megjegyzése:** `lang` cookie, minden oldal ezt használja
+- [x] **Márkanév:** NEON NEWS RADAR
+
+### Következő lépések
+- [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
+- [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
+- [ ] **Hibajelzés.** Ha a napi futás elbukik (Gemini-limit, lejárt kulcs), senki nem kap értesítést. Telegram-bot vagy email kellene. Addig a hiba a Vercel cron-logjában látszik.
+- [ ] **Library keresés.** Postgres full-text search egy `search_posts` RPC-vel, a Library fejlécében egy keresőmezővel.
+- [ ] **Tag-szűrő.** A hírkártyák `#tag`-jei legyenek kattinthatók, és szűrjék a feedet.
 
 ### Tartalom minősége
 - [ ] **Valódi GitHub trending.** Most csak a héten *létrehozott* repókat rangsorolja csillag szerint. A régebbi, de most gyorsan növő repókhoz napi csillagszám-mentés és a különbség számítása kell.
+- [ ] **Beküldött posztok a Radarban.** A Library-posztok nem jelennek meg a heti feedben.
 - [ ] **Paywall-felismerés.** Most csak a `noarchive` jelzést figyeli. A fizetős cikkekből csak a nyilvános eleje kerül be.
 - [ ] **Képek tükrözése** a Supabase Storage-ba. Most a cikkekből csak a szöveg mentődik.
 - [ ] **Forráslink-figyelés.** Nincs ellenőrzés arra, hogy az eredeti link él-e még.
-- [ ] **Beküldött posztok a Radarban.** A Library-posztok nem jelennek meg a heti feedben.
 
 ### Kényelmi funkciók
-- [ ] **Nyelvválasztás megjegyzése.** A dashboard mindig HU-val indul, a Library `?lang=en` paramétert használ.
-- [ ] **Todo cikkhez kötése.** Az adatbázis tudja (`todos.item_id`), de a felületen nincs „tedd a listára” gomb a híreknél.
+- [ ] **Todo cikkhez kötése.** Az adatbázis tudja (`todos.item_id`), de a hírkártyán nincs „tedd a listára” gomb.
+- [ ] **Library lapozás.** Most a legutóbbi 100 poszt látszik, régebbiekhez „Továbbiak” gomb kell.
 - [ ] **Napi összefoglaló emailben** a meghívottaknak.
 - [ ] **Beküldés kívülről.** Egy gépi tokennel a Claude Cowork, egy iOS Shortcut vagy egy böngészőbővítmény is küldhetne linket az `/api/sources`-ra.
 - [ ] **Chat felület** a Library fölött („mit írtak erről?”). Ez a legnagyobb munka.
 
 ### Technikai adósság
-- [ ] Generált Supabase-típusok (`supabase gen types`); most a kliens típus nélkül dolgozik
-- [ ] Teszt a napi pipeline-ra mockolt LLM-válaszokkal (most csak a tiszta segédfüggvényeknek van tesztje)
-- [ ] DNS rebinding elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.
+- [ ] **Függőségek pontos verzióra.** A `package.json`-ban `^` tartományok vannak; a lockfile rögzíti őket, de a policy pontos verziót kér.
+- [ ] **Generált Supabase-típusok** (`supabase gen types`). Most a kliens típus nélkül dolgozik.
+- [ ] **Pipeline-teszt** mockolt LLM-válaszokkal. Most csak a tiszta segédfüggvényeknek van tesztje.
+- [ ] **DNS rebinding** elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.

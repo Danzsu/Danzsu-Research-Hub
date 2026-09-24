@@ -12,10 +12,10 @@ export default async function LoginPage({
   const { next, sent, error } = await searchParams;
 
   return (
-    <main className="grid min-h-screen place-items-center bg-ink px-5 text-paper">
+    <main className="grid min-h-dvh place-items-center bg-ink px-4 text-paper">
       <section className="w-full max-w-md border-2 border-ink bg-cream p-7 text-ink shadow-[8px_8px_0_var(--signal)] sm:p-9">
-        <div className="flex items-center gap-2 font-display text-2xl">
-          <Radar className="text-signal" /> NEON RADAR
+        <div className="flex items-center gap-2 font-display text-xl sm:text-2xl">
+          <Radar className="shrink-0 text-signal" /> NEON NEWS RADAR
         </div>
         <p className="mt-6 font-mono text-xs tracking-[0.2em] text-signal">INVITE-ONLY / CSAK MEGHÍVÓVAL</p>
         <h1 className="mt-2 font-display text-5xl leading-[0.85] tracking-[-0.05em]">

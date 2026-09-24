@@ -5,9 +5,10 @@ import type {
   CurrentIssue,
   DigestItem,
   GithubTopEntry,
+  Language,
   Localized,
 } from "@/data/digest-types";
-import { isoWeek, publishedLabel } from "@/lib/pipeline/util";
+import { isoWeek, isoWeekMonday, publishedLabel } from "@/lib/pipeline/util";
 
 const budapest = new Intl.DateTimeFormat("hu-HU", {
   timeZone: "Europe/Budapest",
@@ -19,18 +20,22 @@ const budapest = new Intl.DateTimeFormat("hu-HU", {
 
 export type RadarData = { issue: CurrentIssue; items: DigestItem[]; githubTop10: GithubTopEntry[] };
 
-export async function getRadar(db: SupabaseClient): Promise<RadarData> {
-  const { data: latest } = await db
-    .from("issues")
-    .select("id, updated_at")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+/**
+ * The latest issue, or the archived week named by `issueId` ('2026-W38').
+ * Null only when `issueId` names a week that has no issue.
+ */
+export async function getRadar(db: SupabaseClient, issueId?: string): Promise<RadarData | null> {
+  const issues = db.from("issues").select("id, updated_at");
+  const { data: latest } = issueId
+    ? await issues.eq("id", issueId).maybeSingle()
+    : await issues.order("id", { ascending: false }).limit(1).maybeSingle();
+  if (issueId && !latest) return null;
 
-  const week = isoWeek(new Date());
-  const sunday = new Date(week.monday.getTime() + 6 * 86_400_000);
+  const weekId = latest?.id ?? isoWeek(new Date()).id;
+  const monday = isoWeekMonday(weekId) ?? isoWeek(new Date()).monday;
+  const sunday = new Date(monday.getTime() + 6 * 86_400_000);
   const issue: CurrentIssue = {
-    label: (latest?.id ?? week.id).replace("-", " / "),
+    label: weekId.replace("-", " / "),
     updated: latest ? budapest.format(new Date(latest.updated_at)) : "—",
     archiveAt: `${String(sunday.getUTCMonth() + 1).padStart(2, "0")}. ${String(sunday.getUTCDate()).padStart(2, "0")}.`,
   };
@@ -67,7 +72,7 @@ export async function getRadar(db: SupabaseClient): Promise<RadarData> {
   };
 }
 
-export async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
+export async function getArchive(db: SupabaseClient, language: Language): Promise<ArchiveIssue[]> {
   const current = isoWeek(new Date()).id;
   const { data } = await db
     .from("archive_issues")
@@ -79,7 +84,7 @@ export async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
     id: row.id,
     period: row.period,
     week: row.id.slice(5), // '2026-W38' → 'W38'
-    top: (row.top_title as Localized | null)?.hu ?? "—",
+    top: (row.top_title as Localized | null)?.[language] ?? "—",
     itemCount: row.item_count,
     readMinutes: row.read_minutes,
   }));

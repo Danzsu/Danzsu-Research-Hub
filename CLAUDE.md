@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-**Danzsu Research Hub** (app name: *NEON RADAR — Weekly AI Intelligence*) — a private, invite-only, bilingual (HU/EN) AI-research hub. Plain **Next.js 16** (App Router, React 19) on **Vercel**, data in **Supabase**.
+**Danzsu Research Hub** (app name: *NEON NEWS RADAR — Weekly AI Intelligence*) — a private, invite-only, bilingual (HU/EN) AI-research hub. Plain **Next.js 16** (App Router, React 19) on **Vercel**, data in **Supabase**.
 
 It was reconstructed from a flat archive (see [docs/ARCHIVE-MAP.md](docs/ARCHIVE-MAP.md)) that targeted OpenAI ChatGPT Sites / Cloudflare Workers via `vinext`. It was then moved to Vercel so the site can schedule its own work. The archive map still describes files that no longer exist (`db/`, `drizzle/`, `scripts/`, `build/`); it is kept as a provenance record.
 
@@ -56,11 +56,14 @@ npx tsc --noEmit
 ## Layout
 
 ```text
-app/              pages (/, /archive, /library, /library/[id], /login), auth routes, API routes
+app/              pages (/, /archive, /archive/[week], /library, /library/[id], /login),
+                  loading/error/not-found, manifest, auth routes, API routes
+app/components/   digest-dashboard, page-header, language-toggle
 app/api/          state (read/saved/todos), sources (link submit), cron/daily
 lib/pipeline/     collect, daily, ingest, feeds, util (+ util.test.ts)
 lib/llm.ts        Gemini + Groq
 lib/content.ts    DB rows → the UI's content types
+lib/language.ts   getLanguage() — the `lang` cookie (hu | en)
 lib/supabase/     server + admin clients, getViewer, safeNext
 data/             digest-types.ts — the content contract and tag vocabulary
 components/ui/    39 vendored shadcn components
@@ -76,13 +79,14 @@ vendor/           shadcn Tailwind 4 utility pack, imported by app/globals.css
 - **System fonts only, no webfonts.** `.font-display` = Arial Black/Impact 900, `.font-mono` = Courier New.
 - **Shadows are hard offsets with zero blur** (`5px 5px 0 var(--ink)` → hover `8px 8px 0 var(--signal)`). Transitions are **160ms ease**.
 - **Single fixed theme.** No `.dark` block, no `prefers-color-scheme`, no `next-themes`. The contrast is spatial: `html` is ink, `body` is paper, the sidebar and hero are ink-on-paper, the content column is cream.
+- **Responsive rules.** Everything must fit 360px with no horizontal scroll. Display headings use `clamp(2.6rem, 11vw, …)` or smaller minimums. Below `md` the dashboard's categories are a sticky chip bar and the sidebar is a Sheet; below `2xl` the progress/to-do panel opens as a right Sheet from the header. Widths inside the main column use container queries (`@container`, `cqi`, `@3xl:`), not `vw`: the sidebar and panel make that column far narrower than the viewport. Touch targets are at least 40px (`min-h-10`, `size-10 sm:size-8`). Custom `:hover` effects in `globals.css` sit inside `@media (hover: hover)`; Tailwind's `hover:` already does that. Use `dvh`, not `vh`.
 
 > ⚠️ **Never run `npx shadcn add` in this repo.** `add sidebar` appends `--sidebar-*` variables and a `.dark` block to `app/globals.css` — after the existing `@theme inline`, so it wins the cascade and the sidebar renders stock grey. It would also overwrite `components/ui/button.tsx`, which carries an extended size set (`xs`, `icon-xs`, `icon-sm`, `icon-lg`) the app depends on, and install individual `@radix-ui/react-*` packages although this project deliberately uses the unified `radix-ui`. Fetch read-only with `npx shadcn@4.17.0 view <name>` and hand-place instead.
 
 ## Hand-authored components
 
 - **`components/ui/progress.tsx`, `separator.tsx`, `skeleton.tsx`, `textarea.tsx`** — written in this project's house style (function components, `data-slot`, unified `radix-ui`). The registry still serves forwardRef-era source, so pasting it would have broken the convention *and* omitted `data-slot="progress-indicator"`, which the dashboard targets to paint the bar signal-orange.
-- **`components/ui/sidebar.tsx`** — fetched read-only from the registry and hand-patched (import paths, `Slot.Root`). See the header comment in the file.
+- **`components/ui/sidebar.tsx`** — fetched read-only from the registry and hand-patched (import paths, `Slot.Root`, Tailwind 4 `w-(--sidebar-width)` instead of the v3 square-bracket variable form, which compiles to invalid CSS). See the header comment in the file.
 
 `skeleton.tsx` deliberately uses `bg-primary/10` rather than upstream's `bg-accent`, because `--accent` is the signal orange here and a stock skeleton would pulse bright orange.
 
@@ -97,3 +101,13 @@ vendor/           shadcn Tailwind 4 utility pack, imported by app/globals.css
 ## Content and copyright
 
 `robots: noindex` in `app/layout.tsx` and the invite gate are load-bearing, not cosmetic — the Library mirrors article text. A `noarchive` robots signal downgrades an article to summary-only (`posts.body = null`). Deleting a `sources` row cascades to its post.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

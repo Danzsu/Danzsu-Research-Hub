@@ -1,6 +1,6 @@
 # Danzsu Research Hub
 
-A private, invite-only, bilingual (HU/EN) AI-research hub. Published as **NEON RADAR — Weekly AI Intelligence**.
+A private, invite-only, bilingual (HU/EN) AI-research hub. Published as **NEON NEWS RADAR — Weekly AI Intelligence**.
 
 It has two views:
 

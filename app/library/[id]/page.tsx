@@ -1,8 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink, Radar } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { LanguageToggle } from "@/app/components/language-toggle";
+import { PageHeader } from "@/app/components/page-header";
 import { Button } from "@/components/ui/button";
 import { getPost } from "@/lib/content";
+import { getLanguage } from "@/lib/language";
 import { createClient, getViewer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -15,41 +17,25 @@ function youtubeId(url: string): string | null {
   return id && /^[\w-]{6,20}$/.test(id) ? id : null;
 }
 
-export default async function PostPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ lang?: string }>;
-}) {
+export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!(await getViewer())) redirect(`/login?next=/library/${id}`);
-  const lang = (await searchParams).lang === "en" ? "en" : "hu";
+  const lang = await getLanguage();
   const post = Number.isInteger(Number(id)) ? await getPost(await createClient(), Number(id)) : null;
   if (!post) notFound();
 
   const video = post.kind === "youtube" ? youtubeId(post.url) : null;
 
   return (
-    <main className="min-h-screen bg-ink text-paper">
-      <header className="flex items-center justify-between border-b border-paper/20 px-5 py-5 sm:px-10">
-        <Link href={lang === "en" ? "/library?lang=en" : "/library"} className="flex items-center gap-3 font-mono text-xs text-paper/65 hover:text-signal">
-          <ArrowLeft className="size-4" /> LIBRARY
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link href={`/library/${post.id}${lang === "hu" ? "?lang=en" : ""}`} className="rounded-full border border-paper/40 px-3 py-1 font-mono text-xs hover:border-signal hover:text-signal">
-            {lang.toUpperCase()}
-          </Link>
-          <div className="flex items-center gap-2 font-display text-2xl">
-            <Radar className="text-signal" /> NEON RADAR
-          </div>
-        </div>
-      </header>
+    <main className="min-h-dvh bg-ink text-paper">
+      <PageHeader backHref="/library" backLabel="LIBRARY">
+        <LanguageToggle language={lang} />
+      </PageHeader>
 
       <article className="bg-cream text-ink">
-        <div className="mx-auto max-w-3xl px-5 py-12 sm:px-10 sm:py-16">
+        <div className="mx-auto max-w-3xl px-4 py-10 sm:px-10 sm:py-16">
           <p className="font-mono text-xs tracking-[0.2em] text-signal">{post.author ?? new URL(post.url).hostname}</p>
-          <h1 className="mt-3 font-display text-[clamp(2.4rem,6vw,4.6rem)] leading-[0.9] tracking-[-0.05em]">{post.title[lang]}</h1>
+          <h1 className="mt-3 font-display text-[clamp(1.9rem,6vw,4.6rem)] leading-[0.95] tracking-[-0.05em] [overflow-wrap:anywhere]">{post.title[lang]}</h1>
 
           {video && (
             <div className="mt-8 aspect-video border-2 border-ink">

@@ -85,7 +85,7 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
     "daily_curate",
     curatedSchema,
     `${AUDIENCE}
-You curate NEON RADAR, a bilingual (Hungarian/English) AI digest.
+You curate NEON NEWS RADAR, a bilingual (Hungarian/English) AI digest.
 
 PART 1 — news. From the numbered NEWS list, choose at most ${MAX_NEW_ITEMS} items worth reading today and return them in "items".
 - category: local (local/open models, inference, tooling you run yourself), research (papers, methods), companies (what AI companies ship or announce), github (a notable repository).

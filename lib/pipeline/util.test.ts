@@ -1,12 +1,25 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isPrivateAddress, isoWeek, itemId, parseSubmittedUrl, publishedLabel, slugify, sourceKind } from "./util.ts";
+import { isPrivateAddress, isoWeek, isoWeekMonday, itemId, parseSubmittedUrl, publishedLabel, slugify, sourceKind } from "./util.ts";
 
 test("isoWeek handles year boundaries", () => {
   assert.equal(isoWeek(new Date("2026-09-23T10:00:00Z")).id, "2026-W39");
   assert.equal(isoWeek(new Date("2027-01-01T00:00:00Z")).id, "2026-W53"); // Friday → previous ISO year
   assert.equal(isoWeek(new Date("2024-12-30T00:00:00Z")).id, "2025-W01"); // Monday → next ISO year
   assert.equal(isoWeek(new Date("2026-09-27T23:00:00Z")).monday.toISOString().slice(0, 10), "2026-09-21");
+});
+
+test("isoWeekMonday inverts isoWeek and rejects bad ids", () => {
+  assert.equal(isoWeekMonday("2026-W39")?.toISOString().slice(0, 10), "2026-09-21");
+  assert.equal(isoWeekMonday("2025-W01")?.toISOString().slice(0, 10), "2024-12-30");
+  assert.equal(isoWeekMonday("2026-W53")?.toISOString().slice(0, 10), "2026-12-28");
+  for (let day = 0; day < 800; day += 3) {
+    const week = isoWeek(new Date(Date.UTC(2025, 0, 1 + day)));
+    assert.equal(isoWeekMonday(week.id)?.getTime(), week.monday.getTime(), week.id);
+  }
+  for (const bad of ["2025-W53", "2026-W00", "2026-W54", "2026-39", "../etc", ""]) {
+    assert.equal(isoWeekMonday(bad), null, bad);
+  }
 });
 
 test("itemId is stable, bounded, and URL-unique", () => {

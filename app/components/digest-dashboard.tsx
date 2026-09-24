@@ -26,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Sidebar,
   SidebarContent,
@@ -48,6 +49,7 @@ import type {
   GithubTopEntry,
   Language,
 } from "@/data/digest-types";
+import { persistLanguage } from "./language-toggle";
 
 type ItemState = { read: boolean; saved: boolean };
 const EMPTY_ITEM_STATE: ItemState = { read: false, saved: false };
@@ -57,6 +59,9 @@ type Filter = "all" | DigestCategory | "saved";
 const ui = {
   hu: {
     live: "ÉLŐ KIADÁS",
+    archived: "LEZÁRT KIADÁS",
+    categories: "Kategóriák",
+    panel: "Haladás és to-do",
     updated: "Napi frissítés",
     archive: "Heti zárás",
     all: "Aktuális radar",
@@ -84,6 +89,9 @@ const ui = {
   },
   en: {
     live: "LIVE ISSUE",
+    archived: "ARCHIVED ISSUE",
+    categories: "Categories",
+    panel: "Progress & to-do",
     updated: "Daily refresh",
     archive: "Weekly close",
     all: "Current radar",
@@ -139,13 +147,18 @@ export function DigestDashboard({
   issue: currentIssue,
   items: digestItems,
   githubTop10,
+  initialLanguage,
+  archived = false,
 }: {
   email: string;
   issue: CurrentIssue;
   items: DigestItem[];
   githubTop10: GithubTopEntry[];
+  initialLanguage: Language;
+  /** A closed week opened from /archive: same reading UI, no "live" framing. */
+  archived?: boolean;
 }) {
-  const [language, setLanguage] = useState<Language>("hu");
+  const [language, setLanguage] = useState<Language>(initialLanguage);
   const [filter, setFilter] = useState<Filter>("all");
   const [states, setStates] = useState<Record<string, ItemState>>({});
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -230,6 +243,13 @@ export function DigestDashboard({
 
   const readCount = digestItems.filter((item) => states[item.id]?.read).length;
   const progress = digestItems.length ? Math.round((readCount / digestItems.length) * 100) : 0;
+  const openTodos = todos.filter((todo) => !todo.done).length;
+
+  function toggleLanguage() {
+    const next = language === "hu" ? "en" : "hu";
+    setLanguage(next);
+    persistLanguage(next);
+  }
 
   async function setItemState(itemId: string, key: "read" | "saved", value: boolean) {
     setStates((current) => ({
@@ -265,8 +285,66 @@ export function DigestDashboard({
     await mutate({ action: "delete_todo", id });
   }
 
+  // Rendered twice: as the 2xl side column, and inside the header Sheet below 2xl.
+  const readerPanel = (
+    <>
+      <section className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_#141414]">
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
+          <span className="font-display text-3xl text-signal">{progress}%</span>
+        </div>
+        <Progress value={progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
+        <p className="mt-3 font-mono text-[11px] text-ink/55">{readCount} / {digestItems.length} · {syncing ? "SYNC…" : "SYNCED"}</p>
+      </section>
+
+      <section className="mt-7">
+        <div className="mb-4 flex items-center justify-between border-b-2 border-ink pb-3">
+          <div className="flex items-center gap-2">
+            <ListTodo className="size-5 text-signal" />
+            <h2 className="font-display text-2xl">{t.todo}</h2>
+          </div>
+          <span className="font-mono text-xs">{openTodos}</span>
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={todoText}
+            onChange={(event) => setTodoText(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") void addTodo(); }}
+            placeholder={t.todoPlaceholder}
+            className="min-w-0 flex-1 rounded-none border-2 border-ink bg-paper px-3 py-2 text-sm outline-none placeholder:text-ink/40 focus:border-signal"
+          />
+          <Button size="icon" onClick={() => void addTodo()} aria-label={t.add} className="rounded-none border-2 border-ink bg-signal text-ink hover:bg-ink hover:text-paper">
+            <Plus />
+          </Button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {todos.map((todo) => (
+            <div key={todo.id} className="group flex items-start gap-3 border border-ink/25 bg-paper/60 p-3">
+              <Checkbox
+                checked={todo.done}
+                onCheckedChange={(checked) => void setTodo(todo.id, checked === true)}
+                className="mt-0.5 border-ink data-[state=checked]:bg-ink"
+              />
+              <span className={`min-w-0 flex-1 text-sm leading-5 ${todo.done ? "text-ink/40 line-through" : ""}`}>{todo.text}</span>
+              <Button variant="ghost" size="icon-xs" onClick={() => void deleteTodo(todo.id)} aria-label="Delete" className="size-8 opacity-60 hover:bg-signal/20 group-hover:opacity-100 sm:size-6">
+                <Trash2 />
+              </Button>
+            </div>
+          ))}
+          {!todos.length && <p className="py-7 text-center font-mono text-xs text-ink/45">(づ ◕‿◕ )づ · QUEUE EMPTY</p>}
+        </div>
+      </section>
+
+      <section className="mt-8 border-t-2 border-ink pt-5 font-mono text-[11px] leading-5 text-ink/55">
+        <p className="flex items-center gap-2 text-signal"><Check className="size-3" /> INVITE-ONLY PROFILES</p>
+        <p>DAILY RUN · 07:00</p>
+        <p>WEEKLY FREEZE · SUN 24:00</p>
+      </section>
+    </>
+  );
+
   return (
-    <SidebarProvider className="min-h-screen bg-ink text-paper">
+    <SidebarProvider className="min-h-dvh bg-ink text-paper">
       <Sidebar className="border-r-0 bg-ink text-paper" collapsible="offcanvas">
         <SidebarHeader className="border-b border-paper/15 p-5">
           <div className="flex items-center gap-3">
@@ -275,6 +353,7 @@ export function DigestDashboard({
             </span>
             <div>
               <p className="font-display text-2xl leading-none tracking-tight">NEON</p>
+              <p className="font-display text-2xl leading-none tracking-tight">NEWS</p>
               <p className="font-display text-2xl leading-none text-signal">RADAR</p>
             </div>
           </div>
@@ -303,10 +382,10 @@ export function DigestDashboard({
                     asChild
                     className="h-10 rounded-none border-l-2 border-transparent font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper"
                   >
-                    <a href="/archive">
+                    <Link href="/archive">
                       <Archive />
                       <span>{t.archiveNav}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
@@ -340,36 +419,79 @@ export function DigestDashboard({
       </Sidebar>
 
       <SidebarInset className="min-w-0 bg-cream text-ink">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b-2 border-ink bg-cream px-4 sm:px-7">
-          <div className="flex items-center gap-3">
-            <SidebarTrigger className="rounded-none border border-ink bg-transparent md:hidden" />
-            <span className="live-pulse" />
-            <div>
-              <p className="font-mono text-[10px] tracking-[0.2em] text-signal">{t.live}</p>
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <SidebarTrigger className="size-9 rounded-none border border-ink bg-transparent md:hidden" />
+            {!archived && <span className="live-pulse shrink-0" />}
+            <div className="min-w-0">
+              <p className="truncate font-mono text-[10px] tracking-[0.2em] text-signal">{archived ? t.archived : t.live}</p>
               <p className="font-display text-lg leading-none">{currentIssue.label}</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLanguage(language === "hu" ? "en" : "hu")}
-            className="rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper"
-          >
-            <Languages /> {language.toUpperCase()}
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label={t.panel}
+                  className="h-9 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper 2xl:hidden"
+                >
+                  <ListTodo /> {progress}%{openTodos > 0 && <span className="text-signal">· {openTodos}</span>}
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                // Focusing the to-do input on open would pop the phone keyboard over the panel.
+                onOpenAutoFocus={(event) => event.preventDefault()}
+                className="w-[88vw] max-w-sm overflow-y-auto border-l-2 border-ink bg-cream p-5 pt-12 text-ink"
+              >
+                <SheetHeader className="sr-only">
+                  <SheetTitle>{t.panel}</SheetTitle>
+                </SheetHeader>
+                {readerPanel}
+              </SheetContent>
+            </Sheet>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleLanguage}
+              className="h-9 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper"
+            >
+              <Languages className="hidden sm:block" /> {language.toUpperCase()}
+            </Button>
+          </div>
         </header>
 
-        <div className="grid min-h-[calc(100vh-4rem)] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">
+        <nav
+          aria-label={t.categories}
+          className="sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none md:hidden"
+        >
+          {filters.map(({ id, icon: Icon, key }) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={filter === id}
+              onClick={() => setFilter(id)}
+              className="flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            >
+              <Icon className="size-3.5" /> {t[key]}
+            </button>
+          ))}
+        </nav>
+
+        <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_330px]">
           <main className="min-w-0 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
             <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-7 text-paper sm:px-8 sm:py-9">
               <div className="signal-grid" aria-hidden="true" />
               <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
-                <div>
+                {/* Sized in cqi, not vw: the sidebar and panel make this column much narrower than the viewport. */}
+                <div className="min-w-0 @container">
                   <div className="mb-4 flex flex-wrap items-center gap-2 font-mono text-[11px] text-paper/55">
                     <span className="border border-paper/30 px-2 py-1">AUTO / 自動</span>
                     <span>{t.updated}: {currentIssue.updated}</span>
                   </div>
-                  <h1 className="max-w-4xl font-display text-[clamp(3.4rem,9vw,8rem)] leading-[0.77] tracking-[-0.07em]">
+                  <h1 className="max-w-4xl font-display text-[clamp(2.6rem,15cqi,8rem)] leading-[0.77] tracking-[-0.07em]">
                     AI WEEKLY<span className="text-signal">{"//"}</span>
                   </h1>
                   <p className="mt-5 max-w-2xl font-mono text-sm leading-6 text-paper/65">
@@ -379,12 +501,12 @@ export function DigestDashboard({
                 <div className="border-l border-paper/25 pl-5 font-mono text-xs leading-6 text-paper/60">
                   <p className="text-signal">{t.archive}</p>
                   <p className="text-lg font-bold text-paper">{currentIssue.archiveAt}</p>
-                  <p>STATUS: COLLECTING</p>
+                  <p>STATUS: {archived ? "FROZEN" : "COLLECTING"}</p>
                 </div>
               </div>
             </section>
 
-            {!digestItems.length && (
+            {!digestItems.length && !archived && (
               <div className="mt-4 border border-signal/50 bg-signal/10 px-4 py-3 font-mono text-xs leading-5 text-ink/70">
                 ※ {t.sample}
               </div>
@@ -418,9 +540,9 @@ export function DigestDashboard({
             ) : (
               <>
                 {filter === "all" && (
-                  <section className="mt-9">
+                  <section className="mt-9 @container">
                     <SectionLabel icon={Zap} label={t.mustRead} />
-                    <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="grid gap-4 @3xl:grid-cols-3">
                       {digestItems.filter((item) => item.mustRead).map((item, index) => (
                         <article key={item.id} className="must-card border-2 border-ink bg-paper p-5">
                           <div className="mb-10 flex items-start justify-between">
@@ -444,12 +566,14 @@ export function DigestDashboard({
                       const state = states[item.id] ?? { read: false, saved: false };
                       return (
                         <article key={item.id} className={`story-card border-2 border-ink bg-paper p-5 sm:p-6 ${state.read ? "story-read" : ""}`}>
-                          <div className="grid gap-5 lg:grid-cols-[96px_minmax(0,1fr)]">
-                            <div className="font-mono text-[10px] leading-5 text-ink/55">
+                          <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
+                            {/* A row of meta on narrow screens, the 96px gutter from lg up. */}
+                            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[10px] leading-5 text-ink/55 lg:block">
                               <p className="text-signal">{item.publishedLabel}</p>
-                              <p className="mt-2">SCORE</p>
-                              <p className="font-display text-3xl text-ink">{item.score}</p>
-                              <p className="mt-2 flex items-center gap-1"><Clock3 className="size-3" /> {item.readMinutes} MIN</p>
+                              <p className="lg:mt-2">
+                                SCORE <span className="font-display text-xl text-ink lg:block lg:text-3xl">{item.score}</span>
+                              </p>
+                              <p className="flex items-center gap-1 lg:mt-2"><Clock3 className="size-3" /> {item.readMinutes} MIN</p>
                             </div>
                             <div>
                               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -460,11 +584,11 @@ export function DigestDashboard({
                                     size="icon-sm"
                                     aria-label={t.save}
                                     onClick={() => void setItemState(item.id, "saved", !state.saved)}
-                                    className="rounded-full hover:bg-signal/15"
+                                    className="size-10 rounded-full hover:bg-signal/15 sm:size-8"
                                   >
                                     {state.saved ? <BookmarkCheck className="text-signal" /> : <Bookmark />}
                                   </Button>
-                                  <label className="flex items-center gap-2 font-mono text-[11px]">
+                                  <label className="flex min-h-10 cursor-pointer items-center gap-2 font-mono text-[11px] sm:min-h-0">
                                     <Checkbox
                                       checked={state.read}
                                       onCheckedChange={(checked) => void setItemState(item.id, "read", checked === true)}
@@ -474,7 +598,7 @@ export function DigestDashboard({
                                   </label>
                                 </div>
                               </div>
-                              <h2 className="mt-3 max-w-3xl font-display text-[clamp(1.7rem,3vw,2.6rem)] leading-[0.98] tracking-tight">{item.title[language]}</h2>
+                              <h2 className="mt-3 max-w-3xl font-display text-[clamp(1.5rem,3vw,2.6rem)] leading-[0.98] tracking-tight [overflow-wrap:anywhere]">{item.title[language]}</h2>
                               <p className="mt-4 max-w-3xl text-base leading-7 text-ink/72">{item.summary[language]}</p>
                               <div className="mt-5 border-l-4 border-signal pl-4">
                                 <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{t.why}</p>
@@ -501,59 +625,8 @@ export function DigestDashboard({
             )}
           </main>
 
-          <aside className="border-l-2 border-ink bg-[#f8e8b4] px-5 py-7 xl:sticky xl:top-16 xl:h-[calc(100vh-4rem)] xl:overflow-y-auto">
-            <section className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_#141414]">
-              <div className="flex items-center justify-between">
-                <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
-                <span className="font-display text-3xl text-signal">{progress}%</span>
-              </div>
-              <Progress value={progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
-              <p className="mt-3 font-mono text-[11px] text-ink/55">{readCount} / {digestItems.length} · {syncing ? "SYNC…" : "SYNCED"}</p>
-            </section>
-
-            <section className="mt-7">
-              <div className="mb-4 flex items-center justify-between border-b-2 border-ink pb-3">
-                <div className="flex items-center gap-2">
-                  <ListTodo className="size-5 text-signal" />
-                  <h2 className="font-display text-2xl">{t.todo}</h2>
-                </div>
-                <span className="font-mono text-xs">{todos.filter((todo) => !todo.done).length}</span>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={todoText}
-                  onChange={(event) => setTodoText(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === "Enter") void addTodo(); }}
-                  placeholder={t.todoPlaceholder}
-                  className="min-w-0 flex-1 rounded-none border-2 border-ink bg-paper px-3 py-2 text-sm outline-none placeholder:text-ink/40 focus:border-signal"
-                />
-                <Button size="icon" onClick={() => void addTodo()} aria-label={t.add} className="rounded-none border-2 border-ink bg-signal text-ink hover:bg-ink hover:text-paper">
-                  <Plus />
-                </Button>
-              </div>
-              <div className="mt-4 space-y-2">
-                {todos.map((todo) => (
-                  <div key={todo.id} className="group flex items-start gap-3 border border-ink/25 bg-paper/60 p-3">
-                    <Checkbox
-                      checked={todo.done}
-                      onCheckedChange={(checked) => void setTodo(todo.id, checked === true)}
-                      className="mt-0.5 border-ink data-[state=checked]:bg-ink"
-                    />
-                    <span className={`min-w-0 flex-1 text-sm leading-5 ${todo.done ? "text-ink/40 line-through" : ""}`}>{todo.text}</span>
-                    <Button variant="ghost" size="icon-xs" onClick={() => void deleteTodo(todo.id)} aria-label="Delete" className="opacity-60 hover:bg-signal/20 group-hover:opacity-100">
-                      <Trash2 />
-                    </Button>
-                  </div>
-                ))}
-                {!todos.length && <p className="py-7 text-center font-mono text-xs text-ink/45">(づ ◕‿◕ )づ · QUEUE EMPTY</p>}
-              </div>
-            </section>
-
-            <section className="mt-8 border-t-2 border-ink pt-5 font-mono text-[11px] leading-5 text-ink/55">
-              <p className="flex items-center gap-2 text-signal"><Check className="size-3" /> INVITE-ONLY PROFILES</p>
-              <p>DAILY RUN · 07:00</p>
-              <p>WEEKLY FREEZE · SUN 24:00</p>
-            </section>
+          <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 2xl:sticky 2xl:top-16 2xl:block 2xl:h-[calc(100dvh-4rem)] 2xl:overflow-y-auto">
+            {readerPanel}
           </aside>
         </div>
       </SidebarInset>

@@ -105,7 +105,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   mask-image: linear-gradient(90deg, transparent 0%, black 55%, black 100%);
 }
 .signal-grid::after {
-  content: "/// 07:00 → 18:00 → FRI 16:00";
+  content: "/// DAILY 07:00 → SUN FREEZE";
   position: absolute;
   right: 2rem;
   top: 1.2rem;
@@ -122,13 +122,19 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   box-shadow: 0 0 0 0 rgb(241 95 34 / 60%);
   animation: pulse-ring 2s infinite;
 }
-.must-card:nth-child(2) { transform: translateY(10px); }
-.must-card:nth-child(3) { transform: translateY(-5px); }
 .must-card { box-shadow: 5px 5px 0 var(--ink); transition: transform 160ms ease, box-shadow 160ms ease; }
 .must-card h2 { overflow-wrap: anywhere; hyphens: auto; }
-.must-card:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
+/* The stagger only reads as deliberate with three cards across: the must-read grid's @3xl (48rem) breakpoint. */
+@container (min-width: 48rem) {
+  .must-card:nth-child(2) { transform: translateY(10px); }
+  .must-card:nth-child(3) { transform: translateY(-5px); }
+}
 .story-card { transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
-.story-card:hover { transform: translateX(3px); box-shadow: -6px 0 0 var(--signal); }
+/* Touch screens keep :hover after a tap, which would leave cards shifted. */
+@media (hover: hover) {
+  .must-card:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
+  .story-card:hover { transform: translateX(3px); box-shadow: -6px 0 0 var(--signal); }
+}
 .story-read { opacity: 0.58; }
 
 @keyframes pulse-ring {
@@ -141,6 +147,5 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 }
 
 @media (max-width: 640px) {
-  .must-card:nth-child(2), .must-card:nth-child(3) { transform: none; }
   .signal-grid::after { display: none; }
 }
