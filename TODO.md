@@ -104,6 +104,13 @@
 - [ ] **Habit tracker a dashboardon:** saját szokások napi pipálással és sorozatszámlálóval. A statisztika alprojekthez kapcsolódik.
 - [ ] **Kapcsolatok és kategorizálás:** Obsidian-szerű gráf a posztok között, jobb kategóriák és címkék. A UI/UX design után írunk rá tervet.
 - [ ] **Kabala (mascot) az oldalra**, hogy barátságosabb legyen.
+- [ ] **Kutatási források bővítése és priorizálás:**
+  - Új források az arXiv mellé:
+    - Hugging Face Daily Papers (a közösség által felszavazott napi cikkek)
+    - Semantic Scholar és OpenAlex (a Google Scholar helyett: annak nincs API-ja, és a letöltését a feltételei tiltják)
+    - Google Research, IBM Research és Microsoft Research blog (a DeepMind már bent van)
+  - Szigorúbb szűrés, hogy ne legyen túl sok: napi keret, minimum pontszám, forrásonkénti limit, és ugyanaz a hír csak egyszer, akárhány forrásból jön.
+  - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
