@@ -1,7 +1,8 @@
 import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
-import { USER_AGENT } from "./fetch.ts";
+import { githubHeaders, USER_AGENT } from "./fetch.ts";
 import { feeds, githubTopics, hnQueries } from "./feeds.ts";
+import { list } from "./util.ts";
 
 export type Candidate = {
   url: string;
@@ -36,7 +37,6 @@ const isoDate = (value: unknown) => {
   const date = new Date(text(value));
   return Number.isNaN(date.getTime()) ? new Date().toISOString().slice(0, 10) : date.toISOString().slice(0, 10);
 };
-const list = <T,>(value: T | T[] | undefined): T[] => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
 
 const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
 
@@ -100,8 +100,7 @@ async function fromHackerNews(since: Date): Promise<Candidate[]> {
 
 export async function collectRepos(now: Date): Promise<Repo[]> {
   const since = new Date(now.getTime() - 7 * DAY).toISOString().slice(0, 10);
-  const headers: Record<string, string> = { accept: "application/vnd.github+json" };
-  if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const headers = githubHeaders("application/vnd.github+json");
 
   const results = await Promise.allSettled(
     githubTopics.map(async (topic) => {

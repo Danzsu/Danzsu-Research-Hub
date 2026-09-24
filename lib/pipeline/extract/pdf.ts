@@ -2,7 +2,7 @@ import { z } from "zod/v4";
 import { assignIds, plainText, type BlockDraft } from "../../blocks.ts";
 import { generate } from "../../llm.ts";
 import { cancelBody, FetchError, readLimited, safeFetch } from "../fetch.ts";
-import { hostOf } from "../util.ts";
+import { hasNoarchive, hostOf } from "../util.ts";
 import type { Extracted, Extractor } from "./types.ts";
 
 const MAX_PDF = 20 * 1024 * 1024;
@@ -39,11 +39,13 @@ export function fromLlmBlock(block: LlmBlock): BlockDraft | null {
   }
 }
 
-const PDF_INSTRUCTIONS = `Transcribe the attached PDF into structured blocks, faithfully and in its original language.
+// ponytail: a long PDF is truncated at ~12k words so one Gemini call fits inside post()'s 120s
+// abort — upgrade path is chunked transcription by page range, stitched together after.
+export const PDF_INSTRUCTIONS = `Transcribe the attached PDF into structured blocks, faithfully and in its original language.
 - title: the document title. author: the authors, if stated.
 - blocks: headings (level 2–4), paragraphs, lists, quotes and code, in reading order.
 - Skip page headers, footers, page numbers and reference lists. Describe no figures.
-- If the document is very long, stop after roughly 40,000 words.`;
+- If the document is long, stop at a clean section boundary once you reach roughly 12,000 words.`;
 
 export async function extractPdfResponse(db: Parameters<Extractor>[0], url: string, response: Response, note: string): Promise<Extracted> {
   const data = await readLimited(response, MAX_PDF);
@@ -52,10 +54,10 @@ export async function extractPdfResponse(db: Parameters<Extractor>[0], url: stri
   return {
     blocks,
     title: result.title || new URL(url).pathname.split("/").pop() || url,
-    author: result.author ?? null,
+    author: result.author?.trim() || null,
     siteName: hostOf(url),
     publishedAt: null,
-    meta: {},
+    meta: hasNoarchive(response.headers.get("x-robots-tag")) ? { noarchive: true } : {},
     text: plainText(blocks),
   };
 }

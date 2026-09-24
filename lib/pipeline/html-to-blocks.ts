@@ -1,9 +1,9 @@
 import { parseHTML } from "linkedom";
 import { assignIds, blockIdentity, blockText, inlineText, safeHref, type Block, type BlockDraft, type Inline } from "../blocks.ts";
-import { imageUrl, isIconOrAvatarImage } from "./html-images.ts";
+import { imageUrl, isIconOrAvatarImage, type ImageResolver } from "./html-images.ts";
 import { hostOf, youtubeId } from "./util.ts";
 
-export type HtmlToBlocksOptions = { baseUrl: string; imageBaseUrl?: string; resolveImage?: (raw: string) => string | undefined };
+export type HtmlToBlocksOptions = { baseUrl: string; imageBaseUrl?: string; resolveImage?: ImageResolver };
 
 // ── Layer 1: structural and named noise, removed before conversion ──────────
 
@@ -136,7 +136,7 @@ export function cleanDocument(root: Element, baseUrl: string): void {
 // ── Conversion ───────────────────────────────────────────────────────────────
 
 type Marks = { href?: string; bold?: true; italic?: true };
-type Ctx = { base: string; imageBase: string; resolveImage?: (raw: string) => string | undefined; out: BlockDraft[]; pending: Element[] };
+type Ctx = { base: string; imageBase: string; resolveImage?: ImageResolver; out: BlockDraft[]; pending: Element[] };
 
 const INLINE = new Set([
   "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "del", "dfn", "em", "i", "ins", "kbd",
@@ -153,7 +153,7 @@ function containsBlockDescendant(el: Element): boolean {
   return false;
 }
 
-const collapse = (text: string | null | undefined) => (text ?? "").replace(/\s+/g, " ").trim();
+export const collapse = (text: string | null | undefined) => (text ?? "").replace(/\s+/g, " ").trim();
 
 function pushImage(img: Element, caption: string | undefined, ctx: Ctx) {
   const url = imageUrl(img, ctx.imageBase, ctx.resolveImage);

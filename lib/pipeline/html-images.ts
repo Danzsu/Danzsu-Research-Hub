@@ -39,8 +39,11 @@ export function parseSrcset(srcset: string): string[] {
   return candidates.sort((a, b) => b.size - a.size).map((c) => c.url);
 }
 
+/** Rewrites a raw image src to its real absolute URL before normal resolution; undefined defers to it. */
+export type ImageResolver = (raw: string) => string | undefined;
+
 /** Resolves the best available image URL for an <img>, trying srcset/lazy-load fallbacks in order. */
-export function imageUrl(img: Element, imageBase: string, resolveImage?: (raw: string) => string | undefined): string | undefined {
+export function imageUrl(img: Element, imageBase: string, resolveImage?: ImageResolver): string | undefined {
   const srcset = img.getAttribute("srcset") || img.getAttribute("data-srcset") || img.getAttribute("data-lazy-srcset");
   const candidates = [
     ...(srcset ? parseSrcset(srcset) : []),

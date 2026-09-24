@@ -1,25 +1,34 @@
 import { XMLParser } from "fast-xml-parser";
-import { assignIds, withoutIds, type Block, type BlockDraft } from "../../blocks.ts";
+import { assignIds, plainText, withoutIds, type Block, type BlockDraft } from "../../blocks.ts";
 import { cancelBody, readText, safeFetch } from "../fetch.ts";
-import { arxivId } from "../util.ts";
+import { collapse } from "../html-to-blocks.ts";
+import { arxivId, list } from "../util.ts";
 import { articleFromHtml } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
 import type { Extractor } from "./types.ts";
 
 export type ArxivMeta = { title: string; summary: string; published: string | null; authors: string[] };
 
-const xml = new XMLParser();
-const squash = (text: unknown) => String(text ?? "").replace(/\s+/g, " ").trim();
+const MAX_ARXIV_HTML = 16 * 1024 * 1024;
+
+// parseTagValue: false — otherwise a purely numeric-looking title or summary ("0.10") is parsed as
+// the JS number 0.1, silently dropping a trailing zero and changing its type.
+const xml = new XMLParser({ parseTagValue: false });
+const text = (value: unknown) => collapse(typeof value === "string" ? value : undefined);
 
 export function parseArxivAtom(body: string): ArxivMeta {
-  const entry = (xml.parse(body) as { feed?: { entry?: Record<string, unknown> } }).feed?.entry ?? {};
-  const authors = ([] as { name?: string }[]).concat((entry.author as { name?: string }[] | { name?: string }) ?? []);
-  const published = squash(entry.published);
+  const entry = (xml.parse(body) as { feed?: { entry?: Record<string, unknown> } }).feed?.entry;
+  if (!entry) throw new Error("arxiv: no matching paper");
+  // A malformed/unrecognised id still gets a 200 with one entry shaped like an error report,
+  // not empty results — <id> contains "/api/errors#", title "Error", author "arXiv api core".
+  if (text(entry.id).includes("/api/errors#")) throw new Error(`arxiv: ${text(entry.title) || "error"} — ${text(entry.summary)}`);
+  const authors = list(entry.author as { name?: string }[] | { name?: string } | undefined);
+  const published = text(entry.published);
   return {
-    title: squash(entry.title),
-    summary: squash(entry.summary),
+    title: text(entry.title),
+    summary: text(entry.summary),
     published: published ? published.slice(0, 10) : null,
-    authors: authors.map((author) => squash(author.name)).filter(Boolean),
+    authors: authors.map((author) => text(author.name)).filter(Boolean),
   };
 }
 
@@ -44,11 +53,13 @@ export const extractArxiv: Extractor = async (db, url, note) => {
 
   try {
     const response = await safeFetch(`https://arxiv.org/html/${id}`, { accept: "text/html" });
-    const html = response.ok ? await readText(response, 16 * 1024 * 1024) : "";
+    const html = response.ok ? await readText(response, MAX_ARXIV_HTML) : "";
     if (!response.ok) await cancelBody(response);
     if (isArxivHtml(html)) {
-      // Figures are relative to the paper's directory, so the base needs a trailing slash.
-      const base = (response.url || `https://arxiv.org/html/${id}`).replace(/\/?$/, "/");
+      // No <base> tag and no redirect: a real /html/<id> page's figures are plain paths like
+      // "<id>v1/fig.png", meant to resolve against the page's own (unslashed) URL exactly as a
+      // browser would — forcing a trailing slash here breaks that and 404s every figure.
+      const base = response.url || `https://arxiv.org/html/${id}`;
       const article = articleFromHtml(html, base);
       return { ...article, title: info.title || article.title, author: byline(info.authors), siteName: "arXiv", publishedAt: info.published, meta };
     }
@@ -75,6 +86,6 @@ export const extractArxiv: Extractor = async (db, url, note) => {
     siteName: "arXiv",
     publishedAt: info.published,
     meta,
-    text: [info.summary, ...body.map((block) => (block.type === "paragraph" ? block.content.map((s) => s.text).join("") : ""))].join("\n\n"),
+    text: [info.summary, plainText(body)].filter(Boolean).join("\n\n"),
   };
 };

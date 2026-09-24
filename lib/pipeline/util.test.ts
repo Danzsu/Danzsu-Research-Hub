@@ -6,11 +6,13 @@ import {
   detectSource,
   formatTimestamp,
   githubRepo,
+  hasNoarchive,
   hostOf,
   isPrivateAddress,
   isoWeek,
   isoWeekMonday,
   itemId,
+  list,
   parseId,
   parseSubmittedUrl,
   publishedLabel,
@@ -110,4 +112,18 @@ test("publishedLabel", () => {
 
 test("youtubeId rejects videoseries playlist embeds", () => {
   assert.equal(youtubeId(new URL("https://www.youtube.com/embed/videoseries?list=PL123")), null);
+});
+
+test("list normalizes an XML-parsed field that's absent, a single value, or an array", () => {
+  assert.deepEqual(list(undefined), []);
+  assert.deepEqual(list({ name: "Grisha Perelman" }), [{ name: "Grisha Perelman" }]); // a single tag, not split apart
+  assert.deepEqual(list([{ name: "a" }, { name: "b" }]), [{ name: "a" }, { name: "b" }]);
+});
+
+test("hasNoarchive matches case-insensitively across several robots-directive strings", () => {
+  assert.equal(hasNoarchive("index, follow"), false);
+  assert.equal(hasNoarchive("max-image-preview:large", "noarchive"), true); // two metas, the second carries it
+  assert.equal(hasNoarchive("NOARCHIVE"), true);
+  assert.equal(hasNoarchive(null, undefined, "noarchive"), true); // a header alongside absent metas
+  assert.equal(hasNoarchive(), false);
 });

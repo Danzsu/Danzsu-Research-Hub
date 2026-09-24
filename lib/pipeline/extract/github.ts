@@ -1,6 +1,7 @@
 import { assignIds, plainText, type BlockDraft } from "../../blocks.ts";
-import { cancelBody, FetchError } from "../fetch.ts";
+import { cancelBody, FetchError, githubHeaders } from "../fetch.ts";
 import { htmlToDrafts } from "../html-to-blocks.ts";
+import type { ImageResolver } from "../html-images.ts";
 import { githubRepo } from "../util.ts";
 import type { Extractor } from "./types.ts";
 
@@ -17,30 +18,23 @@ type RepoInfo = {
   owner: { login: string };
 };
 
-function headers(accept: string): Record<string, string> {
-  const result: Record<string, string> = { accept, "user-agent": "NeonRadar" };
-  if (process.env.GITHUB_TOKEN) result.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  return result;
-}
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * GitHub's HTML-rendered README (Accept: application/vnd.github.html+json) proxies every
- * *absolute* external image through camo (data-canonical-src carries the original), but leaves a
- * same-repo relative src exactly as written in the markdown. Two of that markdown's own shapes
- * are root-relative and resolve wrong against imageBaseUrl (raw.githubusercontent.com/<repo>/<branch>/)
- * with plain URL resolution, because a leading "/" resolves against the *domain* root, not the repo:
- * - a bare repo-root path ("/docs/banner.png") needs the repo+branch re-inserted; and
- * - a path that already names the repo ("/<owner>/<repo>/raw/<branch>/docs/x.png" — the shape GitHub
- *   itself writes when a README used a root-relative link that only makes sense on github.com) needs
- *   the github.com origin, not raw.githubusercontent.com, or it would double up the owner/repo/branch.
- * A plain relative src ("docs/x.png") and an absolute one (camo included) resolve correctly already,
- * so this returns undefined for those and lets the caller fall back to normal resolution.
+ * A root-relative README image src ("/docs/banner.png") isn't relative to the domain — it's
+ * relative to the repo, so it needs the repo+branch re-inserted before raw.githubusercontent.com
+ * will serve it. One that already names the repo ("/<owner>/<repo>/(blob|raw)/<branch>/docs/x.png")
+ * already resolves on github.com as-is; re-inserting the repo+branch there would double them up, so
+ * that shape is matched case-insensitively (repo names and README links aren't always the same case)
+ * and routed to the github.com origin instead. A plain relative src ("docs/x.png") and an absolute
+ * one resolve correctly already, so this returns undefined for those and lets the caller fall back
+ * to normal resolution.
  */
-export function resolveGithubImage(fullName: string, branch: string): (raw: string) => string | undefined {
-  const repoRawPrefix = `/${fullName}/raw/`;
+export function resolveGithubImage(fullName: string, branch: string): ImageResolver {
+  const repoLinkPrefix = new RegExp(`^/${escapeRegExp(fullName)}/(?:blob|raw)/`, "i");
   return (raw: string) => {
     if (!raw.startsWith("/") || raw.startsWith("//")) return undefined;
-    if (raw.startsWith(repoRawPrefix)) return `https://github.com${raw}`;
+    if (repoLinkPrefix.test(raw)) return `https://github.com${raw}`;
     return `https://raw.githubusercontent.com/${fullName}/${branch}${raw}`;
   };
 }
@@ -50,17 +44,23 @@ export const extractGithub: Extractor = async (_db, url) => {
   if (!repo) throw new Error("not a GitHub repository URL");
   const api = `https://api.github.com/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`;
 
-  const infoResponse = await fetch(api, { headers: headers("application/vnd.github+json"), signal: AbortSignal.timeout(20_000) });
+  const infoResponse = await fetch(api, { headers: githubHeaders("application/vnd.github+json"), signal: AbortSignal.timeout(20_000) });
   if (!infoResponse.ok) {
     await cancelBody(infoResponse);
     throw new FetchError(`github ${infoResponse.status}`);
   }
   const info = (await infoResponse.json()) as RepoInfo;
 
-  const readmeResponse = await fetch(`${api}/readme`, { headers: headers("application/vnd.github.html+json"), signal: AbortSignal.timeout(20_000) });
+  // Only a 404 means "this repo has no README" — any other failure (403 rate limit, 502, …) must
+  // fail the whole extraction so the article fallback runs, not silently produce a README-less post.
+  const readmeResponse = await fetch(`${api}/readme`, { headers: githubHeaders("application/vnd.github.html+json"), signal: AbortSignal.timeout(20_000) });
   let readme = "";
-  if (readmeResponse.ok) readme = await readmeResponse.text();
-  else await cancelBody(readmeResponse);
+  if (readmeResponse.ok) {
+    readme = await readmeResponse.text();
+  } else {
+    await cancelBody(readmeResponse);
+    if (readmeResponse.status !== 404) throw new FetchError(`github readme ${readmeResponse.status}`);
+  }
   const branch = encodeURIComponent(info.default_branch);
 
   const drafts: BlockDraft[] = [

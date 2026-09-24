@@ -188,3 +188,13 @@ export function publishedLabel(isoDate: string): string {
   const [, month, day] = isoDate.split("-");
   return `${month} / ${day}`;
 }
+
+/** Normalizes an XML-parsed field that's absent, a single value, or (when repeated) an array. */
+export function list<T>(value: T | T[] | undefined): T[] {
+  return value === undefined ? [] : Array.isArray(value) ? value : [value];
+}
+
+/** True if any of the given robots-directive strings turns off archiving, case-insensitively. */
+export function hasNoarchive(...values: (string | null | undefined)[]): boolean {
+  return values.some((value) => value && /noarchive/i.test(value));
+}

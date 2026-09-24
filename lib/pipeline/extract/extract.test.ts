@@ -1,16 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { articleFromHtml } from "./article.ts";
-import { isArxivHtml, parseArxivAtom } from "./arxiv.ts";
-import { resolveGithubImage } from "./github.ts";
-import { fromLlmBlock } from "./pdf.ts";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { parseHTML } from "linkedom";
+import type { Block, BlockDraft } from "../../blocks.ts";
+import { FetchError } from "../fetch.ts";
 import { htmlToDrafts } from "../html-to-blocks.ts";
-import type { BlockDraft } from "../../blocks.ts";
+import { mockDns, mockFetch } from "../mock-fetch.ts";
+import { articleFromHtml, extractArticle, publishedDate, readPageMeta, trimByline } from "./article.ts";
+import { extractArxiv, isArxivHtml, parseArxivAtom } from "./arxiv.ts";
+import { extractGithub, resolveGithubImage } from "./github.ts";
+import { fromLlmBlock, PDF_INSTRUCTIONS } from "./pdf.ts";
+
+const db = {} as unknown as SupabaseClient;
+const image = (blocks: Block[]) => blocks.find((b): b is Extract<Block, { type: "image" }> => b.type === "image");
 
 const page = (head: string, body: string) => `<!doctype html><html><head>${head}</head><body>${body}</body></html>`;
 // Each paragraph is numbered, not identical, so the html-to-blocks noise filter's adjacent-duplicate
-// dedupe (added after this brief was written) doesn't collapse all 12 into one and starve the fixture
-// below articleFromHtml's 200-char floor.
+// dedupe doesn't collapse all 12 into one and starve the fixture below articleFromHtml's 200-char floor.
 const paragraphs = Array.from({ length: 12 }, (_, i) => `<p>Sentence ${i} about local models and inference speed. </p>`).join("");
 const article = `<nav>Menu</nav><article><h1>Big news</h1>${paragraphs}
   <figure><img src="/a.png" alt="Chart" width="800" height="400"><figcaption>Speed</figcaption></figure></article>
@@ -29,15 +35,65 @@ test("articleFromHtml reads blocks and page metadata", () => {
   assert.ok(result.text.includes("local models"));
 });
 
-test("articleFromHtml honours noarchive from meta or header", () => {
-  const meta = articleFromHtml(page(`<meta name="robots" content="index, noarchive">`, article), "https://blog.test/p");
-  assert.equal(meta.meta.noarchive, true);
-  const header = articleFromHtml(page("", article), "https://blog.test/p", "noarchive");
-  assert.equal(header.meta.noarchive, true);
+test("articleFromHtml rejects pages with no readable content", () => {
+  assert.throws(() => articleFromHtml(page("", "<div>tiny</div>"), "https://blog.test/p"), /no readable article text/);
 });
 
-test("articleFromHtml rejects pages with no readable content", () => {
-  assert.throws(() => articleFromHtml(page("", "<div>tiny</div>"), "https://blog.test/p"));
+test("publishedDate keeps a stated calendar date instead of reinterpreting its timezone", () => {
+  // A UTC-negative offset converts to a later UTC date; the source's own YYYY-MM-DD must win.
+  assert.equal(publishedDate("2026-09-20T23:30:00-05:00"), "2026-09-20");
+  assert.equal(publishedDate("2026-09-20T10:00:00Z"), "2026-09-20");
+  assert.equal(publishedDate("2026-09-20"), "2026-09-20");
+  assert.equal(publishedDate("March 3, 2026 UTC"), "2026-03-03"); // a non-ISO format still needs Date parsing
+  assert.equal(publishedDate("not a date"), null);
+  assert.equal(publishedDate(undefined), null);
+});
+
+test("trimByline cuts a long author list at the last comma instead of mid-name", () => {
+  const names = ["Alex Kim", "Bao Nguyen", "Chen Wei", "Dara Osei", "Elin Park", "Farah Khan", "Grace Lynn Tan", "Cody Reyes"];
+  const byline = names.join(", "); // longer than 120 chars, cuts inside "Cody Reyes" without the fix
+  const trimmed = trimByline(byline);
+  assert.ok(trimmed && trimmed.length <= 120);
+  assert.ok(names.slice(0, -1).every((name) => trimmed!.includes(name))); // every full name up to the cut survives
+  assert.ok(!trimmed!.endsWith(","));
+  assert.equal(trimByline(null), null);
+  assert.equal(trimByline("Short Name"), "Short Name");
+});
+
+test("articleFromHtml reads robots directives from every robots/googlebot meta, case-insensitively", () => {
+  const twoMetas = articleFromHtml(
+    page(`<meta name="robots" content="max-image-preview:large"><meta name="robots" content="noarchive">`, article),
+    "https://blog.test/p",
+  );
+  assert.equal(twoMetas.meta.noarchive, true);
+  const googlebot = articleFromHtml(page(`<meta name="googlebot" content="noarchive">`, article), "https://blog.test/p");
+  assert.equal(googlebot.meta.noarchive, true);
+  const shoutyCase = articleFromHtml(page(`<meta name="ROBOTS" content="NOARCHIVE">`, article), "https://blog.test/p");
+  assert.equal(shoutyCase.meta.noarchive, true);
+  const header = articleFromHtml(page("", article), "https://blog.test/p", "noarchive");
+  assert.equal(header.meta.noarchive, true);
+  assert.equal(articleFromHtml(page("", article), "https://blog.test/p").meta.noarchive, undefined);
+});
+
+// Trimmed from a live fetch of oneusefulthing.org/p/the-overhang: the NewsArticle JSON-LD block
+// Substack renders into the body (not the head), which cleanDocument would otherwise strip as a
+// <script> before Readability ever sees it. No article:published_time or og:site_name meta exists
+// on that page — datePublished and publisher.name are the only source for either field.
+const substackJsonLd = `<script type="application/ld+json">${JSON.stringify({
+  "@type": "NewsArticle",
+  headline: "The Overhang",
+  datePublished: "2026-09-18T17:54:32+00:00",
+  publisher: { "@type": "Organization", name: "One Useful Thing" },
+})}</script>`;
+
+test("readPageMeta and articleFromHtml take date and site name from body JSON-LD when no meta tag has them", () => {
+  const doc = parseHTML(page("", substackJsonLd + article)).document as unknown as Document;
+  const meta = readPageMeta(doc);
+  assert.equal(meta.published, "2026-09-18T17:54:32+00:00");
+  assert.equal(meta.siteName, "One Useful Thing");
+  const result = articleFromHtml(page("", substackJsonLd + article), "https://www.oneusefulthing.org/p/the-overhang");
+  assert.equal(result.publishedAt, "2026-09-18");
+  assert.equal(result.siteName, "One Useful Thing");
 });
 
 test("fromLlmBlock maps the flat model schema and drops malformed blocks", () => {
@@ -49,7 +105,12 @@ test("fromLlmBlock maps the flat model schema and drops malformed blocks", () =>
   assert.equal(fromLlmBlock({ type: "paragraph", text: "  " }), null);
 });
 
-test("arXiv helpers", () => {
+test("the PDF transcription budget is cut to fit one Gemini call inside post()'s abort", () => {
+  assert.match(PDF_INSTRUCTIONS, /12,000 words/);
+  assert.doesNotMatch(PDF_INSTRUCTIONS, /40,000/);
+});
+
+test("arXiv helpers: HTML detection and Atom parsing", () => {
   assert.equal(isArxivHtml('<div class="ltx_page_main">'), true);
   assert.equal(isArxivHtml("<p>No HTML for this paper</p>"), false);
   const meta = parseArxivAtom(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry>
@@ -59,27 +120,171 @@ test("arXiv helpers", () => {
   assert.deepEqual(meta, { title: "Attention Is All You Need", summary: "We propose the Transformer.", published: "2017-06-12", authors: ["Ashish Vaswani", "Noam Shazeer"] });
 });
 
-// Fixture built from the real API-rendered README of facebookresearch/detectron2 (fetched live via
-// `GET https://api.github.com/repos/facebookresearch/detectron2/readme`, Accept: application/vnd.github.html+json):
-// the plain-relative top image and the absolute camo-proxied badge (here a real snippet from
-// tensorflow/tensorflow's rendered README, same shape) are verbatim, except the first image's real filename
-// (".github/Detectron2-Logo-Horz.svg") is renamed below to ".github/Detectron2-Horz.svg" — the real name
-// contains "logo", which is Task 4's unrelated icon/logo noise filter, not this task's resolution logic, and
-// filterNoise runs as part of htmlToDrafts so it would otherwise drop the block before the assertion. GitHub's
-// own HTML rendering never rewrites a relative src — it only proxies *absolute* external image URLs through
-// camo, leaving same-repo relative paths untouched, which is what actually breaks image resolution here.
-// The root-relative ("/docs/banner.png") and API-rendered-absolute-path ("/<owner>/<repo>/raw/<branch>/...")
-// shapes are synthetic: neither appeared in a live sample of ~40 major repos' rendered READMEs, but the
-// controller's deferred Task 4 finding names both as failure modes to guard against, so they're pinned here too.
+// Live export.arxiv.org/api/query?id_list=math/0211159 response, trimmed: real https links, a
+// feed-level <title>, the arxiv: namespace, and — the case this pins — a SINGLE <author>, which
+// fast-xml-parser hands back as one object rather than an array. Wrapping it wrong (e.g. spreading
+// its .name string) would parse it into individual characters instead of one author.
+const singleAuthorFeed = `<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <title>arXiv Query: search_query=&amp;id_list=math/0211159&amp;start=0&amp;max_results=10</title>
+  <entry>
+    <id>http://arxiv.org/abs/math/0211159v1</id>
+    <title>The entropy formula for the Ricci flow and its geometric applications</title>
+    <link href="https://arxiv.org/abs/math/0211159v1" rel="alternate" type="text/html"/>
+    <summary>  We present a monotonic expression for the Ricci flow, valid in all dimensions and without curvature assumptions.</summary>
+    <published>2002-11-11T16:11:49Z</published>
+    <arxiv:comment>39 pages</arxiv:comment>
+    <arxiv:primary_category term="math.DG"/>
+    <author>
+      <name>Grisha Perelman</name>
+    </author>
+  </entry>
+</feed>`;
+
+// Live export.arxiv.org/api/query?id_list=2401.99999 (and id_list=1234.5678) response, verbatim: a
+// well-formed but unrecognised id gets a 200 with an empty result set, not a 404 and not an entry.
+const emptyFeed = `<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/rnxrW8yd5bhCFzWS8hh40TByGfM</id>
+  <title>arXiv Query: search_query=&amp;id_list=2401.99999&amp;start=0&amp;max_results=10</title>
+  <updated>2026-09-24T13:57:13Z</updated>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>0</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+</feed>`;
+
+// Live export.arxiv.org/api/query?id_list=foo response, verbatim: a malformed id instead gets a 200
+// with one entry shaped like an error report — id containing "/api/errors#", title "Error", author
+// "arXiv api core" — not an HTTP failure and not an empty result set either.
+const errorEntryFeed = `<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/</id>
+  <title>arXiv Search Results</title>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <entry>
+    <id>https://arxiv.org/api/errors#incorrect_id_format_for_foo</id>
+    <title>Error</title>
+    <link href="https://arxiv.org/api/errors#incorrect_id_format_for_foo" rel="alternate" type="text/html"/>
+    <summary>incorrect id format for foo</summary>
+    <author>
+      <name>arXiv api core</name>
+    </author>
+  </entry>
+</feed>`;
+
+test("parseArxivAtom parses a real single-author entry to one author, not characters", () => {
+  assert.deepEqual(parseArxivAtom(singleAuthorFeed), {
+    title: "The entropy formula for the Ricci flow and its geometric applications",
+    summary: "We present a monotonic expression for the Ricci flow, valid in all dimensions and without curvature assumptions.",
+    published: "2002-11-11",
+    authors: ["Grisha Perelman"],
+  });
+});
+
+test("parseArxivAtom throws a plain Error for an empty result set or an error-shaped entry", () => {
+  assert.throws(() => parseArxivAtom(emptyFeed), (error: unknown) => error instanceof Error && !(error instanceof FetchError));
+  assert.throws(() => parseArxivAtom(errorEntryFeed), (error: unknown) => error instanceof Error && /error/i.test(error.message));
+});
+
+test("a numeric-looking title or summary stays a string instead of being parsed as a number", () => {
+  const feed = `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>https://arxiv.org/abs/0.10</id><title>0.10</title><summary>0.10</summary></entry></feed>`;
+  const meta = parseArxivAtom(feed);
+  assert.equal(meta.title, "0.10");
+  assert.equal(meta.summary, "0.10");
+});
+
+test("extractArxiv throws a plain Error, not a FetchError, for an id the API doesn't recognise", async () => {
+  const restore = mockFetch(async () => new Response(emptyFeed, { status: 200 }));
+  try {
+    await assert.rejects(
+      () => extractArxiv(db, "https://arxiv.org/abs/2401.99999", ""),
+      (error: unknown) => error instanceof Error && !(error instanceof FetchError),
+    );
+  } finally {
+    restore();
+  }
+});
+
+// Trimmed from a live fetch of arxiv.org/html/2401.00001 (200, no redirect, no <base> tag): the
+// figure src is a plain relative path, "2401.00001v1/return_difference.png".
+const arxivHtmlFixture = `<!doctype html><html><head><title>Sector Rotation by Factor Model and Fundamental Analysis</title></head>
+<body><div class="ltx_page_main"><article>
+<h1 class="ltx_title">Sector Rotation by Factor Model and Fundamental Analysis</h1>
+${Array.from({ length: 12 }, (_, i) => `<p class="ltx_p">Paragraph ${i} on factor models, fundamental analysis and sector rotation strategies. </p>`).join("")}
+<figure class="ltx_figure"><img src="2401.00001v1/return_difference.png" alt="Return difference" width="640" height="480"><figcaption class="ltx_caption">Figure 1: Return difference.</figcaption></figure>
+</article></div></body></html>`;
+
+test("extractArxiv resolves an HTML paper's figure against the real (unslashed) page URL", async () => {
+  const restoreDns = mockDns();
+  const restoreFetch = mockFetch(async (url) => {
+    if (url.includes("export.arxiv.org")) return new Response(singleAuthorFeed, { status: 200 });
+    if (url.includes("/html/")) return new Response(arxivHtmlFixture, { status: 200, headers: { "content-type": "text/html" } });
+    return new Response("", { status: 404 });
+  });
+  try {
+    const result = await extractArxiv(db, "https://arxiv.org/abs/2401.00001", "");
+    // Forcing a trailing slash on the base (the old bug) would instead give
+    // ".../html/2401.00001/2401.00001v1/return_difference.png", which 404s.
+    assert.equal(image(result.blocks)?.originalUrl, "https://arxiv.org/html/2401.00001v1/return_difference.png");
+  } finally {
+    restoreFetch();
+    restoreDns();
+  }
+});
+
+test("extractArxiv falls back to the abstract when neither an HTML nor a PDF version can be read", async () => {
+  const restoreDns = mockDns();
+  const restoreFetch = mockFetch(async (url) => {
+    if (url.includes("export.arxiv.org")) return new Response(singleAuthorFeed, { status: 200 });
+    return new Response("", { status: 404 }); // no HTML version, no PDF either
+  });
+  try {
+    const result = await extractArxiv(db, "https://arxiv.org/abs/math/0211159", "");
+    assert.deepEqual(
+      result.blocks.map((b) => b.type),
+      ["heading", "paragraph"],
+    );
+    assert.ok(result.text.includes("monotonic expression for the Ricci flow"));
+  } finally {
+    restoreFetch();
+    restoreDns();
+  }
+});
+
+// Trimmed from a live fetch of api.github.com/repos/facebookresearch/detectron2 (Accept:
+// application/vnd.github+json).
+const repoInfoFixture = {
+  full_name: "facebookresearch/detectron2",
+  html_url: "https://github.com/facebookresearch/detectron2",
+  description: "Detectron2 is a platform for object detection, segmentation and other visual recognition tasks.",
+  stargazers_count: 34729,
+  language: "Python",
+  topics: [],
+  license: { spdx_id: "Apache-2.0" },
+  default_branch: "main",
+  pushed_at: "2026-08-19T05:38:53Z",
+  owner: { login: "facebookresearch" },
+};
+
+// Trimmed from a live fetch of api.github.com/repos/facebookresearch/detectron2/readme (Accept:
+// application/vnd.github.html+json). The plain-relative top image and the absolute camo-proxied
+// badge (a real snippet from tensorflow/tensorflow's rendered README, same shape) are verbatim,
+// except the first image's real filename (".github/Detectron2-Logo-Horz.svg") is renamed below to
+// drop "logo" — the unrelated icon/logo noise filter would otherwise drop that block before the
+// image-resolution assertion runs, since filterNoise is part of the same htmlToDrafts call. GitHub's
+// rendering never rewrote that relative src at all — it only proxies absolute external images
+// through camo; the root-relative, differently-cased, and blob-vs-raw shapes below are constructed
+// to match a failure mode observed via live probing on repos with root-relative README links.
 const readmeFixture = `
   <img src=".github/Detectron2-Horz.svg" width="300" style="max-width: 100%;">
   <img src="/docs/banner.png" alt="banner">
   <img src="/facebookresearch/detectron2/raw/main/docs/x.png" alt="x">
+  <img src="/Facebookresearch/Detectron2/blob/main/img/y.png" alt="y">
   <img src="https://camo.githubusercontent.com/4b99b5f67e5e01f9ba4d88092d59b81a473b8f8fba65b8d3b5dd638fafdcee58/68747470733a2f2f7777772e74656e736f72666c6f772e6f72672f696d616765732f74665f6c6f676f5f686f72697a6f6e74616c2e706e67"
        data-canonical-src="https://www.tensorflow.org/images/tf_logo_horizontal.png" style="max-width: 100%;">
 `;
 
-test("resolveGithubImage resolves root-relative and API-rendered paths, leaves plain-relative and absolute camo URLs to normal resolution", () => {
+test("resolveGithubImage resolves root-relative and blob/raw-prefixed paths case-insensitively, leaving plain-relative and absolute camo URLs to normal resolution", () => {
   const fullName = "facebookresearch/detectron2";
   const branch = "main";
   const blocks = htmlToDrafts(readmeFixture, {
@@ -91,7 +296,58 @@ test("resolveGithubImage resolves root-relative and API-rendered paths, leaves p
   assert.deepEqual(urls, [
     "https://raw.githubusercontent.com/facebookresearch/detectron2/main/.github/Detectron2-Horz.svg", // plain relative
     "https://raw.githubusercontent.com/facebookresearch/detectron2/main/docs/banner.png", // root-relative
-    "https://github.com/facebookresearch/detectron2/raw/main/docs/x.png", // API-rendered absolute path
+    "https://github.com/facebookresearch/detectron2/raw/main/docs/x.png", // already repo-qualified
+    "https://github.com/Facebookresearch/Detectron2/blob/main/img/y.png", // different case, "blob" not "raw" — not doubled
     "https://camo.githubusercontent.com/4b99b5f67e5e01f9ba4d88092d59b81a473b8f8fba65b8d3b5dd638fafdcee58/68747470733a2f2f7777772e74656e736f72666c6f772e6f72672f696d616765732f74665f6c6f676f5f686f72697a6f6e74616c2e706e67", // absolute camo, untouched
   ]);
+});
+
+test("extractGithub converts repo info and a real README into blocks", async () => {
+  const restore = mockFetch(async (url) =>
+    url.endsWith("/readme")
+      ? new Response(readmeFixture, { status: 200 })
+      : new Response(JSON.stringify(repoInfoFixture), { status: 200 }),
+  );
+  try {
+    const result = await extractGithub(db, "https://github.com/facebookresearch/detectron2", "");
+    assert.equal(result.title, "facebookresearch/detectron2");
+    assert.equal(result.author, "facebookresearch");
+    assert.equal(result.blocks[0].type, "repo");
+    assert.equal(image(result.blocks)?.originalUrl, "https://raw.githubusercontent.com/facebookresearch/detectron2/main/.github/Detectron2-Horz.svg");
+  } finally {
+    restore();
+  }
+});
+
+test("extractGithub treats a 404 README as no README, but any other README failure fails the extraction", async () => {
+  const restoreOk = mockFetch(async (url) =>
+    url.endsWith("/readme") ? new Response("", { status: 404 }) : new Response(JSON.stringify(repoInfoFixture), { status: 200 }),
+  );
+  try {
+    const result = await extractGithub(db, "https://github.com/facebookresearch/detectron2", "");
+    assert.deepEqual(result.blocks.map((b) => b.type), ["repo"]); // no README content, but it still succeeds
+  } finally {
+    restoreOk();
+  }
+
+  const restoreRateLimited = mockFetch(async (url) =>
+    url.endsWith("/readme") ? new Response("", { status: 403 }) : new Response(JSON.stringify(repoInfoFixture), { status: 200 }),
+  );
+  try {
+    await assert.rejects(() => extractGithub(db, "https://github.com/facebookresearch/detectron2", ""), FetchError);
+  } finally {
+    restoreRateLimited();
+  }
+});
+
+test("extractArticle fetches, cleans and extracts an article page, honouring the X-Robots-Tag response header", async () => {
+  const html = page(`<title>Big news</title>`, article);
+  const restore = mockFetch(async () => new Response(html, { headers: { "content-type": "text/html", "x-robots-tag": "noarchive" } }));
+  try {
+    const result = await extractArticle(db, "http://93.184.216.34/post", "");
+    assert.equal(result.meta.noarchive, true);
+    assert.ok(result.text.includes("local models"));
+  } finally {
+    restore();
+  }
 });
