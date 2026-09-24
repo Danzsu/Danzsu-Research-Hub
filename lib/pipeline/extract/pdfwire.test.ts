@@ -1,24 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { mockFetch } from "../mock-fetch.ts";
+import { fakeModelDb, geminiResponse, mockFetch, withGeminiKey } from "../mock-fetch.ts";
 import { extractArticle } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
 
-// Offline: a fake model_settings row + a mocked Gemini response. No Supabase, no Gemini network call.
-const db = {
-  from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { provider: "gemini", model: "m" }, error: null }) }) }) }),
-} as unknown as SupabaseClient;
-const gemini = (out: unknown) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(out) }] } }] }));
+const db = fakeModelDb();
 const handler = (robots: string | null) => async (url: string) =>
   url.includes("googleapis.com")
-    ? gemini({ title: "T", author: "  ", blocks: [{ type: "paragraph", text: "Body" }] })
+    ? geminiResponse({ title: "T", author: "  ", blocks: [{ type: "paragraph", text: "Body" }] })
     : new Response("%PDF-1.4", { headers: { "content-type": "application/pdf", ...(robots ? { "x-robots-tag": robots } : {}) } });
 
 for (const [name, run] of [["extractPdf", extractPdf], ["extractArticle pdf branch", extractArticle]] as const) {
   test(`${name} honours X-Robots-Tag and nulls an empty author`, async () => {
-    const previousKey = process.env.GEMINI_API_KEY;
-    process.env.GEMINI_API_KEY = "test";
+    const restoreKey = withGeminiKey();
     try {
       let restore = mockFetch(handler("googlebot: noarchive"));
       try {
@@ -35,8 +29,7 @@ for (const [name, run] of [["extractPdf", extractPdf], ["extractArticle pdf bran
         restore();
       }
     } finally {
-      if (previousKey === undefined) delete process.env.GEMINI_API_KEY;
-      else process.env.GEMINI_API_KEY = previousKey;
+      restoreKey();
     }
   });
 }

@@ -1,29 +1,14 @@
 import { Readability } from "@mozilla/readability";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseHTML } from "linkedom";
-import { z } from "zod/v4";
-import { digestTags } from "../../data/digest-types.ts";
+import type { z } from "zod/v4";
 import { generate } from "../llm.ts";
 import { safeFetch } from "./fetch.ts";
+import { SUMMARY_INSTRUCTIONS as INSTRUCTIONS, summarySchema as postSchema } from "./summary.ts";
 
 const MAX_ATTEMPTS = 3;
 const MAX_BODY = 200_000;
 const MAX_PROMPT_TEXT = 60_000;
-
-const localized = z.object({ hu: z.string(), en: z.string() });
-const postSchema = z.object({
-  title: localized,
-  summary: localized,
-  keyPoints: z.object({ hu: z.array(z.string()).max(8), en: z.array(z.string()).max(8) }),
-  tags: z.array(z.enum(digestTags)).max(4),
-});
-
-const INSTRUCTIONS = `Write a bilingual (Hungarian + English) library entry for an AI engineer.
-- title: concrete headline. summary: one paragraph (4–6 sentences) on what it says and why it matters.
-- keyPoints: 3–8 short takeaways, same points in both languages.
-- tags: 1–4 from the allowed vocabulary only.
-- Hungarian must be natural and idiomatic, not a literal translation.
-- Only state what the source says.`;
 
 type Article = { title: string; author: string | null; body: string | null; text: string };
 
