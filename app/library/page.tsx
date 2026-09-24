@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookOpen, FileText, PlayCircle } from "lucide-react";
+import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
 import { LanguageToggle } from "@/app/components/language-toggle";
 import { PageHeader, PageHero } from "@/app/components/page-header";
 import { getOpenSources, getPosts } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
+import { hostOf } from "@/lib/pipeline/util";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { SubmitForm } from "./submit-form";
 
 export const dynamic = "force-dynamic";
+
+const kindIcons = { article: FileText, youtube: PlayCircle, arxiv: FlaskConical, github: GitFork, x: MessageSquareQuote, pdf: FileText } as const;
 
 export default async function LibraryPage() {
   if (!(await getViewer())) redirect("/login?next=/library");
@@ -53,7 +56,7 @@ export default async function LibraryPage() {
         )}
         <div className="grid gap-5 lg:grid-cols-2">
           {posts.map((post) => {
-            const Icon = post.kind === "youtube" ? PlayCircle : FileText;
+            const Icon = kindIcons[post.kind];
             return (
               <Link
                 key={post.id}
@@ -64,12 +67,12 @@ export default async function LibraryPage() {
                   <Icon className="size-7 text-signal group-hover:text-ink" />
                   <span className="font-mono text-[10px] opacity-60">{post.createdAt.slice(0, 10)}</span>
                 </div>
-                <p className="mt-6 font-mono text-xs tracking-[0.15em] opacity-60">{post.author ?? new URL(post.url).hostname}</p>
+                <p className="mt-6 font-mono text-xs tracking-[0.15em] opacity-60">{post.author ?? hostOf(post.url)}</p>
                 <h2 className="mt-2 font-display text-2xl leading-[1.02] [overflow-wrap:anywhere] sm:text-3xl">{post.title[lang]}</h2>
                 <p className="mt-4 line-clamp-3 text-base leading-6 opacity-65">{post.summary[lang]}</p>
                 <div className="mt-6 flex flex-wrap gap-2 border-t border-current/20 pt-4">
                   {post.tags.map((tag) => <span key={tag} className="border border-current/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>)}
-                  {post.body && <span className="ml-auto flex items-center gap-1 font-mono text-[10px] opacity-60"><BookOpen className="size-3" /> MIRRORED</span>}
+                  {post.meta.mirrored && <span className="ml-auto flex items-center gap-1 font-mono text-[10px] opacity-60"><BookOpen className="size-3" /> MIRRORED</span>}
                 </div>
               </Link>
             );
