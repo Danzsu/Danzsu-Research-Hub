@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --no-warnings --test \"lib/**/*.test.ts\"",
+    "test": "node --experimental-strip-types --no-warnings --test \"lib/**/*.test.ts\" \"app/**/*.test.ts\"",
     "ingest": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/ingest-url.mts",
     "dup": "npx -y jscpd@4.3.0 app lib proxy.ts scripts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console"
   },
