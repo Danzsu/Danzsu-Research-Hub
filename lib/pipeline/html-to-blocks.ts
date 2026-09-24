@@ -1,5 +1,6 @@
 import { parseHTML } from "linkedom";
 import { assignIds, blockIdentity, blockText, inlineText, safeHref, type Block, type BlockDraft, type Inline } from "../blocks.ts";
+import { imageUrl, isIconOrAvatarImage } from "./html-images.ts";
 import { hostOf, youtubeId } from "./util.ts";
 
 export type HtmlToBlocksOptions = { baseUrl: string; imageBaseUrl?: string };
@@ -13,39 +14,71 @@ const DROP = [
 ].join(", ");
 
 // Generic single-purpose noise keywords: safe as a substring with a delimiter on both sides.
-const NOISE_NAME = /(^|[-_])(ad|ads|adv|advert\w*|sponsor\w*|promo\w*|newsletter\w*|subscribe\w*|comments?|cookie\w*|popup\w*|banner\w*|paywall\w*|outbrain|taboola)([-_]|$)/i;
-// Share/social widgets, narrowed to known widget names so "shared-weights" and "social-proof" survive.
-const SHARE_NAME = /^(share|sharing|share-(buttons?|bar|this|box|links?|icons?|panel|widget|tools?)|sharedaddy\w*|social-share|social-(icons?|buttons?|links?|widget))$/i;
+const NOISE_NAME = /(^|[-_])(ad|ads|adv|advert\w*|sponsor\w*|promo\w*|newsletter\w*|subscribe\w*|cookie\w*|popup\w*|banner\w*|paywall\w*|outbrain|taboola)([-_]|$)/i;
+// share/sharing/sharedaddy/related/relatedposts/comment(s) as whole delimited tokens: catches
+// "post-share", "social-sharing", "yarpp-related", "jp-relatedposts", but not "shared-weights"
+// ("shared" isn't in the list) or "related-work" (no "-work" suffix listed; survives via the
+// heading-descendant id exemption below when used as an id, same as "social-proof" survives
+// because bare "social" isn't a noise token — only "social-share"/"social-sharing" match, via share/sharing).
+const SHARE_RELATED_COMMENT = /(^|[-_])(share|sharing|sharedaddy|related|relatedposts|comments?)([-_]|$)/i;
 // "modal" only at the token's start, so "multi-modal" is not caught.
 const MODAL_NAME = /^modal(-\w*)?$/i;
-// Enumerated related-content widgets, not "related-work".
-const RELATED_NAME = /^related(-(posts|articles|links))?$/i;
 const AD_DATA_ATTR = /^data-ads?(-|$)/i;
-const HEADING_OR_SECTION = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "section"]);
-/** Noise boxes are small relative to the page; keep an absolute floor so tiny pages still work. */
-const NOISE_TEXT_FLOOR = 1500;
-const NOISE_TEXT_RATIO = 0.25;
+const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
+const HEADING_SELECTOR = "h1, h2, h3, h4, h5, h6";
+
+// Known main-content containers: never removed by name/ad-attribute matching, and neither is
+// any ancestor of one (removing the ancestor would take the real content down with it).
+const CONTENT_CLASS_TOKENS = new Set([
+  "entry-content", "post-content", "article-body", "article-content", "post-body", "story-body", "markdown-body",
+]);
+const CONTENT_CONTAINER_SELECTOR =
+  "article, main, [role=main], [itemprop=articleBody], .entry-content, .post-content, .article-body, .article-content, .post-body, .story-body, .markdown-body";
+
+function isContentContainer(el: Element): boolean {
+  if (el.localName === "article" || el.localName === "main") return true;
+  if (el.getAttribute("role") === "main" || el.getAttribute("itemprop") === "articleBody") return true;
+  return (el.getAttribute("class") ?? "").split(/\s+/).some((token) => CONTENT_CLASS_TOKENS.has(token));
+}
+
+/** Replaces a blunt size-ratio guard: protects real content by what it *is*, not how big it is. */
+function isProtectedContainer(el: Element, rootTextLength: number): boolean {
+  if (isContentContainer(el) || el.querySelector(CONTENT_CONTAINER_SELECTOR)) return true;
+  return rootTextLength > 0 && (el.textContent ?? "").length >= rootTextLength * 0.5;
+}
 
 function isNoiseElement(el: Element, rootTextLength: number): boolean {
   if (el.closest("pre, code")) return false; // never strip syntax-highlighted spans, e.g. class="token comment"
+  if (isProtectedContainer(el, rootTextLength)) return false;
   const classTokens = (el.getAttribute("class") ?? "")
     .split(/\s+/)
     .filter((token) => token && !token.startsWith("tag-") && !token.startsWith("category-"));
-  const idToken = HEADING_OR_SECTION.has(el.localName) ? "" : (el.getAttribute("id") ?? "");
+  // An id is skipped for a heading itself, or for a wrapper that contains one (pandoc/R Markdown/
+  // bookdown wrap each section as <div id="ad-hoc-evaluation" class="section level2"><h2>...</h2>,
+  // and a generic "ad"/"promo"-style keyword would otherwise false-positive on the slug).
+  const skipId = HEADING_TAGS.has(el.localName) || !!el.querySelector(HEADING_SELECTOR);
+  const idToken = skipId ? "" : (el.getAttribute("id") ?? "");
   const names = [...classTokens, idToken].filter(Boolean);
-  const named = names.some((name) => NOISE_NAME.test(name) || SHARE_NAME.test(name) || MODAL_NAME.test(name) || RELATED_NAME.test(name));
+  const named = names.some((name) => NOISE_NAME.test(name) || SHARE_RELATED_COMMENT.test(name) || MODAL_NAME.test(name));
   const adData = el.getAttributeNames().some((attr) => AD_DATA_ATTR.test(attr));
-  const maxNoiseText = Math.max(NOISE_TEXT_FLOOR, rootTextLength * NOISE_TEXT_RATIO);
-  return (named || adData) && (el.textContent ?? "").length < maxNoiseText;
+  return named || adData;
 }
 
-/** A `<noscript><img></noscript>` fallback is the real image when JS-driven lazy loading never fires. */
+/**
+ * A `<noscript><img></noscript>` fallback is the real image when JS-driven lazy loading never
+ * fires. Only replaces the preceding placeholder <img> when it has no real src of its own
+ * (missing or a data: URI) — a genuine image (or an unrelated tracking pixel) right before the
+ * noscript must not be deleted just because a noscript happens to follow it.
+ */
 function hoistNoscriptImages(root: Element): void {
   root.querySelectorAll("noscript").forEach((noscript) => {
     const img = noscript.querySelector("img");
     if (!img) return;
     const placeholder = noscript.previousElementSibling;
-    if (placeholder && placeholder.localName === "img") placeholder.remove();
+    if (placeholder && placeholder.localName === "img") {
+      const src = placeholder.getAttribute("src");
+      if (!src || src.startsWith("data:")) placeholder.remove();
+    }
     noscript.replaceWith(img);
   });
 }
@@ -88,43 +121,8 @@ const BLOCK_DESCENDANT_SELECTOR = "h1, h2, h3, h4, h5, h6, p, ul, ol, pre, table
 
 const collapse = (text: string | null | undefined) => (text ?? "").replace(/\s+/g, " ").trim();
 
-/** Per the HTML spec: split on whitespace (URLs can't contain literal whitespace), not on every comma. */
-function parseSrcset(srcset: string): string[] {
-  const tokens = srcset.trim().split(/\s+/).filter(Boolean);
-  const candidates: { url: string; size: number }[] = [];
-  for (let i = 0; i < tokens.length; i++) {
-    const url = tokens[i].replace(/,$/, "");
-    if (!url) continue;
-    let size = 1;
-    const next = tokens[i + 1];
-    if (next && /^\d+(\.\d+)?[wx],?$/.test(next)) {
-      size = Number.parseFloat(next) || 1;
-      i++;
-    }
-    candidates.push({ url, size });
-  }
-  return candidates.sort((a, b) => b.size - a.size).map((c) => c.url);
-}
-
-function imageUrl(img: Element, ctx: Ctx): string | undefined {
-  const srcset = img.getAttribute("srcset") || img.getAttribute("data-srcset") || img.getAttribute("data-lazy-srcset");
-  const candidates = [
-    ...(srcset ? parseSrcset(srcset) : []),
-    img.getAttribute("data-src"),
-    img.getAttribute("data-lazy-src"),
-    img.getAttribute("data-original"),
-    img.getAttribute("src"),
-  ];
-  for (const candidate of candidates) {
-    if (!candidate || candidate.startsWith("data:")) continue;
-    const href = safeHref(candidate, ctx.imageBase);
-    if (href) return href;
-  }
-  return undefined;
-}
-
 function pushImage(img: Element, caption: string | undefined, ctx: Ctx) {
-  const url = imageUrl(img, ctx);
+  const url = imageUrl(img, ctx.imageBase);
   if (!url) return;
   const width = Number(img.getAttribute("width"));
   const height = Number(img.getAttribute("height"));
@@ -286,11 +284,25 @@ function pushParagraph(nodes: Node[], ctx: Ctx) {
   flushPending(ctx);
 }
 
+/**
+ * Unwraps an INLINE-tagged element (e.g. <span>) that actually holds block content (malformed
+ * markup like <li><span><p>one</p><ul>...</span></li>) into its own children, so the p/ul below
+ * it are handled as blocks instead of being flattened into the <li>'s text by collectInline.
+ */
+function unwrapBlockWrappers(nodes: Node[]): Node[] {
+  return nodes.flatMap((node) => {
+    if (node.nodeType === 1 && INLINE.has((node as Element).localName) && (node as Element).querySelector(BLOCK_DESCENDANT_SELECTOR)) {
+      return unwrapBlockWrappers([...(node as Element).childNodes]);
+    }
+    return [node];
+  });
+}
+
 function pushList(el: Element, ctx: Ctx) {
   const items: Inline[][] = [];
   const nested: Element[] = [];
   for (const li of [...el.children].filter((child) => child.localName === "li")) {
-    const own = [...li.childNodes].filter((node) => {
+    const own = unwrapBlockWrappers([...li.childNodes]).filter((node) => {
       const isList = node.nodeType === 1 && ["ul", "ol"].includes((node as Element).localName);
       if (isList) nested.push(node as Element);
       return !isList;
@@ -370,11 +382,18 @@ function visitElement(el: Element, ctx: Ctx) {
     case "ul":
     case "ol":
       return pushList(el, ctx);
-    case "p":
-      // A paragraph is atomic: keep its children as one inline run so a stray <img>
-      // (block-level per INLINE, but handled specially by collectInline) is hoisted
-      // via ctx.pending instead of splitting the paragraph in visitChildren.
+    case "p": {
+      // A paragraph is normally atomic: keep its children as one inline run so a stray <img>
+      // (block-level per INLINE, but handled specially by collectInline) is hoisted via
+      // ctx.pending instead of splitting the paragraph. But malformed markup can wrap real
+      // block content in an inline tag (<p><span><div><ul>...) — then split like any other
+      // container instead of flattening the list/heading into paragraph text.
+      const hasBlockWrapper = [...el.children].some(
+        (child) => INLINE.has(child.localName) && child.querySelector(BLOCK_DESCENDANT_SELECTOR),
+      );
+      if (hasBlockWrapper) return visitChildren(el, ctx);
       return pushParagraph([...el.childNodes], ctx);
+    }
     case "blockquote": {
       const content = normalizeInline(collectInline([...el.childNodes], ctx));
       if (inlineText(content).trim()) ctx.out.push({ type: "quote", content, cite: safeHref(el.getAttribute("cite"), ctx.base) });
@@ -383,15 +402,28 @@ function visitElement(el: Element, ctx: Ctx) {
     case "pre":
       return pushPre(el, ctx);
     case "figure": {
-      const table = el.querySelector("table");
-      if (table) return pushTable(table, ctx);
-      const images = [...el.querySelectorAll("img")];
-      if (images.length === 1) return pushImage(images[0], collapse(el.querySelector("figcaption")?.textContent), ctx);
-      if (images.length > 1) {
-        for (const img of images) pushImage(img, undefined, ctx);
+      const nestedFigures = [...el.querySelectorAll("figure")];
+      const directCaption = collapse([...el.children].find((c) => c.localName === "figcaption")?.textContent);
+      if (nestedFigures.length) {
+        // Each nested figure (e.g. a WordPress gallery) keeps its own caption; this figure's
+        // own caption, if any, becomes a trailing paragraph, gallery-caption style.
+        for (const nested of nestedFigures) visitElement(nested, ctx);
+        if (directCaption) ctx.out.push({ type: "paragraph", content: [{ text: directCaption }] });
         return;
       }
-      return visitChildren(el, ctx);
+      const table = el.querySelector("table");
+      const images = [...el.querySelectorAll("img")];
+      if (images.length === 1 && !table) {
+        pushImage(images[0], directCaption, ctx);
+        return;
+      }
+      if (!images.length && !table) return visitChildren(el, ctx);
+      // Multiple images and/or a table: no single image owns the caption, so it becomes its
+      // own trailing paragraph instead (an arXiv multi-panel "Figure 3: ..." caption).
+      for (const img of images) pushImage(img, undefined, ctx);
+      if (table) pushTable(table, ctx);
+      if (directCaption) ctx.out.push({ type: "paragraph", content: [{ text: directCaption }] });
+      return;
     }
     case "img":
       return pushImage(el, undefined, ctx);
@@ -418,14 +450,13 @@ const SHARE_LINK = /(twitter\.com\/intent|x\.com\/intent|facebook\.com\/sharer|l
 // Call-to-action phrasing only, so real sentences that merely contain "sponsored" or "subscribe" survive.
 const BOILERPLATE_PHRASE = /\b(subscribe to (our|the) newsletter|sign up for (our|the) newsletter|share this (post|article)|follow us|you might also like)\b/i;
 // Short standalone labels: must be the block's *entire* text, not a substring of a real sentence.
-const BOILERPLATE_EXACT = /^(advertisement|sponsored|related (posts|articles|stories)|iratkozz fel|hírlevél|kapcsolódó cikkek|hirdetés|oszd meg)$/i;
-const isBoilerplate = (text: string) => BOILERPLATE_PHRASE.test(text) || BOILERPLATE_EXACT.test(text.trim());
-// Filenames only: real figures like "silicon-photonics.jpg" or "avatar-generation-demo.png" must survive.
-// "pixel"/"tracking"/"1x1" are dropped from the list — the width/height guard in pushImage already catches pixels.
-const ICON_PATH = /(^|[-_./])(icon|logo|emoji|badge|sprite|spacer|gravatar)s?([-_./]|$)/i;
+const BOILERPLATE_EXACT = /^(advertisement|sponsored|related (posts|articles|stories)|hírlevél|kapcsolódó cikkek|hirdetés)$/i;
+// Hungarian CTAs that lead a short sentence rather than standing alone, e.g. "Iratkozz fel a hírlevelünkre!".
+const BOILERPLATE_PREFIX = /^(iratkozz fel|oszd meg)\b/i;
+const isBoilerplate = (text: string) => BOILERPLATE_PHRASE.test(text) || BOILERPLATE_EXACT.test(text.trim()) || BOILERPLATE_PREFIX.test(text.trim());
 
 function isNoiseBlock(block: BlockDraft, baseHost: string): boolean {
-  if (block.type === "image") return ICON_PATH.test(new URL(block.originalUrl).pathname);
+  if (block.type === "image") return isIconOrAvatarImage(new URL(block.originalUrl));
   if (block.type === "list") return block.items.every((item) => !inlineText(item).trim() || item.some((s) => s.href && SHARE_LINK.test(s.href)));
   if (block.type !== "paragraph" && block.type !== "heading" && block.type !== "quote") return false;
   const text = blockText(block).trim();
@@ -439,6 +470,10 @@ function isNoiseBlock(block: BlockDraft, baseHost: string): boolean {
   return linkOnly && text.length < 40 && links.every((span) => hostOf(span.href!) === baseHost);
 }
 
+// Code is compared by its exact text, not the normalised identity: indentation/whitespace is
+// meaningful in code, so two blocks differing only there are not duplicates.
+const dedupeKey = (block: BlockDraft): string => (block.type === "code" ? block.code : blockIdentity(block));
+
 export function filterNoise(blocks: BlockDraft[], baseUrl: string): BlockDraft[] {
   const baseHost = hostOf(baseUrl);
   const kept: BlockDraft[] = [];
@@ -446,7 +481,7 @@ export function filterNoise(blocks: BlockDraft[], baseUrl: string): BlockDraft[]
     if (isNoiseBlock(block, baseHost)) continue;
     const previous = kept.at(-1);
     if (block.type === "divider" && (!previous || previous.type === "divider")) continue;
-    if (previous && previous.type === block.type && blockIdentity(block) && blockIdentity(previous) === blockIdentity(block)) continue;
+    if (previous && previous.type === block.type && dedupeKey(block) && dedupeKey(previous) === dedupeKey(block)) continue;
     kept.push(block);
   }
   while (kept.at(-1)?.type === "divider") kept.pop();

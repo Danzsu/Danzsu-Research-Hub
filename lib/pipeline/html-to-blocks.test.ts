@@ -224,13 +224,31 @@ test("an INLINE-tagged wrapper holding block content is visited as a block, not 
   assert.deepEqual(types(blocks), ["heading", "paragraph"]);
 });
 
-test("figure with multiple images emits one image block per image, no caption when there are several", () => {
+test("figure with multiple images: nested figures keep their own caption, a shared gallery caption becomes a trailing paragraph", () => {
   const blocks = htmlToDrafts(
-    `<figure class="wp-block-gallery"><figure><img src="/g1.jpg" alt="1"></figure><figure><img src="/g2.jpg" alt="2"></figure><figure><img src="/g3.jpg" alt="3"></figure></figure>`,
+    `<figure class="wp-block-gallery"><figure class="wp-block-image"><img src="/g1.jpg" alt="1"><figcaption>First</figcaption></figure><figure class="wp-block-image"><img src="/g2.jpg" alt="2"><figcaption>Second</figcaption></figure><figcaption class="blocks-gallery-caption">Gallery caption</figcaption></figure>`,
     base,
   );
-  assert.deepEqual(types(blocks), ["image", "image", "image"]);
-  assert.ok(blocks.every((b) => !(b as Extract<BlockDraft, { type: "image" }>).caption));
+  assert.deepEqual(types(blocks), ["image", "image", "paragraph"]);
+  assert.equal((blocks[0] as Extract<BlockDraft, { type: "image" }>).caption, "First");
+  assert.equal((blocks[1] as Extract<BlockDraft, { type: "image" }>).caption, "Second");
+  assert.deepEqual((blocks[2] as Extract<BlockDraft, { type: "paragraph" }>).content, [{ text: "Gallery caption" }]);
+});
+
+test("a multi-panel figure with no nested <figure> keeps its caption as a trailing paragraph", () => {
+  const blocks = htmlToDrafts(
+    `<figure class="ltx_figure" id="S4.F3"><div class="ltx_flex_figure"><div class="ltx_flex_cell"><img src="/x1.png" alt="Refer to caption" width="300" height="200"></div><div class="ltx_flex_cell"><img src="/x2.png" alt="Refer to caption" width="300" height="200"></div></div><figcaption class="ltx_caption">Figure 3: Accuracy vs. model size on MMLU (left) and GSM8K (right).</figcaption></figure>`,
+    base,
+  );
+  assert.deepEqual(types(blocks), ["image", "image", "paragraph"]);
+  assert.deepEqual((blocks[2] as Extract<BlockDraft, { type: "paragraph" }>).content, [
+    { text: "Figure 3: Accuracy vs. model size on MMLU (left) and GSM8K (right)." },
+  ]);
+});
+
+test("a figure holding both an image and a table emits both", () => {
+  const blocks = htmlToDrafts(`<figure><img src="/chart.png" alt="c"><table><tr><td>a</td><td>b</td></tr></table></figure>`, base);
+  assert.deepEqual(types(blocks), ["image", "list"]);
 });
 
 test("a table of README images becomes image blocks", () => {
@@ -267,4 +285,132 @@ test("pre strips exactly one leading newline and converts br to newline", () => 
 
   const withBr = htmlToDrafts("<pre><code>a = 1<br>b = 2</code></pre>", base);
   assert.equal((withBr[0] as Extract<BlockDraft, { type: "code" }>).code, "a = 1\nb = 2");
+});
+
+// ── Fix round 2: 5 open findings + 3 regressions from round 1 ───────────────
+
+test("srcset per spec: a comma directly after a descriptor with no following space still splits candidates correctly", () => {
+  const x = htmlToDrafts(`<img srcset="/a.jpg 1x,/b.jpg 2x" src="/a.jpg" alt="s">`, base);
+  assert.equal((x[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/b.jpg");
+
+  const w = htmlToDrafts(`<img srcset="/a-400.jpg 400w,/a-800.jpg 800w" src="/a-400.jpg" alt="s">`, base);
+  assert.equal((w[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/a-800.jpg");
+});
+
+test("srcset: a javascript: candidate is skipped, falling through to the next candidate", () => {
+  const blocks = htmlToDrafts(`<img srcset="javascript:alert(1) 2000w, /ok.jpg 100w" alt="x">`, base);
+  assert.equal((blocks[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/ok.jpg");
+});
+
+test("data-lazy-src is used directly, with no noscript fallback present", () => {
+  const blocks = htmlToDrafts(`<img src="data:image/gif;base64,R0" data-lazy-src="https://blog.test/direct.png" alt="x">`, base);
+  assert.equal((blocks[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/direct.png");
+});
+
+test("data-lazy-srcset is used directly, with no noscript fallback present", () => {
+  const blocks = htmlToDrafts(`<img src="data:image/gif;base64,R0" data-lazy-srcset="/s.jpg 300w, /l.jpg 900w" alt="x">`, base);
+  assert.equal((blocks[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/l.jpg");
+});
+
+test("hoistNoscriptImages only replaces a missing/data: placeholder, never a real preceding image", () => {
+  const blocks = htmlToDrafts(`<img src="/hero.png"><noscript><img width="1" height="1" src="https://px.test/fb"></noscript>`, base);
+  assert.deepEqual(types(blocks), ["image"]);
+  assert.equal((blocks[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/hero.png");
+});
+
+test("named-noise id matching is skipped for a div.section wrapping a heading (pandoc/R Markdown/bookdown)", () => {
+  const evaluation = htmlToDrafts(
+    `<div id="ad-hoc-evaluation" class="section level2"><h2>Ad hoc evaluation</h2><p>We run ad hoc evals here with real content that is long enough.</p></div>`,
+    base,
+  );
+  assert.deepEqual(types(evaluation), ["heading", "paragraph"]);
+
+  const promotion = htmlToDrafts(
+    `<div id="promotion-of-cooperation" class="section level2"><h2>Promotion of cooperation</h2><p>Real content about the topic at hand.</p></div>`,
+    base,
+  );
+  assert.deepEqual(types(promotion), ["heading", "paragraph"]);
+});
+
+test("tag- and category- class tokens are ignored by name matching, even alone on a non-content element (pinned)", () => {
+  const filler = `<p>${"Padding text to dominate the page total so the small div below is not size-protected. ".repeat(30)}</p>`;
+  const blocks = htmlToDrafts(`${filler}<div class="post tag-newsletter"><p>Short real note kept only via the tag- filter.</p></div>`, base);
+  const texts = blocks.filter((b) => b.type === "paragraph").map((b) => (b as Extract<BlockDraft, { type: "paragraph" }>).content[0].text);
+  assert.ok(texts.some((t) => t.startsWith("Short real note")));
+});
+
+test("content-container exemptions: article and article-body classes survive noise-name/ad-attribute matches", () => {
+  const short = htmlToDrafts(`<article class="post has-comments"><h1>Short</h1><p>${"lorem ".repeat(60).trim()}</p></article>`, base);
+  assert.deepEqual(types(short), ["heading", "paragraph"]);
+
+  const body = htmlToDrafts(`<div class="article-body" data-ad-targeting="ml"><p>${"lorem ".repeat(80).trim()}</p></div>`, base);
+  assert.deepEqual(types(body), ["paragraph"]);
+});
+
+test("content-container exemptions replace the size-ratio guard: entry-content survives next to a large comment thread", () => {
+  const words = (n: number, w = "lorem") => Array.from({ length: n }, (_, i) => w + i).join(" ");
+  const comment = (i: number) => `<li class="comment"><div class="comment-body"><p>${words(20, "c" + i)}</p></div></li>`;
+  const blocks = htmlToDrafts(
+    `<div class="entry-content" data-ad-slot="x"><p>${words(400)}</p></div><div class="discussion"><ol>${Array.from({ length: 120 }, (_, i) => comment(i)).join("")}</ol></div>`,
+    base,
+  );
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].type, "paragraph");
+});
+
+test("share/related/comment widget names are matched again as delimited tokens, not just whole tokens", () => {
+  const blocks = htmlToDrafts(
+    `<div class="post-share"><p>Post share box text here</p></div>
+     <div class="social-sharing"><p>Social sharing box</p></div>
+     <div class="yarpp-related"><h3>You may like</h3><p>Related widget text</p></div>
+     <div class="jp-relatedposts"><p>Related stuff text</p></div>
+     <div class="shared-component"><p>Important claim living in a shared component that must not be dropped.</p></div>
+     <div class="social-proof"><p>Used by three major research labs according to this note.</p></div>`,
+    base,
+  );
+  assert.deepEqual(types(blocks), ["paragraph", "paragraph"]);
+});
+
+test("Hungarian CTA sentences starting with the trigger phrase are dropped", () => {
+  const blocks = htmlToDrafts(`<p>Iratkozz fel a hírlevelünkre!</p><p>Oszd meg ismerőseiddel!</p>`, base);
+  assert.deepEqual(blocks, []);
+});
+
+test("ICON_PATH matches only the last path segment; badges/avatars are dropped by host or path, not directory names", () => {
+  const kept = htmlToDrafts(
+    `<img src="/assets/icons-and-diagrams/figure3.png" alt="a"><img src="/logos-study/chart.png" alt="b">
+     <img src="https://raw.githubusercontent.com/u/logo-detection/main/assets/results.png" alt="c">
+     <img src="/avatar-research/results.png" alt="d"><img src="avatar-generation-demo.png" alt="e">`,
+    base,
+  );
+  assert.equal(kept.length, 5);
+
+  const dropped = htmlToDrafts(
+    `<img src="https://secure.gravatar.com/avatar/0bc83cb571cd1c50ba6f3e8a78ef1346?s=96" alt="">
+     <img src="https://img.shields.io/badge/build-passing-green" alt=""><img src="/static/logo.svg" alt="">`,
+    base,
+  );
+  assert.equal(dropped.length, 0);
+});
+
+test("consecutive duplicate code blocks are compared by exact code text, not normalised identity", () => {
+  const blocks = htmlToDrafts(`<pre><code>if x:\n    y()</code></pre><pre><code>if x:\ny()</code></pre>`, base);
+  assert.deepEqual(types(blocks), ["code", "code"]);
+  assert.equal((blocks[0] as Extract<BlockDraft, { type: "code" }>).code, "if x:\n    y()");
+  assert.equal((blocks[1] as Extract<BlockDraft, { type: "code" }>).code, "if x:\ny()");
+});
+
+test("an inline wrapper holding blocks inside a <p> splits into a paragraph plus the block content", () => {
+  const blocks = htmlToDrafts(`<p><span>Intro<div><ul><li>a</li><li>b</li></ul></div></span></p>`, base);
+  assert.deepEqual(types(blocks), ["paragraph", "list"]);
+  assert.deepEqual((blocks[0] as Extract<BlockDraft, { type: "paragraph" }>).content, [{ text: "Intro" }]);
+  assert.deepEqual((blocks[1] as Extract<BlockDraft, { type: "list" }>).items, [[{ text: "a" }], [{ text: "b" }]]);
+});
+
+test("an inline wrapper holding blocks inside a <li> does not flatten into one merged string", () => {
+  const blocks = htmlToDrafts(`<ul><li><span><p>one</p><ul><li>n1</li></ul></span></li></ul>`, base);
+  const texts = blocks.flatMap((b) =>
+    b.type === "list" ? (b as Extract<BlockDraft, { type: "list" }>).items.map((item) => item.map((s) => s.text).join("")) : [],
+  );
+  assert.equal(texts.includes("one n1"), false);
 });
