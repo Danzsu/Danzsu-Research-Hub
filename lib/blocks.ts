@@ -101,7 +101,8 @@ export function blockText(block: BlockDraft): string {
 
 export const plainText = (blocks: BlockDraft[]) => blocks.map(blockText).filter(Boolean).join("\n\n");
 
-function identity(block: BlockDraft): string {
+/** Content-derived identity for a block: what makes two blocks "the same" for ids and dedupe. */
+export function blockIdentity(block: BlockDraft): string {
   if (block.type === "image") return block.originalUrl;
   if (block.type === "video") return `${block.provider}:${block.videoId}`;
   return blockText(block).normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
@@ -115,7 +116,7 @@ export function assignIds(drafts: BlockDraft[]): Block[] {
   const seen = new Map<string, number>();
   return drafts.map((draft) => {
     const typePrefix = draft.type.slice(0, 1);
-    const content = draft.type + "\u0000" + identity(draft);
+    const content = draft.type + "\u0000" + blockIdentity(draft);
     const base = typePrefix + fnv1a(content);
     const count = (seen.get(base) ?? 0) + 1;
     seen.set(base, count);

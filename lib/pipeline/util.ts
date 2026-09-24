@@ -72,6 +72,7 @@ export function youtubeId(url: URL): string | null {
   else if (host === "youtube.com" || host === "youtube-nocookie.com") {
     id = url.searchParams.get("v") ?? /^\/(?:shorts|embed|live)\/([\w-]+)/.exec(url.pathname)?.[1];
   }
+  if (id === "videoseries") return null; // playlist embed, not a single video
   return id && /^[\w-]{11}$/.test(id) ? id : null;
 }
 

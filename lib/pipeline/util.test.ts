@@ -107,3 +107,7 @@ test("hostOf and parseId", () => {
 test("publishedLabel", () => {
   assert.equal(publishedLabel("2026-09-22"), "09 / 22");
 });
+
+test("youtubeId rejects videoseries playlist embeds", () => {
+  assert.equal(youtubeId(new URL("https://www.youtube.com/embed/videoseries?list=PL123")), null);
+});
