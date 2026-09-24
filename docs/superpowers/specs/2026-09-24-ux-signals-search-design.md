@@ -193,7 +193,7 @@ A meglévő `/api/state` route egy új műveletet kap: `set_rating`, paramétere
 
 ### 2.5 Az archívum GitHub-füle
 
-- **Útvonal:** `/archive?tab=github` vagy `/archive/github`. A terv választ, a döntés oka az, melyik egyszerűbb a meglévő archívum mellett.
+- **Útvonal:** `/archive/github`. A statikus szegmens megelőzi a `[week]` dinamikus szegmenst, így nem ütközik a heti oldalakkal. Az archívum fejlécében két fül lesz: „Hetek” és „GitHub”.
 - **Egy sor egy repó (kisbetűs `repo` szerint csoportosítva):** az első és az utolsó hét, hány héten volt fent, a legjobb helyezés, a legutóbbi `focus`, a `language` és a `stars`, és az értékelésed.
 - **Adat:** egy `security_invoker` nézet vagy RPC a `github_top` és az `issues` fölött.
 - **Rendezés és szűrés:**
@@ -217,7 +217,7 @@ A meglévő `/api/state` route egy új műveletet kap: `set_rating`, paramétere
   - a napi kurálásnál, az új hírekhez;
   - a `processSource`-ban, az összefoglaló után;
   - a meglévő sorokhoz egy egyszeri szkripttel (`scripts/backfill-embeddings.mts`).
-- **Hibatűrés:** ha az embedding hibára fut, a sor vektor nélkül kerül be. A napi cron felveszi a vektor nélküli sorokat (legfeljebb N darabot), és pótolja őket.
+- **Hibatűrés:** ha az embedding hibára fut, a sor vektor nélkül kerül be. A napi cron futásonként legfeljebb 200 vektor nélküli sort felvesz, és pótolja őket.
 - **Modellváltás:** a vektor mellé mentjük a modell nevét (`embedding_model`). Így egy későbbi váltásnál látszik, mit kell újravektorizálni.
 
 ### 3.3 Keresés: RPC és API
