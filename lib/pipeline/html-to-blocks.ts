@@ -52,14 +52,13 @@ function isProtectedContainer(el: Element, rootTextLength: number): boolean {
 // Exact, well-known noise ids that are removed even when the element contains a heading
 // (<section id="comments"><h2>3 comments</h2>...) — overrides the heading/section exemptions
 // below (which exist for content sections, e.g. pandoc's div.section), except on a heading
-// itself (<h2 id="comments">) or a pandoc-style section (class tokens "section" + "levelN"),
-// where the id is more likely to name real content than a comments/related-posts widget.
+// itself (<h2 id="comments">) or a pandoc-style section, where the id is more likely to name
+// real content than a comments/related-posts widget. Pandoc needs both class tokens, "section"
+// and "levelN": a bare "section" class is common on real comment wrappers too.
 const NOISE_ID_DENYLIST = new Set(["comments", "respond", "disqus_thread", "related-posts", "jp-relatedposts"]);
 const PANDOC_LEVEL_CLASS = /^level\d+$/;
 
 function isNoiseElement(el: Element, rootTextLength: number): boolean {
-  if (el.closest("pre, code")) return false; // never strip syntax-highlighted spans, e.g. class="token comment"
-
   const rawId = el.getAttribute("id") ?? "";
   const classTokens = (el.getAttribute("class") ?? "")
     .split(/\s+/)
@@ -70,7 +69,7 @@ function isNoiseElement(el: Element, rootTextLength: number): boolean {
   // Cheapest check first: the exact-id denylist, checked before the (expensive) protection
   // check below, so a denylisted id is removed even if it holds ≥50% of the page (a comments
   // section can dwarf a short post).
-  if (NOISE_ID_DENYLIST.has(rawId.toLowerCase()) && !isHeadingSelf && !isPandocSection) return true;
+  if (NOISE_ID_DENYLIST.has(rawId.toLowerCase()) && !isHeadingSelf && !isPandocSection) return !el.closest("pre, code");
 
   const classNamed = classTokens.some((name) => NOISE_NAME.test(name) || SHARE_RELATED_COMMENT.test(name) || MODAL_NAME.test(name));
   // The id only needs the (expensive, subtree-scanning) heading-descendant check when it would
@@ -82,7 +81,10 @@ function isNoiseElement(el: Element, rootTextLength: number): boolean {
   const idLooksNoisy = !!rawId && (NOISE_NAME.test(rawId) || SHARE_RELATED_COMMENT.test(rawId) || MODAL_NAME.test(rawId));
   const idNamed = idLooksNoisy && !(isHeadingSelf || el.localName === "section" || el.querySelector(HEADING_SELECTOR));
   const adData = el.getAttributeNames().some((attr) => AD_DATA_ATTR.test(attr));
-  if (!classNamed && !idNamed && !adData) return false; // nothing matched: skip the expensive protection check entirely
+  if (!classNamed && !idNamed && !adData) return false; // nothing matched: skip the expensive checks below entirely
+  // Never strip syntax-highlighted spans (class="token comment"). Checked only after a match:
+  // closest() on every element was the converter's main remaining cost.
+  if (el.closest("pre, code")) return false;
 
   // Only elements that already look like noise pay for the protection check (subtree query + textContent).
   return !isProtectedContainer(el, rootTextLength);
@@ -143,7 +145,7 @@ const INLINE = new Set([
 // An INLINE-tagged wrapper containing one of these is visited as a block, not inline-collected.
 const BLOCK_DESCENDANT_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol", "pre", "table", "blockquote", "figure"]);
 
-/** Same result as el.querySelector(BLOCK_DESCENDANT_SELECTOR) != null, without the CSS selector overhead — called per paragraph/list item. */
+/** Whether any descendant is a BLOCK_DESCENDANT_TAGS element; a hand walk, not querySelector, since it runs per paragraph/list item. */
 function containsBlockDescendant(el: Element): boolean {
   for (const child of el.children) {
     if (BLOCK_DESCENDANT_TAGS.has(child.localName) || containsBlockDescendant(child)) return true;
@@ -432,17 +434,27 @@ function visitElement(el: Element, ctx: Ctx) {
     case "pre":
       return pushPre(el, ctx);
     case "figure": {
-      const directChildren = [...el.children];
-      const nestedFigures = directChildren.filter((c) => c.localName === "figure");
-      const directCaption = collapse(directChildren.find((c) => c.localName === "figcaption")?.textContent);
+      // Nested = nearest figure ancestor is el, through any wrappers (LaTeXML flex cells, a
+      // WordPress <ul> gallery); a figure three levels down belongs to the middle one.
+      const nestedFigures: Element[] = [...el.querySelectorAll("figure")].filter((f) => f.parentElement?.closest("figure") === el);
+      const directCaption = collapse([...el.children].find((c) => c.localName === "figcaption")?.textContent);
       if (nestedFigures.length) {
-        // Each nested figure (e.g. a WordPress gallery, or an arXiv panel) keeps its own
-        // caption. A bare sibling <img>/<table> outside the nested figures — content this
-        // figure holds directly, not through a nested one — is still processed, not dropped.
-        for (const img of directChildren.filter((c) => c.localName === "img")) pushImage(img, undefined, ctx);
-        const directTable = directChildren.find((c) => c.localName === "table");
-        if (directTable) pushTable(directTable, ctx);
-        for (const nested of nestedFigures) visitElement(nested, ctx);
+        // Nested figures keep their own captions; el's own images and tables are kept too, in document order.
+        const pushedTables: Element[] = [];
+        for (const node of el.querySelectorAll("figure, img, table")) {
+          if (nestedFigures.includes(node)) {
+            visitElement(node, ctx);
+            continue;
+          }
+          const ownedHere = node.closest("figure") === el && !pushedTables.some((table) => table.contains(node));
+          if (!ownedHere) continue; // inside a nested figure, or a table pushTable already handled
+          if (node.localName === "img") pushImage(node, undefined, ctx);
+          // Otherwise a table. One that lays panel figures out (LaTeXML ltx_tabular) is layout, not data.
+          else if (!nestedFigures.some((f) => node.contains(f))) {
+            pushedTables.push(node);
+            pushTable(node, ctx);
+          }
+        }
         if (directCaption) ctx.out.push({ type: "paragraph", content: [{ text: directCaption }] });
         return;
       }

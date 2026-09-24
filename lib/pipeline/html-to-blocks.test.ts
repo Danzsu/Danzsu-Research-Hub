@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { htmlToBlocks, htmlToDrafts } from "./html-to-blocks.ts";
 import { parseSrcset } from "./html-images.ts";
-import type { BlockDraft } from "../blocks.ts";
+import { inlineText, type BlockDraft } from "../blocks.ts";
 
 const base = { baseUrl: "https://blog.test/posts/one" };
 const types = (blocks: BlockDraft[]) => blocks.map((b) => b.type);
@@ -569,4 +569,75 @@ test("a figure with nested figures still keeps content outside them: a bare sibl
 test("non-code block dedupe still uses normalised identity, not exact JSON comparison", () => {
   const blocks = htmlToDrafts(`<p>Hello world</p><p>Hello   World</p>`, base);
   assert.equal(blocks.length, 1);
+});
+
+// Compact view of figure output: img(file|caption), p(text), otherwise the block type.
+const shape = (blocks: BlockDraft[]) =>
+  blocks.map((b) => {
+    if (b.type === "image") return `img(${b.originalUrl.split("/").pop()}${b.caption ? "|" + b.caption : ""})`;
+    return b.type === "paragraph" ? `p(${inlineText(b.content)})` : b.type;
+  });
+
+test("panel figures nested under wrapper elements keep their own captions", () => {
+  const panel = (src: string, caption: string) => `<figure class="ltx_figure ltx_figure_panel"><img src="/${src}" alt="x"><figcaption>${caption}</figcaption></figure>`;
+  const latexmlFlex = htmlToDrafts(
+    `<figure class="ltx_figure"><div class="ltx_flex_figure"><div class="ltx_flex_cell">${panel("p1.png", "(a) left")}</div><div class="ltx_flex_cell">${panel("p2.png", "(b) right")}</div></div><figcaption>Figure 3: both</figcaption></figure>`,
+    base,
+  );
+  assert.deepEqual(shape(latexmlFlex), ["img(p1.png|(a) left)", "img(p2.png|(b) right)", "p(Figure 3: both)"]);
+
+  const wordpressListGallery = htmlToDrafts(
+    `<figure class="wp-block-gallery"><ul class="blocks-gallery-grid"><li class="blocks-gallery-item"><figure><img src="/a.jpg" alt="a"><figcaption>Cap A</figcaption></figure></li><li class="blocks-gallery-item"><figure><img src="/b.jpg" alt="b"><figcaption>Cap B</figcaption></figure></li></ul><figcaption class="blocks-gallery-caption">Gallery</figcaption></figure>`,
+    base,
+  );
+  assert.deepEqual(shape(wordpressListGallery), ["img(a.jpg|Cap A)", "img(b.jpg|Cap B)", "p(Gallery)"]);
+
+  // A table that lays panel figures out is layout, not data: no "(a) · (b)" row, no duplicate images.
+  const latexmlTabular = htmlToDrafts(
+    `<figure class="ltx_figure"><table class="ltx_tabular"><tr><td>${panel("q1.png", "(a)")}</td><td>${panel("q2.png", "(b)")}</td></tr></table><figcaption>Figure 4: tab</figcaption></figure>`,
+    base,
+  );
+  assert.deepEqual(shape(latexmlTabular), ["img(q1.png|(a))", "img(q2.png|(b))", "p(Figure 4: tab)"]);
+});
+
+test("a three-level nested figure visits each level once, not the innermost twice", () => {
+  const blocks = htmlToDrafts(
+    `<figure><figure><figure><img src="/deep.jpg" alt="d"><figcaption>deep</figcaption></figure><figcaption>mid</figcaption></figure></figure>`,
+    base,
+  );
+  assert.deepEqual(shape(blocks), ["img(deep.jpg|deep)", "p(mid)"]);
+});
+
+test("a figure's own images and tables and its nested figures come out in document order, each once", () => {
+  const imageAfterPanel = htmlToDrafts(`<figure><figure><img src="/a.png" alt="a"><figcaption>A</figcaption></figure><img src="/b.png" alt="b"></figure>`, base);
+  assert.deepEqual(shape(imageAfterPanel), ["img(a.png|A)", "img(b.png)"]);
+
+  const wrappedAndTabled = htmlToDrafts(
+    `<figure><a href="/big.jpg"><img src="/thumb.jpg" alt="t"></a><figure><img src="/panel.png" alt="p"><figcaption>a</figcaption></figure><table><tr><td>row</td><td><img src="/c1.png" alt="c"></td><td><img src="/c2.png" alt="c"></td></tr></table></figure>`,
+    base,
+  );
+  assert.deepEqual(shape(wrappedAndTabled), ["img(thumb.jpg)", "img(panel.png|a)", "list", "img(c1.png)", "img(c2.png)"]);
+
+  // Two images, so a repeat would not sit next to the original, where layer-2 dedupe would hide it.
+  const multiImagePanel = htmlToDrafts(
+    `<figure><figure><img src="/m1.png" alt="m"><img src="/m2.png" alt="m"><figcaption>Panels</figcaption></figure><figcaption>Outer</figcaption></figure>`,
+    base,
+  );
+  assert.deepEqual(shape(multiImagePanel), ["img(m1.png)", "img(m2.png)", "p(Panels)", "p(Outer)"]);
+});
+
+test("code spans named like noise survive even when the code block is a small part of a long page", () => {
+  const blocks = htmlToDrafts(
+    // The id="comments" span pins the guard on the denylist path too.
+    `<p>${words(300)}</p><pre><code class="language-py"><span class="token comment"># load the model</span>\n<span id="comments">model = load()</span></code></pre>`,
+    base,
+  );
+  assert.equal((blocks.find((b) => b.type === "code") as Extract<BlockDraft, { type: "code" }>).code, "# load the model\nmodel = load()");
+});
+
+test("the pandoc exception to the noise-id denylist needs both the section and a levelN class", () => {
+  const withClass = (cls: string) =>
+    htmlToDrafts(`<p>${words(40)}</p><div id="comments" class="${cls}"><h2>Comments</h2><p>Nice post!</p></div>`, base);
+  assert.deepEqual(types(withClass("section")), ["paragraph"]);
+  assert.deepEqual(types(withClass("level2")), ["paragraph"]);
 });
