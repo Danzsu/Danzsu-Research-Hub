@@ -40,8 +40,8 @@
 
 ## Review Focus
 
-1. **Lusta betöltésű képek** (`data-src`, csak `srcset`, `<picture>`): a kép nem veszhet el. Tesztje: 3. feladat, `lazy images` eset.
-2. **Relatív és protokoll-relatív kép-URL-ek** (`../img.png`, `//cdn.x/img.png`, a GitHub README relatív képei): abszolút URL-re kell feloldani. Tesztje: 3. feladat, `resolves relative image URLs`.
+1. **Lusta betöltésű képek** (`data-src`, csak `srcset`, `<picture>`): a kép nem veszhet el. Tesztje: 4. feladat, `lazy images` eset.
+2. **Relatív és protokoll-relatív kép-URL-ek** (`../img.png`, `//cdn.x/img.png`, a GitHub README relatív képei): abszolút URL-re kell feloldani. Tesztje: 4. feladat, `resolves relative image URLs`.
 3. **Túl hosszú forrás** (több mint 400 blokk vagy 200 000 karakter): levágás `meta.clipped` jelzéssel, összeomlás nélkül. Tesztje: 2. feladat, `limitBlocks clips…`.
 4. **A fordítás más span-számmal jön vissza:** az adott blokk egyszerű szövegre esik vissza, és nem dobjuk el az egész fordítást. Tesztje: 12. feladat, `applyTranslation span mismatch`.
 5. **Az újrakinyerés elbukik** (a link már nem él): a régi poszt marad, csak a hibaüzenet íródik ki. Tesztje: 9. feladat, `failureUpdate`.

@@ -26,6 +26,17 @@
   CLI nélkül: *SQL Editor*, és egymás után mindkét fájl a `supabase/migrations/` mappából (`…_init.sql`, majd `…_model_settings.sql`)
 - [ ] Ellenőrzés a *Table Editor*-ban: 8 tábla (a `model_settings`-szel együtt) és egy `archive_issues` view, mindegyik táblán „RLS enabled”
 - [ ] *Authentication → Users → Invite user*: meghívod magad
+- [ ] **Egységes poszt-sablon (M1) migrációja, SQL Editorban** (a kód nélküle nem tud blokkokat és képeket menteni):
+  1. Először ellenőrizd a check-ek nevét:
+     ```sql
+     select conrelid::regclass, conname from pg_constraint
+     where conname in ('sources_kind_check', 'posts_kind_check', 'model_settings_task_check');
+     ```
+     3 sort kell kapnod.
+  2. Futtasd le a `supabase/migrations/20260924000000_post_blocks.sql` teljes tartalmát.
+  3. Ellenőrzés: a `posts` táblában van `blocks`, `meta`, `overrides`, `hidden_blocks` oszlop; a *Storage*-ban van egy privát `media` bucket; a `model_settings`-ben 7 sor van.
+  4. Szólj, és lefuttatom a halasztott élő próbákat: `npm run ingest -- <url>` mind a hat forrástípusra, képek a `/media` route-on, fordítás, szerkesztés, újrakinyerés.
+- [ ] **Csak az M1 deployja után:** futtasd le a `supabase/migrations/20260925000000_drop_post_body.sql`-t (a régi `posts.body` oszlop törlése)
 
 ### 2. API kulcsok
 - [ ] **Gemini**: [aistudio.google.com](https://aistudio.google.com) → *Get API key*. Az ingyenes keretnél a Google felhasználhatja a beküldött adatot. Nyilvános hírekhez ez rendben van, de ha zavar, kapcsold be a fizetős csomagot.
