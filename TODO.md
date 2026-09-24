@@ -73,6 +73,16 @@
 - [ ] **3. Statisztika oldal:** heti mentések, hőtérkép, top források, címkézetlen és halott linkek.
 - [ ] **4. Discord-bemenet:** slash-parancs és üzenet-menü, ugyanarra a mentési útvonalra.
 - [ ] **5. Chat-LLM a gyűjtemény fölött:** pgvector, Gemini embedding, válasz forrásmegjelöléssel.
+  - Kiválasztott modellek (2026-09-24, Google AI Studio). A `model_settings`-be a chat alprojekttel együtt kerülnek be, feladatonként:
+
+    | Feladat | Modell | Miért |
+    | --- | --- | --- |
+    | `chat_answer` | `gemini-3.8-flash`, tartalék: `gemini-3.7-flash` | stabil, van ingyenes kerete, tud gondolkodni (thinking), függvényt hívni és Google Search / URL alapján ellenőrizni |
+    | `chat_rewrite` (követő kérdés átírása, olcsó lépések) | `gemini-3.5-flash-lite` | gyors és olcsó |
+    | `chat_embed` | `gemini-embedding-001`, **1536 dimenzió** | stabil; a pgvector HNSW-indexe `vector` típusnál legfeljebb 2000 dimenziót kezel. A 3072-nél kisebb méretű vektort normalizálni kell. |
+    | opcionális „mély” mód | `gemini-3.1-pro-preview` | csak kapcsolóval: preview, nincs ingyenes kerete, és kb. 2,7-szer drágább |
+  - **Az embedding modell „ragad”.** Ha később a `gemini-embedding-2`-re (multimodális: kép, PDF, videó) váltunk, mindent újra kell vektorizálni, ezért a vektor mellett a modellnevet is tároljuk. A 2-es jelenleg preview, ezért még nem erre építünk.
+  - **Ár:** a 3.8 és a 3.7 Flash ára 2027. január 1-jén megduplázódik (input $0.75 → $1.50, output $3.75 → $7.50 / 1M token).
 - [ ] **Jövőbeli:** saját online könyvtár, ahol a PDF-ek és könyvek egy GitHub-repóban vannak, nem a Supabase bucketban.
 
 ### Következő lépések

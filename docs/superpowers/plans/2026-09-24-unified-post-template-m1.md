@@ -18,7 +18,7 @@
 
 - Node `>=22.13.0`. A tesztek `node --experimental-strip-types --test`-tel futnak. A `lib/blocks.ts`, `lib/translate.ts`, `lib/llm.ts` és a `lib/pipeline/**` fájlok **relatív `.ts` importot** használnak, `@/` nélkül.
 - Új függőség csak a `sharp`, **pontos verzióval**: `"sharp": "0.35.4"` (már most is a lockfile-ban van a Next.js miatt). Más új csomag nem kerülhet be.
-- **Az egyetlen Supabase-projekt az éles adatbázis.** A migráció csak bővíthet (új oszlopok, szélesebb check-ek) addig, amíg az új kód nincs kint. A `posts.body` oszlop csak a 13. feladatban, a deploy után törlődik.
+- **Az egyetlen Supabase-projekt az éles adatbázis.** A migráció csak bővíthet (új oszlopok, szélesebb check-ek) addig, amíg az új kód nincs kint. A `posts.body` oszlop csak a 14. feladatban, a deploy után törlődik.
 - A DDL-t a felhasználó futtatja a Supabase SQL Editorban. Az implementáló ezt nem tudja megtenni.
 - Nyers HTML nem kerülhet az oldalra (`dangerouslySetInnerHTML` tilos). Linkből csak `http:` és `https:` maradhat.
 - Minden idegen, felhasználó által megadott URL letöltése a `safeFetch`-en megy (a képeké is). A fix API-hostok (api.github.com, export.arxiv.org, publish.twitter.com, youtube.com/oembed) mehetnek sima `fetch`-csel.
@@ -26,13 +26,24 @@
 - Design: `CLAUDE.md` „Design language” és „Responsive rules” szakasz. `--radius` 0, rendszerbetűk, keményen eltolt árnyékok, 360 px-en nincs vízszintes görgetés, legalább 40 px-es érintési felületek.
 - A felületi szövegek HU/EN, a kódazonosítók angolok. A commitok Conventional Commits formátumúak, kisbetűs tárggyal, attribúció nélkül.
 - Korlátok: 400 blokk / 200 000 karakter; 30 kép × 5 MB; 20 MB PDF; képszélességek 640 és 1280 px; a képek legalább 64 px-esek.
+- **Duplikáció (kiemelt cél):** mielőtt segédfüggvényt vagy osztálylistát írsz, keress rá (`grep -rn`), és a meglévőt használd. Közös helyek:
+  - `lib/media.ts`: kép-útvonalak
+  - `lib/api.ts`: `jsonError`
+  - `lib/supabase/server.ts`: `getReader` / `getViewer`
+  - `lib/pipeline/util.ts`: `hostOf`, `parseId`, `detectSource`…
+  - `lib/pipeline/fetch.ts`: `safeFetch`, `readText`
+  - `lib/blocks.ts`: `localizedSchema`, `parseBlocks`
+  - `extract/article.ts`: `readPageMeta`
+  - UI: a `Button` `ink` / `signal` / `brutal` variánsa, a `focus-ring` utility, a `PageHeader` és a `PageHero`
+
+  Minden feladat végén futtasd: `npm run dup` (jscpd). Az ismétlés legfeljebb 1% lehet, és új klón nem kerülhet be.
 
 ## Review Focus
 
 1. **Lusta betöltésű képek** (`data-src`, csak `srcset`, `<picture>`): a kép nem veszhet el. Tesztje: 3. feladat, `lazy images` eset.
 2. **Relatív és protokoll-relatív kép-URL-ek** (`../img.png`, `//cdn.x/img.png`, a GitHub README relatív képei): abszolút URL-re kell feloldani. Tesztje: 3. feladat, `resolves relative image URLs`.
 3. **Túl hosszú forrás** (több mint 400 blokk vagy 200 000 karakter): levágás `meta.clipped` jelzéssel, összeomlás nélkül. Tesztje: 2. feladat, `limitBlocks clips…`.
-4. **A fordítás más span-számmal jön vissza:** az adott blokk egyszerű szövegre esik vissza, és nem dobjuk el az egész fordítást. Tesztje: 11. feladat, `applyTranslation span mismatch`.
+4. **A fordítás más span-számmal jön vissza:** az adott blokk egyszerű szövegre esik vissza, és nem dobjuk el az egész fordítást. Tesztje: 12. feladat, `applyTranslation span mismatch`.
 5. **Az újrakinyerés elbukik** (a link már nem él): a régi poszt marad, csak a hibaüzenet íródik ki. Tesztje: 9. feladat, `failureUpdate`.
 
 ---
@@ -42,9 +53,11 @@
 | Fájl | Felelősség |
 | --- | --- |
 | `supabase/migrations/20260924000000_post_blocks.sql` | új `posts` oszlopok, `sources.kind`, `model_settings` feladatok, `media` bucket, `update_post_overrides` |
-| `lib/blocks.ts` (+ teszt) | blokk zod-séma, típusok, `assignIds`, `safeHref`, `blockText`, `plainText`, `sectionsToBlocks`, `limitBlocks` |
-| `lib/pipeline/util.ts` (+ teszt) | `fnv1a`, `detectSource`, `youtubeId`, `arxivId`, `githubRepo`, `xStatusId`, `cooldownRemaining`, `formatTimestamp` |
-| `lib/pipeline/fetch.ts` | `safeFetch`, `readLimited`, `FetchError`, `USER_AGENT` (az `ingest.ts`-ből kiemelve) |
+| `lib/blocks.ts` (+ teszt) | blokk zod-séma, típusok, `assignIds`, `safeHref`, `blockText`, `plainText`, `sectionsToBlocks`, `limitBlocks`, `localizedSchema`, `parseBlocks` |
+| `lib/pipeline/util.ts` (+ teszt) | `fnv1a`, `detectSource`, `youtubeId`, `arxivId`, `githubRepo`, `xStatusId`, `cooldownRemaining`, `formatTimestamp`, `hostOf`, `parseId` |
+| `lib/pipeline/fetch.ts` | `safeFetch`, `readLimited`, `readText`, `FetchError`, `USER_AGENT` (az `ingest.ts`-ből kiemelve) |
+| `lib/media.ts` | tiszta kép-útvonal segédek (`variantPath`, `mediaUrl`, `isMediaKey`, `MEDIA_TYPES`); a szerver, a route és a renderer is ezt használja, így a `sharp` nem kerül a kliens bundle-be |
+| `lib/api.ts` | `jsonError` a route-okhoz |
 | `lib/pipeline/html-to-blocks.ts` (+ teszt) | 1. réteg `cleanDocument`, átalakító, 2. réteg `filterNoise` |
 | `lib/pipeline/images.ts` (+ teszt) | `encodeImage`, `mirrorImages`, `imageKey`, `unusedMediaPaths`, `isMediaKey` |
 | `lib/pipeline/extract/types.ts` | `Extracted`, `Extractor` |
@@ -63,7 +76,9 @@
 | `app/library/[id]/page.tsx`, `post-toolbar.tsx`, `post-editor.tsx` | a poszt oldal, az eszközsor, a szerkesztő |
 | `app/library/page.tsx` | kártyák: `overrides`, típus-ikon |
 | `app/api/posts/[id]/route.ts`, `translate/route.ts`, `reextract/route.ts` | kis javítások, fordítás, újrakinyerés |
-| `app/api/sources/route.ts` | `detectSource` |
+| `app/api/sources/route.ts`, `app/api/state/route.ts` | `detectSource`; `getReader` + `jsonError` |
+| `components/ui/button.tsx`, `app/globals.css`, `app/components/page-header.tsx` | közös UI: `ink` / `signal` / `brutal` gombvariáns, `focus-ring` utility, `PageHero` |
+| `scripts/ingest-url.mts` | fejlesztői eszköz: egy URL feldolgozása helyben (`npm run ingest -- <url>`) |
 
 ---
 
@@ -174,7 +189,7 @@ git commit -m "feat(db): add block columns, source kinds and the media bucket"
 
 **Files:**
 - Create: `lib/blocks.ts`, `lib/blocks.test.ts`
-- Modify: `lib/pipeline/util.ts` (`fnv1a` kiemelése), `package.json` (`test` script)
+- Modify: `lib/pipeline/util.ts` (`fnv1a` kiemelése), `lib/pipeline/daily.ts` (`localizedSchema`), `package.json` (`test` és `dup` script)
 
 **Interfaces:**
 - Consumes: semmi
@@ -187,6 +202,7 @@ git commit -m "feat(db): add block columns, source kinds and the media bucket"
   - `sectionsToBlocks(sections: { heading: string; points: string[] }[]): BlockDraft[]`
   - `withoutIds(blocks: Block[]): BlockDraft[]`
   - `limitBlocks(blocks: Block[], maxBlocks?: number, maxChars?: number): { blocks: Block[]; clipped: boolean }`
+  - `localizedSchema` (zod `{ hu, en }`), `parseBlocks(value: unknown): Block[]`
   - `util.ts`: `fnv1a(text: string): string` (8 hex jegy)
 
 - [ ] **Step 1: A teszt megírása**
@@ -196,7 +212,7 @@ git commit -m "feat(db): add block columns, source kinds and the media bucket"
 ```ts
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assignIds, blockSchema, limitBlocks, plainText, safeHref, sectionsToBlocks, type BlockDraft } from "./blocks.ts";
+import { assignIds, blockSchema, limitBlocks, parseBlocks, plainText, safeHref, sectionsToBlocks, type BlockDraft } from "./blocks.ts";
 import { itemId, isoWeek, shortHash } from "./pipeline/util.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
@@ -254,6 +270,13 @@ test("limitBlocks clips by count and by characters", () => {
   assert.equal(limitBlocks(assignIds([p("short")])).clipped, false);
 });
 
+test("parseBlocks turns bad stored data into an empty list instead of throwing", () => {
+  assert.deepEqual(parseBlocks([{ id: "x", type: "nope" }]), []);
+  assert.deepEqual(parseBlocks(null), []);
+  const valid = assignIds([p("ok")]);
+  assert.deepEqual(parseBlocks(valid), valid);
+});
+
 test("fnv1a refactor keeps existing digest item ids unchanged", () => {
   // Pinned value: ids are primary keys in item_states and must never change.
   const week = isoWeek(new Date("2026-09-23T00:00:00Z"));
@@ -267,7 +290,8 @@ test("fnv1a refactor keeps existing digest item ids unchanged", () => {
 A `package.json`-ban a `test` script legyen:
 
 ```json
-"test": "node --experimental-strip-types --no-warnings --test \"lib/**/*.test.ts\""
+"test": "node --experimental-strip-types --no-warnings --test \"lib/**/*.test.ts\"",
+"dup": "npx -y jscpd@4.3.0 app lib scripts proxy.ts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console"
 ```
 
 Futtatás: `npm test`
@@ -310,6 +334,9 @@ export const inlineSchema = z.object({
   code: z.literal(true).optional(),
 });
 export type Inline = z.infer<typeof inlineSchema>;
+
+/** Text that exists in both site languages; the zod twin of `Localized` in data/digest-types.ts. */
+export const localizedSchema = z.object({ hu: z.string(), en: z.string() });
 
 const id = z.string();
 
@@ -354,6 +381,9 @@ export type ImageBlock = Extract<Block, { type: "image" }>;
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 /** A block before `assignIds`; extractors build these. */
 export type BlockDraft = DistributiveOmit<Block, "id">;
+
+/** Stored JSON → blocks. Bad data renders as an empty post instead of crashing the page. */
+export const parseBlocks = (value: unknown): Block[] => blocksSchema.catch([]).parse(value ?? []);
 
 export function safeHref(raw: string | null | undefined, base: string): string | undefined {
   if (!raw) return undefined;
@@ -433,24 +463,29 @@ export function limitBlocks(blocks: Block[], maxBlocks = 400, maxChars = 200_000
 }
 ```
 
-- [ ] **Step 5: A tesztek futtatása, át kell menniük**
+- [ ] **Step 5: A `daily.ts` átállítása a közös sémára**
+
+A `lib/pipeline/daily.ts`-ben töröld a helyi `localized` zod-objektumot. Importáld: `import { localizedSchema } from "../blocks.ts";`, és a `curatedSchema` három `localized` hivatkozását cseréld `localizedSchema`-ra.
+
+- [ ] **Step 6: A tesztek futtatása, át kell menniük**
 
 Futtatás: `npm test` → Elvárt: minden PASS, a régi `util.test.ts` is.
 Futtatás: `npx tsc --noEmit` → Elvárt: nincs kimenet.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add lib/blocks.ts lib/blocks.test.ts lib/pipeline/util.ts package.json
+git add lib/blocks.ts lib/blocks.test.ts lib/pipeline/util.ts lib/pipeline/daily.ts package.json
 git commit -m "feat: add the typed content block model"
 ```
 
 ---
 
-### Task 3: Forrásfelismerés és URL-segédek
+### Task 3: Forrásfelismerés, URL- és API-segédek
 
 **Files:**
-- Modify: `lib/pipeline/util.ts`, `lib/pipeline/util.test.ts`, `app/api/sources/route.ts`
+- Create: `lib/api.ts`
+- Modify: `lib/pipeline/util.ts`, `lib/pipeline/util.test.ts`, `lib/supabase/server.ts`, `app/api/sources/route.ts`, `app/api/state/route.ts`
 
 **Interfaces:**
 - Consumes: semmi új
@@ -460,11 +495,14 @@ git commit -m "feat: add the typed content block model"
   - `youtubeId(url: URL): string | null`, `arxivId(url: URL): string | null`, `githubRepo(url: URL): { owner: string; repo: string } | null`, `xStatusId(url: URL): string | null`
   - `cooldownRemaining(extractedAt: string | null, now: Date, minutes?: number): number` (másodperc)
   - `formatTimestamp(seconds: number): string`
+  - `hostOf(url: string): string`, `parseId(raw: string): number | null`
+  - `lib/supabase/server.ts`: `getReader(): Promise<{ db: SupabaseClient; viewer: Viewer } | null>`; a `getViewer` erre épül
+  - `lib/api.ts`: `jsonError(status: number, error: string, extra?: Record<string, unknown>): NextResponse`
   - a `sourceKind` megszűnik
 
 - [ ] **Step 1: A tesztek bővítése** (`lib/pipeline/util.test.ts`)
 
-Az importban cseréld a `sourceKind`-ot: `detectSource, youtubeId, arxivId, githubRepo, xStatusId, cooldownRemaining, formatTimestamp`. A régi `sourceKind and publishedLabel` tesztet cseréld erre:
+Az importban cseréld a `sourceKind`-ot: `detectSource, youtubeId, arxivId, githubRepo, xStatusId, cooldownRemaining, formatTimestamp, hostOf, parseId`. A régi `sourceKind and publishedLabel` tesztet cseréld erre:
 
 ```ts
 test("detectSource and its URL helpers", () => {
@@ -498,6 +536,12 @@ test("cooldownRemaining and formatTimestamp", () => {
   assert.equal(cooldownRemaining("2026-09-24T09:40:00Z", now), 0);
   assert.equal(formatTimestamp(65), "1:05");
   assert.equal(formatTimestamp(3725), "1:02:05");
+});
+
+test("hostOf and parseId", () => {
+  assert.equal(hostOf("https://www.blog.test/a"), "blog.test");
+  assert.equal(parseId("42"), 42);
+  for (const bad of ["", "0", "4.2", "-1", "abc", "1e3", "12345678901234567"]) assert.equal(parseId(bad), null, bad);
 });
 
 test("publishedLabel", () => {
@@ -570,11 +614,79 @@ export function formatTimestamp(seconds: number): string {
   const s = String(Math.floor(seconds % 60)).padStart(2, "0");
   return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
+
+export const hostOf = (url: string) => new URL(url).hostname.replace(/^www\./, "");
+
+/** Route and page ids: positive integers only. */
+export const parseId = (raw: string): number | null => (/^[1-9]\d{0,15}$/.test(raw) ? Number(raw) : null);
 ```
 
-- [ ] **Step 4: A route átállítása** (`app/api/sources/route.ts`)
+- [ ] **Step 4: Közös API-segédek és a route-ok átállítása**
 
-Az importban: `import { detectSource, parseSubmittedUrl } from "@/lib/pipeline/util";`. A beszúrásban: `kind: detectSource(url)`.
+`lib/api.ts`:
+
+```ts
+import { NextResponse } from "next/server";
+
+export const jsonError = (status: number, error: string, extra: Record<string, unknown> = {}) =>
+  NextResponse.json({ error, ...extra }, { status });
+```
+
+`lib/supabase/server.ts`: a meglévő `getViewer`-t cseréld erre a párosra:
+
+```ts
+/** The signed-in reader's client, or null: the one auth check every API route starts with. */
+export async function getReader(): Promise<{ db: Awaited<ReturnType<typeof createClient>>; viewer: Viewer } | null> {
+  const db = await createClient();
+  const { data } = await db.auth.getClaims();
+  const claims = data?.claims;
+  return claims?.sub ? { db, viewer: { id: claims.sub, email: String(claims.email ?? "") } } : null;
+}
+
+export async function getViewer(): Promise<Viewer | null> {
+  return (await getReader())?.viewer ?? null;
+}
+```
+
+`app/api/sources/route.ts`:
+
+```ts
+import { after, NextResponse } from "next/server";
+import { jsonError } from "@/lib/api";
+import { processSource } from "@/lib/pipeline/ingest";
+import { detectSource, parseSubmittedUrl } from "@/lib/pipeline/util";
+import { createAdminClient, getReader } from "@/lib/supabase/server";
+
+export const maxDuration = 300;
+
+export async function POST(request: Request) {
+  const reader = await getReader();
+  if (!reader) return jsonError(401, "unauthorized");
+
+  const body = (await request.json().catch(() => ({}))) as { url?: unknown; note?: unknown };
+  const url = parseSubmittedUrl(String(body.url ?? ""));
+  if (!url) return jsonError(400, "invalid_url");
+  const note = String(body.note ?? "").trim().slice(0, 500) || null;
+
+  // Inserted as the reader (RLS stamps submitted_by); processed with the admin client.
+  const { data, error } = await reader.db
+    .from("sources")
+    .insert({ url: url.toString(), kind: detectSource(url), note })
+    .select("id")
+    .single();
+  if (error?.code === "23505") return jsonError(409, "already_submitted");
+  if (error || !data) return jsonError(500, "insert_failed");
+
+  // Respond now; the summary takes a while. A killed run is picked up by the daily cron.
+  after(() => processSource(createAdminClient(), data.id));
+  return NextResponse.json({ ok: true, id: data.id }, { status: 202 });
+}
+```
+
+`app/api/state/route.ts`:
+- A helyi `reader()`, `unauthorized` és `failed` függvény helyett: `import { jsonError } from "@/lib/api";`, `import { getReader } from "@/lib/supabase/server";` és `const failed = () => jsonError(500, "db_error");`.
+- A `GET` és a `POST` eleje: `const reader = await getReader(); if (!reader) return jsonError(401, "unauthorized"); const db = reader.db;`.
+- Minden `NextResponse.json({ error: X }, { status: N })` hívás legyen `jsonError(N, X)`.
 
 - [ ] **Step 5: Ellenőrzés**
 
@@ -583,8 +695,8 @@ Futtatás: `npm test` → PASS. Futtatás: `npx tsc --noEmit`. Elvárt: csak az 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/pipeline/util.ts lib/pipeline/util.test.ts app/api/sources/route.ts
-git commit -m "feat: detect arxiv, github, x and pdf sources"
+git add lib/api.ts lib/supabase/server.ts lib/pipeline/util.ts lib/pipeline/util.test.ts app/api/sources/route.ts app/api/state/route.ts
+git commit -m "feat: detect arxiv, github, x and pdf sources; share api auth helpers"
 ```
 
 ---
@@ -1076,14 +1188,15 @@ git commit -m "feat: convert html to content blocks with two noise-filter layers
 ### Task 5: Biztonságos letöltés kiemelése és a képfeldolgozás
 
 **Files:**
-- Create: `lib/pipeline/fetch.ts`, `lib/pipeline/images.ts`, `lib/pipeline/images.test.ts`
+- Create: `lib/media.ts`, `lib/pipeline/fetch.ts`, `lib/pipeline/images.ts`, `lib/pipeline/images.test.ts`
 - Modify: `lib/pipeline/ingest.ts` (a `safeFetch` importja), `package.json` (`sharp`)
 
 **Interfaces:**
 - Consumes: `Block`, `ImageBlock` (2. feladat); `isPrivateAddress`, `parseSubmittedUrl` (`util.ts`)
 - Produces:
-  - `fetch.ts`: `class FetchError extends Error`, `USER_AGENT: string`, `safeFetch(raw: string, init?: { accept?: string; timeoutMs?: number }): Promise<Response>`, `readLimited(response: Response, limit: number): Promise<Buffer>`
-  - `images.ts`: `MEDIA_BUCKET = "media"`, `type Encoded`, `encodeImage(input: Buffer): Promise<Encoded | null>`, `imageKey(sourceId: number, originalUrl: string): string`, `variantPath(key: string, width: number, format: "avif" | "webp" | "svg"): string`, `isMediaKey(key: string): boolean`, `mirrorImages(db: SupabaseClient, sourceId: number, blocks: Block[], previous?: Block[]): Promise<Block[]>`, `unusedMediaPaths(existing: string[], blocks: Block[]): string[]`, `MEDIA_TYPES: Record<"avif" | "webp" | "svg", string>`
+  - `fetch.ts`: `class FetchError extends Error`, `USER_AGENT: string`, `safeFetch(raw: string, init?: { accept?: string; timeoutMs?: number }): Promise<Response>`, `readLimited(response: Response, limit: number): Promise<Buffer>`, `readText(response: Response, limit: number): Promise<string>`
+  - `media.ts` (tiszta, kliensoldalon is importálható): `MEDIA_BUCKET = "media"`, `MEDIA_TYPES`, `type MediaFormat`, `variantPath(key, width, format): string`, `isMediaKey(key): boolean`, `mediaUrl(key, width, format): string`
+  - `images.ts`: `type Encoded`, `encodeImage(input: Buffer): Promise<Encoded | null>`, `imageKey(sourceId: number, originalUrl: string): string`, `mirrorImages(db: SupabaseClient, sourceId: number, blocks: Block[], previous?: Block[]): Promise<Block[]>`, `unusedMediaPaths(existing: string[], blocks: Block[]): string[]`
 
 - [ ] **Step 1: A `sharp` felvétele pontos verzióval**
 
@@ -1096,7 +1209,8 @@ Elvárt: a `package.json`-ban `"sharp": "0.35.4"`, és a lockfile frissül.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import sharp from "sharp";
-import { encodeImage, imageKey, isMediaKey, unusedMediaPaths, variantPath } from "./images.ts";
+import { isMediaKey, variantPath } from "../media.ts";
+import { encodeImage, imageKey, unusedMediaPaths } from "./images.ts";
 import type { Block } from "../blocks.ts";
 
 const png = (width: number, height: number) =>
@@ -1210,22 +1324,38 @@ export async function readLimited(response: Response, limit: number): Promise<Bu
   }
   return Buffer.concat(chunks);
 }
+
+export const readText = async (response: Response, limit: number) => new TextDecoder().decode(await readLimited(response, limit));
 ```
 
 Az `ingest.ts`-ből töröld a helyi `safeFetch`-et, és importáld: `import { safeFetch } from "./fetch.ts";`. Töröld a már nem használt `lookup` és `isPrivateAddress` importot is.
 
-- [ ] **Step 5: A `lib/pipeline/images.ts` megírása**
+- [ ] **Step 5: A `lib/media.ts` és a `lib/pipeline/images.ts` megírása**
+
+`lib/media.ts` (nincs benne `sharp` és `node:` import, mert a renderer a kliensen is betölti):
+
+```ts
+// Pure: shared by the image pipeline, the /media route and the renderer (also client-side).
+export const MEDIA_BUCKET = "media";
+export const MEDIA_TYPES = { avif: "image/avif", webp: "image/webp", svg: "image/svg+xml" } as const;
+export type MediaFormat = keyof typeof MEDIA_TYPES;
+
+export const variantPath = (key: string, width: number, format: MediaFormat) => `${key}-${width}.${format}`;
+
+export const isMediaKey = (key: string) => /^\d+\/[0-9a-f]{16}-\d+\.(avif|webp|svg)$/.test(key);
+
+export const mediaUrl = (key: string, width: number, format: MediaFormat) => `/media/${variantPath(key, width, format)}`;
+```
+
+`lib/pipeline/images.ts`:
 
 ```ts
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import type { Block, ImageBlock } from "../blocks.ts";
+import { MEDIA_BUCKET, MEDIA_TYPES, variantPath, type MediaFormat } from "../media.ts";
 import { readLimited, safeFetch } from "./fetch.ts";
-
-export const MEDIA_BUCKET = "media";
-export const MEDIA_TYPES = { avif: "image/avif", webp: "image/webp", svg: "image/svg+xml" } as const;
-type Format = keyof typeof MEDIA_TYPES;
 
 const MAX_IMAGES = 30;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -1235,7 +1365,7 @@ const CONCURRENCY = 4;
 const PIXEL_LIMIT = 40_000_000; // decompression-bomb guard
 
 export type Encoded = {
-  format: Format;
+  format: MediaFormat;
   width: number;
   height: number;
   placeholder?: string;
@@ -1244,10 +1374,6 @@ export type Encoded = {
 
 export const imageKey = (sourceId: number, originalUrl: string) =>
   `${sourceId}/${createHash("sha1").update(originalUrl).digest("hex").slice(0, 16)}`;
-
-export const variantPath = (key: string, width: number, format: Format) => `${key}-${width}.${format}`;
-
-export const isMediaKey = (key: string) => /^\d+\/[0-9a-f]{16}-\d+\.(avif|webp|svg)$/.test(key);
 
 /** AVIF at two widths (animated → animated WebP); null for images too small to be content. */
 export async function encodeImage(input: Buffer): Promise<Encoded | null> {
@@ -1258,7 +1384,7 @@ export async function encodeImage(input: Buffer): Promise<Encoded | null> {
   if (meta.format === "svg") return { format: "svg", width, height, variants: [{ width, data: input }] };
 
   const animated = (meta.pages ?? 1) > 1;
-  const format: Format = animated ? "webp" : "avif";
+  const format: MediaFormat = animated ? "webp" : "avif";
   const targets = [...new Set(WIDTHS.map((target) => Math.min(target, width)))];
   const variants = await Promise.all(
     targets.map(async (target) => {
@@ -1352,7 +1478,7 @@ Futtatás: `npm test` → PASS (az AVIF-kódolás miatt pár másodperc). Futtat
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/pipeline/fetch.ts lib/pipeline/images.ts lib/pipeline/images.test.ts lib/pipeline/ingest.ts package.json pnpm-lock.yaml
+git add lib/media.ts lib/pipeline/fetch.ts lib/pipeline/images.ts lib/pipeline/images.test.ts lib/pipeline/ingest.ts package.json pnpm-lock.yaml
 git commit -m "feat: mirror images as responsive AVIF variants"
 ```
 
@@ -1364,13 +1490,13 @@ git commit -m "feat: mirror images as responsive AVIF variants"
 - Create: `app/media/[...path]/route.ts`
 
 **Interfaces:**
-- Consumes: `isMediaKey`, `MEDIA_BUCKET`, `MEDIA_TYPES` (5. feladat); `getViewer`, `createAdminClient` (`lib/supabase/server.ts`)
+- Consumes: `isMediaKey`, `MEDIA_BUCKET`, `MEDIA_TYPES` (`lib/media.ts`, 5. feladat); `getViewer`, `createAdminClient` (`lib/supabase/server.ts`)
 - Produces: `GET /media/<sourceId>/<hash>-<width>.<avif|webp|svg>`
 
 - [ ] **Step 1: A route megírása**
 
 ```ts
-import { MEDIA_BUCKET, MEDIA_TYPES, isMediaKey } from "@/lib/pipeline/images";
+import { MEDIA_BUCKET, MEDIA_TYPES, isMediaKey } from "@/lib/media";
 import { createAdminClient, getViewer } from "@/lib/supabase/server";
 
 // Mirrored images are for signed-in readers only. Keys are content-addressed,
@@ -1417,11 +1543,11 @@ git commit -m "feat: serve mirrored images behind the session check"
 - Create: `lib/pipeline/extract/types.ts`, `lib/pipeline/extract/article.ts`, `lib/pipeline/extract/pdf.ts`, `lib/pipeline/extract/github.ts`, `lib/pipeline/extract/arxiv.ts`, `lib/pipeline/extract/extract.test.ts`
 
 **Interfaces:**
-- Consumes: `htmlToBlocks`, `htmlToDrafts`, `cleanDocument` (4. feladat); `safeFetch`, `readLimited`, `FetchError` (5. feladat); `assignIds`, `plainText`, `withoutIds`, `BlockDraft` (2. feladat); `githubRepo`, `arxivId` (3. feladat)
+- Consumes: `htmlToBlocks`, `htmlToDrafts`, `cleanDocument` (4. feladat); `safeFetch`, `readLimited`, `readText`, `FetchError` (5. feladat); `assignIds`, `plainText`, `withoutIds`, `BlockDraft` (2. feladat); `githubRepo`, `arxivId`, `hostOf` (3. feladat)
 - Produces:
   - `llm.ts`: `Task` új értékekkel; `generate(db, task, schema, prompt, options?: { youtubeUrl?: string; pdfBase64?: string })`
   - `types.ts`: `type ExtractedMeta`, `type Extracted`, `type Extractor = (db: SupabaseClient, url: string, note: string) => Promise<Extracted>`
-  - `article.ts`: `extractArticle: Extractor`, `articleFromHtml(html: string, finalUrl: string, robotsHeader?: string | null): Extracted`
+  - `article.ts`: `extractArticle: Extractor`, `articleFromHtml(html: string, finalUrl: string, robotsHeader?: string | null): Extracted`, `readPageMeta(document: Document): PageMeta`
   - `github.ts`: `extractGithub: Extractor`
   - `pdf.ts`: `extractPdf: Extractor`, `extractPdfResponse(db, url, response, note): Promise<Extracted>`, `fromLlmBlock(block: LlmBlock): BlockDraft | null`
   - `arxiv.ts`: `extractArxiv: Extractor`, `parseArxivAtom(xml: string): ArxivMeta`, `isArxivHtml(html: string): boolean`
@@ -1563,40 +1689,46 @@ export type Extractor = (db: SupabaseClient, url: string, note: string) => Promi
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import { plainText } from "../../blocks.ts";
-import { FetchError, readLimited, safeFetch } from "../fetch.ts";
+import { FetchError, readText, safeFetch } from "../fetch.ts";
 import { cleanDocument, htmlToBlocks } from "../html-to-blocks.ts";
+import { hostOf } from "../util.ts";
 import { extractPdfResponse } from "./pdf.ts";
 import type { Extracted, Extractor } from "./types.ts";
 
 const MAX_HTML = 8 * 1024 * 1024;
 
-function metaContent(document: Document, selector: string): string | undefined {
-  return document.querySelector(selector)?.getAttribute("content")?.trim() || undefined;
+export type PageMeta = { title?: string; description?: string; siteName?: string; published?: string; robots: string };
+
+/** The page's own metadata; also the last-resort content of `metadataOnly`. */
+export function readPageMeta(document: Document): PageMeta {
+  const content = (selector: string) => document.querySelector(selector)?.getAttribute("content")?.trim() || undefined;
+  return {
+    title: content('meta[property="og:title"]') ?? (document.querySelector("title")?.textContent?.trim() || undefined),
+    description: content('meta[property="og:description"]') ?? content('meta[name="description"]'),
+    siteName: content('meta[property="og:site_name"]'),
+    published: content('meta[property="article:published_time"]'),
+    robots: content('meta[name="robots"]') ?? "",
+  };
 }
 
 /** Pure: page HTML → blocks and metadata. Throws when nothing readable is left. */
 export function articleFromHtml(html: string, finalUrl: string, robotsHeader?: string | null): Extracted {
-  const { document } = parseHTML(html);
-  const doc = document as unknown as Document;
-  const robots = metaContent(doc, 'meta[name="robots"]') ?? "";
-  const noarchive = /noarchive/i.test(robots) || /noarchive/i.test(robotsHeader ?? "");
-  const siteName = metaContent(doc, 'meta[property="og:site_name"]') ?? new URL(finalUrl).hostname.replace(/^www\./, "");
-  const published = metaContent(doc, 'meta[property="article:published_time"]');
-
+  const doc = parseHTML(html).document as unknown as Document;
+  const page = readPageMeta(doc);
   cleanDocument(doc.body as unknown as Element);
   const parsed = new Readability(doc).parse();
   const blocks = htmlToBlocks(parsed?.content ?? "", { baseUrl: finalUrl });
   const text = plainText(blocks);
   if (text.length < 200) throw new Error("no readable article text found");
 
-  const date = published ?? parsed?.publishedTime ?? undefined;
+  const date = page.published ?? parsed?.publishedTime ?? undefined;
   return {
     blocks,
-    title: parsed?.title?.trim() || metaContent(doc, 'meta[property="og:title"]') || finalUrl,
+    title: parsed?.title?.trim() || page.title || finalUrl,
     author: (parsed?.byline ?? null)?.slice(0, 120) ?? null,
-    siteName,
+    siteName: page.siteName ?? hostOf(finalUrl),
     publishedAt: date && !Number.isNaN(Date.parse(date)) ? new Date(date).toISOString().slice(0, 10) : null,
-    meta: noarchive ? { noarchive: true } : {},
+    meta: /noarchive/i.test(`${page.robots} ${robotsHeader ?? ""}`) ? { noarchive: true } : {},
     text,
   };
 }
@@ -1605,8 +1737,7 @@ export const extractArticle: Extractor = async (db, url, note) => {
   const response = await safeFetch(url, { accept: "text/html,application/xhtml+xml,application/pdf;q=0.9" });
   if (!response.ok) throw new FetchError(`fetch ${response.status}`);
   if ((response.headers.get("content-type") ?? "").includes("application/pdf")) return extractPdfResponse(db, url, response, note);
-  const html = new TextDecoder().decode(await readLimited(response, MAX_HTML));
-  return articleFromHtml(html, response.url || url, response.headers.get("x-robots-tag"));
+  return articleFromHtml(await readText(response, MAX_HTML), response.url || url, response.headers.get("x-robots-tag"));
 };
 ```
 
@@ -1619,6 +1750,7 @@ import { z } from "zod/v4";
 import { assignIds, plainText, type BlockDraft } from "../../blocks.ts";
 import { generate } from "../../llm.ts";
 import { FetchError, readLimited, safeFetch } from "../fetch.ts";
+import { hostOf } from "../util.ts";
 import type { Extracted, Extractor } from "./types.ts";
 
 const MAX_PDF = 20 * 1024 * 1024;
@@ -1669,7 +1801,7 @@ export async function extractPdfResponse(db: Parameters<Extractor>[0], url: stri
     blocks,
     title: result.title || new URL(url).pathname.split("/").pop() || url,
     author: result.author ?? null,
-    siteName: new URL(url).hostname.replace(/^www\./, ""),
+    siteName: hostOf(url),
     publishedAt: null,
     meta: {},
     text: plainText(blocks),
@@ -1757,7 +1889,7 @@ export const extractGithub: Extractor = async (_db, url) => {
 ```ts
 import { XMLParser } from "fast-xml-parser";
 import { assignIds, withoutIds, type Block, type BlockDraft } from "../../blocks.ts";
-import { readLimited, safeFetch } from "../fetch.ts";
+import { readText, safeFetch } from "../fetch.ts";
 import { arxivId } from "../util.ts";
 import { articleFromHtml } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
@@ -1798,7 +1930,7 @@ export const extractArxiv: Extractor = async (db, url, note) => {
 
   try {
     const response = await safeFetch(`https://arxiv.org/html/${id}`, { accept: "text/html" });
-    const html = response.ok ? new TextDecoder().decode(await readLimited(response, 16 * 1024 * 1024)) : "";
+    const html = response.ok ? await readText(response, 16 * 1024 * 1024) : "";
     if (isArxivHtml(html)) {
       // Figures are relative to the paper's directory, so the base needs a trailing slash.
       const base = (response.url || `https://arxiv.org/html/${id}`).replace(/\/?$/, "/");
@@ -1852,7 +1984,7 @@ git commit -m "feat: extract articles, pdfs, github repos and arxiv papers into 
 - Create: `lib/pipeline/summary.ts`, `lib/pipeline/extract/youtube.ts`, `lib/pipeline/extract/x.ts`, `lib/pipeline/extract/index.ts`, `lib/pipeline/extract/media.test.ts`
 
 **Interfaces:**
-- Consumes: `generate` (`lib/llm.ts`); `Extracted`, `Extractor` (7. feladat); `assignIds`, `plainText`, `sectionsToBlocks`, `BlockDraft`, `Inline` (2. feladat); `htmlToDrafts` (4. feladat); `youtubeId`, `SourceKind` (3. feladat); `safeFetch`, `readLimited`, `FetchError` (5. feladat)
+- Consumes: `generate` (`lib/llm.ts`); `Extracted`, `Extractor` (7. feladat); `assignIds`, `plainText`, `sectionsToBlocks`, `BlockDraft`, `Inline` (2. feladat); `htmlToDrafts` (4. feladat); `youtubeId`, `SourceKind`, `hostOf` (3. feladat); `safeFetch`, `readText`, `FetchError` (5. feladat); `readPageMeta` (7. feladat); `localizedSchema` (2. feladat)
 - Produces:
   - `summary.ts`: `summarySchema`, `type Generated`, `SUMMARY_INSTRUCTIONS`, `summarize(db, extracted: Extracted, note: string): Promise<Generated>`, `writeNotes(db, extracted: Extracted): Promise<Block[]>`
   - `x.ts`: `extractX: Extractor`, `parseTweetHtml(html: string): { paragraphs: Inline[][]; text: string; date: string | null }`
@@ -1886,15 +2018,13 @@ Futtatás: `npm test` → Elvárt: FAIL, `Cannot find module .../x.ts`.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod/v4";
 import { digestTags } from "../../data/digest-types.ts";
-import { assignIds, sectionsToBlocks, type Block } from "../blocks.ts";
+import { assignIds, localizedSchema, sectionsToBlocks, type Block } from "../blocks.ts";
 import { generate } from "../llm.ts";
 import type { Extracted } from "./extract/types.ts";
 
-const localized = z.object({ hu: z.string(), en: z.string() });
-
 export const summarySchema = z.object({
-  title: localized,
-  summary: localized,
+  title: localizedSchema,
+  summary: localizedSchema,
   keyPoints: z.object({ hu: z.array(z.string()).max(8), en: z.array(z.string()).max(8) }),
   tags: z.array(z.enum(digestTags)).max(4),
 });
@@ -2040,9 +2170,9 @@ export const extractYoutube: Extractor = async (db, url, note) => {
 ```ts
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseHTML } from "linkedom";
-import { FetchError, readLimited, safeFetch } from "../fetch.ts";
-import type { SourceKind } from "../util.ts";
-import { extractArticle } from "./article.ts";
+import { FetchError, readText, safeFetch } from "../fetch.ts";
+import { hostOf, type SourceKind } from "../util.ts";
+import { extractArticle, readPageMeta } from "./article.ts";
 import { extractArxiv } from "./arxiv.ts";
 import { extractGithub } from "./github.ts";
 import { extractPdf } from "./pdf.ts";
@@ -2065,18 +2195,16 @@ const failure = (error: unknown) => (error instanceof Error ? error.message : St
 export async function metadataOnly(url: string): Promise<Extracted> {
   const response = await safeFetch(url, { accept: "text/html" });
   if (!response.ok) throw new FetchError(`fetch ${response.status}`);
-  const { document } = parseHTML(new TextDecoder().decode(await readLimited(response, 2 * 1024 * 1024)));
-  const meta = (selector: string) => document.querySelector(selector)?.getAttribute("content")?.trim();
-  const title = meta('meta[property="og:title"]') ?? document.querySelector("title")?.textContent?.trim() ?? url;
-  const description = meta('meta[property="og:description"]') ?? meta('meta[name="description"]') ?? "";
+  const page = readPageMeta(parseHTML(await readText(response, 2 * 1024 * 1024)).document as unknown as Document);
+  const title = page.title ?? url;
   return {
     blocks: [],
     title,
     author: null,
-    siteName: meta('meta[property="og:site_name"]') ?? new URL(url).hostname.replace(/^www\./, ""),
+    siteName: page.siteName ?? hostOf(url),
     publishedAt: null,
     meta: { extractionFailed: true },
-    text: `${title}\n\n${description}`,
+    text: `${title}\n\n${page.description ?? ""}`,
   };
 }
 
@@ -2115,11 +2243,11 @@ git commit -m "feat: extract youtube and x sources with a fallback chain"
 ### Task 9: AI-zajszűrés és az új `processSource`
 
 **Files:**
-- Create: `lib/pipeline/cleanup.ts`, `lib/pipeline/cleanup.test.ts`, `lib/pipeline/ingest.test.ts`
-- Modify: `lib/pipeline/ingest.ts` (teljes újraírás)
+- Create: `lib/pipeline/cleanup.ts`, `lib/pipeline/cleanup.test.ts`, `lib/pipeline/ingest.test.ts`, `scripts/ingest-url.mts`
+- Modify: `lib/pipeline/ingest.ts` (teljes újraírás), `package.json` (`ingest` script)
 
 **Interfaces:**
-- Consumes: `extract` (8. feladat); `summarize`, `writeNotes` (8. feladat); `mirrorImages`, `unusedMediaPaths`, `MEDIA_BUCKET` (5. feladat); `limitBlocks`, `blocksSchema`, `Block` (2. feladat); `generate`
+- Consumes: `extract` (8. feladat); `summarize`, `writeNotes` (8. feladat); `mirrorImages`, `unusedMediaPaths`, `MEDIA_BUCKET` (5. feladat); `limitBlocks`, `parseBlocks`, `Block` (2. feladat); `generate`
 - Produces:
   - `cleanup.ts`: `cleanupListing(blocks: Block[]): string`, `applyCleanup(blocks: Block[], remove: string[]): Block[]`, `aiCleanup(db, blocks: Block[]): Promise<Block[]>`
   - `ingest.ts`: `processSource(db, id: number): Promise<void>`, `retryPendingSources(db): Promise<number>` (az aláírás változatlan), `failureUpdate(hasPrevious: boolean, message: string)`, `removeUnusedMedia(db, sourceId: number, blocks: Block[]): Promise<void>`
@@ -2216,7 +2344,7 @@ Ellenőrizd a tesztet: 10 blokkból 2 törlése után 8 marad, és `8 >= 10/2 + 
 
 ```ts
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { blocksSchema, limitBlocks, type Block } from "../blocks.ts";
+import { limitBlocks, parseBlocks, type Block } from "../blocks.ts";
 import { aiCleanup } from "./cleanup.ts";
 import { extract } from "./extract/index.ts";
 import { MEDIA_BUCKET, mirrorImages, unusedMediaPaths } from "./images.ts";
@@ -2279,7 +2407,7 @@ export async function processSource(db: SupabaseClient, id: number): Promise<voi
   if (error || !source) throw error ?? new Error(`source ${id} not found`);
   await db.from("sources").update({ attempts: source.attempts + 1 }).eq("id", id);
   const { data: existing } = await db.from("posts").select("id, blocks").eq("source_id", id).maybeSingle();
-  const previous = existing ? blocksSchema.catch([]).parse(existing.blocks) : [];
+  const previous = existing ? parseBlocks(existing.blocks) : [];
 
   try {
     const post = await buildPost(db, source, previous);
@@ -2314,71 +2442,184 @@ export async function retryPendingSources(db: SupabaseClient): Promise<number> {
 
 Futtatás: `npm test` → PASS. Futtatás: `npx tsc --noEmit && npm run lint`.
 
-- [ ] **Step 6: Élő próba** (a Task 1-es migráció már fut, a `.env.local`-ban a Supabase és a Gemini kulcs megvan)
+- [ ] **Step 6: Fejlesztői eszköz és élő próba**
 
-Készíts egy ideiglenes szkriptet a munkamappában (`.tmp-ingest.mts`, commit nélkül, a végén töröld). A felhasználó azonosítója a `listUsers()`-ből jön. A szkript az admin klienssel beszúr egy `sources` sort, és meghívja a `processSource`-t:
+Előfeltétel: a Task 1-es migráció már lefutott, és a `.env.local`-ban megvan a Supabase és a Gemini kulcs.
+
+Hozd létre a `scripts/ingest-url.mts`-t. Ez commitolva marad, mert a 14. feladat is ezt használja, és a felhasználónak is hasznos:
 
 ```ts
-import { readFileSync } from "node:fs";
+// Dev tool: runs one URL through the real pipeline against the configured Supabase project.
+// Usage: npm run ingest -- <url>   (submits as the first invited user)
 import { createClient } from "@supabase/supabase-js";
-import { processSource } from "./lib/pipeline/ingest.ts";
-import { detectSource } from "./lib/pipeline/util.ts";
+import { processSource } from "../lib/pipeline/ingest.ts";
+import { detectSource, parseSubmittedUrl } from "../lib/pipeline/util.ts";
 
-for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
-  const at = line.indexOf("=");
-  if (/^[A-Z_]+=/.test(line)) process.env[line.slice(0, at)] ??= line.slice(at + 1);
-}
+const url = parseSubmittedUrl(process.argv[2] ?? "");
+if (!url) throw new Error("usage: npm run ingest -- <http(s) url>");
 const db = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
 const { data: users } = await db.auth.admin.listUsers();
-const url = process.argv[2];
+const submitter = users?.users[0]?.id;
+if (!submitter) throw new Error("no user to submit as: invite one first");
+
 const { data: source, error } = await db
   .from("sources")
-  .insert({ url, kind: detectSource(new URL(url)), submitted_by: users!.users[0].id })
+  .insert({ url: url.toString(), kind: detectSource(url), submitted_by: submitter })
   .select("id")
   .single();
 if (error) throw error;
 await processSource(db, source.id);
-const { data: post } = await db.from("posts").select("id, kind, source_site, meta, blocks").eq("source_id", source.id).single();
+
 const { data: status } = await db.from("sources").select("status, error").eq("id", source.id).single();
-console.log(status, post?.kind, post?.source_site, post?.meta, post?.blocks.length, post?.blocks.map((b: { type: string }) => b.type).join(","));
+const { data: post } = await db.from("posts").select("id, kind, source_site, meta, blocks").eq("source_id", source.id).maybeSingle();
+console.log({
+  source: source.id,
+  ...status,
+  post: post?.id,
+  site: post?.source_site,
+  meta: post?.meta,
+  blocks: (post?.blocks as { type: string }[] | undefined)?.map((block) => block.type).join(","),
+});
 ```
 
-Futtatás: `node --no-warnings .tmp-ingest.mts https://huggingface.co/blog/smollm3`
-Elvárt:
-- `{ status: 'done', error: null }`
-- kb. 50–150 blokk, köztük `image`-ek, és az `image` blokkoknak van `path`-ja
-- a Supabase Storage `media/<id>/` mappájában `*-640.avif` és `*-1280.avif` fájlok
+A `package.json` `scripts` részébe: `"ingest": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/ingest-url.mts"`.
 
-Ezt forrástípusonként ismételd a 13. feladat élő próbájában.
+Futtatás: `npm run ingest -- https://huggingface.co/blog/smollm3`
+Elvárt:
+- `status: 'done'`
+- kb. 50–150 blokk, köztük `image`-ek
+- a Supabase Storage `media/<source>/` mappájában `*-640.avif` és `*-1280.avif` fájlok
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/pipeline/cleanup.ts lib/pipeline/cleanup.test.ts lib/pipeline/ingest.ts lib/pipeline/ingest.test.ts
+git add lib/pipeline/cleanup.ts lib/pipeline/cleanup.test.ts lib/pipeline/ingest.ts lib/pipeline/ingest.test.ts scripts/ingest-url.mts package.json
 git commit -m "feat: build posts from blocks with ai cleanup and replace-on-success"
 ```
 
 ---
 
-### Task 10: Renderer és a poszt oldal
+### Task 10: Közös UI-elemek és a meglévő ismétlések kiváltása
+
+**Files:**
+- Modify: `components/ui/button.tsx`, `app/globals.css`, `app/components/page-header.tsx`, `app/archive/page.tsx`, `app/library/page.tsx`, `app/login/page.tsx`, `app/library/submit-form.tsx`, `app/components/digest-dashboard.tsx`, `app/components/language-toggle.tsx`, `app/error.tsx`, `app/not-found.tsx`, `CLAUDE.md`
+
+**Interfaces:**
+- Produces:
+  - a `Button` új variánsai: `ink` (ink háttér, hoverre signal), `signal` (signal háttér, ink keret), `brutal` (paper háttér, ink keret, hoverre signal)
+  - `focus-ring` utility; a színe a `--focus` változóval írható felül
+  - `PageHero(props: { eyebrow: string; title: string; lead: ReactNode; aside?: ReactNode })` az `app/components/page-header.tsx`-ben
+
+- [ ] **Step 1: Mérés előtte**
+
+Futtatás: `npm run dup` és `npx -y jscpd@4.3.0 app lib --min-lines 4 --min-tokens 35 --reporters console`.
+Jegyezd fel az eredményt. A tervezéskor a 6/60-as küszöbön 0 klón volt, a 4/35-ösön 2 kicsi: az archívum és a Library hero-szekciója, valamint a dashboard két `modelContext`-eszköze (ez utóbbi két külön eszköz sémája, maradhat).
+
+- [ ] **Step 2: Gombvariánsok** (`components/ui/button.tsx`)
+
+A `variant` objektumba, a `link:` sor után:
+
+```ts
+        // House variants. rounded-* is already 0 through --radius, so no rounded-none needed.
+        ink: "bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
+        signal: "border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper",
+        brutal: "border-2 border-ink bg-paper font-mono text-xs text-ink hover:bg-signal",
+```
+
+- [ ] **Step 3: `focus-ring` utility** (`app/globals.css`, a meglévő `@utility` sorok után)
+
+```css
+/* Keyboard focus in the house style. Override the colour with --focus (e.g. on signal-coloured controls). */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--focus, var(--signal));
+    outline-offset: 2px;
+  }
+}
+```
+
+- [ ] **Step 4: `PageHero`** (`app/components/page-header.tsx`, a `PageHeader` alá; `import type { ReactNode } from "react";`)
+
+```tsx
+/** The cream title band of the secondary pages: eyebrow, `TITLE//`, lead text, optional side panel. */
+export function PageHero({ eyebrow, title, lead, aside }: { eyebrow: string; title: string; lead: ReactNode; aside?: ReactNode }) {
+  return (
+    <section className="border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
+      <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 lg:grid-cols-[1fr_minmax(0,460px)] lg:items-end" : ""}`}>
+        <div>
+          <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
+          <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em]">
+            {title}
+            <span className="text-signal">{"//"}</span>
+          </h1>
+          <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
+        </div>
+        {aside}
+      </div>
+    </section>
+  );
+}
+```
+
+Az `app/archive/page.tsx`-ben a cream `<section>` helyére: `<PageHero eyebrow="WEEKLY FREEZE / HETI ZÁRÁS" title="ARCHIVE" lead={…a mostani nyelvfüggő szöveg…} />`.
+Az `app/library/page.tsx`-ben: `<PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={…} aside={<SubmitForm language={lang} />} />`.
+
+- [ ] **Step 5: A meglévő ismétlések kiváltása**
+
+- **Fókuszkeret:** minden `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal` helyére `focus-ring` kerül. A dashboard chip-sávjánál `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink` helyett `focus-ring [--focus:var(--ink)]`.
+- **`ink` gombok:**
+  - A dashboard „Megnyitás” gombja `<Button asChild variant="ink">` lesz.
+  - A login gombja `<Button type="submit" variant="ink" className="w-full">` lesz.
+  - Az `error.tsx` és a `not-found.tsx` nyers gombja, illetve linkje `<Button variant="ink" className="mt-6 min-h-10 w-full">` lesz (a linknél `asChild`-dal).
+- **`signal` gombok:** a dashboard to-do „+” gombja `<Button size="icon" variant="signal" …>`, a Library beküldő gombja `<Button type="submit" variant="signal" className="min-h-10" …>`.
+
+Ellenőrzés: ezeknek nem szabad találatot adniuk:
+
+```bash
+grep -rn "focus-visible:outline-2" app
+grep -rn "rounded-none bg-ink font-mono\|border-2 border-ink bg-signal\|border-b-2 border-signal bg-cream" app --include=*.tsx | grep -v page-header.tsx
+```
+
+- [ ] **Step 6: `CLAUDE.md`**
+
+A „Design language” szakasz végére: „Közös vezérlők: `Button` `ink` / `signal` / `brutal` variáns, `focus-ring` utility, `PageHeader` és `PageHero`. Ezeket használd, ne ismételd az osztálylistákat.” A `button.tsx`-re vonatkozó figyelmeztetésbe: „…carries an extended size set and the house variants `ink` / `signal` / `brutal`…”.
+
+- [ ] **Step 7: Ellenőrzés**
+
+Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`.
+Elvárt:
+- minden zöld
+- a 4/35-ös futás legfeljebb 1 klónt mutat (a `modelContext`-et)
+- Playwright 360 px-en: a `/login`, `/archive` és `/library` kinézete nem változott (összehasonlítás az előtte készült képpel), és a Tab-bal végigléptetett elemeken látszik a narancs fókuszkeret
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add components/ui/button.tsx app CLAUDE.md
+git commit -m "refactor: share button variants, focus ring and page hero"
+```
+
+---
+
+### Task 11: Renderer és a poszt oldal
 
 **Files:**
 - Create: `app/components/post-blocks.tsx`, `app/library/[id]/post-toolbar.tsx`
 - Modify: `lib/content.ts`, `app/library/[id]/page.tsx`, `app/library/page.tsx`
 
 **Interfaces:**
-- Consumes: `Block`, `blocksSchema`, `plainText` (2. feladat); `formatTimestamp`, `SourceKind` (3. feladat); `getLanguage` (`lib/language.ts`)
+- Consumes: `Block`, `parseBlocks`, `plainText` (2. feladat); `formatTimestamp`, `SourceKind`, `hostOf`, `parseId` (3. feladat); `mediaUrl` (`lib/media.ts`, 5. feladat); a `Button` variánsai (10. feladat); `getLanguage` (`lib/language.ts`)
 - Produces:
   - `content.ts`: `type PostMeta`, `type Post` (a mezőket lásd lent), `getPost(db, id): Promise<Post | null>`, `getPosts(db): Promise<Post[]>`
-  - `post-blocks.tsx`: `mediaUrl(path: string, width: number, format: string): string`, `PostBlocks(props: { blocks: Block[]; language: Language; hidden?: string[]; showHidden?: boolean; videoStart?: number; controls?: (block: Block) => ReactNode })`
-  - `post-toolbar.tsx`: `PostToolbar(props: { postId: number; language: Language; hasTranslation: boolean; showingTranslation: boolean; canEdit: boolean })`. A fordítás gomb a 11. feladatban kap valódi route-ot; itt már hívja a `/api/posts/[id]/translate`-et.
+  - `post-blocks.tsx`: `PostBlocks(props: { blocks: Block[]; language: Language; hidden?: string[]; showHidden?: boolean; videoStart?: number; controls?: (block: Block) => ReactNode })`
+  - `post-toolbar.tsx`: `PostToolbar(props: { postId: number; language: Language; hasTranslation: boolean; showingTranslation: boolean; canEdit: boolean })`. A fordítás gomb a 12. feladatban kap valódi route-ot; itt már hívja a `/api/posts/[id]/translate`-et.
 
 - [ ] **Step 1: `lib/content.ts`: a `Post` típus és a lekérdezések**
 
 A meglévő `Post`, `POST_COLUMNS`, `toPost`, `getPosts`, `getPost` helyére:
 
 ```ts
-import { blocksSchema, type Block } from "@/lib/blocks";
+import { parseBlocks, type Block } from "@/lib/blocks";
 import type { SourceKind } from "@/lib/pipeline/util";
 
 export type PostMeta = {
@@ -2431,8 +2672,8 @@ function toPost(row: Record<string, unknown>): Post {
     summary: overrides.summary ?? (row.summary as Localized),
     keyPoints: row.key_points as Post["keyPoints"],
     tags: row.tags as string[],
-    blocks: blocksSchema.catch([]).parse(row.blocks ?? []),
-    blocksHu: row.blocks_hu ? blocksSchema.catch([]).parse(row.blocks_hu) : null,
+    blocks: parseBlocks(row.blocks),
+    blocksHu: row.blocks_hu ? parseBlocks(row.blocks_hu) : null,
     meta: (row.meta ?? {}) as PostMeta,
     hiddenBlocks: (row.hidden_blocks ?? []) as string[],
     submittedBy: source?.submitted_by ?? null,
@@ -2458,6 +2699,7 @@ export async function getPost(db: SupabaseClient, id: number): Promise<Post | nu
 import type { ReactNode } from "react";
 import type { Language } from "@/data/digest-types";
 import type { Block, ImageBlock, Inline } from "@/lib/blocks";
+import { mediaUrl } from "@/lib/media";
 import { formatTimestamp } from "@/lib/pipeline/util";
 
 // Plain component (no hooks, no server-only imports) so the editor can reuse it client-side.
@@ -2466,8 +2708,6 @@ const labels = {
   hu: { hidden: (n: number) => `${n} elrejtett blokk — megjelenítés`, missing: "A kép nem érhető el", chapters: "Fejezetek", stars: "csillag" },
   en: { hidden: (n: number) => `${n} hidden block${n > 1 ? "s" : ""} — show`, missing: "Image unavailable", chapters: "Chapters", stars: "stars" },
 };
-
-export const mediaUrl = (path: string, width: number, format: string) => `/media/${path}-${width}.${format}`;
 
 function InlineContent({ spans }: { spans: Inline[] }) {
   return spans.map((span, index) => {
@@ -2657,14 +2897,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Languages, PenLine } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Language } from "@/data/digest-types";
 
 const copy = {
   hu: { original: "Eredeti", translated: "Magyarul", translate: "Fordítás magyarra", working: "Fordítás…", failed: "A fordítás nem sikerült, próbáld újra.", edit: "Szerkesztés" },
   en: { original: "Original", translated: "Hungarian", translate: "Translate to Hungarian", working: "Translating…", failed: "Translation failed, try again.", edit: "Edit" },
 };
-
-const pill = "flex min-h-10 items-center gap-2 border-2 border-ink px-3 font-mono text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal";
 
 export function PostToolbar({ postId, language, hasTranslation, showingTranslation, canEdit }: {
   postId: number;
@@ -2697,18 +2936,22 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
     <div className="flex flex-wrap items-center gap-2">
       {hasTranslation ? (
         <div className="flex" role="group">
-          <Link href={`/library/${postId}`} aria-current={!showingTranslation} className={`${pill} ${showingTranslation ? "bg-paper" : "bg-ink text-paper"}`}>{t.original}</Link>
-          <Link href={`/library/${postId}?text=hu`} aria-current={showingTranslation} className={`${pill} -ml-0.5 ${showingTranslation ? "bg-ink text-paper" : "bg-paper"}`}>{t.translated}</Link>
+          <Button asChild variant={showingTranslation ? "brutal" : "ink"} className="min-h-10">
+            <Link href={`/library/${postId}`} aria-current={!showingTranslation}>{t.original}</Link>
+          </Button>
+          <Button asChild variant={showingTranslation ? "ink" : "brutal"} className="-ml-0.5 min-h-10">
+            <Link href={`/library/${postId}?text=hu`} aria-current={showingTranslation}>{t.translated}</Link>
+          </Button>
         </div>
       ) : (
-        <button type="button" onClick={() => void translate()} disabled={busy} className={`${pill} bg-paper hover:bg-signal`}>
-          <Languages className="size-4" /> {busy ? t.working : t.translate}
-        </button>
+        <Button variant="brutal" className="min-h-10" onClick={() => void translate()} disabled={busy}>
+          <Languages /> {busy ? t.working : t.translate}
+        </Button>
       )}
       {canEdit && (
-        <Link href={`/library/${postId}?edit=1`} className={`${pill} bg-paper hover:bg-signal`}>
-          <PenLine className="size-4" /> {t.edit}
-        </Link>
+        <Button asChild variant="brutal" className="min-h-10">
+          <Link href={`/library/${postId}?edit=1`}><PenLine /> {t.edit}</Link>
+        </Button>
       )}
       {failed && <p role="status" className="font-mono text-xs text-signal">{t.failed}</p>}
     </div>
@@ -2728,6 +2971,7 @@ import { Button } from "@/components/ui/button";
 import { plainText } from "@/lib/blocks";
 import { getPost } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
+import { hostOf, parseId } from "@/lib/pipeline/util";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { PostToolbar } from "./post-toolbar";
 
@@ -2752,7 +2996,8 @@ export default async function PostPage({
   if (!viewer) redirect(`/login?next=/library/${id}`);
   const query = await searchParams;
   const language = await getLanguage();
-  const post = Number.isInteger(Number(id)) ? await getPost(await createClient(), Number(id)) : null;
+  const postId = parseId(id);
+  const post = postId ? await getPost(await createClient(), postId) : null;
   if (!post) notFound();
 
   const t = notices[language];
@@ -2773,7 +3018,7 @@ export default async function PostPage({
           <header className="border-b-2 border-ink pb-6">
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tracking-[0.15em] text-signal">
               <span className="border border-signal px-2 py-0.5">{kindLabel[post.kind]}</span>
-              <span>{post.siteName ?? new URL(post.url).hostname}</span>
+              <span>{post.siteName ?? hostOf(post.url)}</span>
               {post.author && <span className="text-ink/60">{post.author}</span>}
               {post.publishedAt && <span className="text-ink/60">{post.publishedAt}</span>}
               <span className="text-ink/60">{minutes} {t.min}</span>
@@ -2789,7 +3034,7 @@ export default async function PostPage({
             {post.meta.clipped && <p className="mt-2 font-mono text-xs text-ink/60">{t.clipped}</p>}
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <PostToolbar postId={post.id} language={language} hasTranslation={Boolean(post.blocksHu)} showingTranslation={showingTranslation} canEdit={canEdit} />
-              <Button asChild className="min-h-10 rounded-none bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink">
+              <Button asChild variant="ink" className="min-h-10">
                 <a href={post.url} target="_blank" rel="noreferrer">{t.original} <ExternalLink /></a>
               </Button>
             </div>
@@ -2818,7 +3063,7 @@ export default async function PostPage({
           )}
 
           <p className="mt-12 border-t-2 border-ink pt-4 font-mono text-[10px] tracking-[0.15em] text-ink/55 [overflow-wrap:anywhere]">
-            © {post.author ?? post.siteName ?? new URL(post.url).hostname} · {post.url}
+            © {post.author ?? post.siteName ?? hostOf(post.url)} · {post.url}
           </p>
         </div>
       </article>
@@ -2827,11 +3072,11 @@ export default async function PostPage({
 }
 ```
 
-(Az `edit=1` ágat a 12. feladat adja hozzá.)
+(Az `edit=1` ágat a 13. feladat adja hozzá.)
 
-- [ ] **Step 5: `app/library/page.tsx`: típusikonok**
+- [ ] **Step 5: `app/library/page.tsx`: típusikonok és `hostOf`**
 
-Cseréld le az ikon-importot és az ikonválasztást:
+A kártyán a `new URL(post.url).hostname` helyére `hostOf(post.url)` kerüljön (import: `@/lib/pipeline/util`). Cseréld le az ikon-importot és az ikonválasztást is:
 
 ```tsx
 import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
@@ -2861,13 +3106,13 @@ git commit -m "feat: render posts from blocks with an attribution header"
 
 ---
 
-### Task 11: Fordítás kérésre
+### Task 12: Fordítás kérésre
 
 **Files:**
 - Create: `lib/translate.ts`, `lib/translate.test.ts`, `app/api/posts/[id]/translate/route.ts`
 
 **Interfaces:**
-- Consumes: `Block`, `blocksSchema` (2. feladat); `generate` (`lib/llm.ts`); `createClient`, `createAdminClient`
+- Consumes: `Block`, `parseBlocks` (2. feladat); `generate` (`lib/llm.ts`); `getReader`, `jsonError`, `parseId` (3. feladat); `createAdminClient`
 - Produces:
   - `type TranslationItem = { id: string; text?: string; spans?: string[]; items?: string[][]; caption?: string; alt?: string; chapters?: string[] }`
   - `translatable(blocks: Block[]): TranslationItem[]`
@@ -3042,27 +3287,28 @@ export const TRANSLATE_INSTRUCTIONS = `Translate every text field of these conte
 
 ```ts
 import { NextResponse } from "next/server";
-import { blocksSchema } from "@/lib/blocks";
+import { jsonError } from "@/lib/api";
+import { parseBlocks } from "@/lib/blocks";
 import { generate } from "@/lib/llm";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { parseId } from "@/lib/pipeline/util";
+import { createAdminClient, getReader } from "@/lib/supabase/server";
 import { TRANSLATE_INSTRUCTIONS, applyTranslation, chunkTranslatable, translatable, translationSchema } from "@/lib/translate";
 
 export const maxDuration = 300;
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const reader = await createClient();
-  const { data: auth } = await reader.auth.getClaims();
-  if (!auth?.claims) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
-  const postId = Number((await params).id);
-  if (!Number.isInteger(postId)) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  const { data: post } = await reader.from("posts").select("id, blocks, blocks_hu").eq("id", postId).maybeSingle();
-  if (!post) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  const reader = await getReader();
+  if (!reader) return jsonError(401, "unauthorized");
+  const postId = parseId((await params).id);
+  const { data: post } = postId
+    ? await reader.db.from("posts").select("id, blocks, blocks_hu").eq("id", postId).maybeSingle()
+    : { data: null };
+  if (!post) return jsonError(404, "not_found");
   if (post.blocks_hu) return NextResponse.json({ ok: true });
 
   // model_settings and posts writes need the secret key; the reader was checked above.
   const admin = createAdminClient();
-  const blocks = blocksSchema.parse(post.blocks);
+  const blocks = parseBlocks(post.blocks);
   try {
     const answers = await Promise.all(
       chunkTranslatable(translatable(blocks)).map((chunk) =>
@@ -3070,13 +3316,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       ),
     );
     const translated = applyTranslation(blocks, answers.flatMap((answer) => answer.blocks));
-    if (!translated) return NextResponse.json({ error: "translation_shape" }, { status: 502 });
-    const { error } = await admin.from("posts").update({ blocks_hu: translated }).eq("id", postId);
+    if (!translated) return jsonError(502, "translation_shape");
+    const { error } = await admin.from("posts").update({ blocks_hu: translated }).eq("id", post.id);
     if (error) throw error;
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.warn(`translate ${postId}: ${error instanceof Error ? error.message : error}`);
-    return NextResponse.json({ error: "translation_failed" }, { status: 502 });
+    console.warn(`translate ${post.id}: ${error instanceof Error ? error.message : error}`);
+    return jsonError(502, "translation_failed");
   }
 }
 ```
@@ -3095,14 +3341,14 @@ git commit -m "feat: translate posts to hungarian on demand"
 
 ---
 
-### Task 12: Kis javítások: szerkesztő, mentés, újrakinyerés
+### Task 13: Kis javítások: szerkesztő, mentés, újrakinyerés
 
 **Files:**
 - Create: `app/api/posts/[id]/route.ts`, `app/api/posts/[id]/reextract/route.ts`, `app/library/[id]/post-editor.tsx`
 - Modify: `app/library/[id]/page.tsx` (az `edit=1` ág)
 
 **Interfaces:**
-- Consumes: `update_post_overrides` RPC (1. feladat); `processSource` (9. feladat); `cooldownRemaining` (3. feladat); `PostBlocks` (10. feladat); `Post` (10. feladat)
+- Consumes: `update_post_overrides` RPC (1. feladat); `processSource` (9. feladat); `cooldownRemaining`, `parseId`, `getReader`, `jsonError` (3. feladat); a `Button` variánsai (10. feladat); `PostBlocks` (11. feladat); `Post` (11. feladat)
 - Produces:
   - `PATCH /api/posts/[id]` body `{ title?: {hu,en}; summary?: {hu,en}; hidden: string[] }` → `{ ok }` / 400 / 401 / 403
   - `POST /api/posts/[id]/reextract` → 202 / 401 / 403 / 404 / 429 `{ retryAfter }`
@@ -3113,29 +3359,33 @@ git commit -m "feat: translate posts to hungarian on demand"
 ```ts
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { createClient } from "@/lib/supabase/server";
+import { jsonError } from "@/lib/api";
+import { parseId } from "@/lib/pipeline/util";
+import { getReader } from "@/lib/supabase/server";
 
-const localized = z.object({ hu: z.string().trim().min(1).max(300), en: z.string().trim().min(1).max(300) });
+const text = (max: number) => z.string().trim().min(1).max(max);
 const patchSchema = z.object({
-  title: localized.optional(),
-  summary: z.object({ hu: z.string().trim().min(1).max(3000), en: z.string().trim().min(1).max(3000) }).optional(),
+  title: z.object({ hu: text(300), en: text(300) }).optional(),
+  summary: z.object({ hu: text(3000), en: text(3000) }).optional(),
   hidden: z.array(z.string().max(40)).max(400),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getClaims();
-  if (!auth?.claims) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
-  const postId = Number((await params).id);
+  const reader = await getReader();
+  if (!reader) return jsonError(401, "unauthorized");
+  const postId = parseId((await params).id);
   const body = patchSchema.safeParse(await request.json().catch(() => null));
-  if (!Number.isInteger(postId) || !body.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
+  if (!postId || !body.success) return jsonError(400, "invalid");
 
-  const overrides = { ...(body.data.title ? { title: body.data.title } : {}), ...(body.data.summary ? { summary: body.data.summary } : {}) };
+  const { title, summary, hidden } = body.data;
   // The function checks that the caller submitted this post; RLS cannot restrict columns.
-  const { error } = await supabase.rpc("update_post_overrides", { p_post: postId, p_overrides: overrides, p_hidden: body.data.hidden });
-  if (error?.code === "42501") return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  if (error) return NextResponse.json({ error: "db_error" }, { status: 500 });
+  const { error } = await reader.db.rpc("update_post_overrides", {
+    p_post: postId,
+    p_overrides: { ...(title && { title }), ...(summary && { summary }) },
+    p_hidden: hidden,
+  });
+  if (error?.code === "42501") return jsonError(403, "forbidden");
+  if (error) return jsonError(500, "db_error");
   return NextResponse.json({ ok: true });
 }
 ```
@@ -3144,27 +3394,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 ```ts
 import { after, NextResponse } from "next/server";
+import { jsonError } from "@/lib/api";
 import { processSource } from "@/lib/pipeline/ingest";
-import { cooldownRemaining } from "@/lib/pipeline/util";
+import { cooldownRemaining, parseId } from "@/lib/pipeline/util";
 import { createAdminClient, getViewer } from "@/lib/supabase/server";
 
 export const maxDuration = 300;
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
-  if (!viewer) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
-  const postId = Number((await params).id);
+  if (!viewer) return jsonError(401, "unauthorized");
+  const postId = parseId((await params).id);
   const admin = createAdminClient();
-  const { data: post } = Number.isInteger(postId)
+  const { data: post } = postId
     ? await admin.from("posts").select("source_id, extracted_at, sources(submitted_by)").eq("id", postId).maybeSingle()
     : { data: null };
-  if (!post) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (!post) return jsonError(404, "not_found");
   const source = post.sources as unknown as { submitted_by: string } | null;
-  if (source?.submitted_by !== viewer.id) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (source?.submitted_by !== viewer.id) return jsonError(403, "forbidden");
 
   const wait = cooldownRemaining(post.extracted_at, new Date());
-  if (wait > 0) return NextResponse.json({ error: "cooldown", retryAfter: wait }, { status: 429 });
+  if (wait > 0) return jsonError(429, "cooldown", { retryAfter: wait });
 
   after(() => processSource(admin, post.source_id));
   return NextResponse.json({ ok: true }, { status: 202 });
@@ -3181,6 +3431,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { PostBlocks } from "@/app/components/post-blocks";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { Language } from "@/data/digest-types";
 import type { Post } from "@/lib/content";
 
@@ -3188,8 +3441,6 @@ const copy = {
   hu: { title: "Cím", summary: "Összefoglaló", save: "Mentés", cancel: "Mégse", saving: "Mentés…", reextract: "Újrakinyerés", started: "Az újrakinyerés elindult, pár perc múlva frissül.", cooldown: (s: number) => `Újrakinyerés ${Math.ceil(s / 60)} perc múlva lehetséges.`, failed: "Nem sikerült, próbáld újra.", hide: "Elrejtés", show: "Megjelenítés" },
   en: { title: "Title", summary: "Summary", save: "Save", cancel: "Cancel", saving: "Saving…", reextract: "Re-extract", started: "Re-extraction started; the post updates in a few minutes.", cooldown: (s: number) => `Re-extraction possible in ${Math.ceil(s / 60)} min.`, failed: "That failed, try again.", hide: "Hide", show: "Show" },
 };
-
-const field = "min-h-10 w-full rounded-none border-2 border-ink bg-paper px-3 py-2 text-sm outline-none focus:border-signal";
 
 export function PostEditor({ post, language }: { post: Post; language: Language }) {
   const router = useRouter();
@@ -3233,25 +3484,21 @@ export function PostEditor({ post, language }: { post: Post; language: Language 
       <div className="grid gap-4 border-2 border-ink bg-paper p-5 sm:grid-cols-2">
         {(["hu", "en"] as const).map((lang) => (
           <div key={lang} className="space-y-3">
-            <label className="block font-mono text-xs">
-              {t.title} ({lang.toUpperCase()})
-              <input value={title[lang]} onChange={(e) => setTitle({ ...title, [lang]: e.target.value })} className={`${field} mt-1`} />
+            <label className="block space-y-1 font-mono text-xs">
+              <span>{t.title} ({lang.toUpperCase()})</span>
+              <Input value={title[lang]} onChange={(e) => setTitle({ ...title, [lang]: e.target.value })} className="min-h-10 border-2 border-ink bg-paper" />
             </label>
-            <label className="block font-mono text-xs">
-              {t.summary} ({lang.toUpperCase()})
-              <textarea value={summary[lang]} onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })} rows={5} className={`${field} mt-1`} />
+            <label className="block space-y-1 font-mono text-xs">
+              <span>{t.summary} ({lang.toUpperCase()})</span>
+              <Textarea value={summary[lang]} onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })} rows={5} className="border-2 border-ink bg-paper" />
             </label>
           </div>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => void save()} disabled={busy} className="min-h-10 bg-ink px-4 font-mono text-xs text-paper hover:bg-signal hover:text-ink">
-          {busy ? t.saving : t.save}
-        </button>
-        <Link href={`/library/${post.id}`} className="flex min-h-10 items-center border-2 border-ink px-4 font-mono text-xs hover:bg-signal">{t.cancel}</Link>
-        <button type="button" onClick={() => void reextract()} className="flex min-h-10 items-center gap-2 border-2 border-ink px-4 font-mono text-xs hover:bg-signal">
-          <RefreshCw className="size-4" /> {t.reextract}
-        </button>
+        <Button variant="ink" className="min-h-10" onClick={() => void save()} disabled={busy}>{busy ? t.saving : t.save}</Button>
+        <Button asChild variant="brutal" className="min-h-10"><Link href={`/library/${post.id}`}>{t.cancel}</Link></Button>
+        <Button variant="brutal" className="min-h-10" onClick={() => void reextract()}><RefreshCw /> {t.reextract}</Button>
         {status && <p role="status" className="font-mono text-xs text-ink/70">{status}</p>}
       </div>
       <PostBlocks
@@ -3259,15 +3506,16 @@ export function PostEditor({ post, language }: { post: Post; language: Language 
         language={language}
         hidden={[...hidden]}
         controls={(block) => (
-          <button
-            type="button"
+          <Button
+            variant="brutal"
+            size="icon-lg"
             onClick={() => toggle(block.id)}
             aria-label={hidden.has(block.id) ? t.show : t.hide}
             aria-pressed={hidden.has(block.id)}
-            className="absolute top-0 right-0 grid size-10 place-items-center border-2 border-ink bg-paper opacity-100 hover:bg-signal"
+            className="absolute top-0 right-0"
           >
-            {hidden.has(block.id) ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-          </button>
+            {hidden.has(block.id) ? <Eye /> : <EyeOff />}
+          </Button>
         )}
       />
     </div>
@@ -3317,7 +3565,7 @@ git commit -m "feat: let submitters hide blocks, edit titles and re-extract"
 
 ---
 
-### Task 13: Élő próba forrástípusonként, dokumentáció, a `body` oszlop törlése
+### Task 14: Élő próba forrástípusonként, dokumentáció, a `body` oszlop törlése
 
 **Files:**
 - Modify: `CLAUDE.md`, `README.md`, `TODO.md`, `docs/superpowers/specs/2026-09-24-unified-post-template-design.md` (a `media/<post_id>` → `media/<source_id>` eltérés rögzítése)
@@ -3325,15 +3573,15 @@ git commit -m "feat: let submitters hide blocks, edit titles and re-extract"
 
 - [ ] **Step 1: Élő próba mind a hat forrásra**
 
-A 9. feladat `.tmp-ingest.mts` szkriptjével, egyenként:
+A 9. feladatban készült `npm run ingest` paranccsal, egyenként:
 
 ```bash
-node --no-warnings .tmp-ingest.mts https://simonwillison.net/2024/Dec/31/llms-in-2024/
-node --no-warnings .tmp-ingest.mts https://www.youtube.com/watch?v=zjkBMFhNj_g
-node --no-warnings .tmp-ingest.mts https://arxiv.org/abs/2401.00001
-node --no-warnings .tmp-ingest.mts https://arxiv.org/abs/1706.03762
-node --no-warnings .tmp-ingest.mts https://github.com/ggml-org/llama.cpp
-node --no-warnings .tmp-ingest.mts https://x.com/karpathy/status/1886192184808149383
+npm run ingest -- https://simonwillison.net/2024/Dec/31/llms-in-2024/
+npm run ingest -- https://www.youtube.com/watch?v=zjkBMFhNj_g
+npm run ingest -- https://arxiv.org/abs/2401.00001
+npm run ingest -- https://arxiv.org/abs/1706.03762
+npm run ingest -- https://github.com/ggml-org/llama.cpp
+npm run ingest -- https://x.com/karpathy/status/1886192184808149383
 ```
 
 Elvárt forrásonként: `status: done`, és:
@@ -3349,11 +3597,12 @@ Elvárt forrásonként: `status: done`, és:
 
 Minden posztot nézz meg Playwrighttal 360 és 1280 px-en (forrásjelölés, nincs vízszintes görgetés, a képek AVIF-ek). Ha egy forrás hibás, javítsd az érintett kinyerőt, adj hozzá egy regressziós tesztet, és commitolj.
 
-A próbaposztok az éles Library-ben jelennek meg. A végén kérdezd meg a felhasználót, maradjanak-e. Ha nem kellenek, a `sources` sorok törlése a posztokat is törli (cascade), és a `removeUnusedMedia(db, sourceId, [])` a képeket is. A `.tmp-ingest.mts`-t töröld.
+A próbaposztok az éles Library-ben jelennek meg. A végén kérdezd meg a felhasználót, maradjanak-e. Ha nem kellenek, a `sources` sorok törlése a posztokat is törli (cascade), és a `removeUnusedMedia(db, sourceId, [])` a képeket is.
 
 - [ ] **Step 2: A dokumentáció frissítése**
 
 - **`CLAUDE.md`, „How content gets in”, 2. pont:** a link-beküldés leírása legyen ez: `detectSource` → `lib/pipeline/extract/<kind>.ts` (visszaesés: article, majd metaadat) → háromrétegű zajszűrés (`html-to-blocks.ts`, `cleanup.ts`) → `limitBlocks` → `mirrorImages` (AVIF, `media/<source_id>/…`, `/media` route) → `summarize` / `writeNotes` (noarchive) → mentés. Csak siker esetén cserél, és az `overrides` / `hidden_blocks` mezőt nem írja.
+- **`CLAUDE.md`, Commands:** `npm run dup` (jscpd, legfeljebb 1% ismétlés) és `npm run ingest -- <url>` (egy link feldolgozása helyben).
 - **`CLAUDE.md`, Layout:** új sorok a `lib/blocks.ts`, `lib/translate.ts`, `lib/pipeline/extract/`, `app/media/`, `app/components/post-blocks.tsx` fájloknak.
 - **`CLAUDE.md`, Data contract:** egy bekezdés a blokkmodellről. Az `id` tartalomból képződik és stabil, a renderer egyetlen, nyers HTML nincs.
 - **`README.md`:** a Library bekezdésébe kerüljön be, hogy a tartalom blokkokra bontva, képekkel tükröződik, és a források: cikk, YouTube, arXiv, PDF, GitHub, X.
@@ -3373,7 +3622,7 @@ Kérd meg a felhasználót, hogy ezt **a `main`-re pusholás és a sikeres Verce
 
 - [ ] **Step 4: Végső ellenőrzés és commit**
 
-Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build`. Elvárt: minden zöld.
+Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`. Elvárt: minden zöld, és a `dup` nem mutat új klónt a 10. feladat mérése óta.
 
 ```bash
 git add CLAUDE.md README.md TODO.md docs supabase/migrations/20260925000000_drop_post_body.sql
