@@ -25,9 +25,8 @@ async function fetchOembed(watchUrl: string): Promise<OembedInfo> {
   } catch {
     return {};
   }
-  // A non-JSON, null, array or primitive 200 body is as good as no info at all — readJsonObject
-  // folds all of those to null, never left to escape as a TypeError past extractYoutube's own error
-  // handling (which used to turn that into a video-less watch-page post).
+  // A non-JSON, null, array or primitive 200 body is as good as no info at all: readJsonObject folds
+  // all of those to null instead of letting a TypeError escape past extractYoutube's error handling.
   if (response.ok) return ((await readJsonObject(response)) as OembedInfo | null) ?? {};
   await cancelBody(response);
   if (response.status === 400 || response.status === 404) throw new FetchError("youtube video not found");

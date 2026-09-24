@@ -82,7 +82,7 @@ function validText(original: string, translated: string): boolean {
  * Whether `item` is a well-formed translation of `block`: every expected field is present, `items`/
  * `chapters` array lengths match the original, and no text field looks broken. A span-count
  * mismatch inside one paragraph/quote/list-item still degrades to plain text later (`spansFrom`
- * above, per the Review Focus) — but the *joined* fallback text is validated here like any other
+ * above) — but the *joined* fallback text is validated here like any other
  * field, so a mismatch can't be used to smuggle empty or degenerate text past this check.
  */
 function shapeOk(block: Block, item: TranslationItem): boolean {

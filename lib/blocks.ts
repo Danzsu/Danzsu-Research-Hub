@@ -109,8 +109,8 @@ export function blockIdentity(block: BlockDraft): string {
 }
 
 /**
- * Ids come from type + content, not position, so re-extraction keeps them:
- * hidden blocks and (in M2) highlights reference these.
+ * Ids come from type + content, not position, so re-extraction keeps them and
+ * `hidden_blocks` still points at the same blocks afterwards.
  */
 export function assignIds(drafts: BlockDraft[]): Block[] {
   const seen = new Map<string, number>();
