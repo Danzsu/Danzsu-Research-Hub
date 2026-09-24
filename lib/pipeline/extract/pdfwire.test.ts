@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeDb, geminiResponse, mockFetch, TEST_IP, withGeminiKey } from "../mock-fetch.ts";
+import { fakeDb } from "../fake-db.ts";
+import { geminiResponse, mockFetch, TEST_IP, withGeminiKey } from "../mock-fetch.ts";
 import { extractArticle } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
 
@@ -11,43 +12,28 @@ const handler = (robots: string | null) => async (url: string) =>
     : new Response("%PDF-1.4", { headers: { "content-type": "application/pdf", ...(robots ? { "x-robots-tag": robots } : {}) } });
 
 for (const [name, run] of [["extractPdf", extractPdf], ["extractArticle pdf branch", extractArticle]] as const) {
-  test(`${name} honours X-Robots-Tag and nulls an empty author`, async () => {
-    const restoreKey = withGeminiKey();
-    try {
-      let restore = mockFetch(handler("googlebot: noarchive"));
-      try {
-        const result = await run(db, `http://${TEST_IP}/paper.pdf`, "");
-        assert.equal(result.meta.noarchive, true);
-        assert.equal(result.author, null); // the model's "  " (whitespace-only) author must become null, not ""
-      } finally {
-        restore();
-      }
-      restore = mockFetch(handler(null));
-      try {
-        assert.equal((await run(db, `http://${TEST_IP}/paper.pdf`, "")).meta.noarchive, undefined);
-      } finally {
-        restore();
-      }
-    } finally {
-      restoreKey();
-    }
+  test(`${name} honours X-Robots-Tag and nulls an empty author`, async (t) => {
+    withGeminiKey(t);
+    mockFetch(t, handler("googlebot: noarchive"));
+    const result = await run(db, `http://${TEST_IP}/paper.pdf`, "");
+    assert.equal(result.meta.noarchive, true);
+    assert.equal(result.author, null); // the model's "  " (whitespace-only) author must become null, not ""
+  });
+
+  test(`${name} leaves meta.noarchive unset without an X-Robots-Tag`, async (t) => {
+    withGeminiKey(t);
+    mockFetch(t, handler(null));
+    assert.equal((await run(db, `http://${TEST_IP}/paper.pdf`, "")).meta.noarchive, undefined);
   });
 }
 
-// fix round 3, item 2 (5a): the model's title is empty, so extractPdfResponse falls back to the
-// URL's own decoded filename via the shared filenameOf helper.
-test("extractPdf falls back to the URL's decoded filename when the model gives no title", async () => {
-  const restoreKey = withGeminiKey();
-  const restore = mockFetch(async (url) =>
+test("extractPdf falls back to the URL's decoded filename when the model gives no title", async (t) => {
+  withGeminiKey(t);
+  mockFetch(t, async (url) =>
     url.includes("googleapis.com")
       ? geminiResponse({ title: "", blocks: [{ type: "paragraph", text: "Body" }] })
       : new Response("%PDF-1.4", { headers: { "content-type": "application/pdf" } }),
   );
-  try {
-    const result = await extractPdf(db, "https://1.2.3.4/docs/annual%20report.pdf", "");
-    assert.equal(result.title, "annual report.pdf");
-  } finally {
-    restore();
-    restoreKey();
-  }
+  const result = await extractPdf(db, "https://1.2.3.4/docs/annual%20report.pdf", "");
+  assert.equal(result.title, "annual report.pdf");
 });

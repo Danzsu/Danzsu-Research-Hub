@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft } from "./blocks.ts";
 import { TITLE_MAX } from "./overrides.ts";
-import { fakeDb } from "./pipeline/mock-fetch.ts";
+import { fakeDb } from "./pipeline/fake-db.ts";
 import { editPayload, requestReextract, savePostEdits } from "./post-edit.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
@@ -26,12 +26,12 @@ test("editPayload: a changed HU title only sends the title, not the unchanged su
   assert.deepEqual(editPayload(generated, draft, []), { title: draft.title, hidden: [] });
 });
 
-test("editPayload: a changed EN-only title also sends the title (N2 — a HU-only comparison would miss this)", () => {
+test("editPayload: a changed EN-only title also sends the title, not only a changed HU one", () => {
   const draft = { title: { hu: generated.generatedTitle.hu, en: "a new EN title" }, summary: generated.generatedSummary };
   assert.deepEqual(editPayload(generated, draft, []), { title: draft.title, hidden: [] });
 });
 
-test("editPayload: trailing/leading whitespace alone doesn't count as a change (N3 — the server trims on save)", () => {
+test("editPayload: trailing/leading whitespace alone doesn't count as a change, since the server trims on save", () => {
   const draft = {
     title: { hu: `${generated.generatedTitle.hu} `, en: generated.generatedTitle.en },
     summary: { hu: generated.generatedSummary.hu, en: `  ${generated.generatedSummary.en}` },
@@ -166,7 +166,7 @@ test("requestReextract: a successful claim after the cooldown expires writes ext
   const result = await requestReextract(db, "owner", 1, now);
   assert.deepEqual(result, { status: "accepted", sourceId: 5 });
   assert.deepEqual(db.postUpdates[0], { extracted_at: now.toISOString() });
-  // M5: the CAS must also filter by id, or the legacy `.is(null)` branch below would match (and
+  // The CAS must also filter by id, or the legacy `.is(null)` branch below would match (and
   // bump) every never-extracted post in the table, not just this one.
   assert.deepEqual(db.postUpdateFilters[0], [
     { column: "id", value: 1, op: "eq" },

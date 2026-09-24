@@ -242,16 +242,12 @@ test("a numeric-looking title or summary stays a string instead of being parsed 
   assert.equal(meta.summary, "0.10");
 });
 
-test("extractArxiv throws a plain Error, not a FetchError, for an id the API doesn't recognise", async () => {
-  const restore = mockFetch(async () => new Response(emptyFeed, { status: 200 }));
-  try {
-    await assert.rejects(
-      () => extractArxiv(db, "https://arxiv.org/abs/2401.99999", ""),
-      (error: unknown) => error instanceof Error && !(error instanceof FetchError),
-    );
-  } finally {
-    restore();
-  }
+test("extractArxiv throws a plain Error, not a FetchError, for an id the API doesn't recognise", async (t) => {
+  mockFetch(t, async () => new Response(emptyFeed, { status: 200 }));
+  await assert.rejects(
+    () => extractArxiv(db, "https://arxiv.org/abs/2401.99999", ""),
+    (error: unknown) => error instanceof Error && !(error instanceof FetchError),
+  );
 });
 
 // Trimmed from a live fetch of arxiv.org/html/2401.00001 (200, no redirect, no <base> tag): the
@@ -265,37 +261,29 @@ ${Array.from({ length: 12 }, (_, i) => `<p class="ltx_p">Paragraph ${i} on facto
 
 test("extractArxiv resolves an HTML paper's figure against the real (unslashed) page URL", async (t) => {
   mockDns(t);
-  const restoreFetch = mockFetch(async (url) => {
+  mockFetch(t, async (url) => {
     if (url.includes("export.arxiv.org")) return new Response(singleAuthorFeed, { status: 200 });
     if (url.includes("/html/")) return new Response(arxivHtmlFixture, { status: 200, headers: { "content-type": "text/html" } });
     return new Response("", { status: 404 });
   });
-  try {
-    const result = await extractArxiv(db, "https://arxiv.org/abs/2401.00001", "");
-    // Forcing a trailing slash on the base (the old bug) would instead give
-    // ".../html/2401.00001/2401.00001v1/return_difference.png", which 404s.
-    assert.equal(image(result.blocks)?.originalUrl, "https://arxiv.org/html/2401.00001v1/return_difference.png");
-  } finally {
-    restoreFetch();
-  }
+  const result = await extractArxiv(db, "https://arxiv.org/abs/2401.00001", "");
+  // Forcing a trailing slash on the base (the old bug) would instead give
+  // ".../html/2401.00001/2401.00001v1/return_difference.png", which 404s.
+  assert.equal(image(result.blocks)?.originalUrl, "https://arxiv.org/html/2401.00001v1/return_difference.png");
 });
 
 test("extractArxiv falls back to the abstract when neither an HTML nor a PDF version can be read", async (t) => {
   mockDns(t);
-  const restoreFetch = mockFetch(async (url) => {
+  mockFetch(t, async (url) => {
     if (url.includes("export.arxiv.org")) return new Response(singleAuthorFeed, { status: 200 });
     return new Response("", { status: 404 }); // no HTML version, no PDF either
   });
-  try {
-    const result = await extractArxiv(db, "https://arxiv.org/abs/math/0211159", "");
-    assert.deepEqual(
-      result.blocks.map((b) => b.type),
-      ["heading", "paragraph"],
-    );
-    assert.ok(result.text.includes("monotonic expression for the Ricci flow"));
-  } finally {
-    restoreFetch();
-  }
+  const result = await extractArxiv(db, "https://arxiv.org/abs/math/0211159", "");
+  assert.deepEqual(
+    result.blocks.map((b) => b.type),
+    ["heading", "paragraph"],
+  );
+  assert.ok(result.text.includes("monotonic expression for the Ricci flow"));
 });
 
 // Trimmed from a live fetch of api.github.com/repos/facebookresearch/detectron2 (Accept:
@@ -349,52 +337,37 @@ test("resolveGithubImage resolves root-relative and blob/raw-prefixed paths case
   ]);
 });
 
-test("extractGithub converts repo info and a real README into blocks", async () => {
-  const restore = mockFetch(async (url) =>
+test("extractGithub converts repo info and a real README into blocks", async (t) => {
+  mockFetch(t, async (url) =>
     url.endsWith("/readme")
       ? new Response(readmeFixture, { status: 200 })
       : new Response(JSON.stringify(repoInfoFixture), { status: 200 }),
   );
-  try {
-    const result = await extractGithub(db, "https://github.com/facebookresearch/detectron2", "");
-    assert.equal(result.title, "facebookresearch/detectron2");
-    assert.equal(result.author, "facebookresearch");
-    assert.equal(result.blocks[0].type, "repo");
-    assert.equal(image(result.blocks)?.originalUrl, "https://raw.githubusercontent.com/facebookresearch/detectron2/main/.github/Detectron2-Horz.svg");
-  } finally {
-    restore();
-  }
+  const result = await extractGithub(db, "https://github.com/facebookresearch/detectron2", "");
+  assert.equal(result.title, "facebookresearch/detectron2");
+  assert.equal(result.author, "facebookresearch");
+  assert.equal(result.blocks[0].type, "repo");
+  assert.equal(image(result.blocks)?.originalUrl, "https://raw.githubusercontent.com/facebookresearch/detectron2/main/.github/Detectron2-Horz.svg");
 });
 
-test("extractGithub treats a 404 README as no README, but any other README failure fails the extraction", async () => {
-  const restoreOk = mockFetch(async (url) =>
-    url.endsWith("/readme") ? new Response("", { status: 404 }) : new Response(JSON.stringify(repoInfoFixture), { status: 200 }),
-  );
-  try {
-    const result = await extractGithub(db, "https://github.com/facebookresearch/detectron2", "");
-    assert.deepEqual(result.blocks.map((b) => b.type), ["repo"]); // no README content, but it still succeeds
-  } finally {
-    restoreOk();
-  }
+const readmeAnswers = (status: number) => async (url: string) =>
+  url.endsWith("/readme") ? new Response("", { status }) : new Response(JSON.stringify(repoInfoFixture), { status: 200 });
 
-  const restoreRateLimited = mockFetch(async (url) =>
-    url.endsWith("/readme") ? new Response("", { status: 403 }) : new Response(JSON.stringify(repoInfoFixture), { status: 200 }),
-  );
-  try {
-    await assert.rejects(() => extractGithub(db, "https://github.com/facebookresearch/detectron2", ""), FetchError);
-  } finally {
-    restoreRateLimited();
-  }
+test("extractGithub treats a 404 README as no README", async (t) => {
+  mockFetch(t, readmeAnswers(404));
+  const result = await extractGithub(db, "https://github.com/facebookresearch/detectron2", "");
+  assert.deepEqual(result.blocks.map((b) => b.type), ["repo"]);
 });
 
-test("extractArticle fetches, cleans and extracts an article page, honouring the X-Robots-Tag response header", async () => {
+test("extractGithub fails the extraction on any other README failure, such as a rate limit", async (t) => {
+  mockFetch(t, readmeAnswers(403));
+  await assert.rejects(() => extractGithub(db, "https://github.com/facebookresearch/detectron2", ""), FetchError);
+});
+
+test("extractArticle fetches, cleans and extracts an article page, honouring the X-Robots-Tag response header", async (t) => {
   const html = page(`<title>Big news</title>`, article);
-  const restore = mockFetch(async () => new Response(html, { headers: { "content-type": "text/html", "x-robots-tag": "noarchive" } }));
-  try {
-    const result = await extractArticle(db, `http://${TEST_IP}/post`, "");
-    assert.equal(result.meta.noarchive, true);
-    assert.ok(result.text.includes("local models"));
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response(html, { headers: { "content-type": "text/html", "x-robots-tag": "noarchive" } }));
+  const result = await extractArticle(db, `http://${TEST_IP}/post`, "");
+  assert.equal(result.meta.noarchive, true);
+  assert.ok(result.text.includes("local models"));
 });

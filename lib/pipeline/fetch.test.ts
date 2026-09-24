@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import dns from "node:dns/promises";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { apiFetch, ensureOk, FetchError, readLimited, safeFetch, USER_AGENT } from "./fetch.ts";
 import { mockFetch, TEST_HOST } from "./mock-fetch.ts";
 
@@ -16,58 +16,42 @@ const redirect = (location: string) => new Response(null, { status: 302, headers
  * that redirects unconditionally would mask a broken guard behind "too many redirects" instead
  * of the real rejection, so this shape is what actually pins the SSRF check.
  */
-function redirectOnceThenOk(location: string) {
+function redirectOnceThenOk(t: TestContext, location: string): string[] {
   const calls: string[] = [];
-  const restore = mockFetch(async (url) => {
+  mockFetch(t, async (url) => {
     calls.push(url);
     return url === `${PUB}/a` ? redirect(location) : new Response("ok");
   });
-  return { calls, restore };
+  return calls;
 }
 
-test("safeFetch blocks a redirect to a loopback address", async () => {
-  const { calls, restore } = redirectOnceThenOk("http://127.0.0.1/admin");
-  try {
-    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message));
-    assert.equal(calls.length, 1); // the blocked hop must never actually be fetched
-  } finally {
-    restore();
-  }
+test("safeFetch blocks a redirect to a loopback address", async (t) => {
+  const calls = redirectOnceThenOk(t, "http://127.0.0.1/admin");
+  await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message));
+  assert.equal(calls.length, 1); // the blocked hop must never actually be fetched
 });
 
-test("safeFetch blocks a redirect to the cloud metadata address", async () => {
-  const { calls, restore } = redirectOnceThenOk("http://169.254.169.254/latest/meta-data/");
-  try {
-    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message));
-    assert.equal(calls.length, 1);
-  } finally {
-    restore();
-  }
+test("safeFetch blocks a redirect to the cloud metadata address", async (t) => {
+  const calls = redirectOnceThenOk(t, "http://169.254.169.254/latest/meta-data/");
+  await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message));
+  assert.equal(calls.length, 1);
 });
 
 test("safeFetch checks each hop's DNS-resolved address, not only its hostname", async (t) => {
   // parseSubmittedUrl already rejects private IP literals, so only a hostname that resolves to a
   // private (here CGNAT) address can reach the post-lookup check in checkedHop.
   t.mock.method(dns, "lookup", async (host: string) => [{ address: host === "internal.test" ? "100.64.0.1" : host, family: 4 }]);
-  const { calls, restore } = redirectOnceThenOk("http://internal.test/");
-  try {
-    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && error.message === "blocked address");
-    assert.equal(calls.length, 1);
-  } finally {
-    restore();
-  }
+  const calls = redirectOnceThenOk(t, "http://internal.test/");
+  await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && error.message === "blocked address");
+  assert.equal(calls.length, 1);
 });
 
-test("safeFetch blocks a redirect to a file: URL via the parseSubmittedUrl guard", async () => {
-  const { calls, restore } = redirectOnceThenOk("file:///etc/passwd");
-  try {
-    // The exact message the non-http(s) guard produces — not just "some FetchError" — so a
-    // guard that silently falls through to `new URL(raw)` instead of rejecting still fails this.
-    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && error.message === "blocked url");
-    assert.equal(calls.length, 1);
-  } finally {
-    restore();
-  }
+test("safeFetch blocks a redirect to a file: URL via the parseSubmittedUrl guard", async (t) => {
+  const calls = redirectOnceThenOk(t, "file:///etc/passwd");
+  // The exact message the non-http(s) guard produces — not just "some FetchError" — so a
+  // guard that silently falls through to `new URL(raw)` instead of rejecting still fails this.
+  await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && error.message === "blocked url");
+  assert.equal(calls.length, 1);
 });
 
 /** Redirects for the first `n` calls, then 200s — lets the redirect-hop cap be pinned exactly. */
@@ -79,52 +63,36 @@ function redirectChain(n: number) {
   };
 }
 
-test("safeFetch follows redirects up to its cap and succeeds", async () => {
-  const restore = mockFetch(redirectChain(4)); // 4 redirects then a 200 fits within the cap
-  try {
-    const response = await safeFetch(`${PUB}/a`);
-    assert.equal(await response.text(), "ok");
-  } finally {
-    restore();
-  }
+test("safeFetch follows redirects up to its cap and succeeds", async (t) => {
+  mockFetch(t, redirectChain(4)); // 4 redirects then a 200 fits within the cap
+  const response = await safeFetch(`${PUB}/a`);
+  assert.equal(await response.text(), "ok");
 });
 
-test("safeFetch gives up one hop past its cap with 'too many redirects'", async () => {
-  const restore = mockFetch(redirectChain(5)); // the 6th call (the 200) is never reached
-  try {
-    await assert.rejects(
-      () => safeFetch(`${PUB}/a`),
-      (error: unknown) => error instanceof FetchError && /too many redirects/.test(error.message),
-    );
-  } finally {
-    restore();
-  }
+test("safeFetch gives up one hop past its cap with 'too many redirects'", async (t) => {
+  mockFetch(t, redirectChain(5)); // the 6th call (the 200) is never reached
+  await assert.rejects(
+    () => safeFetch(`${PUB}/a`),
+    (error: unknown) => error instanceof FetchError && /too many redirects/.test(error.message),
+  );
 });
 
-test("safeFetch treats a malformed redirect Location as blocked, not a crash", async () => {
-  const restore = mockFetch(async () => redirect("http://["));
-  try {
-    await assert.rejects(() => safeFetch(`${PUB}/a`), FetchError);
-  } finally {
-    restore();
-  }
+test("safeFetch treats a malformed redirect Location as blocked, not a crash", async (t) => {
+  mockFetch(t, async () => redirect("http://["));
+  await assert.rejects(() => safeFetch(`${PUB}/a`), FetchError);
 });
 
-test("safeFetch cancels the body of an intermediate redirect response", async () => {
+test("safeFetch cancels the body of an intermediate redirect response", async (t) => {
   let cancelled = false;
   let hop = 0;
-  const restore = mockFetch(async () => {
+  mockFetch(t, async () => {
     hop++;
     if (hop === 1) return new Response(new ReadableStream({ cancel: () => { cancelled = true; } }), { status: 302, headers: { location: `${PUB}/b` } });
     return new Response("ok");
   });
-  try {
-    const response = await safeFetch(`${PUB}/a`);
-    assert.equal(await response.text(), "ok");
-    assert.equal(cancelled, true);
-  } finally {
-    restore();
-  }
+  const response = await safeFetch(`${PUB}/a`);
+  assert.equal(await response.text(), "ok");
+  assert.equal(cancelled, true);
 });
 
 test("readLimited cancels the body when the declared content-length exceeds the limit", async () => {
@@ -191,16 +159,12 @@ test("ensureOk passes an ok response through and otherwise cancels the body and 
   assert.equal(cancelled, true);
 });
 
-test("apiFetch sends this app's user agent and keeps the caller's own headers", async () => {
+test("apiFetch sends this app's user agent and keeps the caller's own headers", async (t) => {
   let headers: Record<string, string> = {};
-  const restore = mockFetch(async (_url, init) => {
+  mockFetch(t, async (_url, init) => {
     headers = init?.headers as Record<string, string>;
     return new Response("ok");
   });
-  try {
-    await apiFetch("https://api.github.com/x", { headers: { accept: "application/json" } });
-    assert.deepEqual(headers, { "user-agent": USER_AGENT, accept: "application/json" });
-  } finally {
-    restore();
-  }
+  await apiFetch("https://api.github.com/x", { headers: { accept: "application/json" } });
+  assert.deepEqual(headers, { "user-agent": USER_AGENT, accept: "application/json" });
 });

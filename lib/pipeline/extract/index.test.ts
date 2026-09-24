@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FetchError } from "../fetch.ts";
-import { fakeDb, geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, TEST_IP, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
+import { fakeDb } from "../fake-db.ts";
+import { geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, TEST_IP, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
 import { extract, isHtml, metadataOnly } from "./index.ts";
 
 const db = fakeDb();
@@ -21,129 +22,94 @@ function brokenGeminiHandler(counters: { gemini: number; other: number }, onOthe
   };
 }
 
-// (a) article kind: FetchError rethrows, metadataOnly is never reached.
 test("extract() rethrows FetchError for kind='article' instead of falling back to metadataOnly", async (t) => {
   mockDns(t);
   let calls = 0;
-  const restore = mockFetch(async () => {
+  mockFetch(t, async () => {
     calls++;
     return new Response("", { status: 500 });
   });
-  try {
-    await assert.rejects(() => extract(db, "article", `http://${TEST_IP}/post`, ""), FetchError);
-    assert.equal(calls, 1); // only the one failed article fetch — metadataOnly was never tried
-  } finally {
-    restore();
-  }
+  await assert.rejects(() => extract(db, "article", `http://${TEST_IP}/post`, ""), FetchError);
+  assert.equal(calls, 1); // only the one failed article fetch — metadataOnly was never tried
 });
 
-// (I7) article's own extractor never gets a second, redundant attempt as its own "fallback".
-test("extract() never re-runs extractArticle as its own fallback for kind='article' (I7)", async (t) => {
+test("extract() never re-runs extractArticle as its own fallback for kind='article'", async (t) => {
   mockDns(t);
   let calls = 0;
   const tinyHtml = `<!doctype html><html><head><title>Thin</title></head><body><p>too short</p></body></html>`;
-  const restore = mockFetch(async () => {
+  mockFetch(t, async () => {
     calls++;
     return new Response(tinyHtml, { headers: { "content-type": "text/html" } });
   });
-  try {
-    const result = await extract(db, "article", `http://${TEST_IP}/post`, "");
-    assert.equal(calls, 2); // extractArticle's own attempt + metadataOnly — never a second extractArticle attempt
-    assert.equal(result.meta.extractionFailed, true);
-  } finally {
-    restore();
-  }
+  const result = await extract(db, "article", `http://${TEST_IP}/post`, "");
+  assert.equal(calls, 2); // extractArticle's own attempt + metadataOnly — never a second extractArticle attempt
+  assert.equal(result.meta.extractionFailed, true);
 });
 
-// (b) a non-article, non-404 extractor failure falls to the article extractor, and its result wins.
 test("extract() falls back to the article extractor when github's own extractor fails on a non-404 status", async (t) => {
   mockDns(t);
   const articleHtml = `<!doctype html><html><head><title>Repo mirror</title></head><body><article><h1>Fallback article</h1><p>${"This repository has a long enough description to pass Readability's minimum content length check easily. ".repeat(3)}</p></article></body></html>`;
-  const restore = mockFetch(async (url) => (url.includes("api.github.com") ? new Response("", { status: 500 }) : new Response(articleHtml, { headers: { "content-type": "text/html" } })));
-  try {
-    const result = await extract(db, "github", "https://github.com/owner/repo", "");
-    assert.equal(result.blocks[0]?.type, "heading"); // article extraction, not github's own "repo" block
-    assert.equal(result.title, "Repo mirror");
-    assert.equal(result.meta.extractionFailed, undefined);
-  } finally {
-    restore();
-  }
+  mockFetch(t, async (url) => (url.includes("api.github.com") ? new Response("", { status: 500 }) : new Response(articleHtml, { headers: { "content-type": "text/html" } })));
+  const result = await extract(db, "github", "https://github.com/owner/repo", "");
+  assert.equal(result.blocks[0]?.type, "heading"); // article extraction, not github's own "repo" block
+  assert.equal(result.title, "Repo mirror");
+  assert.equal(result.meta.extractionFailed, undefined);
 });
 
-// (c) pdf: skips the article fallback, and metadata-only must not choke on a realistic, oversized PDF.
-test("extract() skips the article fallback for pdf and reaches metadata-only after exactly one Gemini call, even over a 2 MB pdf (fix round 1, item 1)", async (t) => {
+test("extract() skips the article fallback for pdf and reaches metadata-only after exactly one Gemini call, even over a 2 MB pdf", async (t) => {
   mockDns(t);
-  const restoreKey = withGeminiKey();
+  withGeminiKey(t);
   const counters = { gemini: 0, other: 0 };
-  // Both fetches serve the same realistic, >2 MB pdf — a lying/small placeholder body wouldn't
-  // exercise the bug (metadataOnly used to try to read the whole thing as HTML and throw).
+  // Both fetches serve the same realistic, >2 MB pdf: a small placeholder body wouldn't show that
+  // metadataOnly never tries to read a non-HTML response as HTML.
   const bigPdf = () => new Response(`%PDF-1.4\n${"A".repeat(2 * 1024 * 1024 + 1024)}`, { headers: { "content-type": "application/pdf" } });
-  const restore = mockFetch(brokenGeminiHandler(counters, () => bigPdf()));
-  try {
-    const result = await extract(db, "pdf", `http://${TEST_IP}/paper.pdf`, "");
-    assert.equal(counters.gemini, 1);
-    assert.equal(counters.other, 2); // extractPdf's fetch + metadataOnly's — an article-fallback attempt would make it 3
-    assert.equal(result.meta.extractionFailed, true);
-    assert.deepEqual(result.blocks, []);
-    assert.equal(result.title, "paper.pdf"); // metadataOnly never reads a non-HTML body; the URL's filename names it instead
-  } finally {
-    restore();
-    restoreKey();
-  }
+  mockFetch(t, brokenGeminiHandler(counters, () => bigPdf()));
+  const result = await extract(db, "pdf", `http://${TEST_IP}/paper.pdf`, "");
+  assert.equal(counters.gemini, 1);
+  assert.equal(counters.other, 2); // extractPdf's fetch + metadataOnly's — an article-fallback attempt would make it 3
+  assert.equal(result.meta.extractionFailed, true);
+  assert.deepEqual(result.blocks, []);
+  assert.equal(result.title, "paper.pdf"); // metadataOnly never reads a non-HTML body; the URL's filename names it instead
 });
 
-// (d) every extractor and the article fallback fail, but the page itself is reachable.
 test("extract() gives extractionFailed metadata with no blocks when everything fails but the page is reachable", async (t) => {
   mockDns(t);
   const tinyHtml = `<!doctype html><html><head><title>Thin page</title><meta property="og:description" content="A short description."></head><body><p>Too short.</p></body></html>`;
-  const restore = mockFetch(async (url) => (url.includes("api.github.com") ? new Response("", { status: 500 }) : new Response(tinyHtml, { headers: { "content-type": "text/html" } })));
-  try {
-    const result = await extract(db, "github", "https://github.com/owner/repo", "");
-    assert.equal(result.meta.extractionFailed, true);
-    assert.deepEqual(result.blocks, []);
-    assert.equal(result.title, "Thin page");
-  } finally {
-    restore();
-  }
+  mockFetch(t, async (url) => (url.includes("api.github.com") ? new Response("", { status: 500 }) : new Response(tinyHtml, { headers: { "content-type": "text/html" } })));
+  const result = await extract(db, "github", "https://github.com/owner/repo", "");
+  assert.equal(result.meta.extractionFailed, true);
+  assert.deepEqual(result.blocks, []);
+  assert.equal(result.title, "Thin page");
 });
 
-// (e) youtube: a Gemini failure is handled by extractYoutube itself now — extract() just surfaces it.
+// A youtube Gemini failure is handled inside extractYoutube; extract() just surfaces the result.
 test("extract() surfaces extractYoutube's own metadata-only result (video block + extractionFailed) when Gemini fails, without fetching the watch page", async (t) => {
   mockDns(t);
-  const restoreKey = withGeminiKey();
+  withGeminiKey(t);
   const counter = { calls: 0 };
-  const restore = mockFetch(oembedThenBrokenGemini({ title: "A video", author_name: "A Channel" }, counter));
-  try {
-    const result = await extract(db, "youtube", youtubeUrl, "");
-    assert.equal(counter.calls, 2); // oEmbed + Gemini only — no third call for the (JS-rendered) watch page
-    assert.deepEqual(result.blocks.map((b) => b.type), ["video"]);
-    assert.equal(result.meta.extractionFailed, true);
-  } finally {
-    restore();
-    restoreKey();
-  }
+  mockFetch(t, oembedThenBrokenGemini({ title: "A video", author_name: "A Channel" }, counter));
+  const result = await extract(db, "youtube", youtubeUrl, "");
+  assert.equal(counter.calls, 2); // oEmbed + Gemini only — no third call for the (JS-rendered) watch page
+  assert.deepEqual(result.blocks.map((b) => b.type), ["video"]);
+  assert.equal(result.meta.extractionFailed, true);
 });
 
 test("extract() rethrows FetchError('youtube video not found') for kind='youtube' when oEmbed 400s (live: an invalid video id)", async (t) => {
   mockDns(t);
-  const restore = mockFetch(async () => new Response("Bad Request", { status: 400 }));
-  try {
-    await assert.rejects(
-      () => extract(db, "youtube", youtubeUrl, ""),
-      (error: unknown) => error instanceof FetchError && error.message === "youtube video not found",
-    );
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response("Bad Request", { status: 400 }));
+  await assert.rejects(
+    () => extract(db, "youtube", youtubeUrl, ""),
+    (error: unknown) => error instanceof FetchError && error.message === "youtube video not found",
+  );
 });
 
-// fix round 3, item 1: an oEmbed 200 whose body isn't a plain JSON object (non-JSON, JSON null, or a
-// JSON array/primitive) is the rest of round-2 item 2 — closed here for youtube's null case below too.
+// An oEmbed 200 whose body isn't a plain JSON object (non-JSON, JSON null, an array or a primitive)
+// counts as no info.
 test("extract() still calls Gemini and keeps the video block for youtube when oEmbed returns a JSON null body, never fetching the watch page", async (t) => {
   mockDns(t);
-  const restoreKey = withGeminiKey();
+  withGeminiKey(t);
   const counters = { oembed: 0, gemini: 0, other: 0 };
-  const restore = mockFetch(async (url) => {
+  mockFetch(t, async (url) => {
     if (url.includes("/oembed")) {
       counters.oembed++;
       return new Response("null", { status: 200 });
@@ -155,114 +121,51 @@ test("extract() still calls Gemini and keeps the video block for youtube when oE
     counters.other++; // the watch page, if it were ever fetched
     return new Response("", { status: 404 });
   });
-  try {
-    const result = await extract(db, "youtube", youtubeUrl, "");
-    assert.equal(counters.oembed, 1);
-    assert.equal(counters.gemini, 1);
-    assert.equal(counters.other, 0);
-    assert.deepEqual(result.blocks.map((b) => b.type), ["video"]);
-    assert.equal(result.title, youtubeUrl); // no oEmbed title — falls back to the watch URL
-  } finally {
-    restore();
-    restoreKey();
-  }
+  const result = await extract(db, "youtube", youtubeUrl, "");
+  assert.equal(counters.oembed, 1);
+  assert.equal(counters.gemini, 1);
+  assert.equal(counters.other, 0);
+  assert.deepEqual(result.blocks.map((b) => b.type), ["video"]);
+  assert.equal(result.title, youtubeUrl); // no oEmbed title — falls back to the watch URL
 });
 
-// (f) a deleted/nonexistent X post: FetchError from extract(), fetching only the oEmbed host.
-test("extract() rethrows FetchError for a deleted X post (oEmbed 404), fetching only the oEmbed host", async (t) => {
-  mockDns(t);
-  let calls = 0;
-  const restore = mockFetch(async () => {
-    calls++;
-    return new Response("", { status: 404 });
-  });
-  try {
-    await assert.rejects(() => extract(db, "x", "https://x.com/someone/status/1", ""), FetchError);
-    assert.equal(calls, 1); // only the oEmbed request — x has no article fallback and never reaches metadataOnly
-  } finally {
-    restore();
-  }
-});
-
-// fix round 2, item 2: every extractX failure is a FetchError, so extract() rethrows for x instead
-// of falling through to a metadata post scraped from the x.com login shell.
-test("extract() rethrows FetchError for an x network error (oEmbed fetch itself fails), fetching only the oEmbed host", async (t) => {
-  mockDns(t);
-  let calls = 0;
-  const restore = mockFetch(async () => {
-    calls++;
+// Every extractX failure is a FetchError, so extract() rethrows for x instead of falling through
+// to a metadata post scraped from the x.com login shell, and only the oEmbed host is ever fetched.
+const emptyXPost = `<blockquote class="twitter-tweet"><p lang="en" dir="ltr"></p>&mdash; Someone (@someone) <a href="https://x.com/someone/status/1">January 1, 2025</a></blockquote>`;
+const xFailures: [string, () => Response, string?][] = [
+  ["a deleted post (oEmbed 404)", () => new Response("", { status: 404 })],
+  ["a network error", () => {
     throw new Error("network down");
-  });
-  try {
-    await assert.rejects(() => extract(db, "x", "https://x.com/someone/status/1", ""), FetchError);
-    assert.equal(calls, 1);
-  } finally {
-    restore();
-  }
-});
+  }],
+  ["an empty post", () => new Response(JSON.stringify({ author_name: "Someone", html: emptyXPost })), "x post has no text"],
+  ["an oEmbed 200 with a non-JSON body", () => new Response("not json", { status: 200 })],
+  ["an oEmbed 200 with a JSON null body", () => new Response("null", { status: 200 })],
+];
 
-test("extract() rethrows FetchError('x post has no text') for an empty x post, fetching only the oEmbed host", async (t) => {
-  mockDns(t);
-  let calls = 0;
-  const emptyPost = `<blockquote class="twitter-tweet"><p lang="en" dir="ltr"></p>&mdash; Someone (@someone) <a href="https://x.com/someone/status/1">January 1, 2025</a></blockquote>`;
-  const restore = mockFetch(async () => {
-    calls++;
-    return new Response(JSON.stringify({ author_name: "Someone", html: emptyPost }));
-  });
-  try {
+for (const [name, answer, message] of xFailures) {
+  test(`extract() rethrows FetchError for x on ${name}, fetching only the oEmbed host`, async (t) => {
+    mockDns(t);
+    let calls = 0;
+    mockFetch(t, async () => {
+      calls++;
+      return answer();
+    });
     await assert.rejects(
       () => extract(db, "x", "https://x.com/someone/status/1", ""),
-      (error: unknown) => error instanceof FetchError && error.message === "x post has no text",
+      (error: unknown) => error instanceof FetchError && (!message || error.message === message),
     );
     assert.equal(calls, 1);
-  } finally {
-    restore();
-  }
-});
-
-test("extract() rethrows FetchError for an x oEmbed 200 with a non-JSON body, fetching only the oEmbed host", async (t) => {
-  mockDns(t);
-  let calls = 0;
-  const restore = mockFetch(async () => {
-    calls++;
-    return new Response("not json", { status: 200 });
   });
-  try {
-    await assert.rejects(() => extract(db, "x", "https://x.com/someone/status/1", ""), FetchError);
-    assert.equal(calls, 1);
-  } finally {
-    restore();
-  }
-});
-
-test("extract() rethrows FetchError for an x oEmbed 200 with a JSON null body, fetching only the oEmbed host", async (t) => {
-  mockDns(t);
-  let calls = 0;
-  const restore = mockFetch(async () => {
-    calls++;
-    return new Response("null", { status: 200 });
-  });
-  try {
-    await assert.rejects(() => extract(db, "x", "https://x.com/someone/status/1", ""), FetchError);
-    assert.equal(calls, 1);
-  } finally {
-    restore();
-  }
-});
+}
 
 // The generic "everything unreachable" path: a kind with neither special case (github) still falls
 // all the way through to metadataOnly, which itself throws when the page can't be reached at all.
 test("extract() throws FetchError from metadataOnly when the page is unreachable after every extractor fails", async (t) => {
   mockDns(t);
-  const restore = mockFetch(async () => new Response("", { status: 503 }));
-  try {
-    await assert.rejects(() => extract(db, "github", "https://github.com/owner/repo", ""), FetchError);
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response("", { status: 503 }));
+  await assert.rejects(() => extract(db, "github", "https://github.com/owner/repo", ""), FetchError);
 });
 
-// fix round 2, item 3.
 test("isHtml treats a missing content-type, case variation and whitespace before the charset all as HTML; a pdf as not", () => {
   assert.equal(isHtml("text/html; charset=UTF-8"), true);
   assert.equal(isHtml("TEXT/HTML"), true);
@@ -272,70 +175,47 @@ test("isHtml treats a missing content-type, case variation and whitespace before
   assert.equal(isHtml("application/pdf"), false);
 });
 
-// fix round 2, item 4: cancelBody was called in metadataOnly's non-HTML branch, but nothing
-// verified the cancel actually fired — only that the right (filename) title came out.
 test("metadataOnly cancels the body of a non-HTML response instead of leaving it open", async (t) => {
   mockDns(t);
   let cancelled = false;
   const body = new ReadableStream({ cancel: () => { cancelled = true; } });
-  const restore = mockFetch(async () => new Response(body, { headers: { "content-type": "application/pdf" } }));
-  try {
-    await metadataOnly(`http://${TEST_IP}/paper.pdf`);
-    assert.equal(cancelled, true);
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response(body, { headers: { "content-type": "application/pdf" } }));
+  await metadataOnly(`http://${TEST_IP}/paper.pdf`);
+  assert.equal(cancelled, true);
 });
 
-// metadataOnly, tested directly (fix round 1, item 1).
 test("metadataOnly builds a title from the URL's filename for a non-HTML response, without reading the body", async (t) => {
   mockDns(t);
-  const restore = mockFetch(async () => new Response("A".repeat(3_000_000), { headers: { "content-type": "image/png" } }));
-  try {
-    const result = await metadataOnly(`http://${TEST_IP}/reports/annual%20report.png`);
-    assert.equal(result.title, "annual report.png");
-    assert.equal(result.siteName, TEST_IP);
-    assert.equal(result.meta.extractionFailed, true);
-    assert.deepEqual(result.blocks, []);
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response("A".repeat(3_000_000), { headers: { "content-type": "image/png" } }));
+  const result = await metadataOnly(`http://${TEST_IP}/reports/annual%20report.png`);
+  assert.equal(result.title, "annual report.png");
+  assert.equal(result.siteName, TEST_IP);
+  assert.equal(result.meta.extractionFailed, true);
+  assert.deepEqual(result.blocks, []);
 });
 
 // P1's second symptom: under the 2 MB cap, the old code had no content-type check at all, so the PDF
 // bytes were parsed as (garbage) HTML and the title silently fell back to the URL.
 test("metadataOnly names a small non-HTML response by its filename too, not by parsing it as HTML", async (t) => {
   mockDns(t);
-  const restore = mockFetch(async () => new Response("%PDF-1.4", { headers: { "content-type": "application/pdf" } }));
-  try {
-    const result = await metadataOnly(`http://${TEST_IP}/paper.pdf`);
-    assert.equal(result.title, "paper.pdf"); // not the URL — the old bug's symptom
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response("%PDF-1.4", { headers: { "content-type": "application/pdf" } }));
+  const result = await metadataOnly(`http://${TEST_IP}/paper.pdf`);
+  assert.equal(result.title, "paper.pdf"); // not the URL — the old bug's symptom
 });
 
 test("metadataOnly falls back to the URL itself when a non-HTML response has no path segment to name it by", async (t) => {
   mockDns(t);
-  const restore = mockFetch(async () => new Response("binary", { headers: { "content-type": "application/octet-stream" } }));
-  try {
-    const result = await metadataOnly(`http://${TEST_IP}/`);
-    assert.equal(result.title, `http://${TEST_IP}/`);
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response("binary", { headers: { "content-type": "application/octet-stream" } }));
+  const result = await metadataOnly(`http://${TEST_IP}/`);
+  assert.equal(result.title, `http://${TEST_IP}/`);
 });
 
-test("metadataOnly reads a bounded HTML prefix instead of throwing when the page is over 2 MB, and its text includes the og:description (I10)", async (t) => {
+test("metadataOnly reads a bounded HTML prefix instead of throwing when the page is over 2 MB, and its text includes the og:description", async (t) => {
   mockDns(t);
   const head = `<head><title>Big page</title><meta property="og:description" content="Still readable."></head>`;
   const html = `<!doctype html><html>${head}<body>${"x".repeat(3_000_000)}</body></html>`;
-  const restore = mockFetch(async () => new Response(html, { headers: { "content-type": "text/html" } }));
-  try {
-    const result = await metadataOnly(`http://${TEST_IP}/big-page`);
-    assert.equal(result.title, "Big page");
-    assert.ok(result.text.includes("Still readable."));
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response(html, { headers: { "content-type": "text/html" } }));
+  const result = await metadataOnly(`http://${TEST_IP}/big-page`);
+  assert.equal(result.title, "Big page");
+  assert.ok(result.text.includes("Still readable."));
 });

@@ -117,140 +117,108 @@ function fakeStorageDb(fail: (path: string) => boolean = () => false) {
   return { db, uploads };
 }
 
-test("mirrorImages applies the 30-image cap before any download starts", async () => {
+test("mirrorImages applies the 30-image cap before any download starts", async (t) => {
   const { db } = fakeStorageDb();
   let fetches = 0;
-  const restore = mockFetch(async () => {
+  mockFetch(t, async () => {
     fetches++;
     return new Response(await png(100, 100), { headers: { "content-type": "image/png" } });
   });
-  try {
-    const blocks = Array.from({ length: 35 }, (_, i) => image(`i${i}`, `${HOST}/${i}.png`));
-    const out = await mirrorImages(db, 1, blocks);
-    assert.equal(out.filter((b) => b.type === "image").length, 30);
-    assert.equal(fetches, 30);
-  } finally {
-    restore();
-  }
+  const blocks = Array.from({ length: 35 }, (_, i) => image(`i${i}`, `${HOST}/${i}.png`));
+  const out = await mirrorImages(db, 1, blocks);
+  assert.equal(out.filter((b) => b.type === "image").length, 30);
+  assert.equal(fetches, 30);
 });
 
-test("mirrorImages reuses a previously mirrored image by URL without re-fetching", async () => {
+test("mirrorImages reuses a previously mirrored image by URL without re-fetching", async (t) => {
   const { db } = fakeStorageDb();
   let fetches = 0;
-  const restore = mockFetch(async () => {
+  mockFetch(t, async () => {
     fetches++;
     return new Response("boom", { status: 500 });
   });
-  try {
-    const url = `${HOST}/cached.png`;
-    const block = image("i1", url);
-    const previous: Block[] = [
-      { ...block, path: "1/abcdef0123456789", format: "avif", widths: [640], width: 900, height: 600, placeholder: "data:x" } as ImageBlock,
-    ];
-    const out = await mirrorImages(db, 1, [block], previous);
-    assert.equal(fetches, 0);
-    assert.equal((out[0] as ImageBlock).path, "1/abcdef0123456789");
-  } finally {
-    restore();
-  }
+  const url = `${HOST}/cached.png`;
+  const block = image("i1", url);
+  const previous: Block[] = [
+    { ...block, path: "1/abcdef0123456789", format: "avif", widths: [640], width: 900, height: 600, placeholder: "data:x" } as ImageBlock,
+  ];
+  const out = await mirrorImages(db, 1, [block], previous);
+  assert.equal(fetches, 0);
+  assert.equal((out[0] as ImageBlock).path, "1/abcdef0123456789");
 });
 
-test("mirrorImages drops an image too small to be content", async () => {
+test("mirrorImages drops an image too small to be content", async (t) => {
   const { db } = fakeStorageDb();
-  const restore = mockFetch(async () => new Response(await png(32, 32), { headers: { "content-type": "image/png" } }));
-  try {
-    const out = await mirrorImages(db, 1, [image("i1", `${HOST}/icon.png`)]);
-    assert.equal(out.length, 0);
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response(await png(32, 32), { headers: { "content-type": "image/png" } }));
+  const out = await mirrorImages(db, 1, [image("i1", `${HOST}/icon.png`)]);
+  assert.equal(out.length, 0);
 });
 
-test("mirrorImages keeps the block with path: null when the download fails, and cancels its body", async () => {
+test("mirrorImages keeps the block with path: null when the download fails, and cancels its body", async (t) => {
   const { db } = fakeStorageDb();
   let cancelled = false;
-  const restore = mockFetch(async () => new Response(new ReadableStream({ cancel: () => { cancelled = true; } }), { status: 404 }));
-  try {
-    const out = await mirrorImages(db, 1, [image("i1", `${HOST}/missing.png`)]);
-    assert.equal(out.length, 1);
-    assert.equal((out[0] as ImageBlock).path, null);
-    assert.equal(cancelled, true);
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response(new ReadableStream({ cancel: () => { cancelled = true; } }), { status: 404 }));
+  const out = await mirrorImages(db, 1, [image("i1", `${HOST}/missing.png`)]);
+  assert.equal(out.length, 1);
+  assert.equal((out[0] as ImageBlock).path, null);
+  assert.equal(cancelled, true);
 });
 
-test("mirrorImages ignores a wrong content-type and lets sharp sniff the bytes", async () => {
+test("mirrorImages ignores a wrong content-type and lets sharp sniff the bytes", async (t) => {
   const { db, uploads } = fakeStorageDb();
-  const restore = mockFetch(async () => new Response(await png(200, 150), { headers: { "content-type": "binary/octet-stream" } }));
-  try {
-    const out = await mirrorImages(db, 1, [image("i1", `${HOST}/data.bin`)]);
-    assert.notEqual((out[0] as ImageBlock).path, null);
-    assert.ok(uploads.length > 0);
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response(await png(200, 150), { headers: { "content-type": "binary/octet-stream" } }));
+  const out = await mirrorImages(db, 1, [image("i1", `${HOST}/data.bin`)]);
+  assert.notEqual((out[0] as ImageBlock).path, null);
+  assert.ok(uploads.length > 0);
 });
 
-test("mirrorImages drops images past its time budget without fetching them", async () => {
+test("mirrorImages drops images past its time budget without fetching them", async (t) => {
   const { db } = fakeStorageDb();
   let fetches = 0;
-  const restore = mockFetch(async () => {
+  mockFetch(t, async () => {
     fetches++;
     await new Promise((resolve) => setTimeout(resolve, 60));
     return new Response(await png(200, 150), { headers: { "content-type": "image/png" } });
   });
-  try {
-    const blocks = Array.from({ length: 8 }, (_, i) => image(`i${i}`, `${HOST}/${i}.png`));
-    const out = await mirrorImages(db, 1, blocks, [], { budgetMs: 5 });
-    const images = out.filter((b) => b.type === "image") as ImageBlock[];
-    assert.equal(images.length, 8); // budget-skipped blocks are kept with path: null, not dropped
-    assert.ok(fetches < 8, `expected some images to be skipped, got ${fetches} fetches`);
-    assert.ok(images.some((b) => b.path === null));
-  } finally {
-    restore();
-  }
+  const blocks = Array.from({ length: 8 }, (_, i) => image(`i${i}`, `${HOST}/${i}.png`));
+  const out = await mirrorImages(db, 1, blocks, [], { budgetMs: 5 });
+  const images = out.filter((b) => b.type === "image") as ImageBlock[];
+  assert.equal(images.length, 8); // budget-skipped blocks are kept with path: null, not dropped
+  assert.ok(fetches < 8, `expected some images to be skipped, got ${fetches} fetches`);
+  assert.ok(images.some((b) => b.path === null));
 });
 
-test("mirrorImages with budgetMs: 0 starts no downloads at all (fix round 2, item 7)", async () => {
+test("mirrorImages with budgetMs: 0 starts no downloads at all", async (t) => {
   const { db } = fakeStorageDb();
   let fetches = 0;
-  const restore = mockFetch(async () => {
+  mockFetch(t, async () => {
     fetches++;
     return new Response(await png(200, 150), { headers: { "content-type": "image/png" } });
   });
-  try {
-    const blocks = Array.from({ length: 4 }, (_, i) => image(`i${i}`, `${HOST}/${i}.png`));
-    const out = await mirrorImages(db, 1, blocks, [], { budgetMs: 0 });
-    const images = out.filter((b) => b.type === "image") as ImageBlock[];
-    assert.equal(fetches, 0); // a zero (or already-exhausted) budget must not start even the first download
-    assert.equal(images.length, 4);
-    assert.ok(images.every((b) => b.path === null));
-  } finally {
-    restore();
-  }
+  const blocks = Array.from({ length: 4 }, (_, i) => image(`i${i}`, `${HOST}/${i}.png`));
+  const out = await mirrorImages(db, 1, blocks, [], { budgetMs: 0 });
+  const images = out.filter((b) => b.type === "image") as ImageBlock[];
+  assert.equal(fetches, 0); // a zero (or already-exhausted) budget must not start even the first download
+  assert.equal(images.length, 4);
+  assert.ok(images.every((b) => b.path === null));
 });
 
-test("mirrorImages keys uploaded variants by the downloaded bytes, not the URL", async () => {
+test("mirrorImages keys uploaded variants by the downloaded bytes, not the URL", async (t) => {
   const { db, uploads } = fakeStorageDb();
   const bytes = await png(200, 150);
   // Two different URLs, byte-identical response: a URL-derived key would give them different paths.
-  const restore = mockFetch(async () => new Response(bytes, { headers: { "content-type": "image/png" } }));
-  try {
-    const out = await mirrorImages(db, 9, [image("i1", `${HOST}/a.png`), image("i2", `${HOST}/b.png`)]);
-    const blocks = out.filter((b) => b.type === "image") as ImageBlock[];
-    assert.equal(blocks.length, 2);
-    const expectedKey = imageKey(9, bytes);
-    assert.equal(blocks[0].path, expectedKey);
-    assert.equal(blocks[1].path, expectedKey); // identical bytes -> identical path, regardless of URL
-    assert.ok(uploads.length > 0);
-    assert.ok(uploads.every((u) => u.path.startsWith(`${expectedKey}-`)));
-  } finally {
-    restore();
-  }
+  mockFetch(t, async () => new Response(bytes, { headers: { "content-type": "image/png" } }));
+  const out = await mirrorImages(db, 9, [image("i1", `${HOST}/a.png`), image("i2", `${HOST}/b.png`)]);
+  const blocks = out.filter((b) => b.type === "image") as ImageBlock[];
+  assert.equal(blocks.length, 2);
+  const expectedKey = imageKey(9, bytes);
+  assert.equal(blocks[0].path, expectedKey);
+  assert.equal(blocks[1].path, expectedKey); // identical bytes -> identical path, regardless of URL
+  assert.ok(uploads.length > 0);
+  assert.ok(uploads.every((u) => u.path.startsWith(`${expectedKey}-`)));
 });
 
-test("mirrorImages bounds each download with its own fetch timeout", async () => {
+test("mirrorImages bounds each download with its own fetch timeout", async (t) => {
   const { db } = fakeStorageDb();
   const seenTimeouts: number[] = [];
   const realTimeout = AbortSignal.timeout;
@@ -261,12 +229,11 @@ test("mirrorImages bounds each download with its own fetch timeout", async () =>
     seenTimeouts.push(ms);
     return realTimeout(ms);
   };
-  const restore = mockFetch(async () => new Response(await png(200, 150), { headers: { "content-type": "image/png" } }));
+  mockFetch(t, async () => new Response(await png(200, 150), { headers: { "content-type": "image/png" } }));
   try {
     await mirrorImages(db, 1, [image("i1", `${HOST}/x.png`)]);
     assert.deepEqual(seenTimeouts, [FETCH_TIMEOUT_MS]);
   } finally {
-    restore();
     AbortSignal.timeout = realTimeout;
   }
 });

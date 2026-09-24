@@ -108,7 +108,7 @@ test("htmlToBlocks assigns ids", () => {
   assert.ok(blocks.every((b) => typeof b.id === "string" && b.id.length > 0));
 });
 
-// ── Fix round 1: content-loss findings, each pinned by a focused test ───────
+// ── Edge cases: content that must survive, and noise that must not ─────────
 
 test("srcset parses per spec: commas inside CDN URLs don't break candidate splitting", () => {
   const substack = (w: number) =>
@@ -288,8 +288,6 @@ test("pre strips exactly one leading newline and converts br to newline", () => 
   assert.equal((withBr[0] as Extract<BlockDraft, { type: "code" }>).code, "a = 1\nb = 2");
 });
 
-// ── Fix round 2: 5 open findings + 3 regressions from round 1 ───────────────
-
 test("srcset per spec: a comma directly after a descriptor with no following space still splits candidates correctly", () => {
   const x = htmlToDrafts(`<img srcset="/a.jpg 1x,/b.jpg 2x" src="/a.jpg" alt="s">`, base);
   assert.equal((x[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/b.jpg");
@@ -343,7 +341,7 @@ test("an exact-id denylist removes well-known comment containers even though the
   assert.equal(discussion.some((b) => b.type === "heading" && (b as Extract<BlockDraft, { type: "heading" }>).text === "Discussion"), false);
 });
 
-test("tag- and category- class tokens are ignored by name matching, even alone on a non-content element (pinned)", () => {
+test("tag- and category- class tokens are ignored by name matching, even alone on a non-content element", () => {
   const filler = `<p>${"Padding text to dominate the page total so the small div below is not size-protected. ".repeat(30)}</p>`;
   const blocks = htmlToDrafts(`${filler}<div class="post tag-newsletter"><p>Short real note kept only via the tag- filter.</p></div>`, base);
   const texts = blocks.filter((b) => b.type === "paragraph").map((b) => (b as Extract<BlockDraft, { type: "paragraph" }>).content[0].text);
@@ -394,7 +392,7 @@ test("content-container exemptions replace the size-ratio guard: entry-content s
   assert.equal(blocks[0].type, "paragraph");
 });
 
-test("share/related/comment widget names are matched again as delimited tokens, not just whole tokens", () => {
+test("share/related/comment widget names are matched as delimited tokens, not just whole tokens", () => {
   const blocks = htmlToDrafts(
     `<div class="post-share"><p>Post share box text here</p></div>
      <div class="social-sharing"><p>Social sharing box</p></div>
@@ -451,8 +449,6 @@ test("an inline wrapper holding blocks inside a <li> does not flatten into one m
   assert.equal(texts.includes("one n1"), false);
 });
 
-// ── Fix round 3: 4 open findings + 3 regressions + a perf drop ──────────────
-
 const words = (n: number, w = "lorem") => Array.from({ length: n }, (_, i) => w + i).join(" ");
 
 test("srcset: a bare URL followed by a comma has no descriptor, and the comma itself is stripped", () => {
@@ -489,7 +485,7 @@ test("the heading-descendant id exemption holds on a multi-section page where no
   assert.deepEqual(headings, ["Introduction", "Ad hoc evaluation", "Promotion", "Results"]);
 });
 
-test("a <section> with no heading is exempted from id matching (restored)", () => {
+test("a <section> with no heading is exempted from id matching", () => {
   const filler = `<p>${words(300)}</p>`;
   const blocks = htmlToDrafts(
     `${filler}<section id="promo-codes-analysis"><p>We analysed promo codes in this study at length here.</p></section>`,

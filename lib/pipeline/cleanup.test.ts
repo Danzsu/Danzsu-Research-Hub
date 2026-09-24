@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft } from "../blocks.ts";
 import { aiCleanup, applyCleanup, cleanupListing } from "./cleanup.ts";
-import { fakeDb, geminiPrompt, geminiResponse, mockFetch, withGeminiKey } from "./mock-fetch.ts";
+import { fakeDb } from "./fake-db.ts";
+import { geminiPrompt, geminiResponse, mockFetch, withGeminiKey } from "./mock-fetch.ts";
 import { NOT_INSTRUCTIONS } from "./summary.ts";
 
 const paragraphs = (n: number, prefix = "p") =>
@@ -22,51 +23,41 @@ test("applyCleanup removes named blocks but refuses to gut the article", () => {
   assert.equal(applyCleanup(blocks, ["unknown"]).length, 10);
 });
 
-// M23: at 4 blocks, /2 (=2) and /2+1 (=3) genuinely differ from the 10-block case above —
+// At 4 blocks, /2 (=2) and /2+1 (=3) genuinely differ from the 10-block case above —
 // removing 2 of 4 must still be refused (kept=2 < 3).
-test("applyCleanup refuses to remove 2 of 4 blocks (half+1 boundary, M23)", () => {
+test("applyCleanup refuses to remove 2 of 4 blocks (the half-plus-one boundary)", () => {
   const four = paragraphs(4, "q");
   assert.equal(applyCleanup(four, [four[0].id, four[1].id]).length, 4);
 });
 
-// M24/M24b: exactly at the boundary. Both need an ambient key — without one, `generate()` never
+// Exactly at the boundary. Both halves need an ambient key — without one, `generate()` never
 // fetches regardless of the block-count guard, and the "no call" half would pass for the wrong reason.
-test("aiCleanup makes no model call below the minimum block count, and exactly one at it (M24/M24b)", async () => {
-  const restoreKey = withGeminiKey();
+test("aiCleanup makes no model call below the minimum block count, and exactly one at it", async (t) => {
+  withGeminiKey(t);
   let calls = 0;
-  const restore = mockFetch(async () => {
+  mockFetch(t, async () => {
     calls++;
     return geminiResponse({ remove: [] });
   });
-  try {
-    const three = paragraphs(3, "r");
-    const result = await aiCleanup(fakeDb(), three);
-    assert.equal(calls, 0);
-    assert.deepEqual(result, three);
+  const three = paragraphs(3, "r");
+  const result = await aiCleanup(fakeDb(), three);
+  assert.equal(calls, 0);
+  assert.deepEqual(result, three);
 
-    const four = paragraphs(4, "t");
-    await aiCleanup(fakeDb(), four);
-    assert.equal(calls, 1);
-  } finally {
-    restore();
-    restoreKey();
-  }
+  const four = paragraphs(4, "t");
+  await aiCleanup(fakeDb(), four);
+  assert.equal(calls, 1);
 });
 
-test("aiCleanup includes summary.ts's prompt-injection guard line before the block listing", async () => {
-  const restoreKey = withGeminiKey();
+test("aiCleanup includes summary.ts's prompt-injection guard line before the block listing", async (t) => {
+  withGeminiKey(t);
   const four = paragraphs(4, "s");
   let prompt = "";
-  const restore = mockFetch(async (_url, init) => {
+  mockFetch(t, async (_url, init) => {
     prompt = geminiPrompt(init);
     return geminiResponse({ remove: [] });
   });
-  try {
-    await aiCleanup(fakeDb(), four);
-    assert.ok(prompt.includes(NOT_INSTRUCTIONS));
-    assert.ok(prompt.indexOf(NOT_INSTRUCTIONS) < prompt.indexOf(cleanupListing(four)));
-  } finally {
-    restore();
-    restoreKey();
-  }
+  await aiCleanup(fakeDb(), four);
+  assert.ok(prompt.includes(NOT_INSTRUCTIONS));
+  assert.ok(prompt.indexOf(NOT_INSTRUCTIONS) < prompt.indexOf(cleanupListing(four)));
 });
