@@ -3629,4 +3629,147 @@ git add CLAUDE.md README.md TODO.md docs supabase/migrations/20260925000000_drop
 git commit -m "docs: document the block pipeline and schedule dropping posts.body"
 ```
 
+---
+
+### Task 15: A teljes projekt átnézése: tesztek, funkciópróba, refaktor, kódminőség, duplikáció, dokumentáció, onboarding-README
+
+A felhasználó kérte (2026-09-24). A cél, hogy a projekt karbantartható legyen, és egy új fejlesztő a README-ből el tudjon indulni.
+
+A kiinduló lista a kódbázis-átnézés: `.superpowers/brainstorm/codebase-audit.md` (24 javaslat, fájl- és sorhivatkozással). Ebben a feladatban az ott „M1”-nek, illetve a lent felsorolt „Later” pontok készülnek el.
+
+Három dolog **nem része** a feladatnak:
+- **A `digest-dashboard.tsx` szétbontása** (az átnézés 11–13. pontja). Ezt a UI/UX A mérföldkő teljesen átírja, lásd `docs/superpowers/specs/2026-09-24-ux-signals-search-design.md` és `docs/superpowers/plans/2026-09-24-ux-a-app-shell.md`.
+- **A nem használt vendored `components/ui` fájlok törlése.** A UI/UX mérföldkövek még használhatják őket. A listájuk bekerül a jelentésbe.
+- **Új funkció.**
+
+**Files:** (a pontos lista az átnézésből, lépésenként)
+- Modify:
+  - `lib/pipeline/util.ts`, `lib/pipeline/fetch.ts`, `lib/pipeline/collect.ts`, `lib/pipeline/daily.ts`, `lib/pipeline/ingest.ts`, `lib/pipeline/html-to-blocks.ts`, `lib/pipeline/extract/*.ts`, `lib/llm.ts`, `lib/content.ts`, `lib/post-view.ts`
+  - `app/api/cron/daily/route.ts`, `app/api/sources/route.ts`, `app/api/state/route.ts`
+  - `app/page.tsx`, `app/archive/**`, `app/library/**`
+  - `package.json`, `pnpm-lock.yaml`, `CLAUDE.md`, `README.md`, `TODO.md`, `data/digest-types.ts`
+- Create:
+  - `lib/pipeline/html-noise.ts`
+  - `lib/pipeline/fake-db.ts` (a `mock-fetch.ts` adatbázis-része ide költözik)
+  - `lib/state.ts` + `lib/state.test.ts`
+  - `lib/pipeline/collect.test.ts`, `lib/pipeline/daily.test.ts`, `lib/llm.test.ts`
+
+**Interfaces:**
+- Produces:
+  - `errorMessage(error: unknown): string` (`lib/pipeline/util.ts`)
+  - `ensureOk(response: Response, label: string): Promise<Response>`: ha nem ok, `cancelBody`, majd `FetchError`
+  - `apiFetch(url: string, init?: RequestInit & { timeoutMs?: number }): Promise<Response>`: `USER_AGENT` és időkorlát (mindkettő a `lib/pipeline/fetch.ts`-ben)
+  - `parseStateAction(body: unknown)` (`lib/state.ts`): zod-dal ellenőrzött, diszkriminált akció
+  - `curatePrompt(...)` és `toDigestRows(...)` (`lib/pipeline/daily.ts`): tiszta függvények
+  - `mockFetch(t, handler)` és `withGeminiKey(t)`: a takarítás `t.after`-rel automatikus
+
+- [ ] **Step 1: Kiinduló mérés.**
+  - Futtasd: `npm test`, `npm run dup`, `npx -y jscpd@4.3.0 app lib scripts proxy.ts --min-lines 4 --min-tokens 35 --reporters console`.
+  - Listázd a 300 sornál hosszabb, kézzel írt fájlokat.
+  - Az eredmény a jelentés elejére kerül.
+- [ ] **Step 2: Refaktor és duplikáció** (az átnézés 4–7., 9. és 20–21. pontja). Minden alpontnál az a mérce, hogy a kód könnyebben érthető legyen.
+  - `errorMessage()` a 14 darab `error instanceof Error ? error.message : error` helyett.
+  - `ensureOk()` és `apiFetch()` a 7 darab „nem ok → cancelBody → throw” minta és a 6 fix hostos fetch helyett. A `collect.ts` saját `get()`-je ezekre épül.
+  - Apró tiszta összevonások:
+    - egy `videoFromUrl` a `html-to-blocks.ts` két videó-parsere helyett;
+    - egy YouTube-id ellenőrzés;
+    - a `parseSubmittedUrl` az `isPrivateAddress`-t használja;
+    - egyetlen `publishedDate` (x.ts, collect.ts);
+    - a `Generated` típus újrahasznosítása;
+    - a nem használt `Week.label` törlése.
+  - Cron és hibák:
+    - a `retryPendingSources` akkor is fusson, ha a `runDaily` hibát dob (külön try);
+    - a cron route `jsonError`-t használjon;
+    - a `sources` és a `state` route naplózza a DB-hibákat;
+    - az `ingest.ts` három ellenőrizetlen `sources.update` eredményét nézd meg, és naplózd.
+  - Az oldalak `getReader()`-t használjanak a `getViewer()` + `createClient()` páros helyett (5 oldal).
+  - Töröld a review-történetet vagy a tervet idéző kommenteket, és a mutáns-azonosítókat a tesztnevekből. Egy komment azt mondja el, miért működik így a kód, nem azt, hogyan készült.
+  - Szedd szét a `html-to-blocks.ts`-t: a zajszabályok a `html-noise.ts`-be kerülnek, a konverzió marad. A meglévő tesztek változatlanul zöldek maradnak.
+  - Tesztsegédek:
+    - a `fakeDb` a `lib/pipeline/fake-db.ts`-be költözik;
+    - a `mockFetch(t, …)` és a `withGeminiKey(t)` maga regisztrálja a takarítást `t.after`-rel;
+    - ez megszünteti a tesztekben lévő 45 ismétlődés nagy részét.
+- [ ] **Step 3: Tesztek pótlása** (az átnézés 15–19. pontja). Minden új teszt bukjon el, ha a védett viselkedést visszafordítod.
+  - `collect.ts`: a `parseFeed` RSS- és Atom-mintákra, valamint a jelöltek URL-alapú duplikációszűrése.
+  - `daily.ts`: a `curatePrompt()` / `toDigestRows()` kiemelése. Teszt kell arra, hogy az `itemId` örökre stabil marad, mert a `CLAUDE.md` szerint az `item_states` elsődleges kulcsának fele. Kell egy `fakeDb`-s bekötési teszt is.
+  - `/api/state`: a `parseStateAction()` kiemelése, tesztekkel az összes akcióra és a hibás bemenetekre.
+  - `llm.ts` útválasztás:
+    - a hiányzó kulcsú útvonal kimarad;
+    - a média (YouTube, PDF) csak Geminire megy;
+    - a tartalék útvonal fut, ha az első elbukik;
+    - a hibák összegződnek.
+  - A `toPost` átkerül a `lib/post-view.ts`-be. Teszt az `overrides` elsőbbségére és az `archiveAt` dátumszámítására.
+- [ ] **Step 4: Függőségek** (supply-chain szabály).
+  - Minden `^` tartomány a lockfile-ban szereplő pontos verzióra rögzül.
+  - A `jscpd@4.3.0` pontos devDependency lesz, és az `npm run dup` a helyi binárist hívja (`jscpd …`, nem `npx -y`).
+  - A lockfile újragenerálása: `corepack pnpm@11.25.0 install`. A `pnpm-workspace.yaml` `minimumReleaseAge: 10080` beállítása (7 nap) marad, ne gyengítsd.
+  - A nem használt vendored komponensek és a csak általuk használt függőségek listája a jelentésbe kerül, de nem törlöd őket.
+- [ ] **Step 5: Funkciópróba** (a kontroller futtatja, a 14. feladat élő próbája után). Bejelentkezve, Playwrighttal, 360 és 1280 px-en, lépésről lépésre:
+  1. belépés;
+  2. Radar: olvasott, mentés, teendő;
+  3. archív hét;
+  4. Library-beküldés, forrástípusonként egy link;
+  5. poszt-oldal: blokkok, képek, videó és fejezetek, forrásjelölés, sávok;
+  6. fordítás;
+  7. szerkesztés, elrejtés, újrakinyerés és a 10 perces várakozás;
+  8. a `/media` kijelentkezve 401-et ad;
+  9. egy `noarchive` oldal;
+  10. sehol nincs vízszintes görgetés.
+
+  Minden talált hibára regressziós tesztet írsz és javítasz, vagy a `TODO.md`-be kerül indoklással.
+- [ ] **Step 6: Dokumentáció.**
+  - `CLAUDE.md`:
+    - az átnézés 3. és 22. pontja: az RPC és a Storage írási útjai, a `generate()` opciói, az `npm test` sor, a relatív importok listája, a komponensszám, a `noarchive` / `posts.body` sor, a képek árvái forrás törlésekor;
+    - a `model_settings` feladatlistája: `ingest_pdf`, `ingest_cleanup`, `translate_post`;
+    - a fordító és a szerkesztő route-ok;
+    - a tesztsegédek (`fake-db.ts`, `mock-fetch.ts`);
+    - a konvenciók: duplikációs kapu, copy-objektum komponensenként.
+  - `data/digest-types.ts:46`: az id formátuma.
+  - Nyilvános `lib/` függvényeknél JSDoc csak ott, ahol a viselkedés nem egyértelmű.
+- [ ] **Step 7: Onboarding-README** (angolul, mint a mostani README; a célközönség egy új fejlesztő). Minden parancsot és útvonalat ellenőrizz a kódban. A szakaszok:
+  1. **What it is:** két bekezdés, a Radar és a Library.
+  2. **How it works:**
+     - egy Mermaid-ábra a két íróval: a napi cron és a link-beküldés;
+     - a blokk-pipeline (kinyerők, háromrétegű zajszűrés, képtükrözés, összefoglaló vagy noarchive-jegyzet);
+     - a fordítás;
+     - az auth, az RLS és a `update_post_overrides` RPC;
+     - a `model_settings`.
+  3. **Quick start (local):**
+     - előfeltételek;
+     - `corepack pnpm@11.25.0 install --frozen-lockfile`;
+     - `.env.local`;
+     - Supabase: a migrációk sorrendben, meghívás;
+     - az első kiadás (`curl … /api/cron/daily`);
+     - egy link helyben: `npm run ingest -- <url>`, azzal a figyelmeztetéssel, hogy a beállított projektbe ír.
+  4. **Deploy:** Vercel és Supabase, a környezeti változók, a cron.
+  5. **Project tour:** könyvtártérkép, soronként egy mondattal, és hol érdemes elkezdeni az olvasást.
+  6. **Recipes:**
+     - új hírforrás (`feeds.ts`);
+     - új forrás-kinyerő (`lib/pipeline/extract/`);
+     - új vagy módosított modell-feladat a `model_settings`-ben;
+     - új migráció (additív, SQL Editor);
+     - új felületi szöveg (copy-objektum);
+     - tesztek, `dup` és lint futtatása.
+  7. **Testing:** `node --test` a `lib/`-ben, a `fake-db` és a `mock-fetch` segédek, mi nincs lefedve (a felület), és hogyan ellenőrizzük (Playwright).
+  8. **Conventions:**
+     - a design-nyelv röviden, hivatkozással a `CLAUDE.md`-re;
+     - kétnyelvűség;
+     - duplikációs kapu;
+     - Conventional Commits;
+     - pontos verziók és 7 napos kor.
+  9. **Content & copyright:** `noindex`, meghívásos belépés, `noarchive`, takedown.
+  10. **Troubleshooting:**
+      - a magic link rossz címre visz;
+      - a cron 401-et ad;
+      - Gemini-keret;
+      - migrációs hibák;
+      - lejárt GitHub-token.
+  11. **Roadmap:** hivatkozás a `TODO.md`-re és a `docs/superpowers/` specekre és tervekre.
+- [ ] **Step 8: Végső ellenőrzés és commit.**
+  - Futtasd: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`. Elvárt: minden zöld, 0 klón.
+  - A jelentésbe írd be az előtte és utána mért számokat: tesztszám, 4/35-ös klónok, a legnagyobb fájlok mérete.
+  - Témánként külön commit legyen: `refactor: …`, `test: …`, `chore(deps): pin exact versions …`, `docs: …`.
+
+---
+
 A push a felhasználó feladata: `! git push origin <branch>`, vagy a `main` beolvasztása után `! git push origin main`.
