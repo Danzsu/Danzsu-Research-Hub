@@ -40,7 +40,7 @@ export function parseSrcset(srcset: string): string[] {
 }
 
 /** Resolves the best available image URL for an <img>, trying srcset/lazy-load fallbacks in order. */
-export function imageUrl(img: Element, imageBase: string): string | undefined {
+export function imageUrl(img: Element, imageBase: string, resolveImage?: (raw: string) => string | undefined): string | undefined {
   const srcset = img.getAttribute("srcset") || img.getAttribute("data-srcset") || img.getAttribute("data-lazy-srcset");
   const candidates = [
     ...(srcset ? parseSrcset(srcset) : []),
@@ -51,7 +51,7 @@ export function imageUrl(img: Element, imageBase: string): string | undefined {
   ];
   for (const candidate of candidates) {
     if (!candidate || candidate.startsWith("data:")) continue;
-    const href = safeHref(candidate, imageBase);
+    const href = safeHref(resolveImage?.(candidate) ?? candidate, imageBase);
     if (href) return href;
   }
   return undefined;

@@ -5,7 +5,9 @@ import { z } from "zod/v4";
 // not code: the `model_settings` table (edit a row, the next run uses it).
 // Only the API keys live in env.
 
-export type Task = "daily_shortlist" | "daily_curate" | "ingest_article" | "ingest_video";
+export type Task =
+  | "daily_shortlist" | "daily_curate" | "ingest_article" | "ingest_video"
+  | "ingest_pdf" | "ingest_cleanup" | "translate_post";
 type Provider = "gemini" | "groq";
 type Route = { provider: Provider; model: string };
 
@@ -32,9 +34,15 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
   return response.json();
 }
 
-async function gemini<T extends z.ZodType>(model: string, schema: T, prompt: string, youtubeUrl?: string): Promise<z.infer<T>> {
+async function gemini<T extends z.ZodType>(
+  model: string,
+  schema: T,
+  prompt: string,
+  media: { youtubeUrl?: string; pdfBase64?: string } = {},
+): Promise<z.infer<T>> {
   const parts: unknown[] = [{ text: prompt }];
-  if (youtubeUrl) parts.unshift({ file_data: { file_uri: youtubeUrl } });
+  if (media.youtubeUrl) parts.unshift({ file_data: { file_uri: media.youtubeUrl } });
+  if (media.pdfBase64) parts.unshift({ inline_data: { mime_type: "application/pdf", data: media.pdfBase64 } });
 
   const data = (await post(
     `${GEMINI_URL}/${encodeURIComponent(model)}:generateContent`,
@@ -46,7 +54,7 @@ async function gemini<T extends z.ZodType>(model: string, schema: T, prompt: str
         responseMimeType: "application/json",
         responseJsonSchema: jsonSchema(schema),
         // Low resolution keeps a long video around ~100 tokens/second instead of ~300.
-        ...(youtubeUrl ? { mediaResolution: "MEDIA_RESOLUTION_LOW" } : {}),
+        ...(media.youtubeUrl ? { mediaResolution: "MEDIA_RESOLUTION_LOW" } : {}),
       },
     },
   )) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
@@ -97,7 +105,7 @@ export async function generate<T extends z.ZodType>(
   task: Task,
   schema: T,
   prompt: string,
-  options: { youtubeUrl?: string } = {},
+  options: { youtubeUrl?: string; pdfBase64?: string } = {},
 ): Promise<z.infer<T>> {
   const errors: string[] = [];
   for (const route of await routesFor(db, task)) {
@@ -105,10 +113,11 @@ export async function generate<T extends z.ZodType>(
       errors.push(`${route.provider}: ${KEYS[route.provider]} not set`);
       continue;
     }
-    if (options.youtubeUrl && route.provider !== "gemini") continue;
+    // Only Gemini reads video and PDF input.
+    if ((options.youtubeUrl || options.pdfBase64) && route.provider !== "gemini") continue;
     try {
       return route.provider === "gemini"
-        ? await gemini(route.model, schema, prompt, options.youtubeUrl)
+        ? await gemini(route.model, schema, prompt, options)
         : await groq(route.model, schema, prompt);
     } catch (error) {
       errors.push(`${route.provider}/${route.model}: ${error instanceof Error ? error.message : error}`);

@@ -3,7 +3,7 @@ import { assignIds, blockIdentity, blockText, inlineText, safeHref, type Block, 
 import { imageUrl, isIconOrAvatarImage } from "./html-images.ts";
 import { hostOf, youtubeId } from "./util.ts";
 
-export type HtmlToBlocksOptions = { baseUrl: string; imageBaseUrl?: string };
+export type HtmlToBlocksOptions = { baseUrl: string; imageBaseUrl?: string; resolveImage?: (raw: string) => string | undefined };
 
 // ── Layer 1: structural and named noise, removed before conversion ──────────
 
@@ -136,7 +136,7 @@ export function cleanDocument(root: Element, baseUrl: string): void {
 // ── Conversion ───────────────────────────────────────────────────────────────
 
 type Marks = { href?: string; bold?: true; italic?: true };
-type Ctx = { base: string; imageBase: string; out: BlockDraft[]; pending: Element[] };
+type Ctx = { base: string; imageBase: string; resolveImage?: (raw: string) => string | undefined; out: BlockDraft[]; pending: Element[] };
 
 const INLINE = new Set([
   "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "del", "dfn", "em", "i", "ins", "kbd",
@@ -156,7 +156,7 @@ function containsBlockDescendant(el: Element): boolean {
 const collapse = (text: string | null | undefined) => (text ?? "").replace(/\s+/g, " ").trim();
 
 function pushImage(img: Element, caption: string | undefined, ctx: Ctx) {
-  const url = imageUrl(img, ctx.imageBase);
+  const url = imageUrl(img, ctx.imageBase, ctx.resolveImage);
   if (!url) return;
   const width = Number(img.getAttribute("width"));
   const height = Number(img.getAttribute("height"));
@@ -542,7 +542,7 @@ export function htmlToDrafts(html: string, options: HtmlToBlocksOptions): BlockD
   const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
   const body = document.body as unknown as Element;
   cleanDocument(body, options.baseUrl);
-  const ctx: Ctx = { base: options.baseUrl, imageBase: options.imageBaseUrl ?? options.baseUrl, out: [], pending: [] };
+  const ctx: Ctx = { base: options.baseUrl, imageBase: options.imageBaseUrl ?? options.baseUrl, resolveImage: options.resolveImage, out: [], pending: [] };
   visitChildren(body, ctx);
   return filterNoise(ctx.out, options.baseUrl);
 }
