@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { isMediaKey, variantPath } from "../media.ts";
-import { encodeImage, imageKey, mirrorImages, unusedMediaPaths } from "./images.ts";
+import { FETCH_TIMEOUT_MS, encodeImage, imageKey, mirrorImages, unusedMediaPaths } from "./images.ts";
 import { mockFetch } from "./mock-fetch.ts";
 import type { Block, ImageBlock } from "../blocks.ts";
 
@@ -57,6 +57,20 @@ test("encodeImage rasterizes SVG instead of storing markup (stored-XSS guard)", 
   for (const variant of encoded.variants) {
     assert.equal((await sharp(variant.data).metadata()).format, "heif"); // avif container
     assert.ok(!variant.data.toString("latin1").includes("<script"), "encoded bytes must not carry the source markup");
+  }
+});
+
+test("encodeImage still yields a variant for a narrow, very tall SVG", async () => {
+  // 400x8000: hitting the 1280px width target at density would push the decoded height
+  // past libheif's per-dimension limit; the density (and, as a backstop, a failing variant)
+  // must not lose the image entirely.
+  const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="8000"><rect width="400" height="8000" fill="red"/></svg>`);
+  const encoded = await encodeImage(svg);
+  assert.ok(encoded);
+  assert.ok(encoded.variants.length > 0);
+  for (const variant of encoded.variants) {
+    const meta = await sharp(variant.data).metadata();
+    assert.ok((meta.height ?? 0) <= 16_384);
   }
 });
 
@@ -195,5 +209,45 @@ test("mirrorImages drops images past its time budget without fetching them", asy
     assert.ok(images.some((b) => b.path === null));
   } finally {
     restore();
+  }
+});
+
+test("mirrorImages keys uploaded variants by the downloaded bytes, not the URL", async () => {
+  const { db, uploads } = fakeDb();
+  const bytes = await png(200, 150);
+  // Two different URLs, byte-identical response: a URL-derived key would give them different paths.
+  const restore = mockFetch(async () => new Response(bytes, { headers: { "content-type": "image/png" } }));
+  try {
+    const out = await mirrorImages(db, 9, [image("i1", `${HOST}/a.png`), image("i2", `${HOST}/b.png`)]);
+    const blocks = out.filter((b) => b.type === "image") as ImageBlock[];
+    assert.equal(blocks.length, 2);
+    const expectedKey = imageKey(9, bytes);
+    assert.equal(blocks[0].path, expectedKey);
+    assert.equal(blocks[1].path, expectedKey); // identical bytes -> identical path, regardless of URL
+    assert.ok(uploads.length > 0);
+    assert.ok(uploads.every((u) => u.path.startsWith(`${expectedKey}-`)));
+  } finally {
+    restore();
+  }
+});
+
+test("mirrorImages bounds each download with its own fetch timeout", async () => {
+  const { db } = fakeDb();
+  const seenTimeouts: number[] = [];
+  const realTimeout = AbortSignal.timeout;
+  // safeFetch calls AbortSignal.timeout(init.timeoutMs ?? 20_000); spying on it pins the exact
+  // value mirrorImages passes in, so dropping `timeoutMs: FETCH_TIMEOUT_MS` falls back to 20_000
+  // and fails this assertion instead of silently reverting to the caller-agnostic default.
+  (AbortSignal as unknown as { timeout: (ms: number) => AbortSignal }).timeout = (ms: number) => {
+    seenTimeouts.push(ms);
+    return realTimeout(ms);
+  };
+  const restore = mockFetch(async () => new Response(await png(200, 150), { headers: { "content-type": "image/png" } }));
+  try {
+    await mirrorImages(db, 1, [image("i1", `${HOST}/x.png`)]);
+    assert.deepEqual(seenTimeouts, [FETCH_TIMEOUT_MS]);
+  } finally {
+    restore();
+    AbortSignal.timeout = realTimeout;
   }
 });

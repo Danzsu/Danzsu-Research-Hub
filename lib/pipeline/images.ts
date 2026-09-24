@@ -11,11 +11,12 @@ const WIDTHS = [640, 1280];
 const MIN_SIDE = 64;
 const CONCURRENCY = 4;
 const PIXEL_LIMIT = 40_000_000; // decompression-bomb guard
-const FETCH_TIMEOUT_MS = 10_000;
+export const FETCH_TIMEOUT_MS = 10_000;
 const IMAGE_BUDGET_MS = 90_000;
 // ponytail: fixed upscale ceiling for vector sources; raise if a submitted SVG's
 // declared size is so small that even this still doesn't clear the 1280px target.
 const MAX_SVG_DENSITY = 2400;
+const HEIF_MAX_SIDE = 16_384; // libheif's per-dimension limit for the AVIF container we encode into
 
 export type Encoded = {
   format: MediaFormat;
@@ -43,18 +44,27 @@ export async function encodeImage(input: Buffer): Promise<Encoded | null> {
   if (width < MIN_SIDE || height < MIN_SIDE) return null;
 
   const largestTarget = WIDTHS.at(-1)!;
-  const density = meta.format === "svg" ? Math.min(MAX_SVG_DENSITY, Math.max(72, Math.ceil((72 * largestTarget) / width))) : undefined;
+  let density = meta.format === "svg" ? Math.min(MAX_SVG_DENSITY, Math.max(72, Math.ceil((72 * largestTarget) / width))) : undefined;
+  if (density) {
+    // A narrow-but-tall SVG upscaled to hit the width target can overshoot the encoder's max side.
+    const maxSide = Math.max(Math.round((width * density) / 72), Math.round((height * density) / 72));
+    if (maxSide > HEIF_MAX_SIDE) density = Math.max(72, Math.floor((density * HEIF_MAX_SIDE) / maxSide));
+  }
   const open = () => sharp(input, { autoOrient: true, animated, limitInputPixels: PIXEL_LIMIT, ...(density ? { density } : {}) });
   const decodedWidth = density ? Math.round((width * density) / 72) : width;
 
   const targets = [...new Set(WIDTHS.map((target) => Math.min(target, decodedWidth)))];
-  const variants = await Promise.all(
+  const settled = await Promise.allSettled(
     targets.map(async (target) => {
       const resized = open().resize({ width: target, withoutEnlargement: true });
       const data = await (animated ? resized.webp({ quality: 75 }) : resized.avif({ quality: 50, effort: 4 })).toBuffer();
       return { width: target, data };
     }),
   );
+  // A variant that still overshoots the encoder's limits is dropped, not fatal — the smaller ones survive.
+  const variants = settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+  if (variants.length === 0) return null;
+
   const tiny = await open().resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
   const format: MediaFormat = animated ? "webp" : "avif";
   return { format, width, height, placeholder: `data:image/webp;base64,${tiny.toString("base64")}`, variants };

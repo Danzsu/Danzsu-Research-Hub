@@ -9,35 +9,88 @@ const PUB = "http://93.184.216.34";
 
 const redirect = (location: string) => new Response(null, { status: 302, headers: { location } });
 
+/**
+ * Redirects only the first call (the public start URL) to `location`; every other URL — in
+ * particular the blocked hop itself, if the guard fails to stop it — gets a plain 200. A mock
+ * that redirects unconditionally would mask a broken guard behind "too many redirects" instead
+ * of the real rejection, so this shape is what actually pins the SSRF check.
+ */
+function redirectOnceThenOk(location: string) {
+  const calls: string[] = [];
+  const restore = mockFetch(async (url) => {
+    calls.push(url);
+    return url === `${PUB}/a` ? redirect(location) : new Response("ok");
+  });
+  return { calls, restore };
+}
+
 test("safeFetch blocks a redirect to a loopback address", async () => {
-  const restore = mockFetch(async () => redirect("http://127.0.0.1/admin"));
+  const { calls, restore } = redirectOnceThenOk("http://127.0.0.1/admin");
   try {
-    await assert.rejects(() => safeFetch(`${PUB}/a`), FetchError);
+    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message));
+    assert.equal(calls.length, 1); // the blocked hop must never actually be fetched
   } finally {
     restore();
   }
 });
 
 test("safeFetch blocks a redirect to the cloud metadata address", async () => {
-  const restore = mockFetch(async () => redirect("http://169.254.169.254/latest/meta-data/"));
+  const { calls, restore } = redirectOnceThenOk("http://169.254.169.254/latest/meta-data/");
   try {
-    await assert.rejects(() => safeFetch(`${PUB}/a`), FetchError);
+    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message));
+    assert.equal(calls.length, 1);
   } finally {
     restore();
   }
 });
 
-test("safeFetch blocks a redirect to a file: URL", async () => {
-  const restore = mockFetch(async () => redirect("file:///etc/passwd"));
+test("safeFetch blocks a redirect to a CGNAT address via the DNS-resolved private-address check", async () => {
+  // 127.*, 169.254.* etc. are already rejected by parseSubmittedUrl's own hostname regex, before
+  // the DNS-resolved address is ever looked up — so they can't pin the isPrivateAddress check
+  // that runs after DNS resolution (fetch.ts's `checkedHop`). 100.64.0.0/10 (CGNAT) isn't in that
+  // regex's blocklist, so this hop only gets stopped if the post-lookup check is actually run.
+  const { calls, restore } = redirectOnceThenOk("http://100.64.0.1/");
   try {
-    await assert.rejects(() => safeFetch(`${PUB}/a`), FetchError);
+    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && error.message === "blocked address");
+    assert.equal(calls.length, 1);
   } finally {
     restore();
   }
 });
 
-test("safeFetch gives up after too many redirect hops", async () => {
-  const restore = mockFetch(async () => redirect(`${PUB}/next`));
+test("safeFetch blocks a redirect to a file: URL via the parseSubmittedUrl guard", async () => {
+  const { calls, restore } = redirectOnceThenOk("file:///etc/passwd");
+  try {
+    // The exact message the non-http(s) guard produces — not just "some FetchError" — so a
+    // guard that silently falls through to `new URL(raw)` instead of rejecting still fails this.
+    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && error.message === "blocked url");
+    assert.equal(calls.length, 1);
+  } finally {
+    restore();
+  }
+});
+
+/** Redirects for the first `n` calls, then 200s — lets the redirect-hop cap be pinned exactly. */
+function redirectChain(n: number) {
+  let calls = 0;
+  return async () => {
+    calls++;
+    return calls <= n ? redirect(`${PUB}/hop${calls}`) : new Response("ok");
+  };
+}
+
+test("safeFetch follows redirects up to its cap and succeeds", async () => {
+  const restore = mockFetch(redirectChain(4)); // 4 redirects then a 200 fits within the cap
+  try {
+    const response = await safeFetch(`${PUB}/a`);
+    assert.equal(await response.text(), "ok");
+  } finally {
+    restore();
+  }
+});
+
+test("safeFetch gives up one hop past its cap with 'too many redirects'", async () => {
+  const restore = mockFetch(redirectChain(5)); // the 6th call (the 200) is never reached
   try {
     await assert.rejects(
       () => safeFetch(`${PUB}/a`),
