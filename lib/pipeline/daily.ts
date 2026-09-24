@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod/v4";
+import { localizedSchema } from "../blocks.ts";
 import { digestCategories, digestTags } from "../../data/digest-types.ts";
 import { generate } from "../llm.ts";
 import { collectCandidates, collectRepos, type Candidate } from "./collect.ts";
@@ -8,8 +9,6 @@ import { isoWeek, itemId } from "./util.ts";
 const DAY = 86_400_000;
 const SHORTLIST = 40;
 const MAX_NEW_ITEMS = 25;
-
-const localized = z.object({ hu: z.string(), en: z.string() });
 
 const shortlistSchema = z.object({ keep: z.array(z.int()) });
 
@@ -21,9 +20,9 @@ const curatedSchema = z.object({
       score: z.int().min(0).max(100),
       readMinutes: z.int().min(1).max(120),
       tags: z.array(z.enum(digestTags)).max(4),
-      title: localized,
-      summary: localized,
-      why: localized,
+      title: localizedSchema,
+      summary: localizedSchema,
+      why: localizedSchema,
     }),
   ),
   github: z.array(z.object({ index: z.int(), focus: z.string() })).max(10),

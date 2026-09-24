@@ -40,14 +40,19 @@ export function slugify(text: string, max = 60): string {
     .replace(/-+$/, "");
 }
 
-/** FNV-1a, 6 hex chars. Only for making ids unique per URL, not for security. */
-export function shortHash(text: string): string {
+/** FNV-1a as 8 hex chars. Not for security; only for stable, content-derived ids. */
+export function fnv1a(text: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
     hash ^= text.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
-  return (hash >>> 0).toString(16).padStart(8, "0").slice(0, 6);
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+/** 6 hex chars of fnv1a. ⚠️ Feeds digest item ids — never change its output. */
+export function shortHash(text: string): string {
+  return fnv1a(text).slice(0, 6);
 }
 
 /**
