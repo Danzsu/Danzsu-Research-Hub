@@ -177,10 +177,11 @@ test("isHtml treats a missing content-type, case variation and whitespace before
 
 test("metadataOnly cancels the body of a non-HTML response instead of leaving it open", async (t) => {
   mockDns(t);
-  const { body, cancelled } = endlessBody();
+  const { body, cancelled, reads } = endlessBody();
   mockFetch(t, async () => new Response(body, { headers: { "content-type": "application/pdf" } }));
   await metadataOnly(`http://${TEST_IP}/paper.pdf`);
   assert.equal(cancelled(), true);
+  assert.equal(reads(), 0);
 });
 
 test("metadataOnly builds a title from the URL's filename for a non-HTML response, without reading the body", async (t) => {

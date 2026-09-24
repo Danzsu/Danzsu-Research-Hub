@@ -156,12 +156,13 @@ test("mirrorImages drops an image too small to be content", async (t) => {
 
 test("mirrorImages keeps the block with path: null when the download fails, and cancels its body", async (t) => {
   const { db } = fakeStorageDb();
-  const { body, cancelled } = endlessBody();
+  const { body, cancelled, reads } = endlessBody();
   mockFetch(t, async () => new Response(body, { status: 404 }));
   const out = await mirrorImages(db, 1, [image("i1", `${HOST}/missing.png`)]);
   assert.equal(out.length, 1);
   assert.equal((out[0] as ImageBlock).path, null);
   assert.equal(cancelled(), true);
+  assert.equal(reads(), 0); // the error page is never downloaded, let alone handed to sharp
 });
 
 test("mirrorImages ignores a wrong content-type and lets sharp sniff the bytes", async (t) => {

@@ -4,9 +4,10 @@ import { errorMessage, isPrivateAddress, parseSubmittedUrl } from "./util.ts";
 export const USER_AGENT = "Mozilla/5.0 (compatible; NeonRadar/1.0; private research digest)";
 
 /**
- * A fetch failed: the source itself (`safeFetch`) or a fixed host the pipeline calls (feeds, images,
- * the arXiv and GitHub APIs, oEmbed), via `ensureOk`. `extract()` rethrows it, failing the whole
- * submission, only for article, x and youtube; every other kind still tries its fallbacks.
+ * A fetch failed: the source itself, a fixed API host (feeds, arXiv, GitHub, x oEmbed) or an image
+ * download, via `ensureOk`; `safeFetch`, `readLimited` and some extractors also throw it directly.
+ * `extract()` rethrows it, failing the whole submission, only for article, x and youtube; every other
+ * kind still tries its fallbacks.
  */
 export class FetchError extends Error {}
 

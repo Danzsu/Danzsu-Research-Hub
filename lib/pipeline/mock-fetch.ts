@@ -69,18 +69,26 @@ const setEnv = (name: string, value: string | undefined) => {
 };
 
 /**
- * A response body that never ends (each pull yields `chunkBytes` more) and records whether it was
- * cancelled: for pinning that code releases a body it won't read, or stops reading one that's too big.
+ * A response body that never ends (each read yields `chunkBytes` more) and records whether it was
+ * cancelled and how many chunks were read. `highWaterMark: 0` means nothing is pulled until a reader
+ * asks, so `reads() === 0` proves a body was released unread, not read up to a cap and then cancelled.
  */
-export function endlessBody(chunkBytes = 1024): { body: ReadableStream<Uint8Array>; cancelled: () => boolean } {
+export function endlessBody(chunkBytes = 1024): { body: ReadableStream<Uint8Array>; cancelled: () => boolean; reads: () => number } {
   let cancelled = false;
-  const body = new ReadableStream<Uint8Array>({
-    pull: (controller) => controller.enqueue(new Uint8Array(chunkBytes)),
-    cancel: () => {
-      cancelled = true;
+  let reads = 0;
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull: (controller) => {
+        reads++;
+        controller.enqueue(new Uint8Array(chunkBytes));
+      },
+      cancel: () => {
+        cancelled = true;
+      },
     },
-  });
-  return { body, cancelled: () => cancelled };
+    { highWaterMark: 0 },
+  );
+  return { body, cancelled: () => cancelled, reads: () => reads };
 }
 
 /** Sets (or, with `undefined`, unsets) an environment variable for the rest of test `t`. */

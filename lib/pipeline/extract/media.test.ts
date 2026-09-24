@@ -174,10 +174,11 @@ for (const [name, oembed] of oembedWithoutInfo) {
 
 test("extractYoutube cancels the oEmbed response body on a non-ok status instead of leaving it open", async (t) => {
   withGeminiKey(t);
-  const { body, cancelled } = endlessBody();
+  const { body, cancelled, reads } = endlessBody();
   mockFetch(t, async (url) => (url.includes("/oembed") ? new Response(body, { status: 403 }) : geminiResponse(noChapters)));
   await extractYoutube(fakeDb(), youtubeUrl, "");
   assert.equal(cancelled(), true);
+  assert.equal(reads(), 0);
 });
 
 test("extractYoutube returns a metadata-only result when the Gemini call fails, without ever fetching the watch page", async (t) => {

@@ -93,6 +93,7 @@ test("safeFetch cancels the body of an intermediate redirect response", async (t
   const response = await safeFetch(`${PUB}/a`);
   assert.equal(await response.text(), "ok");
   assert.equal(hopBody.cancelled(), true);
+  assert.equal(hopBody.reads(), 0); // released unread: the redirect's own body is never consumed
 });
 
 test("readLimited cancels the body when the declared content-length exceeds the limit", async () => {
@@ -141,9 +142,10 @@ test("readLimited with `truncate` returns the prefix read so far instead of thro
 test("ensureOk passes an ok response through and otherwise cancels the body and throws FetchError('<label> <status>')", async () => {
   const ok = new Response("fine");
   assert.equal(await ensureOk(ok, "github"), ok);
-  const { body, cancelled } = endlessBody();
+  const { body, cancelled, reads } = endlessBody();
   await assert.rejects(() => ensureOk(new Response(body, { status: 404 }), "github"), (error: unknown) => error instanceof FetchError && error.message === "github 404");
   assert.equal(cancelled(), true);
+  assert.equal(reads(), 0);
 });
 
 test("apiFetch sends this app's user agent and keeps the caller's own headers", async (t) => {
