@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { htmlToBlocks, htmlToDrafts } from "./html-to-blocks.ts";
+import { parseSrcset } from "./html-images.ts";
 import type { BlockDraft } from "../blocks.ts";
 
 const base = { baseUrl: "https://blog.test/posts/one" };
@@ -357,6 +358,31 @@ test("content-container exemptions: article and article-body classes survive noi
   assert.deepEqual(types(body), ["paragraph"]);
 });
 
+test("content-container identity/role/itemprop/ancestor checks hold even when the container is a minority of the page (not size-protected)", () => {
+  const words = (n: number, w = "lorem") => Array.from({ length: n }, (_, i) => w + i).join(" ");
+  const filler = `<p>${words(400)}</p>`;
+  const hasText = (blocks: BlockDraft[], needle: string) =>
+    blocks.some((b) => b.type === "paragraph" && (b as Extract<BlockDraft, { type: "paragraph" }>).content[0].text.includes(needle));
+
+  const article = htmlToDrafts(
+    `${filler}<article class="post has-comments"><p>Short real article paragraph kept via the article tag.</p></article>`,
+    base,
+  );
+  assert.equal(hasText(article, "kept via the article tag"), true);
+
+  const main = htmlToDrafts(`${filler}<div role="main" class="ad-slot"><p>Short real content kept via role=main.</p></div>`, base);
+  assert.equal(hasText(main, "kept via role=main"), true);
+
+  const articleBody = htmlToDrafts(`${filler}<div itemprop="articleBody" class="ad-slot"><p>Short real content kept via itemprop.</p></div>`, base);
+  assert.equal(hasText(articleBody, "kept via itemprop"), true);
+
+  const wrapper = htmlToDrafts(
+    `${filler}<div class="ad-wrapper"><article><p>Short real content protected as an ancestor of an article.</p></article></div>`,
+    base,
+  );
+  assert.equal(hasText(wrapper, "protected as an ancestor"), true);
+});
+
 test("content-container exemptions replace the size-ratio guard: entry-content survives next to a large comment thread", () => {
   const words = (n: number, w = "lorem") => Array.from({ length: n }, (_, i) => w + i).join(" ");
   const comment = (i: number) => `<li class="comment"><div class="comment-body"><p>${words(20, "c" + i)}</p></div></li>`;
@@ -423,4 +449,124 @@ test("an inline wrapper holding blocks inside a <li> does not flatten into one m
     b.type === "list" ? (b as Extract<BlockDraft, { type: "list" }>).items.map((item) => item.map((s) => s.text).join("")) : [],
   );
   assert.equal(texts.includes("one n1"), false);
+});
+
+// ── Fix round 3: 4 open findings + 3 regressions + a perf drop ──────────────
+
+const words = (n: number, w = "lorem") => Array.from({ length: n }, (_, i) => w + i).join(" ");
+
+test("srcset: a bare URL followed by a comma has no descriptor, and the comma itself is stripped", () => {
+  const single = htmlToDrafts(`<img srcset="/only.png," src="/fallback.png" alt="s">`, base);
+  assert.equal((single[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/only.png");
+
+  const multi = htmlToDrafts(`<img srcset="/a.png, /photo@2x.png 2x" alt="s">`, base);
+  assert.equal((multi[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/photo@2x.png");
+});
+
+test("srcset whose only candidate is unsafe falls through to src", () => {
+  const blocks = htmlToDrafts(`<img srcset="javascript:alert(1) 2x" src="/ok.jpg" alt="x">`, base);
+  assert.equal((blocks[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/ok.jpg");
+});
+
+test("srcset: a comma inside parentheses in a descriptor does not split the candidate", () => {
+  assert.deepEqual(parseSrcset("/a.jpg foo(1,2)x, /b.jpg 900w"), ["/b.jpg", "/a.jpg"]);
+});
+
+test("srcset: descriptor scanning only stops at a comma (honoring parens), not at whitespace too", () => {
+  assert.deepEqual(parseSrcset("/a.jpg 400w extra, /b.jpg 900w"), ["/b.jpg", "/a.jpg"]);
+});
+
+test("the heading-descendant id exemption holds on a multi-section page where no section is ≥50% of the text", () => {
+  const sec = (id: string, h: string) => `<div id="${id}" class="section level2"><h2>${h}</h2><p>${words(60, id.slice(0, 3))}</p></div>`;
+  const blocks = htmlToDrafts(
+    sec("introduction", "Introduction") +
+      sec("ad-hoc-evaluation", "Ad hoc evaluation") +
+      sec("promotion-of-cooperation", "Promotion") +
+      sec("results", "Results"),
+    base,
+  );
+  const headings = blocks.filter((b) => b.type === "heading").map((b) => (b as Extract<BlockDraft, { type: "heading" }>).text);
+  assert.deepEqual(headings, ["Introduction", "Ad hoc evaluation", "Promotion", "Results"]);
+});
+
+test("a <section> with no heading is exempted from id matching (restored)", () => {
+  const filler = `<p>${words(300)}</p>`;
+  const blocks = htmlToDrafts(
+    `${filler}<section id="promo-codes-analysis"><p>We analysed promo codes in this study at length here.</p></section>`,
+    base,
+  );
+  assert.equal(
+    blocks.some((b) => b.type === "paragraph" && (b as Extract<BlockDraft, { type: "paragraph" }>).content[0].text.startsWith("We analysed")),
+    true,
+  );
+});
+
+test("the noise-id denylist does not apply to a heading itself or a pandoc-style section", () => {
+  const heading = htmlToDrafts(`<h2 id="comments">Comments</h2><p>Some real prose about the word comments in linguistics.</p>`, base);
+  assert.deepEqual(heading[0], { type: "heading", level: 2, text: "Comments" });
+
+  const pandoc = htmlToDrafts(`<div id="comments" class="section level2"><h2>Comments</h2><p>Real content in this section.</p></div>`, base);
+  assert.deepEqual(types(pandoc), ["heading", "paragraph"]);
+});
+
+test("the noise-id denylist removes a comments section even when its content is >=50% of the page, case-insensitively", () => {
+  const majority = htmlToDrafts(
+    `<div class="entry-content"><p>${words(80)}</p></div><section id="comments"><h2>12 comments</h2><ol>${Array.from(
+      { length: 12 },
+      (_, i) => `<li><p>${words(25, "c" + i)}</p></li>`,
+    ).join("")}</ol></section>`,
+    base,
+  );
+  assert.equal(majority.some((b) => b.type === "heading"), false);
+
+  const filler = `<p>${words(300)}</p>`;
+  const withArticleChildren = htmlToDrafts(
+    `${filler}<section id="comments"><h2>Comments</h2><article class="js-comment"><p>First commenter says hello there.</p></article></section>`,
+    base,
+  );
+  assert.equal(withArticleChildren.some((b) => b.type === "heading"), false);
+
+  const uppercase = htmlToDrafts(`${filler}<div id="Comments"><h3>Comments</h3><p>Nice.</p></div>`, base);
+  assert.equal(uppercase.some((b) => b.type === "heading"), false);
+});
+
+test("SHARE_RELATED_COMMENT excludes a related-work class, via a negative lookahead", () => {
+  const filler = `<p>${words(300)}</p>`;
+  const blocks = htmlToDrafts(`${filler}<section class="related-work"><h2>Related Work</h2><p>${words(20, "r")}</p></section>`, base);
+  assert.equal(blocks.some((b) => b.type === "heading" && (b as Extract<BlockDraft, { type: "heading" }>).text === "Related Work"), true);
+});
+
+test("a LaTeXML tabular figure route does not duplicate its cell images", () => {
+  const blocks = htmlToDrafts(
+    `<figure class="ltx_figure"><table class="ltx_tabular"><tr><td><img src="/p1.png" alt="Refer to caption" width="300" height="200"></td><td><img src="/p2.png" alt="Refer to caption" width="300" height="200"></td></tr></table><figcaption class="ltx_caption">Figure 2: Two panels laid out by a tabular.</figcaption></figure>`,
+    base,
+  );
+  assert.deepEqual(types(blocks), ["image", "image", "paragraph"]);
+  assert.equal((blocks[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/p1.png");
+  assert.equal((blocks[1] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/p2.png");
+  assert.deepEqual((blocks[2] as Extract<BlockDraft, { type: "paragraph" }>).content, [
+    { text: "Figure 2: Two panels laid out by a tabular." },
+  ]);
+});
+
+test("a figure with nested figures still keeps content outside them: a bare sibling image and a sibling table", () => {
+  const withImage = htmlToDrafts(
+    `<figure><img src="/bare.png" alt="b"><figure><img src="/panel.png" alt="p"><figcaption>a</figcaption></figure></figure>`,
+    base,
+  );
+  assert.deepEqual(types(withImage), ["image", "image"]);
+  assert.equal((withImage[0] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/bare.png");
+  assert.equal((withImage[1] as Extract<BlockDraft, { type: "image" }>).originalUrl, "https://blog.test/panel.png");
+  assert.equal((withImage[1] as Extract<BlockDraft, { type: "image" }>).caption, "a");
+
+  const withTable = htmlToDrafts(
+    `<figure><table><tr><td>a</td><td>b</td></tr></table><figure><img src="/g1.jpg" alt="1"><figcaption>One</figcaption></figure></figure>`,
+    base,
+  );
+  assert.deepEqual(types(withTable), ["list", "image"]);
+});
+
+test("non-code block dedupe still uses normalised identity, not exact JSON comparison", () => {
+  const blocks = htmlToDrafts(`<p>Hello world</p><p>Hello   World</p>`, base);
+  assert.equal(blocks.length, 1);
 });

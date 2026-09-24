@@ -16,11 +16,13 @@ const DROP = [
 // Generic single-purpose noise keywords: safe as a substring with a delimiter on both sides.
 const NOISE_NAME = /(^|[-_])(ad|ads|adv|advert\w*|sponsor\w*|promo\w*|newsletter\w*|subscribe\w*|cookie\w*|popup\w*|banner\w*|paywall\w*|outbrain|taboola)([-_]|$)/i;
 // share/sharing/sharedaddy/related/relatedposts/comment(s) as whole delimited tokens: catches
-// "post-share", "social-sharing", "yarpp-related", "jp-relatedposts", but not "shared-weights"
-// ("shared" isn't in the list) or "related-work" (no "-work" suffix listed; survives via the
-// heading-descendant id exemption below when used as an id, same as "social-proof" survives
-// because bare "social" isn't a noise token — only "social-share"/"social-sharing" match, via share/sharing).
-const SHARE_RELATED_COMMENT = /(^|[-_])(share|sharing|sharedaddy|related|relatedposts|comments?)([-_]|$)/i;
+// "post-share", "social-sharing", "yarpp-related", "jp-relatedposts", "related-posts", but not
+// "shared-weights" ("shared" isn't in the list) or "social-proof" (bare "social" isn't a noise
+// token — only "social-share"/"social-sharing" match, via share/sharing). "related" excludes a
+// "-work"/"_work" suffix via a negative lookahead, so "related-work" (as a class, e.g.
+// <section class="related-work">) is never noise by name — independent of the id exemptions
+// below, which separately protect "related-work" when it's used as an id on/under a heading.
+const SHARE_RELATED_COMMENT = /(^|[-_])(share|sharing|sharedaddy|related(?![-_]work)|relatedposts|comments?)([-_]|$)/i;
 // "modal" only at the token's start, so "multi-modal" is not caught.
 const MODAL_NAME = /^modal(-\w*)?$/i;
 const AD_DATA_ATTR = /^data-ads?(-|$)/i;
@@ -48,28 +50,42 @@ function isProtectedContainer(el: Element, rootTextLength: number): boolean {
 }
 
 // Exact, well-known noise ids that are removed even when the element contains a heading
-// (<section id="comments"><h2>3 comments</h2>...) — overrides the heading exemption below,
-// which exists for content sections (pandoc's div.section), not for these specific containers.
+// (<section id="comments"><h2>3 comments</h2>...) — overrides the heading/section exemptions
+// below (which exist for content sections, e.g. pandoc's div.section), except on a heading
+// itself (<h2 id="comments">) or a pandoc-style section (class tokens "section" + "levelN"),
+// where the id is more likely to name real content than a comments/related-posts widget.
 const NOISE_ID_DENYLIST = new Set(["comments", "respond", "disqus_thread", "related-posts", "jp-relatedposts"]);
+const PANDOC_LEVEL_CLASS = /^level\d+$/;
 
 function isNoiseElement(el: Element, rootTextLength: number): boolean {
   if (el.closest("pre, code")) return false; // never strip syntax-highlighted spans, e.g. class="token comment"
-  if (isProtectedContainer(el, rootTextLength)) return false;
+
   const rawId = el.getAttribute("id") ?? "";
-  if (NOISE_ID_DENYLIST.has(rawId.toLowerCase())) return true;
   const classTokens = (el.getAttribute("class") ?? "")
     .split(/\s+/)
     .filter((token) => token && !token.startsWith("tag-") && !token.startsWith("category-"));
-  // An id is otherwise skipped for a heading itself, or for a wrapper that contains one
-  // (pandoc/R Markdown/bookdown wrap each section as <div id="ad-hoc-evaluation" class="section
-  // level2"><h2>...</h2>, and a generic "ad"/"promo"-style keyword would otherwise false-positive
+  const isHeadingSelf = HEADING_TAGS.has(el.localName);
+  const isPandocSection = classTokens.includes("section") && classTokens.some((t) => PANDOC_LEVEL_CLASS.test(t));
+
+  // Cheapest check first: the exact-id denylist, checked before the (expensive) protection
+  // check below, so a denylisted id is removed even if it holds ≥50% of the page (a comments
+  // section can dwarf a short post).
+  if (NOISE_ID_DENYLIST.has(rawId.toLowerCase()) && !isHeadingSelf && !isPandocSection) return true;
+
+  const classNamed = classTokens.some((name) => NOISE_NAME.test(name) || SHARE_RELATED_COMMENT.test(name) || MODAL_NAME.test(name));
+  // The id only needs the (expensive, subtree-scanning) heading-descendant check when it would
+  // otherwise match a noise keyword at all — most ids don't, so this keeps that query off the
+  // common path. An id is skipped for a heading itself, an actual <section> tag, or a wrapper
+  // that contains a heading (pandoc/R Markdown/bookdown: <div id="ad-hoc-evaluation" class=
+  // "section level2"><h2>...</h2> — a generic "ad"/"promo" keyword would otherwise false-positive
   // on the slug).
-  const skipId = HEADING_TAGS.has(el.localName) || !!el.querySelector(HEADING_SELECTOR);
-  const idToken = skipId ? "" : rawId;
-  const names = [...classTokens, idToken].filter(Boolean);
-  const named = names.some((name) => NOISE_NAME.test(name) || SHARE_RELATED_COMMENT.test(name) || MODAL_NAME.test(name));
+  const idLooksNoisy = !!rawId && (NOISE_NAME.test(rawId) || SHARE_RELATED_COMMENT.test(rawId) || MODAL_NAME.test(rawId));
+  const idNamed = idLooksNoisy && !(isHeadingSelf || el.localName === "section" || el.querySelector(HEADING_SELECTOR));
   const adData = el.getAttributeNames().some((attr) => AD_DATA_ATTR.test(attr));
-  return named || adData;
+  if (!classNamed && !idNamed && !adData) return false; // nothing matched: skip the expensive protection check entirely
+
+  // Only elements that already look like noise pay for the protection check (subtree query + textContent).
+  return !isProtectedContainer(el, rootTextLength);
 }
 
 /**
@@ -124,8 +140,16 @@ const INLINE = new Set([
   "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "del", "dfn", "em", "i", "ins", "kbd",
   "label", "mark", "math", "q", "s", "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr",
 ]);
-/** An INLINE-tagged wrapper containing one of these is visited as a block, not inline-collected. */
-const BLOCK_DESCENDANT_SELECTOR = "h1, h2, h3, h4, h5, h6, p, ul, ol, pre, table, blockquote, figure";
+// An INLINE-tagged wrapper containing one of these is visited as a block, not inline-collected.
+const BLOCK_DESCENDANT_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol", "pre", "table", "blockquote", "figure"]);
+
+/** Same result as el.querySelector(BLOCK_DESCENDANT_SELECTOR) != null, without the CSS selector overhead — called per paragraph/list item. */
+function containsBlockDescendant(el: Element): boolean {
+  for (const child of el.children) {
+    if (BLOCK_DESCENDANT_TAGS.has(child.localName) || containsBlockDescendant(child)) return true;
+  }
+  return false;
+}
 
 const collapse = (text: string | null | undefined) => (text ?? "").replace(/\s+/g, " ").trim();
 
@@ -299,7 +323,7 @@ function pushParagraph(nodes: Node[], ctx: Ctx) {
  */
 function unwrapBlockWrappers(nodes: Node[]): Node[] {
   return nodes.flatMap((node) => {
-    if (node.nodeType === 1 && INLINE.has((node as Element).localName) && (node as Element).querySelector(BLOCK_DESCENDANT_SELECTOR)) {
+    if (node.nodeType === 1 && INLINE.has((node as Element).localName) && containsBlockDescendant(node as Element)) {
       return unwrapBlockWrappers([...(node as Element).childNodes]);
     }
     return [node];
@@ -362,7 +386,7 @@ function visitChildren(parent: Element, ctx: Ctx) {
   };
   for (const node of [...parent.childNodes]) {
     const isInlineTag = node.nodeType === 3 || (node.nodeType === 1 && INLINE.has((node as Element).localName));
-    const inline = isInlineTag && !(node.nodeType === 1 && (node as Element).querySelector(BLOCK_DESCENDANT_SELECTOR));
+    const inline = isInlineTag && !(node.nodeType === 1 && containsBlockDescendant(node as Element));
     if (inline) {
       run.push(node);
       continue;
@@ -396,9 +420,7 @@ function visitElement(el: Element, ctx: Ctx) {
       // ctx.pending instead of splitting the paragraph. But malformed markup can wrap real
       // block content in an inline tag (<p><span><div><ul>...) — then split like any other
       // container instead of flattening the list/heading into paragraph text.
-      const hasBlockWrapper = [...el.children].some(
-        (child) => INLINE.has(child.localName) && child.querySelector(BLOCK_DESCENDANT_SELECTOR),
-      );
+      const hasBlockWrapper = [...el.children].some((child) => INLINE.has(child.localName) && containsBlockDescendant(child));
       if (hasBlockWrapper) return visitChildren(el, ctx);
       return pushParagraph([...el.childNodes], ctx);
     }
@@ -410,17 +432,25 @@ function visitElement(el: Element, ctx: Ctx) {
     case "pre":
       return pushPre(el, ctx);
     case "figure": {
-      const nestedFigures = [...el.querySelectorAll("figure")];
-      const directCaption = collapse([...el.children].find((c) => c.localName === "figcaption")?.textContent);
+      const directChildren = [...el.children];
+      const nestedFigures = directChildren.filter((c) => c.localName === "figure");
+      const directCaption = collapse(directChildren.find((c) => c.localName === "figcaption")?.textContent);
       if (nestedFigures.length) {
-        // Each nested figure (e.g. a WordPress gallery) keeps its own caption; this figure's
-        // own caption, if any, becomes a trailing paragraph, gallery-caption style.
+        // Each nested figure (e.g. a WordPress gallery, or an arXiv panel) keeps its own
+        // caption. A bare sibling <img>/<table> outside the nested figures — content this
+        // figure holds directly, not through a nested one — is still processed, not dropped.
+        for (const img of directChildren.filter((c) => c.localName === "img")) pushImage(img, undefined, ctx);
+        const directTable = directChildren.find((c) => c.localName === "table");
+        if (directTable) pushTable(directTable, ctx);
         for (const nested of nestedFigures) visitElement(nested, ctx);
         if (directCaption) ctx.out.push({ type: "paragraph", content: [{ text: directCaption }] });
         return;
       }
       const table = el.querySelector("table");
-      const images = [...el.querySelectorAll("img")];
+      // Images already inside the table are handled by pushTable's own cell processing —
+      // counting them here too would duplicate every image (a LaTeXML <table class="ltx_tabular">
+      // panel figure lays two images out as table cells).
+      const images = [...el.querySelectorAll("img")].filter((img) => !table || !table.contains(img));
       if (images.length === 1 && !table) {
         pushImage(images[0], directCaption, ctx);
         return;
