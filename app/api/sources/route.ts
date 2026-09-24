@@ -22,7 +22,10 @@ export async function POST(request: Request) {
     .select("id")
     .single();
   if (error?.code === "23505") return jsonError(409, "already_submitted");
-  if (error || !data) return jsonError(500, "insert_failed");
+  if (error || !data) {
+    console.error("source insert failed", error);
+    return jsonError(500, "insert_failed");
+  }
 
   // Respond now; the summary takes a while. A killed run is picked up by the daily cron.
   after(() => processSource(createAdminClient(), data.id));

@@ -5,7 +5,10 @@ import { getReader } from "@/lib/supabase/server";
 // Per-reader state. RLS limits every query to the caller's own rows, and
 // user_id defaults to auth.uid(), so no query here names the user.
 
-const failed = () => jsonError(500, "db_error");
+function failed(error: unknown) {
+  console.error("reader state query failed", error);
+  return jsonError(500, "db_error");
+}
 
 export async function GET() {
   const reader = await getReader();
@@ -16,7 +19,7 @@ export async function GET() {
     db.from("item_states").select("item_id, is_read, is_saved"),
     db.from("todos").select("id, item_id, text, is_done").order("is_done").order("created_at", { ascending: false }),
   ]);
-  if (stateResult.error || todoResult.error) return failed();
+  if (stateResult.error || todoResult.error) return failed(stateResult.error ?? todoResult.error);
 
   const states = Object.fromEntries(
     stateResult.data.map((row) => [row.item_id, { read: row.is_read, saved: row.is_saved }]),
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
     const { error } = await db
       .from("item_states")
       .upsert({ item_id: itemId, [column]: value, updated_at: now }, { onConflict: "user_id,item_id" });
-    return error ? failed() : NextResponse.json({ ok: true });
+    return error ? failed(error) : NextResponse.json({ ok: true });
   }
 
   if (action === "add_todo") {
@@ -51,7 +54,7 @@ export async function POST(request: Request) {
     if (!text) return jsonError(400, "missing_text");
     const itemId = body.itemId ? String(body.itemId).slice(0, 120) : null;
     const { data, error } = await db.from("todos").insert({ text, item_id: itemId }).select("id").single();
-    return error ? failed() : NextResponse.json({ ok: true, id: data.id });
+    return error ? failed(error) : NextResponse.json({ ok: true, id: data.id });
   }
 
   const id = Number(body.id);
@@ -61,12 +64,12 @@ export async function POST(request: Request) {
 
   if (action === "set_todo") {
     const { error } = await db.from("todos").update({ is_done: value, updated_at: now }).eq("id", id);
-    return error ? failed() : NextResponse.json({ ok: true });
+    return error ? failed(error) : NextResponse.json({ ok: true });
   }
 
   if (action === "delete_todo") {
     const { error } = await db.from("todos").delete().eq("id", id);
-    return error ? failed() : NextResponse.json({ ok: true });
+    return error ? failed(error) : NextResponse.json({ ok: true });
   }
 
   return jsonError(400, "unknown_action");

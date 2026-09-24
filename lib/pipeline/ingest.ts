@@ -59,6 +59,12 @@ export function imageBudgetFor(deadline: number | undefined, now = Date.now()): 
   return deadline === undefined ? undefined : Math.min(IMAGE_BUDGET_MS, Math.max(0, deadline - now - SUMMARY_RESERVE_MS));
 }
 
+/** Logged, not thrown: a lost status write only means the source is processed again on a later run. */
+async function updateSource(db: SupabaseClient, id: number, values: Record<string, unknown>): Promise<void> {
+  const { error } = await db.from("sources").update(values).eq("id", id);
+  if (error) console.warn(`source ${id}: status write failed`, error);
+}
+
 async function buildPost(db: SupabaseClient, source: Source, previous: Block[], deadline?: number) {
   const note = source.note ? `\nThe submitter's note: ${source.note}` : "";
   const extracted = await extract(db, source.kind, source.url, note);
@@ -100,7 +106,7 @@ async function buildPost(db: SupabaseClient, source: Source, previous: Block[], 
 export async function processSource(db: SupabaseClient, id: number, options: { deadline?: number } = {}): Promise<void> {
   const { data: source, error } = await db.from("sources").select("id, url, kind, note, attempts").eq("id", id).single<Source>();
   if (error || !source) throw error ?? new Error(`source ${id} not found`);
-  await db.from("sources").update({ attempts: source.attempts + 1 }).eq("id", id);
+  await updateSource(db, id, { attempts: source.attempts + 1 });
   // A transient lookup error is not "no existing post" — treating it as one would let a failed
   // re-extraction below mark an already-published post `failed` instead of leaving it alone.
   const { data: existing, error: existingError } = await db.from("posts").select("id, blocks").eq("source_id", id).maybeSingle();
@@ -117,7 +123,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
     if (saveError) throw saveError;
     saved = true;
     await removeUnusedMedia(db, source.id, post.blocks);
-    await db.from("sources").update({ status: "done", error: null }).eq("id", id);
+    await updateSource(db, id, { status: "done", error: null });
   } catch (failure) {
     const message = errorMessage(failure);
     // Once the upsert itself has succeeded, the new post's images are live and referenced — nothing
@@ -137,7 +143,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
     // `saved` counts too: a post that this very run just wrote is exactly as "already published" as
     // one written earlier — a failure after that point (e.g. the trailing media cleanup or status
     // write) must not flip a live post's source row to `failed`.
-    await db.from("sources").update(failureUpdate(saved || Boolean(existing), message)).eq("id", id);
+    await updateSource(db, id, failureUpdate(saved || Boolean(existing), message));
   }
 }
 
@@ -153,13 +159,14 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
  * runDaily's.
  */
 export async function retryPendingSources(db: SupabaseClient, deadline?: number): Promise<number> {
-  const { data } = await db
+  const { data, error } = await db
     .from("sources")
     .select("id")
     .neq("status", "done")
     .lt("attempts", MAX_ATTEMPTS)
     .order("id")
     .limit(10);
+  if (error) console.warn("pending sources lookup failed", error);
 
   let processed = 0;
   for (const row of data ?? []) {

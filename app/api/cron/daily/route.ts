@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { jsonError } from "@/lib/api";
 import { runDaily } from "@/lib/pipeline/daily";
 import { retryPendingSources } from "@/lib/pipeline/ingest";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -11,11 +12,16 @@ export async function GET(request: NextRequest) {
   const start = Date.now();
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return jsonError(401, "unauthorized");
   }
 
   const db = createAdminClient();
-  const digest = await runDaily(db);
+  // A failed digest (model outage, bad key) must not also stall the pending link submissions.
+  const digest = await runDaily(db).catch((error: unknown) => {
+    console.error("daily digest failed", error);
+    return null;
+  });
   const retried = await retryPendingSources(db, start + maxDuration * 1000);
+  if (!digest) return jsonError(500, "daily_failed", { retriedSources: retried });
   return NextResponse.json({ ...digest, retriedSources: retried });
 }
