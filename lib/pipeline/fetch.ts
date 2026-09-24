@@ -68,9 +68,14 @@ export async function safeFetch(raw: string, init: { accept?: string; timeoutMs?
   throw new FetchError("too many redirects");
 }
 
-/** Reads the body, refusing anything over `limit` bytes. */
-export async function readLimited(response: Response, limit: number): Promise<Buffer> {
-  if (Number(response.headers.get("content-length") ?? 0) > limit) {
+/**
+ * Reads the body, refusing anything over `limit` bytes — unless `truncate` is set, in which case it
+ * silently stops at `limit` and returns the prefix read so far instead of throwing. For a page whose
+ * useful content (e.g. `<head>`) is always near the start, a bounded prefix is as good as the whole
+ * thing; the caller just shouldn't have to write its own second stream loop to get one.
+ */
+export async function readLimited(response: Response, limit: number, options: { truncate?: boolean } = {}): Promise<Buffer> {
+  if (!options.truncate && Number(response.headers.get("content-length") ?? 0) > limit) {
     await cancelBody(response);
     throw new Error(`larger than ${limit} bytes`);
   }
@@ -89,11 +94,17 @@ export async function readLimited(response: Response, limit: number): Promise<Bu
     size += step.value!.byteLength;
     if (size > limit) {
       await reader.cancel().catch(() => {});
-      throw new Error(`larger than ${limit} bytes`);
+      if (!options.truncate) throw new Error(`larger than ${limit} bytes`);
+      // Keep a partial slice of this chunk up to the limit — a small in-memory body can arrive as
+      // one single oversized chunk, and dropping it whole would truncate to nothing instead of a prefix.
+      const keep = step.value!.byteLength - (size - limit);
+      if (keep > 0) chunks.push(step.value!.subarray(0, keep));
+      break;
     }
     chunks.push(step.value!);
   }
   return Buffer.concat(chunks);
 }
 
-export const readText = async (response: Response, limit: number) => new TextDecoder().decode(await readLimited(response, limit));
+export const readText = async (response: Response, limit: number, options?: { truncate?: boolean }) =>
+  new TextDecoder().decode(await readLimited(response, limit, options));

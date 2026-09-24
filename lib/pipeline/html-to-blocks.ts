@@ -319,6 +319,17 @@ function pushParagraph(nodes: Node[], ctx: Ctx) {
 }
 
 /**
+ * Inline spans from a run of DOM nodes, merged and trimmed — the paragraph converter's own span
+ * builder, but without `cleanDocument`'s noise stripping or `filterNoise`'s block-level noise removal
+ * (which would drop a hashtag-only line or a same-site link as navigation). For markup outside the
+ * article pipeline — e.g. a tweet's own HTML — where that content is real, not chrome.
+ */
+export function inlineSpans(nodes: Node[], baseUrl: string): Inline[] {
+  const ctx: Ctx = { base: baseUrl, imageBase: baseUrl, out: [], pending: [] };
+  return normalizeInline(collectInline(nodes, ctx));
+}
+
+/**
  * Unwraps an INLINE-tagged element (e.g. <span>) that actually holds block content (malformed
  * markup like <li><span><p>one</p><ul>...</span></li>) into its own children, so the p/ul below
  * it are handled as blocks instead of being flattened into the <li>'s text by collectInline.

@@ -1,15 +1,30 @@
 import { parseHTML } from "linkedom";
 import { assignIds, inlineText, type BlockDraft, type Inline } from "../../blocks.ts";
 import { cancelBody, FetchError } from "../fetch.ts";
-import { htmlToDrafts } from "../html-to-blocks.ts";
+import { inlineSpans } from "../html-to-blocks.ts";
 import type { Extractor } from "./types.ts";
+
+/** Splits a node list at every run of one or more `<br>`, so `a<br><br>b` becomes two groups, not three. */
+function splitOnBreaks(nodes: Node[]): Node[][] {
+  const groups: Node[][] = [[]];
+  for (const node of nodes) {
+    if (node.nodeType === 1 && (node as Element).localName === "br") {
+      if (groups.at(-1)!.length > 0) groups.push([]);
+      continue;
+    }
+    groups.at(-1)!.push(node);
+  }
+  return groups.filter((group) => group.length > 0);
+}
 
 export function parseTweetHtml(html: string): { paragraphs: Inline[][]; text: string; date: string | null } {
   const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
+  // Built with inlineSpans, not htmlToDrafts: the article pipeline's noise filter would drop a
+  // hashtag-only line, a mention-only line, or "Follow us" as boilerplate — here it's the post itself.
   const paragraphs = [...document.querySelectorAll("blockquote p")]
-    .flatMap((p) => htmlToDrafts(p.outerHTML, { baseUrl: "https://x.com/" }))
-    .filter((block): block is Extract<BlockDraft, { type: "paragraph" }> => block.type === "paragraph")
-    .map((block) => block.content);
+    .flatMap((p) => splitOnBreaks([...p.childNodes]))
+    .map((nodes) => inlineSpans(nodes, "https://x.com/"))
+    .filter((content) => inlineText(content).trim().length > 0);
   const dateText = [...document.querySelectorAll("blockquote > a")].at(-1)?.textContent ?? "";
   const parsed = Date.parse(`${dateText} UTC`);
   return {

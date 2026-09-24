@@ -168,3 +168,16 @@ test("readLimited wraps an aborted read as FetchError", async () => {
   });
   await assert.rejects(() => readLimited(new Response(body), 5 * 1024 * 1024), FetchError);
 });
+
+test("readLimited with `truncate` returns the prefix read so far instead of throwing, on both a lying content-length and an oversized stream", async () => {
+  let cancelled = false;
+  const body = new ReadableStream({
+    pull: (controller) => controller.enqueue(new Uint8Array(1024 * 1024)),
+    cancel: () => { cancelled = true; },
+  });
+  // A declared content-length far over the limit would normally reject before a single byte is read.
+  const response = new Response(body, { headers: { "content-length": String(10 * 1024 * 1024) } });
+  const result = await readLimited(response, 2 * 1024 * 1024, { truncate: true });
+  assert.ok(result.length > 0 && result.length <= 2 * 1024 * 1024);
+  assert.equal(cancelled, true); // the rest of the stream is still released, not left hanging
+});

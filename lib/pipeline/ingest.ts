@@ -1,14 +1,12 @@
 import { Readability } from "@mozilla/readability";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseHTML } from "linkedom";
-import type { z } from "zod/v4";
 import { generate } from "../llm.ts";
 import { safeFetch } from "./fetch.ts";
-import { SUMMARY_INSTRUCTIONS as INSTRUCTIONS, summarySchema as postSchema } from "./summary.ts";
+import { MAX_PROMPT_TEXT, SUMMARY_INSTRUCTIONS as INSTRUCTIONS, summarySchema as postSchema, type Generated } from "./summary.ts";
 
 const MAX_ATTEMPTS = 3;
 const MAX_BODY = 200_000;
-const MAX_PROMPT_TEXT = 60_000;
 
 type Article = { title: string; author: string | null; body: string | null; text: string };
 
@@ -60,7 +58,7 @@ export async function processSource(db: SupabaseClient, id: number): Promise<voi
 
   try {
     const note = source.note ? `\nThe submitter's note: ${source.note}` : "";
-    let post: { author: string | null; body: string | null; generated: z.infer<typeof postSchema> };
+    let post: { author: string | null; body: string | null; generated: Generated };
 
     if (source.kind === "youtube") {
       const video = await readVideo(source.url);
