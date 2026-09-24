@@ -67,6 +67,14 @@
 - [x] **Nyelvválasztás megjegyzése:** `lang` cookie, minden oldal ezt használja
 - [x] **Márkanév:** NEON NEWS RADAR
 
+### Kutatási dashboard — ütemterv (5 alprojekt)
+- [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md). M1: blokkok, kinyerők, zajszűrés, képek, fordítás, kis javítások. M2: kiemelés és komment, Key insights, Fogalmak.
+- [ ] **2. Privát gyűjtemény:** linkek, idézetek (a kiemelésekből is), toolok, jegyzetek; címkék, Inbox / Később / Archív, keresés, export.
+- [ ] **3. Statisztika oldal:** heti mentések, hőtérkép, top források, címkézetlen és halott linkek.
+- [ ] **4. Discord-bemenet:** slash-parancs és üzenet-menü, ugyanarra a mentési útvonalra.
+- [ ] **5. Chat-LLM a gyűjtemény fölött:** pgvector, Gemini embedding, válasz forrásmegjelöléssel.
+- [ ] **Jövőbeli:** saját online könyvtár, ahol a PDF-ek és könyvek egy GitHub-repóban vannak, nem a Supabase bucketban.
+
 ### Következő lépések
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
