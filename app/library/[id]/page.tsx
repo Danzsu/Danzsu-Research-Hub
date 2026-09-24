@@ -9,7 +9,7 @@ import { getPost } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
 import { hostOf, parseId } from "@/lib/pipeline/util";
 import { readMinutes, type PostQuery } from "@/lib/post-view";
-import { createClient, getViewer } from "@/lib/supabase/server";
+import { getReader } from "@/lib/supabase/server";
 import { translatable } from "@/lib/translate";
 import { PostEditor } from "./post-editor";
 import { PostToolbar } from "./post-toolbar";
@@ -46,16 +46,16 @@ export default async function PostPage({
   searchParams: Promise<PostQuery>;
 }) {
   const { id } = await params;
-  const viewer = await getViewer();
-  if (!viewer) redirect(`/login?next=/library/${id}`);
+  const reader = await getReader();
+  if (!reader) redirect(`/login?next=/library/${id}`);
   const query = await searchParams;
   const language = await getLanguage();
   const postId = parseId(id);
-  const post = postId ? await getPost(await createClient(), postId) : null;
+  const post = postId ? await getPost(reader.db, postId) : null;
   if (!post) notFound();
 
   const t = notices[language];
-  const canEdit = post.submittedBy === viewer.id;
+  const canEdit = post.submittedBy === reader.viewer.id;
   const showingTranslation = query.text === "hu" && Boolean(post.blocksHu);
   const blocks = showingTranslation ? post.blocksHu! : post.blocks;
   const minutes = readMinutes(post.blocks, post.kind);

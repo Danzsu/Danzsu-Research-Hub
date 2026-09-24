@@ -6,7 +6,7 @@ import { PageHeader, PageHero } from "@/app/components/page-header";
 import { getOpenSources, getPosts } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
 import { hostOf } from "@/lib/pipeline/util";
-import { createClient, getViewer } from "@/lib/supabase/server";
+import { getReader } from "@/lib/supabase/server";
 import { SubmitForm } from "./submit-form";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,10 @@ export const dynamic = "force-dynamic";
 const kindIcons = { article: FileText, youtube: PlayCircle, arxiv: FlaskConical, github: GitFork, x: MessageSquareQuote, pdf: FileText } as const;
 
 export default async function LibraryPage() {
-  if (!(await getViewer())) redirect("/login?next=/library");
+  const reader = await getReader();
+  if (!reader) redirect("/login?next=/library");
   const lang = await getLanguage();
-  const db = await createClient();
-  const [posts, open] = await Promise.all([getPosts(db), getOpenSources(db)]);
+  const [posts, open] = await Promise.all([getPosts(reader.db), getOpenSources(reader.db)]);
 
   return (
     <main className="min-h-dvh bg-ink text-paper">

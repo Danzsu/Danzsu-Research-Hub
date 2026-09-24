@@ -5,14 +5,15 @@ import { LanguageToggle } from "@/app/components/language-toggle";
 import { PageHeader, PageHero } from "@/app/components/page-header";
 import { getArchive } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
-import { createClient, getViewer } from "@/lib/supabase/server";
+import { getReader } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function ArchivePage() {
-  if (!(await getViewer())) redirect("/login?next=/archive");
+  const reader = await getReader();
+  if (!reader) redirect("/login?next=/archive");
   const language = await getLanguage();
-  const archiveIssues = await getArchive(await createClient(), language);
+  const archiveIssues = await getArchive(reader.db, language);
 
   return (
     <main className="min-h-dvh bg-ink text-paper">
