@@ -12,7 +12,7 @@ const MIN_SIDE = 64;
 const CONCURRENCY = 4;
 const PIXEL_LIMIT = 40_000_000; // decompression-bomb guard
 export const FETCH_TIMEOUT_MS = 10_000;
-const IMAGE_BUDGET_MS = 90_000;
+export const IMAGE_BUDGET_MS = 90_000;
 // ponytail: fixed upscale ceiling for vector sources; raise if a submitted SVG's
 // declared size is so small that even this still doesn't clear the 1280px target.
 const MAX_SVG_DENSITY = 2400;

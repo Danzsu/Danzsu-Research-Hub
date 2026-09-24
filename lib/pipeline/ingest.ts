@@ -1,118 +1,103 @@
-import { Readability } from "@mozilla/readability";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseHTML } from "linkedom";
-import { generate } from "../llm.ts";
-import { safeFetch } from "./fetch.ts";
-import { MAX_PROMPT_TEXT, SUMMARY_INSTRUCTIONS as INSTRUCTIONS, summarySchema as postSchema, type Generated } from "./summary.ts";
+import { limitBlocks, parseBlocks, type Block } from "../blocks.ts";
+import { MEDIA_BUCKET } from "../media.ts";
+import { aiCleanup } from "./cleanup.ts";
+import { extract } from "./extract/index.ts";
+import { IMAGE_BUDGET_MS, mirrorImages, unusedMediaPaths } from "./images.ts";
+import { summarize, writeNotes } from "./summary.ts";
+import type { SourceKind } from "./util.ts";
 
 const MAX_ATTEMPTS = 3;
-const MAX_BODY = 200_000;
 
-type Article = { title: string; author: string | null; body: string | null; text: string };
+// The cleanup prompt targets web-page chrome (nav, ads, share buttons); pdf (a Gemini
+// transcription), x (post text) and youtube (the video block) have none of that to strip,
+// and running the prompt on them risks dropping real content instead.
+const AI_CLEANUP_KINDS: ReadonlySet<SourceKind> = new Set(["article", "github", "arxiv"]);
 
-async function readArticle(url: string): Promise<Article> {
-  const response = await safeFetch(url);
-  if (!response.ok) throw new Error(`fetch ${response.status}`);
-  const html = await response.text();
-  const { document } = parseHTML(html);
+// A Gemini summary call can take up to 120s; starting one more source this close to the
+// cron's own deadline would likely be killed mid-flight instead of finishing.
+const GEMINI_SUMMARY_RESERVE_MS = 120_000;
 
-  // noarchive = the publisher asked not to be copied: keep metadata, drop the body.
-  const robots = document.querySelector('meta[name="robots"]')?.getAttribute("content") ?? "";
-  const mayMirror = !/noarchive/i.test(robots) && !/noarchive/i.test(response.headers.get("x-robots-tag") ?? "");
+type Source = { id: number; url: string; kind: SourceKind; note: string | null; attempts: number };
 
-  const parsed = new Readability(document as unknown as Document).parse();
-  // One block per paragraph-level element, so the mirror keeps its paragraphs.
-  const BLOCKS = "p, h1, h2, h3, h4, li, pre, blockquote";
-  const blocks = parseHTML(`<main>${parsed?.content ?? ""}</main>`).document.querySelectorAll(BLOCKS);
-  const text = [...blocks]
-    .filter((block) => !block.querySelector(BLOCKS)) // innermost only: <li><p> would repeat
-    .map((block) => (block.textContent ?? "").replace(/[ \t]+/g, " ").trim())
-    .filter(Boolean)
-    .join("\n\n");
-  if (text.length < 200) throw new Error("no readable article text found");
+/** A failed re-extraction must not unpublish a post that already exists. */
+export function failureUpdate(hasPrevious: boolean, message: string): { status?: "failed"; error: string } {
+  const error = message.slice(0, 500);
+  return hasPrevious ? { error } : { status: "failed", error };
+}
+
+export async function removeUnusedMedia(db: SupabaseClient, sourceId: number, blocks: Block[]): Promise<void> {
+  const { data } = await db.storage.from(MEDIA_BUCKET).list(String(sourceId), { limit: 1000 });
+  const unused = unusedMediaPaths((data ?? []).map((object) => `${sourceId}/${object.name}`), blocks);
+  if (unused.length) await db.storage.from(MEDIA_BUCKET).remove(unused);
+}
+
+async function buildPost(db: SupabaseClient, source: Source, previous: Block[], imageBudgetMs?: number) {
+  const note = source.note ? `\nThe submitter's note: ${source.note}` : "";
+  const extracted = await extract(db, source.kind, source.url, note);
+  const meta: Record<string, unknown> = { ...extracted.meta };
+  let blocks: Block[];
+
+  if (extracted.meta.noarchive) {
+    blocks = await writeNotes(db, extracted);
+    meta.mirrored = false;
+  } else {
+    const cleaned = AI_CLEANUP_KINDS.has(source.kind) ? await aiCleanup(db, extracted.blocks) : extracted.blocks;
+    const limited = limitBlocks(cleaned);
+    blocks = await mirrorImages(db, source.id, limited.blocks, previous, { budgetMs: imageBudgetMs });
+    meta.mirrored = !extracted.meta.extractionFailed && blocks.length > 0;
+    if (limited.clipped) meta.clipped = true;
+  }
+
+  const generated = extracted.generated ?? (await summarize(db, extracted, note));
   return {
-    title: parsed?.title ?? url,
-    author: (parsed?.byline ?? parsed?.siteName ?? null)?.slice(0, 120) ?? null,
-    body: mayMirror ? text.slice(0, MAX_BODY) : null,
-    text,
+    title: generated.title,
+    summary: generated.summary,
+    key_points: generated.keyPoints,
+    tags: generated.tags,
+    author: extracted.author,
+    source_site: extracted.siteName,
+    published_at: extracted.publishedAt,
+    blocks,
+    meta,
   };
 }
 
-async function readVideo(url: string) {
-  const oembed = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, {
-    signal: AbortSignal.timeout(15_000),
-  });
-  const meta = oembed.ok ? ((await oembed.json()) as { title?: string; author_name?: string }) : {};
-  return { title: meta.title ?? url, author: meta.author_name ?? null };
-}
-
-/** Turns one submitted source into a post. Safe to re-run; failures are recorded on the source. */
-export async function processSource(db: SupabaseClient, id: number): Promise<void> {
-  const { data: source, error } = await db
-    .from("sources")
-    .select("id, url, kind, note, attempts")
-    .eq("id", id)
-    .single();
+/**
+ * Turns a submitted source into a post, or refreshes an existing one.
+ * Only machine fields are written: `overrides` and `hidden_blocks` belong to
+ * the submitter and are never touched here. Replaces only on success.
+ */
+export async function processSource(db: SupabaseClient, id: number, options: { imageBudgetMs?: number } = {}): Promise<void> {
+  const { data: source, error } = await db.from("sources").select("id, url, kind, note, attempts").eq("id", id).single<Source>();
   if (error || !source) throw error ?? new Error(`source ${id} not found`);
   await db.from("sources").update({ attempts: source.attempts + 1 }).eq("id", id);
+  const { data: existing } = await db.from("posts").select("id, blocks").eq("source_id", id).maybeSingle();
+  const previous = existing ? parseBlocks(existing.blocks) : [];
 
   try {
-    const note = source.note ? `\nThe submitter's note: ${source.note}` : "";
-    let post: { author: string | null; body: string | null; generated: Generated };
-
-    if (source.kind === "youtube") {
-      const video = await readVideo(source.url);
-      post = {
-        author: video.author,
-        body: null,
-        generated: await generate(
-          db,
-          "ingest_video",
-          postSchema,
-          `${INSTRUCTIONS}\nThe source is the attached YouTube video "${video.title}".${note}`,
-          { youtubeUrl: source.url },
-        ),
-      };
-    } else {
-      const article = await readArticle(source.url);
-      post = {
-        author: article.author,
-        body: article.body,
-        generated: await generate(
-          db,
-          "ingest_article",
-          postSchema,
-          `${INSTRUCTIONS}${note}\n\nARTICLE "${article.title}":\n${article.text.slice(0, MAX_PROMPT_TEXT)}`,
-        ),
-      };
-    }
-
-    const { error: insertError } = await db.from("posts").upsert(
-      {
-        source_id: source.id,
-        kind: source.kind,
-        url: source.url,
-        author: post.author,
-        body: post.body,
-        title: post.generated.title,
-        summary: post.generated.summary,
-        key_points: post.generated.keyPoints,
-        tags: post.generated.tags,
-      },
+    const post = await buildPost(db, source, previous, options.imageBudgetMs);
+    const { error: saveError } = await db.from("posts").upsert(
+      { source_id: source.id, kind: source.kind, url: source.url, ...post, blocks_hu: null, extracted_at: new Date().toISOString() },
       { onConflict: "source_id" },
     );
-    if (insertError) throw insertError;
+    if (saveError) throw saveError;
+    await removeUnusedMedia(db, source.id, post.blocks);
     await db.from("sources").update({ status: "done", error: null }).eq("id", id);
   } catch (failure) {
-    await db
-      .from("sources")
-      .update({ status: "failed", error: String(failure instanceof Error ? failure.message : failure).slice(0, 500) })
-      .eq("id", id);
+    const message = failure instanceof Error ? failure.message : String(failure);
+    await db.from("sources").update(failureUpdate(Boolean(existing), message)).eq("id", id);
   }
 }
 
-/** Sources that never finished (e.g. the function was killed) or failed fewer than MAX_ATTEMPTS times. */
-export async function retryPendingSources(db: SupabaseClient): Promise<number> {
+/**
+ * Sources that never finished (e.g. the function was killed) or failed fewer than MAX_ATTEMPTS
+ * times. `deadline` (epoch ms, e.g. from the cron route's own maxDuration) stops the loop from
+ * *starting* a source once too little time remains for one more; a source already started runs
+ * to completion. ponytail: sequential, one request's time budget shared one source at a time —
+ * a queue deeper than that just waits for the next cron run rather than racing a shared budget.
+ */
+export async function retryPendingSources(db: SupabaseClient, deadline?: number): Promise<number> {
   const { data } = await db
     .from("sources")
     .select("id")
@@ -120,6 +105,13 @@ export async function retryPendingSources(db: SupabaseClient): Promise<number> {
     .lt("attempts", MAX_ATTEMPTS)
     .order("id")
     .limit(10);
-  for (const row of data ?? []) await processSource(db, row.id as number);
-  return data?.length ?? 0;
+
+  let processed = 0;
+  for (const row of data ?? []) {
+    if (deadline !== undefined && deadline - Date.now() < GEMINI_SUMMARY_RESERVE_MS) break;
+    const imageBudgetMs = deadline === undefined ? undefined : Math.min(IMAGE_BUDGET_MS, Math.max(0, deadline - Date.now()));
+    await processSource(db, row.id as number, { imageBudgetMs });
+    processed++;
+  }
+  return processed;
 }

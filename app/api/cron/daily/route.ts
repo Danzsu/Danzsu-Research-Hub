@@ -8,6 +8,7 @@ export const maxDuration = 300;
 // Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. The same header
 // triggers a manual run: curl -H "Authorization: Bearer $CRON_SECRET" <site>/api/cron/daily
 export async function GET(request: NextRequest) {
+  const start = Date.now();
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -15,6 +16,6 @@ export async function GET(request: NextRequest) {
 
   const db = createAdminClient();
   const digest = await runDaily(db);
-  const retried = await retryPendingSources(db);
+  const retried = await retryPendingSources(db, start + maxDuration * 1000);
   return NextResponse.json({ ...digest, retriedSources: retried });
 }

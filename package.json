@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "node --experimental-strip-types --no-warnings --test \"lib/**/*.test.ts\"",
-    "dup": "npx -y jscpd@4.3.0 app lib proxy.ts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console"
+    "ingest": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/ingest-url.mts",
+    "dup": "npx -y jscpd@4.3.0 app lib proxy.ts scripts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
