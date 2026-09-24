@@ -143,7 +143,13 @@ export function applyTranslation(blocks: Block[], translated: TranslationItem[])
       case "list":
         return { ...block, items: block.items.map((spans, i) => spansFrom(spans, item.items?.[i])) };
       case "image":
-        return { ...block, alt: item.alt ?? block.alt, caption: block.caption === undefined ? undefined : (item.caption ?? block.caption) };
+        return {
+          ...block,
+          // Mirrors the caption guard below: an empty alt means a decorative image, so a model's
+          // invented (or oversized) alt is never applied, not just never required.
+          alt: block.alt === "" ? block.alt : (item.alt ?? block.alt),
+          caption: block.caption === undefined ? undefined : (item.caption ?? block.caption),
+        };
       case "chapters":
         return { ...block, items: block.items.map((chapter, i) => ({ ...chapter, title: item.chapters?.[i] ?? chapter.title })) };
       default:

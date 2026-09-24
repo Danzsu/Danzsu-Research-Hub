@@ -121,11 +121,13 @@ test("applyTranslation rejects a 50 000-character list item", () => {
 // Minor #3 (S2, S7, S8): the "ids only" test above fails through every type at once, so it can't
 // tell whether any one type's own presence check actually works. One isolated probe each.
 test("applyTranslation rejects a missing heading text alone (S2)", () => {
-  assert.equal(applyTranslation(blocks, answerWith(blocks[0].id)), null); // text omitted, everything else valid
+  // { id } only — the entry itself is present (unlike "rejects a missing block" above, which drops
+  // the entry entirely and only exercises the "missing id" check, not this type's own presence check).
+  assert.equal(applyTranslation(blocks, answerWith(blocks[0].id, {})), null);
 });
 
 test("applyTranslation rejects a missing paragraph spans field alone (S7)", () => {
-  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id)), null); // spans omitted, everything else valid
+  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, {})), null); // entry present, spans absent
 });
 
 test("applyTranslation rejects a missing image alt alone, when the original alt was non-empty (S8)", () => {
@@ -178,6 +180,19 @@ test("applyTranslation accepts a missing alt when the original alt was empty", (
   ] satisfies BlockDraft[]);
   const result = applyTranslation(emptyAltBlocks, [{ id: emptyAltBlocks[0].id, caption: "Egy alcím" }]); // alt omitted
   assert.ok(result);
+  assert.equal(result[0].type === "image" && result[0].caption, "Egy alcím");
+});
+
+// Fix round 3, item 2: an empty original alt means a decorative image — the model's alt must be
+// ignored outright (not just optional), or a made-up (or 100k-character) alt turns it into an
+// announced image and saves an uncapped string.
+test("applyTranslation ignores the model's alt entirely when the original alt was empty (decorative image)", () => {
+  const decorativeBlocks = assignIds([
+    { type: "image", originalUrl: "https://a.test/l.png", alt: "", caption: "A caption", path: "1/jkl", placeholder: "data:image/webp;base64,DDD" },
+  ] satisfies BlockDraft[]);
+  const result = applyTranslation(decorativeBlocks, [{ id: decorativeBlocks[0].id, alt: "x".repeat(100_000), caption: "Egy alcím" }]);
+  assert.ok(result);
+  assert.equal(result[0].type === "image" && result[0].alt, "");
   assert.equal(result[0].type === "image" && result[0].caption, "Egy alcím");
 });
 
