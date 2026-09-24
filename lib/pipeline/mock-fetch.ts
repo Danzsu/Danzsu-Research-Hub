@@ -47,8 +47,14 @@ export type FakeIngestTables = {
   source?: Record<string, unknown>;
   /** The row `posts`' `select().eq().maybeSingle()` resolves to; omit/null for "no existing post". */
   post?: Record<string, unknown> | null;
-  /** Forces the `posts` lookup's `maybeSingle()` to resolve with this error instead of `post`. */
+  /** Forces a `posts` lookup's `maybeSingle()` to resolve with this error instead of `post`. Applies
+   *  to every lookup unless `postErrorOnCall` narrows it to just one of them. */
   postError?: unknown;
+  /** Narrows `postError` to only the Nth `posts` select→maybeSingle() call (1-indexed, counting every
+   *  `.from("posts").select(...).eq(...)`); every other call resolves normally. Needed to test code
+   *  that reads `posts` more than once per run — e.g. the initial existing-post lookup succeeding,
+   *  then a later re-read failing. */
+  postErrorOnCall?: number;
   /** Bare object names (no `<sourceId>/` prefix) the media bucket already holds for this source. */
   media?: string[];
   /** Rows `retryPendingSources`' pending-sources listing resolves to. */
@@ -120,6 +126,7 @@ export function fakeDb(
   const removedMedia: string[] = [];
   const writes: FakeIngestDb["writes"] = [];
   const objects = new Set(tables.media ?? []);
+  let postSelectCalls = 0;
 
   const from = (table: string) => {
     if (table === "model_settings") {
@@ -159,16 +166,24 @@ export function fakeDb(
         select: () => ({
           eq: (column: string, value: unknown) => {
             eqCalls.push({ table: "posts", column, value });
+            postSelectCalls++;
+            const callNumber = postSelectCalls;
             return {
-              maybeSingle: async () =>
-                tables.postError ? { data: null, error: tables.postError } : { data: tables.post ?? null, error: null },
+              maybeSingle: async () => {
+                const errored = tables.postErrorOnCall !== undefined ? callNumber === tables.postErrorOnCall : Boolean(tables.postError);
+                return errored ? { data: null, error: tables.postError ?? new Error("posts lookup failed") } : { data: tables.post ?? null, error: null };
+              },
             };
           },
         }),
+        // Write-through: a later `posts` lookup (e.g. a failure-path re-read) sees this row, so a
+        // test can simulate a concurrent run's own successful upsert with a real call instead of
+        // reaching into the fake's internals to mutate a row object directly.
         upsert: async (values: Record<string, unknown>, options?: Record<string, unknown>) => {
           postUpserts.push(values);
           postUpsertOptions.push(options ?? {});
           writes.push("posts.upsert");
+          tables.post = values;
           return { data: null, error: null };
         },
       };

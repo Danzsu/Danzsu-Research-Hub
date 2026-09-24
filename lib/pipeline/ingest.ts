@@ -134,7 +134,10 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
         console.warn(`orphaned-media cleanup failed for source ${id}: ${cleanupError instanceof Error ? cleanupError.message : cleanupError}`);
       }
     }
-    await db.from("sources").update(failureUpdate(Boolean(existing), message)).eq("id", id);
+    // `saved` counts too: a post that this very run just wrote is exactly as "already published" as
+    // one written earlier — a failure after that point (e.g. the trailing media cleanup or status
+    // write) must not flip a live post's source row to `failed`.
+    await db.from("sources").update(failureUpdate(saved || Boolean(existing), message)).eq("id", id);
   }
 }
 

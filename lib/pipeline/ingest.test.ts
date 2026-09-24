@@ -318,11 +318,13 @@ test("processSource(): a failure after an image upload removes the orphaned uplo
   }
 });
 
-test("processSource(): the failure-path media cleanup never re-runs once the post upsert has succeeded (probe A1)", async (t) => {
+test("processSource(): the failure-path media cleanup never re-runs once the post upsert has succeeded, and the saved post keeps its status (probe A1)", async (t) => {
   mockDns(t);
   const restoreKey = withGeminiKey();
   // No <img>, so buildPost never touches storage — the post upsert succeeds cleanly, and the
   // *success*-path removeUnusedMedia call right after it is the storage fake's very first call.
+  // No existing post either, so the only reason `{ error }` (not `{ status: "failed", error }`)
+  // could come out is `saved` itself — Boolean(existing) alone would be false here.
   const source = { id: 11, url: `${TEST_HOST}/post`, kind: "article", note: null, attempts: 0 };
   const db = fakeDb(undefined, { source, post: null, storageError: true });
   const restore = mockFetch(articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
@@ -330,9 +332,37 @@ test("processSource(): the failure-path media cleanup never re-runs once the pos
     await processSource(db, source.id);
     assert.equal(db.postUpserts.length, 1); // the upsert itself succeeded
     assert.equal(db.writes.filter((w) => w === "storage.list").length, 1); // only the success-path attempt — no repeat from the catch
+    assert.deepEqual(db.sourceUpdates.at(-1), { error: "storage down" }); // saved: status is left alone, only the error is recorded
   } finally {
     restore();
     restoreKey();
+  }
+});
+
+test("processSource(): a failure-time re-read that itself errors skips cleanup, removing nothing (R2)", async () => {
+  // No withGeminiKey(): the 404 below fails extraction immediately (article rethrows FetchError),
+  // so no Gemini call is ever reached.
+  const existingBlocks = [
+    { id: "img1", type: "image", originalUrl: "https://old.test/pic.png", alt: "pic", path: "70/aaaaaaaaaaaaaaaa", format: "avif", widths: [640] },
+  ];
+  const source = { id: 70, url: `${TEST_HOST}/gone`, kind: "article", note: null, attempts: 0 };
+  // Call 1 (the start-of-run existing-post lookup) succeeds; call 2 (the failure-path re-read) is
+  // the one that errors — the reverted bug ("re-read failed → treat as no post → wipe everything")
+  // is unreachable if the very first `posts` lookup is also the one that fails.
+  const db = fakeDb(undefined, {
+    source,
+    post: { id: 1, blocks: existingBlocks },
+    media: ["aaaaaaaaaaaaaaaa-640.avif"],
+    postErrorOnCall: 2,
+    postError: new Error("re-read down"),
+  });
+  const restore = mockFetch(async () => new Response("", { status: 404 }));
+  try {
+    await processSource(db, source.id);
+    assert.deepEqual(db.removedMedia, []); // the re-read failed: cleanup is skipped entirely, nothing removed
+    assert.deepEqual(db.sourceUpdates.at(-1), { error: "fetch 404" }); // the real failure is still recorded
+  } finally {
+    restore();
   }
 });
 
@@ -345,13 +375,14 @@ test("processSource(): the failure-path cleanup re-reads the current post right 
     { id: "new1", type: "image", originalUrl: `${TEST_HOST}/new.png`, alt: "new", path: "12/bbbbbbbbbbbbbbbb", format: "avif", widths: [640] },
   ];
   const source = { id: 12, url: `${TEST_HOST}/post`, kind: "article", note: null, attempts: 0 };
-  const postRow: { id: number; blocks: unknown } = { id: 1, blocks: oldBlocks };
-  const db = fakeDb(undefined, { source, post: postRow, media: ["aaaaaaaaaaaaaaaa-640.avif", "bbbbbbbbbbbbbbbb-640.avif"] });
+  const db = fakeDb(undefined, { source, post: { id: 1, blocks: oldBlocks }, media: ["aaaaaaaaaaaaaaaa-640.avif", "bbbbbbbbbbbbbbbb-640.avif"] });
   const restore = mockFetch(async (url, init) => {
     if (url.startsWith(TEST_HOST)) return new Response(ARTICLE_HTML, { headers: { "content-type": "text/html" } });
     const prompt = geminiPrompt(init);
     if (prompt.includes("NOT part of the article")) return geminiResponse({ remove: [] }); // cleanup: keep going
-    postRow.blocks = newBlocks; // simulate a concurrent run publishing new media right as summarize() runs
+    // Simulate a concurrent run publishing new media via its own real (write-through) upsert,
+    // right as our own summarize() call is about to fail this attempt.
+    await db.from("posts").upsert({ source_id: source.id, blocks: newBlocks }, { onConflict: "source_id" });
     return geminiText("not a valid summary"); // summarize: fail this attempt
   });
   try {
@@ -653,6 +684,18 @@ test("retryPendingSources(): forwards its deadline into processSource, so a tigh
   const restoreKey = withGeminiKey();
   const html = manyImagesHtml(6);
 
+  // The "tight" run's deadline clears retryPendingSources' own start gate by GATE_MARGIN_MS, then
+  // (via the Date.now() offset below) simulates extraction eating into the budget until only
+  // TARGET_TIGHT_BUDGET_MS is left. Deriving the offset from the real constants — instead of a
+  // hand-picked literal — means changing any one of them can't silently break this test when
+  // there's no real bug: offset = (deadline's margin over the start gate) − (the summarize()
+  // reserve) − (the tiny budget buildPost should end up with), which algebraically needs only
+  // START_GATE_RESERVE_MS and SUMMARY_RESERVE_MS; IMAGE_BUDGET_MS just keeps the target budget
+  // safely tiny relative to whatever the cap currently is, so it stays "tight" even if that cap changes.
+  const GATE_MARGIN_MS = 2_000;
+  const TARGET_TIGHT_BUDGET_MS = Math.min(100, IMAGE_BUDGET_MS / 100);
+  const offsetAfterExtraction = START_GATE_RESERVE_MS + GATE_MARGIN_MS - SUMMARY_RESERVE_MS - TARGET_TIGHT_BUDGET_MS;
+
   async function run(id: number, deadline: number | undefined, offsetAfterExtraction: number) {
     const source = { id, url: `${TEST_HOST}/post`, kind: "article", note: null, attempts: 0 };
     const db = fakeDb(undefined, { source, post: null, pending: [{ id }] });
@@ -688,7 +731,7 @@ test("retryPendingSources(): forwards its deadline into processSource, so a tigh
   // extraction that ate into the budget — computes down to a tight image budget once buildPost
   // actually reaches mirrorImages. If retryPendingSources dropped `deadline` instead of forwarding
   // it, this would behave exactly like the generous run above (mirrorImages' own 90s default).
-  const tight = await run(31, Date.now() + START_GATE_RESERVE_MS + 2_000, 91_900);
+  const tight = await run(31, Date.now() + START_GATE_RESERVE_MS + GATE_MARGIN_MS, offsetAfterExtraction);
   assert.ok(tight.some((b) => !b.path));
 
   restoreKey();
