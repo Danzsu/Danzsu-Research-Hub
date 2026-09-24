@@ -91,6 +91,20 @@
   - **Ár:** a 3.8 és a 3.7 Flash ára 2027. január 1-jén megduplázódik (input $0.75 → $1.50, output $3.75 → $7.50 / 1M token).
 - [ ] **Jövőbeli:** saját online könyvtár, ahol a PDF-ek és könyvek egy GitHub-repóban vannak, nem a Supabase bucketban.
 
+### Új ötletek (2026-09-24), a tervezés sorrendjében
+- [ ] **UI/UX és keresés** (tervezés alatt):
+  - egységes navigáció: asztalon oldalsáv vagy felső sáv, mobilon alsó sáv
+  - mobilos ergonómia
+  - okos keresés a címekben: elgépelés-tűrő, jelentés szerint is talál, szűrők
+  - lapozás
+  - offline előnézeti oldal mintaadatokkal, Playwright-tesztekkel
+- [ ] **Olvasási jelzések:**
+  - kedvenc (szív), plusz like / dislike a Radar-híreknél és a Library-posztoknál
+  - a „nem hasznos” tétel az archívumban marad, csak halványítva jelenik meg, és kiszűrhető
+- [ ] **Habit tracker a dashboardon:** saját szokások napi pipálással és sorozatszámlálóval. A statisztika alprojekthez kapcsolódik.
+- [ ] **Kapcsolatok és kategorizálás:** Obsidian-szerű gráf a posztok között, jobb kategóriák és címkék. A UI/UX design után írunk rá tervet.
+- [ ] **Kabala (mascot) az oldalra**, hogy barátságosabb legyen.
+
 ### Következő lépések
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
