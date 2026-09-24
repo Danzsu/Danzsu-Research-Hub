@@ -27,6 +27,8 @@ export type FakeIngestTables = {
   /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g. `{
    *  code: "42501" }` for the `update_post_overrides` "not the submitter" case. */
   rpcError?: { code?: string; message?: string };
+  /** Rows any other table's `select().gte()` resolves to, by table name (runDaily's recent-items lookup). */
+  rows?: Record<string, Record<string, unknown>[]>;
 };
 
 export type FakeIngestDb = SupabaseClient & {
@@ -54,6 +56,8 @@ export type FakeIngestDb = SupabaseClient & {
   removedMedia: string[];
   /** Every `db.rpc(name, args)` call, in call order. */
   rpcCalls: { name: string; args: Record<string, unknown> }[];
+  /** Every UPSERT into a table other than `posts` (issues, digest_items, github_top), in call order. */
+  upserts: { table: string; values: unknown; options: Record<string, unknown> }[];
   /** Every write across every table/bucket above, plus any `"fetch"` entries a test's own mockFetch
    *  handler chooses to push (same array — `db.writes`), in the single order it actually happened.
    *  For cross-operation ordering assertions, e.g. "attempts is bumped before the first fetch". */
@@ -106,12 +110,13 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * every value queried via `.eq("task", value)`, so a test can assert which task (`ingest_video`,
  * `ingest_cleanup`, …) a call actually asked for, and how many times.
  * `sources`/`posts`/storage: fixed by `tables` (all optional — omit what a test never queries).
+ * Any other table only upserts (recorded on `.upserts`) and answers `select().gte()` from `tables.rows`.
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it and
  * `list` reflects it, so a test can mirror an image and then see it (or its absence) in a later list.
  * Every write is recorded on `.sourceUpdates`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
  */
 export function fakeDb(
-  route: { provider: string; model: string } = { provider: "gemini", model: "m" },
+  route: { provider: string; model: string; fallback_provider?: string; fallback_model?: string } = { provider: "gemini", model: "m" },
   tables: FakeIngestTables = {},
 ): FakeIngestDb {
   const tasks: string[] = [];
@@ -124,6 +129,7 @@ export function fakeDb(
   const removedMedia: string[] = [];
   const writes: FakeIngestDb["writes"] = [];
   const rpcCalls: FakeIngestDb["rpcCalls"] = [];
+  const upserts: FakeIngestDb["upserts"] = [];
   const objects = new Set(tables.media ?? []);
   let postSelectCalls = 0;
 
@@ -224,7 +230,13 @@ export function fakeDb(
         },
       };
     }
-    throw new Error(`fakeDb: table "${table}" not set up`);
+    return {
+      upsert: async (values: unknown, options?: Record<string, unknown>) => {
+        upserts.push({ table, values, options: options ?? {} });
+        return { data: null, error: null };
+      },
+      select: () => ({ gte: async () => ({ data: tables.rows?.[table] ?? [], error: null }) }),
+    };
   };
 
   const storage = {
@@ -272,5 +284,6 @@ export function fakeDb(
     removedMedia,
     writes,
     rpcCalls,
+    upserts,
   } as unknown as FakeIngestDb;
 }

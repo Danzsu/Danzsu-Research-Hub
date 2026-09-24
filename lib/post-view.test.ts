@@ -9,6 +9,7 @@ import {
   parseTranslatedBlocks,
   primaryVideoId,
   readMinutes,
+  toPost,
   videoEmbedSrc,
   withQuery,
   type PostQuery,
@@ -169,4 +170,50 @@ test("isBlockVisible: a hidden block only renders with showHidden or controls mo
   assert.equal(isBlockVisible("h1", hidden, false, true), true);
   assert.equal(isBlockVisible("h1", hidden, true, true), true);
   assert.equal(isBlockVisible("other", hidden, false, false), true);
+});
+
+const postRow = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  id: 7,
+  source_id: 3,
+  kind: "article",
+  url: "https://blog.test/a",
+  author: null,
+  source_site: "Blog",
+  published_at: "2026-09-22",
+  title: { hu: "Gépi cím", en: "Model title" },
+  summary: { hu: "Gépi összefoglaló", en: "Model summary" },
+  key_points: { hu: [], en: [] },
+  tags: ["llm"],
+  meta: { mirrored: true },
+  overrides: {},
+  hidden_blocks: [],
+  extracted_at: null,
+  created_at: "2026-09-22T10:00:00Z",
+  ...overrides,
+});
+
+test("toPost lets the submitter's title and summary win, keeping the model's text as the reset target", () => {
+  const post = toPost(postRow({ overrides: { title: { hu: "Saját cím", en: "Own title" } } }));
+  assert.deepEqual(post.title, { hu: "Saját cím", en: "Own title" });
+  assert.deepEqual(post.generatedTitle, { hu: "Gépi cím", en: "Model title" });
+  assert.deepEqual(post.summary, { hu: "Gépi összefoglaló", en: "Model summary" }); // no summary override
+  assert.deepEqual(post.generatedSummary, post.summary);
+});
+
+test("toPost ignores a malformed override field instead of showing it", () => {
+  const post = toPost(postRow({ overrides: { title: { hu: "", en: "x" }, summary: { hu: "Saját", en: "Own" } } }));
+  assert.deepEqual(post.title, { hu: "Gépi cím", en: "Model title" });
+  assert.deepEqual(post.summary, { hu: "Saját", en: "Own" });
+});
+
+test("toPost reads the submitter from the sources embed and defaults the optional columns", () => {
+  const listed = toPost(postRow({ meta: null, hidden_blocks: "garbage" })); // the list query has no embed
+  assert.equal(listed.submittedBy, null);
+  assert.deepEqual(listed.meta, {});
+  assert.deepEqual(listed.hiddenBlocks, []);
+  assert.deepEqual(listed.blocks, []);
+  assert.equal(listed.blocksHu, null);
+  const full = toPost(postRow({ sources: { submitted_by: "user-1" }, hidden_blocks: ["b1", 5] }));
+  assert.equal(full.submittedBy, "user-1");
+  assert.deepEqual(full.hiddenBlocks, ["b1"]);
 });

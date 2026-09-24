@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  archiveLabel,
   arxivId,
   cooldownRemaining,
   detectSource,
@@ -235,4 +236,10 @@ test("videoFromUrl recognises YouTube and Vimeo player embeds, resolving against
   for (const other of ["https://vimeo.com/76979871", "https://ads.test/frame", "/embed/dQw4w9WgXcQ", "http://[bad"]) {
     assert.equal(videoFromUrl(other, base), null, other);
   }
+});
+
+test("archiveLabel names the Sunday that closes the week, across month and year boundaries", () => {
+  assert.equal(archiveLabel(isoWeekMonday("2026-W39")!), "09. 27.");
+  assert.equal(archiveLabel(isoWeekMonday("2026-W40")!), "10. 04.");
+  assert.equal(archiveLabel(isoWeekMonday("2026-W53")!), "01. 03.");
 });
