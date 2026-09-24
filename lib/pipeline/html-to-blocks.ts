@@ -47,17 +47,25 @@ function isProtectedContainer(el: Element, rootTextLength: number): boolean {
   return rootTextLength > 0 && (el.textContent ?? "").length >= rootTextLength * 0.5;
 }
 
+// Exact, well-known noise ids that are removed even when the element contains a heading
+// (<section id="comments"><h2>3 comments</h2>...) — overrides the heading exemption below,
+// which exists for content sections (pandoc's div.section), not for these specific containers.
+const NOISE_ID_DENYLIST = new Set(["comments", "respond", "disqus_thread", "related-posts", "jp-relatedposts"]);
+
 function isNoiseElement(el: Element, rootTextLength: number): boolean {
   if (el.closest("pre, code")) return false; // never strip syntax-highlighted spans, e.g. class="token comment"
   if (isProtectedContainer(el, rootTextLength)) return false;
+  const rawId = el.getAttribute("id") ?? "";
+  if (NOISE_ID_DENYLIST.has(rawId.toLowerCase())) return true;
   const classTokens = (el.getAttribute("class") ?? "")
     .split(/\s+/)
     .filter((token) => token && !token.startsWith("tag-") && !token.startsWith("category-"));
-  // An id is skipped for a heading itself, or for a wrapper that contains one (pandoc/R Markdown/
-  // bookdown wrap each section as <div id="ad-hoc-evaluation" class="section level2"><h2>...</h2>,
-  // and a generic "ad"/"promo"-style keyword would otherwise false-positive on the slug).
+  // An id is otherwise skipped for a heading itself, or for a wrapper that contains one
+  // (pandoc/R Markdown/bookdown wrap each section as <div id="ad-hoc-evaluation" class="section
+  // level2"><h2>...</h2>, and a generic "ad"/"promo"-style keyword would otherwise false-positive
+  // on the slug).
   const skipId = HEADING_TAGS.has(el.localName) || !!el.querySelector(HEADING_SELECTOR);
-  const idToken = skipId ? "" : (el.getAttribute("id") ?? "");
+  const idToken = skipId ? "" : rawId;
   const names = [...classTokens, idToken].filter(Boolean);
   const named = names.some((name) => NOISE_NAME.test(name) || SHARE_RELATED_COMMENT.test(name) || MODAL_NAME.test(name));
   const adData = el.getAttributeNames().some((attr) => AD_DATA_ATTR.test(attr));

@@ -332,6 +332,16 @@ test("named-noise id matching is skipped for a div.section wrapping a heading (p
   assert.deepEqual(types(promotion), ["heading", "paragraph"]);
 });
 
+test("an exact-id denylist removes well-known comment containers even though they contain a heading", () => {
+  const commentsFiller = `<p>${"Filler text to keep the comments section under half the page total. ".repeat(20)}</p>`;
+  const comments = htmlToDrafts(`${commentsFiller}<section id="comments"><h2>3 comments</h2><p>Nice post! thanks a lot</p></section>`, base);
+  assert.equal(comments.some((b) => b.type === "heading" && (b as Extract<BlockDraft, { type: "heading" }>).text === "3 comments"), false);
+
+  const discussionFiller = `<p>${"More filler content so the discussion div stays a small fraction of the page. ".repeat(20)}</p>`;
+  const discussion = htmlToDrafts(`${discussionFiller}<div id="disqus_thread"><h3>Discussion</h3></div>`, base);
+  assert.equal(discussion.some((b) => b.type === "heading" && (b as Extract<BlockDraft, { type: "heading" }>).text === "Discussion"), false);
+});
+
 test("tag- and category- class tokens are ignored by name matching, even alone on a non-content element (pinned)", () => {
   const filler = `<p>${"Padding text to dominate the page total so the small div below is not size-protected. ".repeat(30)}</p>`;
   const blocks = htmlToDrafts(`${filler}<div class="post tag-newsletter"><p>Short real note kept only via the tag- filter.</p></div>`, base);
