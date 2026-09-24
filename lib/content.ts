@@ -8,10 +8,8 @@ import type {
   Language,
   Localized,
 } from "@/data/digest-types";
-import { parseBlocks, type Block } from "@/lib/blocks";
-import { readHiddenBlocks, readOverrides } from "@/lib/overrides";
-import { parseTranslatedBlocks } from "@/lib/post-view";
-import { isoWeek, isoWeekMonday, publishedLabel, type SourceKind } from "@/lib/pipeline/util";
+import { toPost, type Post } from "@/lib/post-view";
+import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel } from "@/lib/pipeline/util";
 
 const budapest = new Intl.DateTimeFormat("hu-HU", {
   timeZone: "Europe/Budapest",
@@ -35,12 +33,10 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
   if (issueId && !latest) return null;
 
   const weekId = latest?.id ?? isoWeek(new Date()).id;
-  const monday = isoWeekMonday(weekId) ?? isoWeek(new Date()).monday;
-  const sunday = new Date(monday.getTime() + 6 * 86_400_000);
   const issue: CurrentIssue = {
     label: weekId.replace("-", " / "),
     updated: latest ? budapest.format(new Date(latest.updated_at)) : "—",
-    archiveAt: `${String(sunday.getUTCMonth() + 1).padStart(2, "0")}. ${String(sunday.getUTCDate()).padStart(2, "0")}.`,
+    archiveAt: archiveLabel(isoWeekMonday(weekId) ?? isoWeek(new Date()).monday),
   };
   if (!latest) return { issue, items: [], githubTop10: [] };
 
@@ -93,69 +89,8 @@ export async function getArchive(db: SupabaseClient, language: Language): Promis
   }));
 }
 
-export type PostMeta = {
-  mirrored?: boolean;
-  noarchive?: boolean;
-  extractionFailed?: boolean;
-  truncated?: boolean;
-  clipped?: boolean;
-};
-
-export type Post = {
-  id: number;
-  sourceId: number;
-  kind: SourceKind;
-  url: string;
-  author: string | null;
-  siteName: string | null;
-  publishedAt: string | null;
-  title: Localized;
-  summary: Localized;
-  /** The model's own text, before any submitter override — the editor's "reset" target and the
-   *  baseline `editPayload` (lib/post-edit.ts) diffs a draft against to decide what to save. */
-  generatedTitle: Localized;
-  generatedSummary: Localized;
-  keyPoints: Record<"hu" | "en", string[]>;
-  tags: string[];
-  blocks: Block[];
-  blocksHu: Block[] | null;
-  meta: PostMeta;
-  hiddenBlocks: string[];
-  submittedBy: string | null;
-  extractedAt: string | null;
-  createdAt: string;
-};
-
 const LIST_COLUMNS = "id, source_id, kind, url, author, source_site, published_at, title, summary, key_points, tags, meta, overrides, hidden_blocks, extracted_at, created_at";
 const POST_COLUMNS = `${LIST_COLUMNS}, blocks, blocks_hu, sources(submitted_by)`;
-
-function toPost(row: Record<string, unknown>): Post {
-  const overrides = readOverrides(row.overrides);
-  const source = row.sources as { submitted_by: string } | null | undefined;
-  return {
-    id: row.id as number,
-    sourceId: row.source_id as number,
-    kind: row.kind as SourceKind,
-    url: row.url as string,
-    author: row.author as string | null,
-    siteName: row.source_site as string | null,
-    publishedAt: row.published_at as string | null,
-    // Submitter edits win over the model's text; re-extraction never overwrites them.
-    title: overrides.title ?? (row.title as Localized),
-    summary: overrides.summary ?? (row.summary as Localized),
-    generatedTitle: row.title as Localized,
-    generatedSummary: row.summary as Localized,
-    keyPoints: row.key_points as Post["keyPoints"],
-    tags: row.tags as string[],
-    blocks: parseBlocks(row.blocks),
-    blocksHu: parseTranslatedBlocks(row.blocks_hu),
-    meta: (row.meta ?? {}) as PostMeta,
-    hiddenBlocks: readHiddenBlocks(row.hidden_blocks),
-    submittedBy: source?.submitted_by ?? null,
-    extractedAt: row.extracted_at as string | null,
-    createdAt: row.created_at as string,
-  };
-}
 
 export async function getPosts(db: SupabaseClient): Promise<Post[]> {
   const { data } = await db.from("posts").select(LIST_COLUMNS).order("created_at", { ascending: false }).limit(100);

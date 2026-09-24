@@ -3,8 +3,8 @@ import { z } from "zod/v4";
 import { localizedSchema } from "../blocks.ts";
 import { digestCategories, digestTags } from "../../data/digest-types.ts";
 import { generate } from "../llm.ts";
-import { collectCandidates, collectRepos, type Candidate } from "./collect.ts";
-import { isoWeek, itemId } from "./util.ts";
+import { collectCandidates, collectRepos, type Candidate, type Repo } from "./collect.ts";
+import { isoWeek, itemId, type Week } from "./util.ts";
 
 const DAY = 86_400_000;
 const SHORTLIST = 40;
@@ -57,6 +57,61 @@ async function shortlist(db: SupabaseClient, candidates: Candidate[]): Promise<C
   }
 }
 
+/** The curation prompt: numbered NEWS and REPOS listings the model answers with indices into. */
+export function curatePrompt(picked: Candidate[], repos: Repo[]): string {
+  return `${AUDIENCE}
+You curate NEON NEWS RADAR, a bilingual (Hungarian/English) AI digest.
+
+PART 1 — news. From the numbered NEWS list, choose at most ${MAX_NEW_ITEMS} items worth reading today and return them in "items".
+- category: local (local/open models, inference, tooling you run yourself), research (papers, methods), companies (what AI companies ship or announce), github (a notable repository).
+- score 0–100: how much this matters to the reader. Be strict: 90+ is rare.
+- readMinutes: realistic reading time of the original.
+- tags: 1–4 from the allowed vocabulary only.
+- title: short, concrete headline. summary: 2–3 sentences on what it is. why: one sentence on why it matters to the reader.
+- Hungarian must be natural, idiomatic Hungarian — not a literal translation. Keep technical terms (LLM, fine-tuning, GGUF) as Hungarian engineers say them.
+- Use only facts present in the listing. Do not invent numbers or claims.
+
+PART 2 — repositories. From the numbered REPOS list, choose the 10 most useful (skip awesome-lists and spam) and return them in "github" with a focus line of at most 8 English words.
+
+NEWS:
+${listing(picked)}
+
+REPOS:
+${repos.map((r, i) => `[${i}] ${r.repo} (${r.stars}★) — ${r.focus}`).join("\n")}`;
+}
+
+/**
+ * The model's answer as `digest_items` and `github_top` rows. Indices it made up are dropped; the
+ * repo list is capped at 10 and ranked in answer order. ⚠️ `itemId` makes half of `item_states`'
+ * primary key from the category, week, English title and source URL: never change those inputs.
+ */
+export function toDigestRows(curated: z.infer<typeof curatedSchema>, picked: Candidate[], repos: Repo[], week: Week) {
+  const items = curated.items
+    .filter((item) => picked[item.index])
+    .map((item) => {
+      const source = picked[item.index];
+      return {
+        id: itemId(item.category, week, item.title.en, source.url),
+        issue_id: week.id,
+        category: item.category,
+        score: item.score,
+        read_minutes: item.readMinutes,
+        published_at: source.publishedAt,
+        source: source.source,
+        url: source.url,
+        tags: item.tags,
+        title: item.title,
+        summary: item.summary,
+        why: item.why,
+      };
+    });
+  const top = curated.github
+    .filter((entry) => repos[entry.index])
+    .slice(0, 10)
+    .map((entry, i) => ({ issue_id: week.id, rank: i + 1, repo: repos[entry.index].repo, focus: entry.focus, url: repos[entry.index].url }));
+  return { items, top };
+}
+
 export async function runDaily(db: SupabaseClient, now = new Date()) {
   const week = isoWeek(now);
 
@@ -79,61 +134,14 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
   ]);
   const picked = await shortlist(db, candidates);
 
-  const curated = await generate(
-    db,
-    "daily_curate",
-    curatedSchema,
-    `${AUDIENCE}
-You curate NEON NEWS RADAR, a bilingual (Hungarian/English) AI digest.
+  const curated = await generate(db, "daily_curate", curatedSchema, curatePrompt(picked, repos));
+  const { items, top } = toDigestRows(curated, picked, repos, week);
 
-PART 1 — news. From the numbered NEWS list, choose at most ${MAX_NEW_ITEMS} items worth reading today and return them in "items".
-- category: local (local/open models, inference, tooling you run yourself), research (papers, methods), companies (what AI companies ship or announce), github (a notable repository).
-- score 0–100: how much this matters to the reader. Be strict: 90+ is rare.
-- readMinutes: realistic reading time of the original.
-- tags: 1–4 from the allowed vocabulary only.
-- title: short, concrete headline. summary: 2–3 sentences on what it is. why: one sentence on why it matters to the reader.
-- Hungarian must be natural, idiomatic Hungarian — not a literal translation. Keep technical terms (LLM, fine-tuning, GGUF) as Hungarian engineers say them.
-- Use only facts present in the listing. Do not invent numbers or claims.
-
-PART 2 — repositories. From the numbered REPOS list, choose the 10 most useful (skip awesome-lists and spam) and return them in "github" with a focus line of at most 8 English words.
-
-NEWS:
-${listing(picked)}
-
-REPOS:
-${repos.map((r, i) => `[${i}] ${r.repo} (${r.stars}★) — ${r.focus}`).join("\n")}`,
-  );
-
-  const rows = curated.items
-    .filter((item) => picked[item.index])
-    .map((item) => {
-      const source = picked[item.index];
-      return {
-        id: itemId(item.category, week, item.title.en, source.url),
-        issue_id: week.id,
-        category: item.category,
-        score: item.score,
-        read_minutes: item.readMinutes,
-        published_at: source.publishedAt,
-        source: source.source,
-        url: source.url,
-        tags: item.tags,
-        title: item.title,
-        summary: item.summary,
-        why: item.why,
-      };
-    });
-
-  if (rows.length) {
+  if (items.length) {
     // ignoreDuplicates: an existing row (same URL) is never rewritten — ids are permanent.
-    const { error } = await db.from("digest_items").upsert(rows, { onConflict: "url", ignoreDuplicates: true });
+    const { error } = await db.from("digest_items").upsert(items, { onConflict: "url", ignoreDuplicates: true });
     if (error) throw error;
   }
-
-  const top = curated.github
-    .filter((entry) => repos[entry.index])
-    .slice(0, 10)
-    .map((entry, i) => ({ issue_id: week.id, rank: i + 1, repo: repos[entry.index].repo, focus: entry.focus, url: repos[entry.index].url }));
   if (top.length) {
     const { error } = await db.from("github_top").upsert(top, { onConflict: "issue_id,rank" });
     if (error) throw error;
@@ -142,5 +150,5 @@ ${repos.map((r, i) => `[${i}] ${r.repo} (${r.stars}★) — ${r.focus}`).join("\
   const { error: rpcError } = await db.rpc("refresh_must_read", { p_issue: week.id });
   if (rpcError) throw rpcError;
 
-  return { issue: week.id, candidates: candidates.length, shortlisted: picked.length, inserted: rows.length, repos: top.length };
+  return { issue: week.id, candidates: candidates.length, shortlisted: picked.length, inserted: items.length, repos: top.length };
 }

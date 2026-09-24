@@ -1,9 +1,73 @@
+import type { Localized } from "../data/digest-types.ts";
 import { parseBlocks, plainText, type Block, type ImageBlock } from "./blocks.ts";
 import { isMediaKey, mediaUrl, variantPath } from "./media.ts";
+import { readHiddenBlocks, readOverrides } from "./overrides.ts";
 import { isValidYoutubeId, type SourceKind } from "./pipeline/util.ts";
 
 // Pure helpers for the post page and its renderer. Kept framework-free (no React, no
 // server-only imports) so `node --test` can load them directly and post-blocks.tsx stays thin.
+
+export type PostMeta = {
+  mirrored?: boolean;
+  noarchive?: boolean;
+  extractionFailed?: boolean;
+  truncated?: boolean;
+  clipped?: boolean;
+};
+
+export type Post = {
+  id: number;
+  sourceId: number;
+  kind: SourceKind;
+  url: string;
+  author: string | null;
+  siteName: string | null;
+  publishedAt: string | null;
+  title: Localized;
+  summary: Localized;
+  /** The model's own text, before any submitter override — the editor's "reset" target and the
+   *  baseline `editPayload` (lib/post-edit.ts) diffs a draft against to decide what to save. */
+  generatedTitle: Localized;
+  generatedSummary: Localized;
+  keyPoints: Record<"hu" | "en", string[]>;
+  tags: string[];
+  blocks: Block[];
+  blocksHu: Block[] | null;
+  meta: PostMeta;
+  hiddenBlocks: string[];
+  submittedBy: string | null;
+  extractedAt: string | null;
+  createdAt: string;
+};
+
+/** A `posts` row (optionally with its `sources(submitted_by)` embed) as the page's Post. */
+export function toPost(row: Record<string, unknown>): Post {
+  const overrides = readOverrides(row.overrides);
+  const source = row.sources as { submitted_by: string } | null | undefined;
+  return {
+    id: row.id as number,
+    sourceId: row.source_id as number,
+    kind: row.kind as SourceKind,
+    url: row.url as string,
+    author: row.author as string | null,
+    siteName: row.source_site as string | null,
+    publishedAt: row.published_at as string | null,
+    // Submitter edits win over the model's text; re-extraction never overwrites them.
+    title: overrides.title ?? (row.title as Localized),
+    summary: overrides.summary ?? (row.summary as Localized),
+    generatedTitle: row.title as Localized,
+    generatedSummary: row.summary as Localized,
+    keyPoints: row.key_points as Post["keyPoints"],
+    tags: row.tags as string[],
+    blocks: parseBlocks(row.blocks),
+    blocksHu: parseTranslatedBlocks(row.blocks_hu),
+    meta: (row.meta ?? {}) as PostMeta,
+    hiddenBlocks: readHiddenBlocks(row.hidden_blocks),
+    submittedBy: source?.submitted_by ?? null,
+    extractedAt: row.extracted_at as string | null,
+    createdAt: row.created_at as string,
+  };
+}
 
 const WORDS_PER_MINUTE = 220;
 /** Below this word count there isn't enough real text for a read-time estimate to mean anything

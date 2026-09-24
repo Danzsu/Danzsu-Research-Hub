@@ -244,6 +244,12 @@ export function publishedDate(raw: string | null | undefined): string | null {
   return Number.isNaN(parsed) ? null : new Date(parsed).toISOString().slice(0, 10);
 }
 
+/** The header's freeze date: the Sunday of the ISO week starting `monday`, as 'MM. DD.'. */
+export function archiveLabel(monday: Date): string {
+  const sunday = new Date(monday.getTime() + 6 * 86_400_000);
+  return `${String(sunday.getUTCMonth() + 1).padStart(2, "0")}. ${String(sunday.getUTCDate()).padStart(2, "0")}.`;
+}
+
 /** Display label for the 96px meta gutter: '09 / 22'. */
 export function publishedLabel(isoDate: string): string {
   const [, month, day] = isoDate.split("-");

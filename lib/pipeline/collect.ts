@@ -112,9 +112,8 @@ export async function collectRepos(now: Date): Promise<Repo[]> {
   return [...byName.values()].sort((a, b) => b.stars - a.stars).slice(0, 25);
 }
 
-/** Everything published since `since`, deduplicated by URL. */
-export async function collectCandidates(since: Date): Promise<Candidate[]> {
-  const all = [...(await fromFeeds(since)), ...(await fromHackerNews(since))];
+/** First of each URL (ignoring a fragment and a trailing slash) wins; untitled candidates are dropped. */
+export function dedupeCandidates(all: Candidate[]): Candidate[] {
   const seen = new Set<string>();
   return all.filter((candidate) => {
     const key = candidate.url.replace(/#.*$/, "").replace(/\/$/, "");
@@ -122,4 +121,9 @@ export async function collectCandidates(since: Date): Promise<Candidate[]> {
     seen.add(key);
     return true;
   });
+}
+
+/** Everything published since `since`, deduplicated by URL. */
+export async function collectCandidates(since: Date): Promise<Candidate[]> {
+  return dedupeCandidates([...(await fromFeeds(since)), ...(await fromHackerNews(since))]);
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
+import { parseStateAction } from "@/lib/state";
 import { getReader } from "@/lib/supabase/server";
 
 // Per-reader state. RLS limits every query to the caller's own rows, and
@@ -33,44 +34,31 @@ export async function POST(request: Request) {
   if (!reader) return jsonError(401, "unauthorized");
   const db = reader.db;
 
-  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const action = String(body.action ?? "");
+  const parsed = parseStateAction(await request.json().catch(() => null));
+  if ("error" in parsed) return jsonError(400, parsed.error);
   const now = new Date().toISOString();
-  const value = body.value === true;
 
-  if (action === "set_read" || action === "set_saved") {
-    const itemId = String(body.itemId ?? "").slice(0, 120);
-    if (!itemId) return jsonError(400, "missing_item");
-    const column = action === "set_read" ? "is_read" : "is_saved";
-    // Upsert only touches the named column, so the other flag survives.
-    const { error } = await db
-      .from("item_states")
-      .upsert({ item_id: itemId, [column]: value, updated_at: now }, { onConflict: "user_id,item_id" });
-    return error ? failed(error) : NextResponse.json({ ok: true });
+  switch (parsed.action) {
+    case "set_read":
+    case "set_saved": {
+      const column = parsed.action === "set_read" ? "is_read" : "is_saved";
+      // Upsert only touches the named column, so the other flag survives.
+      const { error } = await db
+        .from("item_states")
+        .upsert({ item_id: parsed.itemId, [column]: parsed.value, updated_at: now }, { onConflict: "user_id,item_id" });
+      return error ? failed(error) : NextResponse.json({ ok: true });
+    }
+    case "add_todo": {
+      const { data, error } = await db.from("todos").insert({ text: parsed.text, item_id: parsed.itemId }).select("id").single();
+      return error ? failed(error) : NextResponse.json({ ok: true, id: data.id });
+    }
+    case "set_todo": {
+      const { error } = await db.from("todos").update({ is_done: parsed.value, updated_at: now }).eq("id", parsed.id);
+      return error ? failed(error) : NextResponse.json({ ok: true });
+    }
+    case "delete_todo": {
+      const { error } = await db.from("todos").delete().eq("id", parsed.id);
+      return error ? failed(error) : NextResponse.json({ ok: true });
+    }
   }
-
-  if (action === "add_todo") {
-    const text = String(body.text ?? "").trim().slice(0, 180);
-    if (!text) return jsonError(400, "missing_text");
-    const itemId = body.itemId ? String(body.itemId).slice(0, 120) : null;
-    const { data, error } = await db.from("todos").insert({ text, item_id: itemId }).select("id").single();
-    return error ? failed(error) : NextResponse.json({ ok: true, id: data.id });
-  }
-
-  const id = Number(body.id);
-  if ((action === "set_todo" || action === "delete_todo") && !Number.isInteger(id)) {
-    return jsonError(400, "invalid_id");
-  }
-
-  if (action === "set_todo") {
-    const { error } = await db.from("todos").update({ is_done: value, updated_at: now }).eq("id", id);
-    return error ? failed(error) : NextResponse.json({ ok: true });
-  }
-
-  if (action === "delete_todo") {
-    const { error } = await db.from("todos").delete().eq("id", id);
-    return error ? failed(error) : NextResponse.json({ ok: true });
-  }
-
-  return jsonError(400, "unknown_action");
 }
