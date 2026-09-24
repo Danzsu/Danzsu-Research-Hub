@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft } from "./blocks.ts";
 import { fakeDb, geminiPrompt, geminiResponse, geminiText, mockFetch, withGeminiKey, type FakeIngestTables } from "./pipeline/mock-fetch.ts";
-import { applyTranslation, chunkTranslatable, translatable, translatePost } from "./translate.ts";
+import { applyTranslation, chunkTranslatable, translatable, translatePost, type TranslationItem } from "./translate.ts";
 
 const EXTRACTED_AT = "2026-01-01T00:00:00Z";
 
@@ -24,6 +24,14 @@ const translatedAnswer = {
   ],
 };
 
+/** `translatedAnswer.blocks` with the entry for `overrideId` replaced by `{ id: overrideId, ...fields }`
+ *  (or dropped, when `fields` is omitted) — every probe below is "everything valid except this one
+ *  block's answer", without repeating the other 3 valid entries each time. */
+function answerWith(overrideId: string, fields?: Omit<TranslationItem, "id">): TranslationItem[] {
+  const rest = translatedAnswer.blocks.filter((item) => item.id !== overrideId);
+  return fields ? [...rest, { id: overrideId, ...fields }] : rest;
+}
+
 test("translatable sends text only: no code, no image data", () => {
   const view = translatable(blocks);
   assert.equal(view.length, 4);
@@ -42,12 +50,7 @@ test("applyTranslation keeps structure, links and image data", () => {
 });
 
 test("applyTranslation span mismatch: that block falls back to plain text", () => {
-  const result = applyTranslation(blocks, [
-    { id: blocks[0].id, text: "Eredmények" },
-    { id: blocks[1].id, spans: ["Olvasd el most a cikket."] },
-    { id: blocks[2].id, items: [["egy"], ["kettő"]] },
-    { id: blocks[4].id, alt: "grafikon", caption: "Sebesség" },
-  ]);
+  const result = applyTranslation(blocks, answerWith(blocks[1].id, { spans: ["Olvasd el most a cikket."] }));
   assert.ok(result);
   assert.deepEqual(result[1].type === "paragraph" && result[1].content, [{ text: "Olvasd el most a cikket." }]);
 });
@@ -65,23 +68,11 @@ test("applyTranslation rejects an answer that translates nothing (ids only, ever
 });
 
 test("applyTranslation rejects a list whose items array is shorter than the original (2 items, 1 translated)", () => {
-  const result = applyTranslation(blocks, [
-    { id: blocks[0].id, text: "Eredmények" },
-    { id: blocks[1].id, spans: ["Olvasd el a ", "cikket", " most."] },
-    { id: blocks[2].id, items: [["egy"]] },
-    { id: blocks[4].id, alt: "grafikon", caption: "Sebesség" },
-  ]);
-  assert.equal(result, null);
+  assert.equal(applyTranslation(blocks, answerWith(blocks[2].id, { items: [["egy"]] })), null);
 });
 
 test("applyTranslation rejects a non-empty original coming back empty", () => {
-  const result = applyTranslation(blocks, [
-    { id: blocks[0].id, text: "" },
-    { id: blocks[1].id, spans: ["Olvasd el a ", "cikket", " most."] },
-    { id: blocks[2].id, items: [["egy"], ["kettő"]] },
-    { id: blocks[4].id, alt: "grafikon", caption: "Sebesség" },
-  ]);
-  assert.equal(result, null);
+  assert.equal(applyTranslation(blocks, answerWith(blocks[0].id, { text: "" })), null);
 });
 
 test("applyTranslation rejects an answer ~10x the original length (degenerate repetition loop)", () => {
@@ -91,8 +82,79 @@ test("applyTranslation rejects an answer ~10x the original length (degenerate re
   assert.equal(result, null);
 });
 
-// Minor #7: block.caption is optional; a model that invents one for a block that never had one
-// must not have that invention saved.
+// Important #1 (fix round 2): a span-count mismatch (paragraph/quote, or one list item) skipped
+// validating the *joined* fallback text entirely — any garbage passed, as long as the count didn't
+// match. Each input below is exactly the kind the review flagged.
+test("applyTranslation rejects empty spans for a mismatched paragraph (spans: [])", () => {
+  // 0 vs 3 original spans — joined translated text is ""
+  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, { spans: [] })), null);
+});
+
+test('applyTranslation rejects a whitespace-only span for a mismatched paragraph (["   "])', () => {
+  // 1 vs 3 original spans — joined translated text is whitespace
+  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, { spans: ["   "] })), null);
+});
+
+test("applyTranslation rejects a mismatched paragraph whose joined spans total 100 001 characters", () => {
+  // 2 vs 3 original spans
+  const spans = ["x".repeat(50_000), "x".repeat(50_001)];
+  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, { spans })), null);
+});
+
+test("applyTranslation rejects a single-span paragraph answered with spans: []", () => {
+  const singleSpanBlocks = assignIds([{ type: "paragraph", content: [{ text: "Hello there" }] }] satisfies BlockDraft[]);
+  const result = applyTranslation(singleSpanBlocks, [{ id: singleSpanBlocks[0].id, spans: [] }]);
+  assert.equal(result, null);
+});
+
+test("applyTranslation rejects an empty list item ([])", () => {
+  // first item: 0 vs 1 original span — joined text ""
+  assert.equal(applyTranslation(blocks, answerWith(blocks[2].id, { items: [[], ["kettő"]] })), null);
+});
+
+test("applyTranslation rejects a 50 000-character list item", () => {
+  // first item: 2 vs 1 original span
+  const items = [["a", "x".repeat(50_000)], ["kettő"]];
+  assert.equal(applyTranslation(blocks, answerWith(blocks[2].id, { items })), null);
+});
+
+// Minor #3 (S2, S7, S8): the "ids only" test above fails through every type at once, so it can't
+// tell whether any one type's own presence check actually works. One isolated probe each.
+test("applyTranslation rejects a missing heading text alone (S2)", () => {
+  assert.equal(applyTranslation(blocks, answerWith(blocks[0].id)), null); // text omitted, everything else valid
+});
+
+test("applyTranslation rejects a missing paragraph spans field alone (S7)", () => {
+  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id)), null); // spans omitted, everything else valid
+});
+
+test("applyTranslation rejects a missing image alt alone, when the original alt was non-empty (S8)", () => {
+  // alt omitted, everything else valid — blocks[4].alt is "chart"
+  assert.equal(applyTranslation(blocks, answerWith(blocks[4].id, { caption: "Sebesség" })), null);
+});
+
+// Minor #4 (S9, S10, S13, S14): validText rejecting empty/whitespace text, pinned per field — not
+// just via the "10x length" or "ids only" tests above, which exercise different fields.
+test("applyTranslation rejects a whitespace-only span at a matching span count (S9)", () => {
+  // 3 spans (matches), middle is blank
+  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, { spans: ["Olvasd el a ", "   ", " most."] })), null);
+});
+
+test("applyTranslation rejects a whitespace-only list-item span at a matching count (S10)", () => {
+  // 1 span (matches), blank
+  assert.equal(applyTranslation(blocks, answerWith(blocks[2].id, { items: [["  "], ["kettő"]] })), null);
+});
+
+test("applyTranslation rejects a whitespace-only caption when the original had one (S13)", () => {
+  assert.equal(applyTranslation(blocks, answerWith(blocks[4].id, { alt: "grafikon", caption: "   " })), null);
+});
+
+test("applyTranslation rejects a whitespace-only heading answer (S14)", () => {
+  assert.equal(applyTranslation(blocks, answerWith(blocks[0].id, { text: "   " })), null);
+});
+
+// Minor #7 (fix round 1): block.caption is optional; a model that invents one for a block that
+// never had one must not have that invention saved.
 test("applyTranslation applies a translated caption only when the original block had one", () => {
   const noCaptionBlocks = assignIds([
     { type: "image", originalUrl: "https://a.test/j.png", alt: "chart", path: "1/def", placeholder: "data:image/webp;base64,BBB" },
@@ -100,6 +162,23 @@ test("applyTranslation applies a translated caption only when the original block
   const result = applyTranslation(noCaptionBlocks, [{ id: noCaptionBlocks[0].id, alt: "grafikon", caption: "kitalált alcím" }]);
   assert.ok(result);
   assert.equal(result[0].type === "image" && result[0].caption, undefined);
+});
+
+// Minor #2 (fix round 2): the mirror-image bugs — a caption the original had must not be silently
+// droppable, and alt must not be required when the original alt was already empty (an image with
+// alt: "" plus a caption used to fail every retry if the model dropped the empty alt).
+test("applyTranslation rejects a missing caption when the original block had one", () => {
+  // caption omitted — blocks[4].caption is "Speed"
+  assert.equal(applyTranslation(blocks, answerWith(blocks[4].id, { alt: "grafikon" })), null);
+});
+
+test("applyTranslation accepts a missing alt when the original alt was empty", () => {
+  const emptyAltBlocks = assignIds([
+    { type: "image", originalUrl: "https://a.test/k.png", alt: "", caption: "A caption", path: "1/ghi", placeholder: "data:image/webp;base64,CCC" },
+  ] satisfies BlockDraft[]);
+  const result = applyTranslation(emptyAltBlocks, [{ id: emptyAltBlocks[0].id, caption: "Egy alcím" }]); // alt omitted
+  assert.ok(result);
+  assert.equal(result[0].type === "image" && result[0].caption, "Egy alcím");
 });
 
 // Minor #8-F: a chapters fixture, kept separate from the shared 5-block fixture above so its item
@@ -118,6 +197,10 @@ test("applyTranslation translates chapter titles, keeping their seconds untouche
 
 test("applyTranslation rejects a chapters answer whose array is shorter than the original", () => {
   assert.equal(applyTranslation(chaptersBlocks, [{ id: chaptersBlocks[0].id, chapters: ["Bevezető"] }]), null);
+});
+
+test("applyTranslation rejects a whitespace-only chapter title (S11)", () => {
+  assert.equal(applyTranslation(chaptersBlocks, [{ id: chaptersBlocks[0].id, chapters: ["Bevezető", "   "] }]), null);
 });
 
 test("chunkTranslatable splits by size and keeps order", () => {
@@ -163,8 +246,8 @@ test("translatePost: a successful translation writes blocks_hu via posts.update 
     assert.equal(db.postUpdates.length, 1);
     assert.deepEqual(Object.keys(db.postUpdates[0]), ["blocks_hu"]);
     assert.deepEqual(db.postUpdateFilters.at(-1), [
-      { column: "id", value: 7 },
-      { column: "extracted_at", value: EXTRACTED_AT },
+      { column: "id", value: 7, op: "eq" },
+      { column: "extracted_at", value: EXTRACTED_AT, op: "eq" },
     ]);
     const saved = db.postUpdates[0].blocks_hu as Array<Record<string, unknown>>;
     assert.equal(saved.length, blocks.length);
@@ -180,7 +263,10 @@ test("translatePost: a successful translation writes blocks_hu via posts.update 
   }
 });
 
-test("translatePost: writes successfully when extracted_at is null, guarded with .is(...)", async () => {
+// Minor #5 (G4): real PostgREST sends `eq.null` for `.eq(col, null)`, which Postgres rejects for a
+// timestamp column — the null case must use `.is(...)`, not `.eq(...)`, and the fake now records
+// which one was actually called so this is a real assertion, not just a value check.
+test("translatePost: writes successfully when extracted_at is null, guarded with .is(...) not .eq(...)", async () => {
   const restoreKey = withGeminiKey();
   const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null, extracted_at: null } });
   const restoreFetch = mockFetch(() => geminiResponse(translatedAnswer));
@@ -188,8 +274,8 @@ test("translatePost: writes successfully when extracted_at is null, guarded with
     const result = await translatePost(db, 7);
     assert.equal(result, "ok");
     assert.deepEqual(db.postUpdateFilters.at(-1), [
-      { column: "id", value: 7 },
-      { column: "extracted_at", value: null },
+      { column: "id", value: 7, op: "eq" },
+      { column: "extracted_at", value: null, op: "is" },
     ]);
   } finally {
     restoreFetch();

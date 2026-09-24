@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseBlocks, type Block, type Inline } from "./blocks.ts";
+import { inlineText, parseBlocks, type Block, type Inline } from "./blocks.ts";
 import { generate } from "./llm.ts";
 import { mapLimited } from "./pipeline/util.ts";
 import { parseTranslatedBlocks } from "./post-view.ts";
@@ -8,10 +8,12 @@ import { parseTranslatedBlocks } from "./post-view.ts";
 // Only text goes to the model and only text comes back; structure, links and
 // image data are copied from the original, so a translation cannot corrupt them.
 
-// Not a discriminated union: an item carries no `type`, only whichever of these fields its block
-// asked for, so `translationSchema` can't require fields per block type without also adding a type
-// discriminator to what's sent to (and echoed back by) the model. `applyTranslation`'s `shapeOk`
-// check below is what actually enforces the per-type shape at runtime.
+// Not a discriminated union, and fields aren't required per block type, even though an untagged
+// z.union converts fine with z.toJSONSchema: zod keeps only the first union variant an answer
+// matches, so a paragraph legitimately answered as { id, text, spans } would match a narrower
+// variant first and lose its spans — a real answer falsely rejected. A union also can't tie a
+// variant to the block's own type anyway, so `applyTranslation`'s `shapeOk` check below, which has
+// `block` in hand, is the real per-type gate either way.
 export const translationItemSchema = z.object({
   id: z.string(),
   text: z.string().optional(),
@@ -79,8 +81,9 @@ function validText(original: string, translated: string): boolean {
 /**
  * Whether `item` is a well-formed translation of `block`: every expected field is present, `items`/
  * `chapters` array lengths match the original, and no text field looks broken. A span-count
- * mismatch inside one paragraph/quote/list-item is NOT rejected here — `spansFrom` above degrades
- * just that block to plain text instead, per the Review Focus.
+ * mismatch inside one paragraph/quote/list-item still degrades to plain text later (`spansFrom`
+ * above, per the Review Focus) — but the *joined* fallback text is validated here like any other
+ * field, so a mismatch can't be used to smuggle empty or degenerate text past this check.
  */
 function shapeOk(block: Block, item: TranslationItem): boolean {
   switch (block.type) {
@@ -90,19 +93,24 @@ function shapeOk(block: Block, item: TranslationItem): boolean {
     case "quote":
       return (
         item.spans !== undefined &&
-        (item.spans.length !== block.content.length || item.spans.every((span, i) => validText(block.content[i].text, span)))
+        (item.spans.length === block.content.length
+          ? item.spans.every((span, i) => validText(block.content[i].text, span))
+          : validText(inlineText(block.content), item.spans.join("")))
       );
     case "list":
       return (
         item.items !== undefined &&
         item.items.length === block.items.length &&
-        item.items.every((spans, i) => spans.length !== block.items[i].length || spans.every((text, j) => validText(block.items[i][j].text, text)))
+        item.items.every((spans, i) =>
+          spans.length === block.items[i].length
+            ? spans.every((text, j) => validText(block.items[i][j].text, text))
+            : validText(inlineText(block.items[i]), spans.join("")),
+        )
       );
     case "image":
       return (
-        item.alt !== undefined &&
-        validText(block.alt, item.alt) &&
-        (block.caption === undefined || item.caption === undefined || validText(block.caption, item.caption))
+        (!block.alt || (item.alt !== undefined && validText(block.alt, item.alt))) &&
+        (block.caption === undefined || (item.caption !== undefined && validText(block.caption, item.caption)))
       );
     case "chapters":
       return (

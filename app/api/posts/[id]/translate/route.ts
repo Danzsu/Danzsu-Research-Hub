@@ -2,9 +2,19 @@ import { NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
 import { parseId } from "@/lib/pipeline/util";
 import { createAdminClient, getReader } from "@/lib/supabase/server";
-import { translatePost } from "@/lib/translate";
+import { translatePost, type TranslateResult } from "@/lib/translate";
 
 export const maxDuration = 300;
+
+// Exhaustive by construction: a `TranslateResult` variant with no entry here is a tsc error, not a
+// silently-200 response — the way an if-chain that forgot a branch (e.g. dropping "stale" → 409)
+// would fall through to the final `NextResponse.json({ ok: true })` unnoticed.
+const RESULT_STATUS: Record<Exclude<TranslateResult, "ok">, { status: number; error: string }> = {
+  not_found: { status: 404, error: "not_found" },
+  shape: { status: 502, error: "translation_shape" },
+  stale: { status: 409, error: "translation_stale" },
+  failed: { status: 502, error: "translation_failed" },
+};
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const reader = await getReader();
@@ -22,9 +32,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   // model_settings and the posts write need the secret key; existence was already checked as the reader (RLS).
   const result = await translatePost(createAdminClient(), post.id);
-  if (result === "not_found") return jsonError(404, "not_found");
-  if (result === "shape") return jsonError(502, "translation_shape");
-  if (result === "stale") return jsonError(409, "translation_stale");
-  if (result === "failed") return jsonError(502, "translation_failed");
-  return NextResponse.json({ ok: true });
+  if (result === "ok") return NextResponse.json({ ok: true });
+  const { status, error } = RESULT_STATUS[result];
+  return jsonError(status, error);
 }

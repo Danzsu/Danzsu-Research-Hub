@@ -77,10 +77,12 @@ export type FakeIngestDb = SupabaseClient & {
   /** Every `posts` UPDATE payload (the `values` passed to `.update(...)`, before `.eq(...)`/`.is(...)`), in call order. */
   postUpdates: Record<string, unknown>[];
   /** Every `posts` UPDATE's own filters (every `.eq(...)`/`.is(...)` chained onto that `.update(...)`,
-   *  in the order they were chained), same order as `postUpdates` — so a test can check exactly what
-   *  a write was scoped to (e.g. `.eq("id", 7).eq("extracted_at", "2026-01-01")`) without depending
-   *  on `eqCalls`' cross-table, cross-operation ordering. */
-  postUpdateFilters: { column: string; value: unknown }[][];
+   *  in the order they were chained, `op` recording which one), same order as `postUpdates` — so a
+   *  test can check exactly what a write was scoped to (e.g. `.eq("id", 7).is("extracted_at", null)`)
+   *  without depending on `eqCalls`' cross-table, cross-operation ordering. The two matter for more
+   *  than logging: real PostgREST sends `eq.null` for `.eq(col, null)`, which Postgres rejects for a
+   *  timestamp column, so a test asserting `op: "is"` for the null case is asserting real safety. */
+  postUpdateFilters: { column: string; value: unknown; op: "eq" | "is" }[][];
   /** Every `.eq(column, value)` call against `sources`' `update` or either table's `select`, in call
    *  order. `posts`' `update` filters (which can also be `.is(...)`) are on `postUpdateFilters` instead. */
   eqCalls: { table: "sources" | "posts"; column: string; value: unknown }[];
@@ -112,6 +114,16 @@ function pendingChain(rows: Record<string, unknown>[]): PendingChain {
 /** A storage path's bare object name: whatever follows the first `/` (the `<sourceId>/` prefix real
  *  Supabase storage strips when listing a folder), or the whole path if there's no prefix to strip. */
 const bareObjectName = (path: string) => (path.includes("/") ? path.slice(path.indexOf("/") + 1) : path);
+
+/** Projects `row` down to `columns` (comma-separated, `"*"` for everything) the way PostgREST's
+ *  `select=` does — a column the fixture never set comes back `undefined`, not silently present
+ *  because some other part of the row happened to have it. */
+function project(row: Record<string, unknown> | null, columns: string): Record<string, unknown> | null {
+  if (!row) return null;
+  if (columns.trim() === "*") return row;
+  const keys = columns.split(",").map((column) => column.trim()).filter(Boolean);
+  return Object.fromEntries(keys.map((key) => [key, row[key]]));
+}
 
 /**
  * Offline `model_settings`, `sources`, `posts` and media-storage fake, for tests that exercise real
@@ -175,7 +187,7 @@ export function fakeDb(
     }
     if (table === "posts") {
       return {
-        select: () => ({
+        select: (columns = "*") => ({
           eq: (column: string, value: unknown) => {
             eqCalls.push({ table: "posts", column, value });
             postSelectCalls++;
@@ -183,7 +195,9 @@ export function fakeDb(
             return {
               maybeSingle: async () => {
                 const errored = tables.postErrorOnCall !== undefined ? callNumber === tables.postErrorOnCall : Boolean(tables.postError);
-                return errored ? { data: null, error: tables.postError ?? new Error("posts lookup failed") } : { data: tables.post ?? null, error: null };
+                return errored
+                  ? { data: null, error: tables.postError ?? new Error("posts lookup failed") }
+                  : { data: project(tables.post ?? null, columns), error: null };
               },
             };
           },
@@ -206,7 +220,7 @@ export function fakeDb(
         // return=representation`, which the real translatePost gets via `.select()`) reports which
         // rows matched; a bare `.update().eq()` reports `data: null` like a real minimal-return update.
         update: (values: Record<string, unknown>) => {
-          const filters: { column: string; value: unknown }[] = [];
+          const filters: FakeIngestDb["postUpdateFilters"][number] = [];
           const run = async (withRepresentation: boolean) => {
             postUpdates.push(values);
             postUpdateFilters.push(filters);
@@ -220,11 +234,11 @@ export function fakeDb(
           };
           const builder = {
             eq: (column: string, value: unknown) => {
-              filters.push({ column, value });
+              filters.push({ column, value, op: "eq" });
               return builder;
             },
             is: (column: string, value: unknown) => {
-              filters.push({ column, value });
+              filters.push({ column, value, op: "is" });
               return builder;
             },
             select: () => run(true),
