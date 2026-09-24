@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod/v4";
+import { errorMessage } from "./pipeline/util.ts";
 
 // Two providers over plain fetch, no SDKs. Which model runs which task is data,
 // not code: the `model_settings` table (edit a row, the next run uses it).
@@ -120,7 +121,7 @@ export async function generate<T extends z.ZodType>(
         ? await gemini(route.model, schema, prompt, options)
         : await groq(route.model, schema, prompt);
     } catch (error) {
-      errors.push(`${route.provider}/${route.model}: ${error instanceof Error ? error.message : error}`);
+      errors.push(`${route.provider}/${route.model}: ${errorMessage(error)}`);
       console.warn(`${task}: ${errors.at(-1)}`);
     }
   }

@@ -5,7 +5,6 @@ import {
   isBlockVisible,
   isValidPlaceholder,
   isValidVimeoId,
-  isValidYoutubeId,
   mediaSources,
   parseTranslatedBlocks,
   primaryVideoId,
@@ -14,6 +13,7 @@ import {
   withQuery,
   type PostQuery,
 } from "./post-view.ts";
+import { isValidYoutubeId } from "./pipeline/util.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
 const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");

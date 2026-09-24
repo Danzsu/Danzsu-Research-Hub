@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 import { assignIds, plainText, type BlockDraft } from "../../blocks.ts";
 import { generate } from "../../llm.ts";
-import { cancelBody, FetchError, readLimited, safeFetch } from "../fetch.ts";
+import { ensureOk, readLimited, safeFetch } from "../fetch.ts";
 import { filenameOf, hasNoarchive, hostOf } from "../util.ts";
 import type { Extracted, Extractor } from "./types.ts";
 
@@ -63,10 +63,6 @@ export async function extractPdfResponse(db: Parameters<Extractor>[0], url: stri
 }
 
 export const extractPdf: Extractor = async (db, url, note) => {
-  const response = await safeFetch(url, { accept: "application/pdf" });
-  if (!response.ok) {
-    await cancelBody(response);
-    throw new FetchError(`fetch ${response.status}`);
-  }
+  const response = await ensureOk(await safeFetch(url, { accept: "application/pdf" }), "fetch");
   return extractPdfResponse(db, url, response, note);
 };

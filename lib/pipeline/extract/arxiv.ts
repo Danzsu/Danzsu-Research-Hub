@@ -1,8 +1,8 @@
 import { XMLParser } from "fast-xml-parser";
 import { assignIds, plainText, withoutIds, type Block, type BlockDraft } from "../../blocks.ts";
-import { cancelBody, readText, safeFetch } from "../fetch.ts";
+import { apiFetch, cancelBody, ensureOk, readText, safeFetch } from "../fetch.ts";
 import { collapse } from "../html-to-blocks.ts";
-import { arxivId, list, xmlText } from "../util.ts";
+import { arxivId, errorMessage, list, xmlText } from "../util.ts";
 import { articleFromHtml } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
 import type { Extractor } from "./types.ts";
@@ -38,11 +38,7 @@ export function parseArxivAtom(body: string): ArxivMeta {
 export const isArxivHtml = (html: string) => html.includes("ltx_page_main") || html.includes("ltx_document");
 
 async function metadata(id: string): Promise<ArxivMeta> {
-  const response = await fetch(`https://export.arxiv.org/api/query?id_list=${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(20_000) });
-  if (!response.ok) {
-    await cancelBody(response);
-    throw new Error(`arxiv api ${response.status}`);
-  }
+  const response = await ensureOk(await apiFetch(`https://export.arxiv.org/api/query?id_list=${encodeURIComponent(id)}`), "arxiv api");
   return parseArxivAtom(await response.text());
 }
 
@@ -67,7 +63,7 @@ export const extractArxiv: Extractor = async (db, url, note) => {
       return { ...article, title: info.title || article.title, author: byline(info.authors), siteName: "arXiv", publishedAt: info.published, meta };
     }
   } catch (error) {
-    console.warn(`arxiv html ${id}: ${error instanceof Error ? error.message : error}`);
+    console.warn(`arxiv html ${id}: ${errorMessage(error)}`);
   }
 
   // No HTML version: the abstract always, the full text from the PDF when it can be read.
@@ -79,7 +75,7 @@ export const extractArxiv: Extractor = async (db, url, note) => {
   try {
     body = (await extractPdf(db, `https://arxiv.org/pdf/${id}`, note)).blocks;
   } catch (error) {
-    console.warn(`arxiv pdf ${id}: ${error instanceof Error ? error.message : error}`);
+    console.warn(`arxiv pdf ${id}: ${errorMessage(error)}`);
   }
   const blocks = assignIds([...abstract, ...withoutIds(body)]);
   return {

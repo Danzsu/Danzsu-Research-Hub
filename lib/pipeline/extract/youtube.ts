@@ -1,9 +1,9 @@
 import { z } from "zod/v4";
 import { assignIds, type BlockDraft } from "../../blocks.ts";
 import { generate } from "../../llm.ts";
-import { cancelBody, FetchError, readJsonObject } from "../fetch.ts";
+import { apiFetch, cancelBody, FetchError, readJsonObject } from "../fetch.ts";
 import { SUMMARY_INSTRUCTIONS, summarySchema } from "../summary.ts";
-import { youtubeId } from "../util.ts";
+import { errorMessage, youtubeId } from "../util.ts";
 import type { Extracted, Extractor } from "./types.ts";
 
 const videoSchema = summarySchema.extend({
@@ -21,7 +21,7 @@ type OembedInfo = { title?: string; author_name?: string };
 async function fetchOembed(watchUrl: string): Promise<OembedInfo> {
   let response: Response;
   try {
-    response = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(15_000) });
+    response = await apiFetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watchUrl)}`, { timeoutMs: 15_000 });
   } catch {
     return {};
   }
@@ -67,7 +67,7 @@ export const extractYoutube: Extractor = async (db, url, note) => {
       { youtubeUrl: watchUrl },
     );
   } catch (error) {
-    console.warn(`youtube gemini failed for ${url}: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(`youtube gemini failed for ${url}: ${errorMessage(error)}`);
     return videoOnly(id, title, author);
   }
 

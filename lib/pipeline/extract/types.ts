@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Block } from "../../blocks.ts";
+import type { Generated } from "../summary.ts";
 
 export type ExtractedMeta = Record<string, unknown> & {
   noarchive?: boolean;
@@ -18,12 +19,7 @@ export type Extracted = {
   /** What the summarizer reads; for noarchive pages this is all that is used. */
   text: string;
   /** Set when the extractor already wrote the summary in the same model call (YouTube). */
-  generated?: {
-    title: { hu: string; en: string };
-    summary: { hu: string; en: string };
-    keyPoints: { hu: string[]; en: string[] };
-    tags: string[];
-  };
+  generated?: Generated;
 };
 
 export type Extractor = (db: SupabaseClient, url: string, note: string) => Promise<Extracted>;

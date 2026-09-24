@@ -1,9 +1,9 @@
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import { plainText } from "../../blocks.ts";
-import { cancelBody, FetchError, readText, safeFetch } from "../fetch.ts";
+import { ensureOk, readText, safeFetch } from "../fetch.ts";
 import { cleanDocument, htmlToBlocks } from "../html-to-blocks.ts";
-import { hasNoarchive, hostOf } from "../util.ts";
+import { hasNoarchive, hostOf, publishedDate } from "../util.ts";
 import { extractPdfResponse } from "./pdf.ts";
 import type { Extracted, Extractor } from "./types.ts";
 
@@ -85,26 +85,6 @@ export function readPageMeta(document: Document): PageMeta {
   };
 }
 
-/**
- * A raw date's own YYYY-MM-DD prefix is kept only if it's a real calendar date that round-trips —
- * `posts.published_at` is a Postgres `date`, and a value like "2026-13-01" or "2026-02-30" (which
- * JS's Date silently rolls over to March, not rejects) would fail that column's write. Anything else
- * with a matching prefix is rejected outright, not handed to the generic parser below: a bad prefix
- * isn't a "non-ISO format", it's a bad date. A prefix-less, non-ISO format still goes through
- * Date.parse/toISOString — converting through UTC there can shift the calendar day, but there's no
- * better general answer for an arbitrary date string without a date library.
- */
-export function publishedDate(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const prefix = /^\d{4}-\d{2}-\d{2}/.exec(raw)?.[0];
-  if (prefix) {
-    const date = new Date(`${prefix}T00:00:00Z`);
-    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === prefix ? prefix : null;
-  }
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString().slice(0, 10);
-}
-
 /** Readability's byline can run past 120 chars mid-name on a long author list; cut at the last comma instead. */
 export function trimByline(byline: string | null | undefined): string | null {
   if (!byline) return null;
@@ -140,11 +120,7 @@ export function articleFromHtml(html: string, finalUrl: string, robotsHeader?: s
 }
 
 export const extractArticle: Extractor = async (db, url, note) => {
-  const response = await safeFetch(url, { accept: "text/html,application/xhtml+xml,application/pdf;q=0.9" });
-  if (!response.ok) {
-    await cancelBody(response);
-    throw new FetchError(`fetch ${response.status}`);
-  }
+  const response = await ensureOk(await safeFetch(url, { accept: "text/html,application/xhtml+xml,application/pdf;q=0.9" }), "fetch");
   if ((response.headers.get("content-type") ?? "").includes("application/pdf")) return extractPdfResponse(db, url, response, note);
   return articleFromHtml(await readText(response, MAX_HTML), response.url || url, response.headers.get("x-robots-tag"));
 };

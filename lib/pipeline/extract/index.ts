@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseHTML } from "linkedom";
-import { cancelBody, FetchError, readText, safeFetch } from "../fetch.ts";
-import { filenameOf, hostOf, type SourceKind } from "../util.ts";
+import { cancelBody, ensureOk, FetchError, readText, safeFetch } from "../fetch.ts";
+import { errorMessage, filenameOf, hostOf, type SourceKind } from "../util.ts";
 import { extractArticle, readPageMeta } from "./article.ts";
 import { extractArxiv } from "./arxiv.ts";
 import { extractGithub } from "./github.ts";
@@ -26,8 +26,6 @@ const RETHROW_FETCH_ERROR: ReadonlySet<SourceKind> = new Set(["article", "x", "y
 // youtube, x: both are JS-rendered and effectively login-walled, so Readability on the raw page yields junk.
 const NO_ARTICLE_FALLBACK: ReadonlySet<SourceKind> = new Set(["pdf", "youtube", "x"]);
 
-const failure = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
 // A missing content-type still counts as HTML — the request itself asked for `Accept: text/html`.
 // Whitespace before the `;` (a real server can send "text/html ; charset=...") is allowed too.
 export const isHtml = (contentType: string) => !contentType || /^(text\/html|application\/xhtml\+xml)\s*(;|$)/i.test(contentType);
@@ -39,11 +37,7 @@ export const isHtml = (contentType: string) => !contentType || /^(text\/html|app
  * doesn't need to fail just because reading all of it would blow the limit meant for full extraction.
  */
 export async function metadataOnly(url: string): Promise<Extracted> {
-  const response = await safeFetch(url, { accept: "text/html" });
-  if (!response.ok) {
-    await cancelBody(response);
-    throw new FetchError(`fetch ${response.status}`);
-  }
+  const response = await ensureOk(await safeFetch(url, { accept: "text/html" }), "fetch");
   if (!isHtml(response.headers.get("content-type") ?? "")) {
     await cancelBody(response);
     const title = filenameOf(url) ?? url;
@@ -68,13 +62,13 @@ export async function extract(db: SupabaseClient, kind: SourceKind, url: string,
     return await extractors[kind](db, url, note);
   } catch (error) {
     if (error instanceof FetchError && RETHROW_FETCH_ERROR.has(kind)) throw error;
-    console.warn(`${kind} extractor failed for ${url}: ${failure(error)}`);
+    console.warn(`${kind} extractor failed for ${url}: ${errorMessage(error)}`);
   }
   if (!NO_ARTICLE_FALLBACK.has(kind) && kind !== "article") {
     try {
       return await extractArticle(db, url, note);
     } catch (error) {
-      console.warn(`article fallback failed for ${url}: ${failure(error)}`);
+      console.warn(`article fallback failed for ${url}: ${errorMessage(error)}`);
     }
   }
   return metadataOnly(url);

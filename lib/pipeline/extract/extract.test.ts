@@ -6,7 +6,7 @@ import type { Block, BlockDraft } from "../../blocks.ts";
 import { FetchError } from "../fetch.ts";
 import { htmlToDrafts } from "../html-to-blocks.ts";
 import { mockDns, mockFetch, TEST_IP } from "../mock-fetch.ts";
-import { articleFromHtml, extractArticle, publishedDate, readPageMeta, trimByline } from "./article.ts";
+import { articleFromHtml, extractArticle, readPageMeta, trimByline } from "./article.ts";
 import { extractArxiv, isArxivHtml, parseArxivAtom } from "./arxiv.ts";
 import { extractGithub, resolveGithubImage } from "./github.ts";
 import { fromLlmBlock, PDF_INSTRUCTIONS } from "./pdf.ts";
@@ -37,23 +37,6 @@ test("articleFromHtml reads blocks and page metadata", () => {
 
 test("articleFromHtml rejects pages with no readable content", () => {
   assert.throws(() => articleFromHtml(page("", "<div>tiny</div>"), "https://blog.test/p"), /no readable article text/);
-});
-
-test("publishedDate keeps a stated calendar date instead of reinterpreting its timezone", () => {
-  // A UTC-negative offset converts to a later UTC date; the source's own YYYY-MM-DD must win.
-  assert.equal(publishedDate("2026-09-20T23:30:00-05:00"), "2026-09-20");
-  assert.equal(publishedDate("2026-09-20T10:00:00Z"), "2026-09-20");
-  assert.equal(publishedDate("2026-09-20"), "2026-09-20");
-  assert.equal(publishedDate("March 3, 2026 UTC"), "2026-03-03"); // a non-ISO format still needs Date parsing
-  assert.equal(publishedDate("not a date"), null);
-  assert.equal(publishedDate(undefined), null);
-});
-
-test("publishedDate rejects a YYYY-MM-DD prefix that isn't a real calendar date", () => {
-  // posts.published_at is a Postgres date column; any of these would fail that write and lose the post.
-  assert.equal(publishedDate("0000-00-00T00:00:00Z"), null);
-  assert.equal(publishedDate("2026-13-01"), null); // month 13
-  assert.equal(publishedDate("2026-02-30"), null); // Date would silently roll this over to March 2
 });
 
 test("trimByline cuts a long author list at a name boundary, not mid-name", () => {

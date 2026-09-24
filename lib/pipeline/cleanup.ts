@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { blockText, type Block } from "../blocks.ts";
 import { generate } from "../llm.ts";
 import { NOT_INSTRUCTIONS } from "./summary.ts";
+import { errorMessage } from "./util.ts";
 
 const cleanupSchema = z.object({ remove: z.array(z.string()) });
 
@@ -39,7 +40,7 @@ ${cleanupListing(blocks)}`,
     );
     return applyCleanup(blocks, remove);
   } catch (error) {
-    console.warn(`ai cleanup skipped: ${error instanceof Error ? error.message : error}`);
+    console.warn(`ai cleanup skipped: ${errorMessage(error)}`);
     return blocks;
   }
 }

@@ -1,8 +1,8 @@
 import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
-import { githubHeaders, USER_AGENT } from "./fetch.ts";
+import { apiFetch, ensureOk, githubHeaders } from "./fetch.ts";
 import { feeds, githubTopics, hnQueries } from "./feeds.ts";
-import { list, xmlText } from "./util.ts";
+import { list, publishedDate, xmlText } from "./util.ts";
 
 export type Candidate = {
   url: string;
@@ -17,20 +17,10 @@ export type Repo = { repo: string; focus: string; url: string; stars: number };
 
 const DAY = 86_400_000;
 
-async function get(url: string, headers: Record<string, string> = {}): Promise<Response> {
-  const response = await fetch(url, {
-    headers: { "user-agent": USER_AGENT, ...headers },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw new Error(`${response.status} ${url}`);
-  return response;
-}
+const get = async (url: string, headers?: Record<string, string>) => ensureOk(await apiFetch(url, { headers }), url);
 
 const stripHtml = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
-const isoDate = (value: unknown) => {
-  const date = new Date(xmlText(value));
-  return Number.isNaN(date.getTime()) ? new Date().toISOString().slice(0, 10) : date.toISOString().slice(0, 10);
-};
+const isoDate = (value: unknown) => publishedDate(xmlText(value)) ?? new Date().toISOString().slice(0, 10);
 
 const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
 

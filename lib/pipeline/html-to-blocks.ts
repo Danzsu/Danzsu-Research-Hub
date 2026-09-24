@@ -1,7 +1,7 @@
 import { parseHTML } from "linkedom";
 import { assignIds, blockIdentity, blockText, inlineText, safeHref, type Block, type BlockDraft, type Inline } from "../blocks.ts";
 import { imageUrl, isIconOrAvatarImage, type ImageResolver } from "./html-images.ts";
-import { hostOf, youtubeId } from "./util.ts";
+import { hostOf, videoFromUrl } from "./util.ts";
 
 export type HtmlToBlocksOptions = { baseUrl: string; imageBaseUrl?: string; resolveImage?: ImageResolver };
 
@@ -109,23 +109,12 @@ function hoistNoscriptImages(root: Element): void {
   });
 }
 
-function isVideoEmbedSrc(src: string, baseUrl: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(src, baseUrl);
-  } catch {
-    return false;
-  }
-  if (youtubeId(url)) return true;
-  return /(^|\.)player\.vimeo\.com$/.test(url.hostname) && /^\/video\/\d+/.test(url.pathname);
-}
-
 /** Strips page chrome and named noise. Mutates `root`; run it before Readability too. */
 export function cleanDocument(root: Element, baseUrl: string): void {
   hoistNoscriptImages(root);
   root.querySelectorAll(DROP).forEach((el) => el.remove());
   root.querySelectorAll("iframe").forEach((el) => {
-    if (!isVideoEmbedSrc(el.getAttribute("src") ?? "", baseUrl)) el.remove();
+    if (!videoFromUrl(el.getAttribute("src") ?? "", baseUrl)) el.remove();
   });
   const rootTextLength = (root.textContent ?? "").length;
   root.querySelectorAll("*").forEach((el) => {
@@ -165,19 +154,8 @@ function pushImage(img: Element, caption: string | undefined, ctx: Ctx) {
 }
 
 function pushVideo(el: Element, ctx: Ctx) {
-  let url: URL;
-  try {
-    url = new URL(el.getAttribute("src") ?? "", ctx.base);
-  } catch {
-    return;
-  }
-  const yt = youtubeId(url);
-  if (yt) {
-    ctx.out.push({ type: "video", provider: "youtube", videoId: yt });
-    return;
-  }
-  const vimeo = /(^|\.)player\.vimeo\.com$/.test(url.hostname) && /^\/video\/(\d+)/.exec(url.pathname)?.[1];
-  if (vimeo) ctx.out.push({ type: "video", provider: "vimeo", videoId: vimeo });
+  const video = videoFromUrl(el.getAttribute("src") ?? "", ctx.base);
+  if (video) ctx.out.push({ type: "video", ...video });
 }
 
 function preText(el: Element): string {

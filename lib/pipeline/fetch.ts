@@ -1,9 +1,9 @@
 import dns from "node:dns/promises";
-import { isPrivateAddress, parseSubmittedUrl } from "./util.ts";
+import { errorMessage, isPrivateAddress, parseSubmittedUrl } from "./util.ts";
 
 export const USER_AGENT = "Mozilla/5.0 (compatible; NeonRadar/1.0; private research digest)";
 
-/** The source itself is unreachable: the fallback chain cannot help, the submission fails. */
+/** Fetching the source itself failed. `extract()` decides per kind whether a fallback can still help. */
 export class FetchError extends Error {}
 
 /** Standard GitHub REST headers: accept, this app's user agent, and an optional token. */
@@ -20,6 +20,24 @@ export async function cancelBody(response: Response): Promise<void> {
   } catch {
     // best effort — the connection is being torn down either way
   }
+}
+
+/** Passes an ok response through; otherwise drops its body and throws `FetchError("<label> <status>")`. */
+export async function ensureOk(response: Response, label: string): Promise<Response> {
+  if (response.ok) return response;
+  await cancelBody(response);
+  throw new FetchError(`${label} ${response.status}`);
+}
+
+/**
+ * Plain `fetch` for fixed API hosts (GitHub, arXiv, oEmbed, feeds) with this app's user agent and a
+ * timeout. User-submitted URLs go through `safeFetch` instead.
+ */
+export function apiFetch(url: string, init: { headers?: Record<string, string>; timeoutMs?: number } = {}): Promise<Response> {
+  return fetch(url, {
+    headers: { "user-agent": USER_AGENT, ...init.headers },
+    signal: AbortSignal.timeout(init.timeoutMs ?? 20_000),
+  });
 }
 
 /** Parses and DNS-checks one hop's URL; throws FetchError for anything internal or unresolvable. */
@@ -54,7 +72,7 @@ export async function safeFetch(raw: string, init: { accept?: string; timeoutMs?
         redirect: "manual",
       });
     } catch (error) {
-      throw new FetchError(`fetch failed: ${error instanceof Error ? error.message : error}`);
+      throw new FetchError(`fetch failed: ${errorMessage(error)}`);
     }
     const location = response.headers.get("location");
     if (response.status < 300 || response.status >= 400 || !location) return response;
@@ -88,7 +106,7 @@ export async function readLimited(response: Response, limit: number, options: { 
     try {
       step = await reader.read();
     } catch (error) {
-      throw new FetchError(`stream error: ${error instanceof Error ? error.message : error}`);
+      throw new FetchError(`stream error: ${errorMessage(error)}`);
     }
     if (step.done) break;
     size += step.value!.byteLength;

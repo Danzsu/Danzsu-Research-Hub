@@ -2,7 +2,7 @@ import { z } from "zod/v4";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { inlineText, parseBlocks, type Block, type Inline } from "./blocks.ts";
 import { generate } from "./llm.ts";
-import { mapLimited } from "./pipeline/util.ts";
+import { errorMessage, mapLimited } from "./pipeline/util.ts";
 import { parseTranslatedBlocks } from "./post-view.ts";
 
 // Only text goes to the model and only text comes back; structure, links and
@@ -187,7 +187,7 @@ export async function translatePost(db: SupabaseClient, postId: number): Promise
     .eq("id", postId)
     .maybeSingle();
   if (selectError) {
-    console.warn(`translate ${postId}: select failed: ${selectError instanceof Error ? selectError.message : selectError}`);
+    console.warn(`translate ${postId}: select failed: ${errorMessage(selectError)}`);
     return "failed";
   }
   if (!post) return "not_found";
@@ -215,7 +215,7 @@ export async function translatePost(db: SupabaseClient, postId: number): Promise
     if (!updated || updated.length === 0) return "stale"; // re-extracted while the model was running
     return "ok";
   } catch (error) {
-    console.warn(`translate ${post.id}: ${error instanceof Error ? error.message : error}`);
+    console.warn(`translate ${post.id}: ${errorMessage(error)}`);
     return "failed";
   }
 }

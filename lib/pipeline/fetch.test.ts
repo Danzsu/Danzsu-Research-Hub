@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import dns from "node:dns/promises";
 import { test } from "node:test";
-import { FetchError, readLimited, safeFetch } from "./fetch.ts";
+import { apiFetch, ensureOk, FetchError, readLimited, safeFetch, USER_AGENT } from "./fetch.ts";
 import { mockFetch, TEST_HOST } from "./mock-fetch.ts";
 
 // A public IP literal: dns.lookup() resolves it locally without a real DNS query, so these
@@ -44,12 +45,11 @@ test("safeFetch blocks a redirect to the cloud metadata address", async () => {
   }
 });
 
-test("safeFetch blocks a redirect to a CGNAT address via the DNS-resolved private-address check", async () => {
-  // 127.*, 169.254.* etc. are already rejected by parseSubmittedUrl's own hostname regex, before
-  // the DNS-resolved address is ever looked up — so they can't pin the isPrivateAddress check
-  // that runs after DNS resolution (fetch.ts's `checkedHop`). 100.64.0.0/10 (CGNAT) isn't in that
-  // regex's blocklist, so this hop only gets stopped if the post-lookup check is actually run.
-  const { calls, restore } = redirectOnceThenOk("http://100.64.0.1/");
+test("safeFetch checks each hop's DNS-resolved address, not only its hostname", async (t) => {
+  // parseSubmittedUrl already rejects private IP literals, so only a hostname that resolves to a
+  // private (here CGNAT) address can reach the post-lookup check in checkedHop.
+  t.mock.method(dns, "lookup", async (host: string) => [{ address: host === "internal.test" ? "100.64.0.1" : host, family: 4 }]);
+  const { calls, restore } = redirectOnceThenOk("http://internal.test/");
   try {
     await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && error.message === "blocked address");
     assert.equal(calls.length, 1);
@@ -180,4 +180,27 @@ test("readLimited with `truncate` returns the prefix read so far instead of thro
   const result = await readLimited(response, 2 * 1024 * 1024, { truncate: true });
   assert.ok(result.length > 0 && result.length <= 2 * 1024 * 1024);
   assert.equal(cancelled, true); // the rest of the stream is still released, not left hanging
+});
+
+test("ensureOk passes an ok response through and otherwise cancels the body and throws FetchError('<label> <status>')", async () => {
+  const ok = new Response("fine");
+  assert.equal(await ensureOk(ok, "github"), ok);
+  let cancelled = false;
+  const gone = new Response(new ReadableStream({ cancel: () => void (cancelled = true) }), { status: 404 });
+  await assert.rejects(() => ensureOk(gone, "github"), (error: unknown) => error instanceof FetchError && error.message === "github 404");
+  assert.equal(cancelled, true);
+});
+
+test("apiFetch sends this app's user agent and keeps the caller's own headers", async () => {
+  let headers: Record<string, string> = {};
+  const restore = mockFetch(async (_url, init) => {
+    headers = init?.headers as Record<string, string>;
+    return new Response("ok");
+  });
+  try {
+    await apiFetch("https://api.github.com/x", { headers: { accept: "application/json" } });
+    assert.deepEqual(headers, { "user-agent": USER_AGENT, accept: "application/json" });
+  } finally {
+    restore();
+  }
 });

@@ -16,9 +16,11 @@ import {
   mapLimited,
   parseId,
   parseSubmittedUrl,
+  publishedDate,
   publishedLabel,
   safeNext,
   slugify,
+  videoFromUrl,
   xmlText,
   xStatusId,
   youtubeId,
@@ -72,6 +74,16 @@ test("parseSubmittedUrl rejects internal and non-http targets", () => {
   assert.equal(parseSubmittedUrl("https://example.com/a#frag")?.toString(), "https://example.com/a");
   for (const bad of ["ftp://x.com", "http://localhost:3000", "http://127.0.0.1", "http://192.168.1.2", "http://[::1]/", "not a url", "http://intranet"]) {
     assert.equal(parseSubmittedUrl(bad), null, bad);
+  }
+});
+
+test("parseSubmittedUrl applies isPrivateAddress to IPv4 literals only", () => {
+  for (const bad of ["http://100.64.0.1/", "http://224.0.0.1/", "http://0x7f.1/"]) {
+    assert.equal(parseSubmittedUrl(bad), null, bad);
+  }
+  // Hostnames that start like private IPv6 prefixes (ff, fd, fe8) are ordinary sites.
+  for (const good of ["https://ffmpeg.org/", "https://fdroid.org/", "https://fe80.example.com/", "https://10.example.com/"]) {
+    assert.ok(parseSubmittedUrl(good), good);
   }
 });
 
@@ -197,4 +209,30 @@ test("mapLimited stops dispatching new items once one has failed, without cancel
   // checking what actually got dispatched, or this assertion would pass even without the guard.
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.deepEqual(started, [0, 1]); // 2, 3, 4, 5 were never dispatched once item 1 failed
+});
+
+test("publishedDate keeps a stated calendar date instead of reinterpreting its timezone", () => {
+  // A UTC-negative offset converts to a later UTC date; the source's own YYYY-MM-DD must win.
+  assert.equal(publishedDate("2026-09-20T23:30:00-05:00"), "2026-09-20");
+  assert.equal(publishedDate("2026-09-20T10:00:00Z"), "2026-09-20");
+  assert.equal(publishedDate("2026-09-20"), "2026-09-20");
+  assert.equal(publishedDate("March 3, 2026 UTC"), "2026-03-03"); // a non-ISO format still needs Date parsing
+  assert.equal(publishedDate("not a date"), null);
+  assert.equal(publishedDate(undefined), null);
+});
+
+test("publishedDate rejects a YYYY-MM-DD prefix that isn't a real calendar date", () => {
+  // posts.published_at is a Postgres date column; any of these would fail that write and lose the post.
+  assert.equal(publishedDate("0000-00-00T00:00:00Z"), null);
+  assert.equal(publishedDate("2026-13-01"), null); // month 13
+  assert.equal(publishedDate("2026-02-30"), null); // Date would silently roll this over to March 2
+});
+
+test("videoFromUrl recognises YouTube and Vimeo player embeds, resolving against the page", () => {
+  const base = "https://blog.test/post";
+  assert.deepEqual(videoFromUrl("//www.youtube.com/embed/dQw4w9WgXcQ", base), { provider: "youtube", videoId: "dQw4w9WgXcQ" });
+  assert.deepEqual(videoFromUrl("https://player.vimeo.com/video/76979871?h=abc", base), { provider: "vimeo", videoId: "76979871" });
+  for (const other of ["https://vimeo.com/76979871", "https://ads.test/frame", "/embed/dQw4w9WgXcQ", "http://[bad"]) {
+    assert.equal(videoFromUrl(other, base), null, other);
+  }
 });

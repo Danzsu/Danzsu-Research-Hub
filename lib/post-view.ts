@@ -1,6 +1,6 @@
 import { parseBlocks, plainText, type Block, type ImageBlock } from "./blocks.ts";
 import { isMediaKey, mediaUrl, variantPath } from "./media.ts";
-import type { SourceKind } from "./pipeline/util.ts";
+import { isValidYoutubeId, type SourceKind } from "./pipeline/util.ts";
 
 // Pure helpers for the post page and its renderer. Kept framework-free (no React, no
 // server-only imports) so `node --test` can load them directly and post-blocks.tsx stays thin.
@@ -24,7 +24,6 @@ export function parseTranslatedBlocks(raw: unknown): Block[] | null {
   return parsed.length > 0 ? parsed : null;
 }
 
-export const isValidYoutubeId = (id: string): boolean => /^[A-Za-z0-9_-]{11}$/.test(id);
 export const isValidVimeoId = (id: string): boolean => /^\d+$/.test(id);
 
 /** Only a data: URL of an image the pipeline itself produces — never `svg` (stored-XSS risk elsewhere in the pipeline). */

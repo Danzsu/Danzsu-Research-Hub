@@ -1,5 +1,5 @@
 import { assignIds, plainText, type BlockDraft } from "../../blocks.ts";
-import { cancelBody, FetchError, githubHeaders } from "../fetch.ts";
+import { apiFetch, cancelBody, ensureOk, FetchError, githubHeaders } from "../fetch.ts";
 import { htmlToDrafts } from "../html-to-blocks.ts";
 import type { ImageResolver } from "../html-images.ts";
 import { githubRepo } from "../util.ts";
@@ -47,16 +47,12 @@ export const extractGithub: Extractor = async (_db, url) => {
   if (!repo) throw new Error("not a GitHub repository URL");
   const api = `https://api.github.com/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`;
 
-  const infoResponse = await fetch(api, { headers: githubHeaders("application/vnd.github+json"), signal: AbortSignal.timeout(20_000) });
-  if (!infoResponse.ok) {
-    await cancelBody(infoResponse);
-    throw new FetchError(`github ${infoResponse.status}`);
-  }
+  const infoResponse = await ensureOk(await apiFetch(api, { headers: githubHeaders("application/vnd.github+json") }), "github");
   const info = (await infoResponse.json()) as RepoInfo;
 
   // Only a 404 means "this repo has no README" — any other failure (403 rate limit, 502, …) must
   // fail the whole extraction so the article fallback runs, not silently produce a README-less post.
-  const readmeResponse = await fetch(`${api}/readme`, { headers: githubHeaders("application/vnd.github.html+json"), signal: AbortSignal.timeout(20_000) });
+  const readmeResponse = await apiFetch(`${api}/readme`, { headers: githubHeaders("application/vnd.github.html+json") });
   let readme = "";
   if (readmeResponse.ok) {
     readme = await readmeResponse.text();

@@ -1,6 +1,6 @@
 // Pure helpers — no framework imports, so `node --test` can load them directly.
 
-export type Week = { id: string; label: string; period: string; compact: string; monday: Date };
+export type Week = { id: string; period: string; compact: string; monday: Date };
 
 /** ISO-8601 week of `date` (UTC). `id` is the issues PK: '2026-W39'. */
 export function isoWeek(date: Date): Week {
@@ -13,7 +13,7 @@ export function isoWeek(date: Date): Week {
   const week = Math.ceil(((d.getTime() - Date.UTC(year, 0, 1)) / 86_400_000 + 1) / 7);
   const ww = String(week).padStart(2, "0");
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return { id: `${year}-W${ww}`, label: `${year} / W${ww}`, period: `${year} / ${month}`, compact: `${year}w${ww}`, monday };
+  return { id: `${year}-W${ww}`, period: `${year} / ${month}`, compact: `${year}w${ww}`, monday };
 }
 
 /** Monday (UTC) of an ISO week id like '2026-W39', or null if the id is malformed or out of range. */
@@ -65,6 +65,8 @@ export function itemId(category: string, week: Week, title: string, url: string)
 
 export type SourceKind = "article" | "youtube" | "arxiv" | "github" | "x" | "pdf";
 
+export const isValidYoutubeId = (id: string): boolean => /^[A-Za-z0-9_-]{11}$/.test(id);
+
 export function youtubeId(url: URL): string | null {
   const host = url.hostname.replace(/^(www|m|music)\./, "");
   let id: string | null | undefined = null;
@@ -73,7 +75,21 @@ export function youtubeId(url: URL): string | null {
     id = url.searchParams.get("v") ?? /^\/(?:shorts|embed|live)\/([\w-]+)/.exec(url.pathname)?.[1];
   }
   if (id === "videoseries") return null; // playlist embed, not a single video
-  return id && /^[\w-]{11}$/.test(id) ? id : null;
+  return id && isValidYoutubeId(id) ? id : null;
+}
+
+/** The embeddable video an iframe `src` points at (YouTube or a Vimeo player), or null. */
+export function videoFromUrl(src: string, baseUrl: string): { provider: "youtube" | "vimeo"; videoId: string } | null {
+  let url: URL;
+  try {
+    url = new URL(src, baseUrl);
+  } catch {
+    return null;
+  }
+  const youtube = youtubeId(url);
+  if (youtube) return { provider: "youtube", videoId: youtube };
+  const vimeo = /(^|\.)player\.vimeo\.com$/.test(url.hostname) && /^\/video\/(\d+)/.exec(url.pathname)?.[1];
+  return vimeo ? { provider: "vimeo", videoId: vimeo } : null;
 }
 
 export function arxivId(url: URL): string | null {
@@ -186,11 +202,9 @@ export function parseSubmittedUrl(raw: string): URL | null {
     host.endsWith(".local") ||
     host.endsWith(".internal") ||
     !host.includes(".") ||
-    /^(127|10|0)\./.test(host) ||
-    /^192\.168\./.test(host) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-    /^169\.254\./.test(host) ||
-    host.startsWith("[")
+    host.startsWith("[") || // every IPv6 literal
+    // IPv4 literals only: isPrivateAddress' IPv6 prefix rules would also match "ffmpeg.org".
+    (/^[\d.]+$/.test(host) && isPrivateAddress(host))
   ) {
     return null;
   }
@@ -214,6 +228,22 @@ export function safeNext(value: unknown): string {
   }
 }
 
+/**
+ * A raw date as YYYY-MM-DD, or null. An ISO-looking prefix is kept only if it is a real calendar
+ * date: `published_at` is a Postgres `date`, and JS's Date silently rolls "2026-02-30" into March.
+ * Anything without that prefix goes through Date.parse, which reads it in UTC.
+ */
+export function publishedDate(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const prefix = /^\d{4}-\d{2}-\d{2}/.exec(raw)?.[0];
+  if (prefix) {
+    const date = new Date(`${prefix}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === prefix ? prefix : null;
+  }
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString().slice(0, 10);
+}
+
 /** Display label for the 96px meta gutter: '09 / 22'. */
 export function publishedLabel(isoDate: string): string {
   const [, month, day] = isoDate.split("-");
@@ -233,6 +263,8 @@ export function xmlText(value: unknown): string {
   if (value && typeof value === "object" && "#text" in value) return xmlText((value as { "#text": unknown })["#text"]);
   return "";
 }
+
+export const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 /** True if any of the given robots-directive strings turns off archiving, case-insensitively. */
 export function hasNoarchive(...values: (string | null | undefined)[]): boolean {

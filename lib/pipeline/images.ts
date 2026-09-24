@@ -3,8 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import type { Block, ImageBlock } from "../blocks.ts";
 import { MEDIA_BUCKET, MEDIA_TYPES, variantPath, type MediaFormat } from "../media.ts";
-import { cancelBody, readLimited, safeFetch } from "./fetch.ts";
-import { mapLimited } from "./util.ts";
+import { ensureOk, readLimited, safeFetch } from "./fetch.ts";
+import { errorMessage, mapLimited } from "./util.ts";
 
 const MAX_IMAGES = 30;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -106,11 +106,10 @@ export async function mirrorImages(
       return;
     }
     try {
-      const response = await safeFetch(image.originalUrl, { accept: "image/avif,image/webp,image/*;q=0.8", timeoutMs: FETCH_TIMEOUT_MS });
-      if (!response.ok) {
-        await cancelBody(response);
-        throw new Error(`not an image (${response.status})`);
-      }
+      const response = await ensureOk(
+        await safeFetch(image.originalUrl, { accept: "image/avif,image/webp,image/*;q=0.8", timeoutMs: FETCH_TIMEOUT_MS }),
+        "image fetch",
+      );
       const raw = await readLimited(response, MAX_BYTES);
       const encoded = await encodeImage(raw);
       if (!encoded) {
@@ -134,7 +133,7 @@ export async function mirrorImages(
         placeholder: encoded.placeholder,
       });
     } catch (error) {
-      console.warn(`image ${image.originalUrl}: ${error instanceof Error ? error.message : error}`);
+      console.warn(`image ${image.originalUrl}: ${errorMessage(error)}`);
       results.set(image.id, { ...image, path: null });
     }
   });

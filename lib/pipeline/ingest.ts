@@ -5,7 +5,7 @@ import { aiCleanup } from "./cleanup.ts";
 import { extract } from "./extract/index.ts";
 import { IMAGE_BUDGET_MS, mirrorImages, unusedMediaPaths } from "./images.ts";
 import { summarize, writeNotes } from "./summary.ts";
-import type { SourceKind } from "./util.ts";
+import { errorMessage, type SourceKind } from "./util.ts";
 
 const MAX_ATTEMPTS = 3;
 
@@ -119,7 +119,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
     await removeUnusedMedia(db, source.id, post.blocks);
     await db.from("sources").update({ status: "done", error: null }).eq("id", id);
   } catch (failure) {
-    const message = failure instanceof Error ? failure.message : String(failure);
+    const message = errorMessage(failure);
     // Once the upsert itself has succeeded, the new post's images are live and referenced — nothing
     // here is orphaned, and cleaning up against a stale read could delete them. Only a failure
     // before that point gets cleanup, and even then not against `previous` (a start-of-run snapshot
@@ -131,7 +131,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
         const current = await currentPostBlocks(db, id);
         if (current) await removeUnusedMedia(db, id, current);
       } catch (cleanupError) {
-        console.warn(`orphaned-media cleanup failed for source ${id}: ${cleanupError instanceof Error ? cleanupError.message : cleanupError}`);
+        console.warn(`orphaned-media cleanup failed for source ${id}: ${errorMessage(cleanupError)}`);
       }
     }
     // `saved` counts too: a post that this very run just wrote is exactly as "already published" as
