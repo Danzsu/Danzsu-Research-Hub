@@ -109,7 +109,11 @@
     - Hugging Face Daily Papers (a közösség által felszavazott napi cikkek)
     - Semantic Scholar és OpenAlex (a Google Scholar helyett: annak nincs API-ja, és a letöltését a feltételei tiltják)
     - Google Research, IBM Research és Microsoft Research blog (a DeepMind már bent van)
-  - Szigorúbb szűrés, hogy ne legyen túl sok: napi keret, minimum pontszám, forrásonkénti limit, és ugyanaz a hír csak egyszer, akárhány forrásból jön.
+  - Szűrés, hogy ne legyen túl sok (döntés, 2026-09-24):
+    - naponta legfeljebb kb. 8 kiemelt tétel, csak 60 pont felett;
+    - a 40–59 pontosak egy összecsukott „Többi” szakaszba kerülnek, és a keresésben is megtalálhatók;
+    - forrásonkénti limit;
+    - ugyanaz a hír csak egyszer jelenik meg, akárhány forrásból jön.
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
