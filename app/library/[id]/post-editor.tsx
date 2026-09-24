@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { PostBlocks } from "@/app/components/post-blocks";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,29 @@ const copy = {
     toggleHidden: "Hide block",
   },
 };
+
+/** A field with its label and its reset-to-the-model's-text button. */
+function FieldRow({ id, label, resetLabel, resetText, onReset, children }: {
+  id: string;
+  label: string;
+  resetLabel: string;
+  resetText: string;
+  onReset: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-1 font-mono text-xs">
+      <div className="flex items-center justify-between gap-2">
+        {/* Beside the label, never inside it: a button inside a <label> becomes the label's control. */}
+        <label htmlFor={id}>{label}</label>
+        <Button type="button" variant="brutal" size="xs" className="min-h-10" aria-label={resetLabel} onClick={onReset}>
+          {resetText}
+        </Button>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export function PostEditor({ post, language, query, videoStart }: { post: Post; language: Language; query: PostQuery; videoStart?: number }) {
   const router = useRouter();
@@ -97,20 +120,13 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
       <div className="grid gap-4 border-2 border-ink bg-paper p-5 sm:grid-cols-2">
         {(["hu", "en"] as const).map((lang) => (
           <div key={lang} className="space-y-3">
-            <div className="space-y-1 font-mono text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <label htmlFor={titleId(lang)}>{t.title} ({lang.toUpperCase()})</label>
-                <Button
-                  type="button"
-                  variant="brutal"
-                  size="xs"
-                  className="min-h-10"
-                  aria-label={t.resetTitle(lang.toUpperCase())}
-                  onClick={() => setTitle({ ...title, [lang]: post.generatedTitle[lang] })}
-                >
-                  {t.original}
-                </Button>
-              </div>
+            <FieldRow
+              id={titleId(lang)}
+              label={`${t.title} (${lang.toUpperCase()})`}
+              resetLabel={t.resetTitle(lang.toUpperCase())}
+              resetText={t.original}
+              onReset={() => setTitle({ ...title, [lang]: post.generatedTitle[lang] })}
+            >
               <Input
                 id={titleId(lang)}
                 value={title[lang]}
@@ -120,21 +136,14 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
                 maxLength={TITLE_MAX}
                 lang={lang}
               />
-            </div>
-            <div className="space-y-1 font-mono text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <label htmlFor={summaryId(lang)}>{t.summary} ({lang.toUpperCase()})</label>
-                <Button
-                  type="button"
-                  variant="brutal"
-                  size="xs"
-                  className="min-h-10"
-                  aria-label={t.resetSummary(lang.toUpperCase())}
-                  onClick={() => setSummary({ ...summary, [lang]: post.generatedSummary[lang] })}
-                >
-                  {t.original}
-                </Button>
-              </div>
+            </FieldRow>
+            <FieldRow
+              id={summaryId(lang)}
+              label={`${t.summary} (${lang.toUpperCase()})`}
+              resetLabel={t.resetSummary(lang.toUpperCase())}
+              resetText={t.original}
+              onReset={() => setSummary({ ...summary, [lang]: post.generatedSummary[lang] })}
+            >
               <Textarea
                 id={summaryId(lang)}
                 value={summary[lang]}
@@ -145,7 +154,7 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
                 maxLength={SUMMARY_MAX}
                 lang={lang}
               />
-            </div>
+            </FieldRow>
           </div>
         ))}
       </div>
