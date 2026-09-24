@@ -54,11 +54,20 @@ test("parseFeed reads Atom entries, choosing the link that is neither rel=self n
     </entry>`);
   const [first, second] = parseFeed(body, feed, since);
   assert.equal(first.url, "https://blog.test/p/1");
-  assert.equal(first.publishedAt, "2026-09-22"); // the feed's own calendar date, not the UTC one
+  assert.equal(first.publishedAt, "2026-09-22");
   assert.equal(first.snippet, "What the paper found.");
   assert.equal(second.url, "https://blog.test/p/2");
   assert.equal(second.publishedAt, "2026-09-23");
   assert.equal(second.snippet, "Body");
+});
+
+test("parseFeed keeps an ISO 8601 date's own calendar day, while an RSS pubDate becomes its UTC day", () => {
+  // Only ISO dates (Atom's published/updated, dc:date) keep the day they were written with. An RFC 822
+  // pubDate has no ISO prefix, so it still goes through Date.parse and lands on the UTC day.
+  const iso = atom(`<entry><title>ISO</title><link href="https://blog.test/iso"/><published>2026-09-22T23:30:00-05:00</published></entry>`);
+  const rfc = rss(`<item><title>RFC</title><link>https://blog.test/rfc</link><pubDate>Tue, 22 Sep 2026 23:30:00 -0500</pubDate></item>`);
+  assert.equal(parseFeed(iso, feed, since)[0].publishedAt, "2026-09-22");
+  assert.equal(parseFeed(rfc, feed, since)[0].publishedAt, "2026-09-23");
 });
 
 test("parseFeed caps the snippet at 400 characters", () => {

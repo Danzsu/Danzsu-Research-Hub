@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { isMediaKey, variantPath } from "../media.ts";
 import { FETCH_TIMEOUT_MS, encodeImage, imageKey, mirrorImages, unusedMediaPaths } from "./images.ts";
-import { mockFetch, TEST_HOST } from "./mock-fetch.ts";
+import { endlessBody, mockFetch, TEST_HOST } from "./mock-fetch.ts";
 import type { Block, ImageBlock } from "../blocks.ts";
 
 const png = (width: number, height: number) =>
@@ -156,12 +156,12 @@ test("mirrorImages drops an image too small to be content", async (t) => {
 
 test("mirrorImages keeps the block with path: null when the download fails, and cancels its body", async (t) => {
   const { db } = fakeStorageDb();
-  let cancelled = false;
-  mockFetch(t, async () => new Response(new ReadableStream({ cancel: () => { cancelled = true; } }), { status: 404 }));
+  const { body, cancelled } = endlessBody();
+  mockFetch(t, async () => new Response(body, { status: 404 }));
   const out = await mirrorImages(db, 1, [image("i1", `${HOST}/missing.png`)]);
   assert.equal(out.length, 1);
   assert.equal((out[0] as ImageBlock).path, null);
-  assert.equal(cancelled, true);
+  assert.equal(cancelled(), true);
 });
 
 test("mirrorImages ignores a wrong content-type and lets sharp sniff the bytes", async (t) => {

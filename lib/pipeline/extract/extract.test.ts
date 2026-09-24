@@ -128,8 +128,8 @@ test("a garbage JSON-LD date does not shadow a valid date Readability found else
   // reader (which requires one) ignores it and falls through to a meta name it recognises that our
   // own readPageMeta doesn't check at all — "parsely-pub-date" — landing on a genuinely valid date.
   // Our readJsonLd (which doesn't require @context) still reads the garbage "yesterday" into
-  // jsonLdPublished; the old `page.published ?? parsed?.publishedTime` chain (page.published
-  // already merged with the JSON-LD date) would have let that garbage win outright.
+  // jsonLdPublished. A plain `??` chain over the candidates would let that garbage win outright;
+  // each candidate is validated in turn instead.
   const head = `<meta name="parsely-pub-date" content="2026-09-20T10:00:00Z">
     <script type="application/ld+json">${JSON.stringify({ "@type": "NewsArticle", datePublished: "yesterday" })}</script>`;
   const result = articleFromHtml(page(head, article), "https://blog.test/p");
@@ -267,7 +267,7 @@ test("extractArxiv resolves an HTML paper's figure against the real (unslashed) 
     return new Response("", { status: 404 });
   });
   const result = await extractArxiv(db, "https://arxiv.org/abs/2401.00001", "");
-  // Forcing a trailing slash on the base (the old bug) would instead give
+  // Forcing a trailing slash on the base would instead give
   // ".../html/2401.00001/2401.00001v1/return_difference.png", which 404s.
   assert.equal(image(result.blocks)?.originalUrl, "https://arxiv.org/html/2401.00001v1/return_difference.png");
 });

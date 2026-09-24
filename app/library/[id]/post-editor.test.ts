@@ -55,12 +55,17 @@ test("PostEditor keeps edit mode in chapter links", () => {
 test("PostEditor labels each title and summary field through for/id, with the reset button outside the label", () => {
   const doc = renderEditor();
   const labels = [...doc.querySelectorAll("label")];
-  assert.equal(labels.length, 4);
-  for (const label of labels) {
+  const targets = labels.map((label) => {
     const field = doc.getElementById(label.getAttribute("for") ?? "");
-    assert.ok(field && ["INPUT", "TEXTAREA"].includes(field.tagName), label.textContent!);
-    assert.equal(label.querySelector("button"), null, label.textContent!);
-  }
+    return [label.textContent, field?.tagName, field?.getAttribute("lang")];
+  });
+  assert.deepEqual(targets, [
+    ["Title (HU)", "INPUT", "hu"],
+    ["Summary (HU)", "TEXTAREA", "hu"],
+    ["Title (EN)", "INPUT", "en"],
+    ["Summary (EN)", "TEXTAREA", "en"],
+  ]);
+  for (const label of labels) assert.equal(label.querySelector("button"), null, label.textContent!);
   const resets = [...doc.querySelectorAll("button")].filter((button) => button.textContent === "Original");
   assert.deepEqual(resets.map((button) => button.getAttribute("aria-label")), [
     "Original title (HU)",

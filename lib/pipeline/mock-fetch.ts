@@ -68,6 +68,21 @@ const setEnv = (name: string, value: string | undefined) => {
   else process.env[name] = value;
 };
 
+/**
+ * A response body that never ends (each pull yields `chunkBytes` more) and records whether it was
+ * cancelled: for pinning that code releases a body it won't read, or stops reading one that's too big.
+ */
+export function endlessBody(chunkBytes = 1024): { body: ReadableStream<Uint8Array>; cancelled: () => boolean } {
+  let cancelled = false;
+  const body = new ReadableStream<Uint8Array>({
+    pull: (controller) => controller.enqueue(new Uint8Array(chunkBytes)),
+    cancel: () => {
+      cancelled = true;
+    },
+  });
+  return { body, cancelled: () => cancelled };
+}
+
 /** Sets (or, with `undefined`, unsets) an environment variable for the rest of test `t`. */
 export function withEnv(t: TestContext, name: string, value: string | undefined): void {
   setEnv(name, value);

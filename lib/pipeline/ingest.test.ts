@@ -269,7 +269,7 @@ test("processSource(): a failure after an image upload removes the orphaned uplo
   assert.ok(typeof failureWrite?.error === "string" && failureWrite.error.length > 0);
 });
 
-test("processSource(): the failure-path media cleanup never re-runs once the post upsert has succeeded, and the saved post keeps its status (probe A1)", async (t) => {
+test("processSource(): the failure-path media cleanup never re-runs once the post upsert has succeeded, and the saved post keeps its status", async (t) => {
   mockDns(t);
   withGeminiKey(t);
   // No <img>, so buildPost never touches storage — the post upsert succeeds cleanly, and the
@@ -333,11 +333,11 @@ test("processSource(): the failure-path cleanup re-reads the current post right 
   assert.deepEqual(db.removedMedia, ["12/aaaaaaaaaaaaaaaa-640.avif"]);
 });
 
-test("processSource(): a posts-lookup error propagates instead of marking the source failed, without ever fetching (lookup errors)", async (t) => {
+test("processSource(): a posts-lookup error propagates instead of marking the source failed, without ever fetching", async (t) => {
   const source = newSource(13, "article", "x");
   const db = fakeDb(undefined, { source, postError: new Error("db down") });
-  // Reverting the fix would fall through into buildPost/extract(); this fails the test instead of a
-  // real request going out, since the lookup error should propagate well before any fetch happens.
+  // Without the early propagation, processSource would fall through into buildPost/extract(); this
+  // handler fails the test instead of letting a real request go out.
   mockFetch(t, () => {
     throw new Error("must not fetch: the posts-lookup error should propagate before extraction starts");
   });

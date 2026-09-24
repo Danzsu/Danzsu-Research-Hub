@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { Block } from "../../blocks.ts";
 import { FetchError } from "../fetch.ts";
 import { fakeDb } from "../fake-db.ts";
-import { geminiResponse, mockFetch, oembedThenBrokenGemini, withEnv, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
+import { endlessBody, geminiResponse, mockFetch, oembedThenBrokenGemini, withEnv, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
 import { extractX, parseTweetHtml } from "./x.ts";
 import { extractYoutube } from "./youtube.ts";
 
@@ -174,11 +174,10 @@ for (const [name, oembed] of oembedWithoutInfo) {
 
 test("extractYoutube cancels the oEmbed response body on a non-ok status instead of leaving it open", async (t) => {
   withGeminiKey(t);
-  let cancelled = false;
-  const body = new ReadableStream({ cancel: () => { cancelled = true; } });
+  const { body, cancelled } = endlessBody();
   mockFetch(t, async (url) => (url.includes("/oembed") ? new Response(body, { status: 403 }) : geminiResponse(noChapters)));
   await extractYoutube(fakeDb(), youtubeUrl, "");
-  assert.equal(cancelled, true);
+  assert.equal(cancelled(), true);
 });
 
 test("extractYoutube returns a metadata-only result when the Gemini call fails, without ever fetching the watch page", async (t) => {
@@ -205,15 +204,15 @@ test("extractYoutube logs a warning with the url and error message when the Gemi
   });
   mockFetch(t, oembedThenBrokenGemini({ title: "A video", author_name: "A Channel" }));
   await extractYoutube(fakeDb(), youtubeUrl, "");
-  // generate() itself also warns once per failed route; extractYoutube's own line (the one this
-  // fix adds) must be among them, naming both the url and the underlying error, not swallowed.
+  // generate() itself also warns once per failed route; extractYoutube's own line must be among
+  // them, naming both the url and the underlying error, not swallowed.
   assert.ok(logged.length >= 1);
   const own = logged.find((line) => line.includes("youtube") && line.includes(youtubeUrl));
   assert.ok(own, `no logged line named both "youtube" and the url; got: ${JSON.stringify(logged)}`);
   assert.match(own, /is not valid JSON|Unexpected token/); // the underlying Gemini/JSON error, not swallowed
 });
 
-test("extractYoutube normalizes a youtu.be link with a timestamp, and sends the watch URL and ingest_video task to Gemini (Y3, Y4, Y5)", async (t) => {
+test("extractYoutube normalizes a youtu.be link with a timestamp, and sends the watch URL and ingest_video task to Gemini", async (t) => {
   withGeminiKey(t);
   const db = fakeDb();
   let oembedUrl = "";

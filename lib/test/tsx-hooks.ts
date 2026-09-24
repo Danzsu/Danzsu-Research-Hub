@@ -2,7 +2,7 @@
 // things a bundler would: resolve `@/` like tsconfig's paths, compile .tsx with the project's own
 // TypeScript, and swap the Next.js modules that need a running app for next-stub.ts.
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
@@ -13,12 +13,12 @@ const root = new URL("../../", import.meta.url);
 const STUBBED = new Set(["next/link", "next/navigation"]);
 const stub = new URL("./next-stub.ts", import.meta.url).href;
 
+const isFile = (url: string) => statSync(fileURLToPath(url), { throwIfNoEntry: false })?.isFile() ?? false;
+
 /** `@/lib/blocks` → the file it names, trying the extensions an extensionless import can mean. */
 function aliasedFile(specifier: string): string | undefined {
   const base = new URL(specifier.slice(2), root).href;
-  return [".ts", ".tsx", "", "/index.ts"]
-    .map((suffix) => base + suffix)
-    .find((url) => !url.endsWith("/") && existsSync(fileURLToPath(url)));
+  return ["", ".ts", ".tsx", "/index.ts", "/index.tsx"].map((suffix) => base + suffix).find(isFile);
 }
 
 export async function resolve(specifier: string, context: unknown, nextResolve: (specifier: string, context: unknown) => Promise<Resolved>): Promise<Resolved> {

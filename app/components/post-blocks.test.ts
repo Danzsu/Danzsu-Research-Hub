@@ -13,8 +13,10 @@ const blocks = assignIds([
   { type: "chapters", items: [{ seconds: 30, title: "Intro" }] },
   { type: "paragraph", content: [{ text: "docs", href: "/doc" }, { text: " and " }, { text: "a trap", href: "javascript:alert(1)" }] },
   { type: "video", provider: "vimeo", videoId: "76979871" },
+  { type: "repo", fullName: "owner/repo", url: "javascript:alert(2)", stars: 1, topics: [] },
+  { type: "image", originalUrl: "javascript:alert(3)", alt: "", path: null },
 ]);
-const [invalidVideo, youtube, , paragraph, vimeo] = blocks;
+const [invalidVideo, youtube, , paragraph, vimeo, repo, missingImage] = blocks;
 
 type Props = Parameters<typeof PostBlocks>[0];
 const renderBlocks = (props: Partial<Props> = {}) => render(createElement(PostBlocks, { blocks, language: "en", baseUrl, ...props }));
@@ -26,6 +28,15 @@ test("PostBlocks links only what safeHref allows, resolved against the post's UR
   const row = wrapper(doc, paragraph)!;
   assert.deepEqual([...row.querySelectorAll("a")].map((a) => a.getAttribute("href")), ["https://blog.test/doc"]);
   assert.equal(row.textContent, "docs and a trap"); // the unsafe span stays, as plain text
+});
+
+test("PostBlocks emits no link that isn't http(s) or an in-page query or fragment, from any block type", () => {
+  for (const doc of [renderBlocks({ hidden: [vimeo.id] }), renderBlocks({ controls })]) {
+    for (const link of doc.querySelectorAll("a")) assert.match(link.getAttribute("href") ?? "", /^(https?:|\?|#)/);
+  }
+  // The unsafe repo URL and image URL still show, as plain text.
+  assert.equal(wrapper(renderBlocks(), repo)!.querySelector("a"), null);
+  assert.match(wrapper(renderBlocks(), missingImage)!.textContent!, /javascript:alert\(3\)/);
 });
 
 test("PostBlocks embeds a video only when its id validates", () => {

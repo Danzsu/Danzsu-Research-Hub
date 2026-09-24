@@ -58,6 +58,8 @@ export type FakeIngestDb = SupabaseClient & {
   rpcCalls: { name: string; args: Record<string, unknown> }[];
   /** Every UPSERT into a table other than `posts` (issues, digest_items, github_top), in call order. */
   upserts: { table: string; values: unknown; options: Record<string, unknown> }[];
+  /** Every `select().gte(column, value)` against a table other than `posts`/`sources`, in call order. */
+  gteCalls: { table: string; column: string; value: unknown }[];
   /** Every write across every table/bucket above, plus any `"fetch"` entries a test's own mockFetch
    *  handler chooses to push (same array — `db.writes`), in the single order it actually happened.
    *  For cross-operation ordering assertions, e.g. "attempts is bumped before the first fetch". */
@@ -130,6 +132,7 @@ export function fakeDb(
   const writes: FakeIngestDb["writes"] = [];
   const rpcCalls: FakeIngestDb["rpcCalls"] = [];
   const upserts: FakeIngestDb["upserts"] = [];
+  const gteCalls: FakeIngestDb["gteCalls"] = [];
   const objects = new Set(tables.media ?? []);
   let postSelectCalls = 0;
 
@@ -235,7 +238,12 @@ export function fakeDb(
         upserts.push({ table, values, options: options ?? {} });
         return { data: null, error: null };
       },
-      select: () => ({ gte: async () => ({ data: tables.rows?.[table] ?? [], error: null }) }),
+      select: () => ({
+        gte: async (column: string, value: unknown) => {
+          gteCalls.push({ table, column, value });
+          return { data: tables.rows?.[table] ?? [], error: null };
+        },
+      }),
     };
   };
 
@@ -285,5 +293,6 @@ export function fakeDb(
     writes,
     rpcCalls,
     upserts,
+    gteCalls,
   } as unknown as FakeIngestDb;
 }

@@ -102,7 +102,7 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
 
   assert.deepEqual(result, { issue: "2026-W39", candidates: 1, shortlisted: 1, inserted: 1, repos: 1 });
   assert.doesNotMatch(prompt, /Known story/);
-  assert.match(prompt, /\[0\] \(research\) Fresh story/);
+  assert.ok(prompt.includes(`[0] (${feeds[0].hint}) Fresh story`));
   assert.deepEqual(db.tasks, ["daily_curate"]); // one candidate is under the shortlist threshold
   const upserted = Object.fromEntries(db.upserts.map((u) => [u.table, u]));
   assert.equal((upserted.issues.values as { id: string }).id, "2026-W39");
@@ -110,5 +110,8 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
   assert.equal(item.url, "https://blog.test/fresh");
   assert.deepEqual(upserted.digest_items.options, { onConflict: "url", ignoreDuplicates: true }); // ids are never rewritten
   assert.deepEqual(upserted.github_top.values, [{ issue_id: "2026-W39", rank: 1, repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool" }]);
+  assert.deepEqual(upserted.github_top.options, { onConflict: "issue_id,rank" }); // a re-run replaces the week's ranking
+  // "Known" means stored in the last 14 days, by creation time.
+  assert.deepEqual(db.gteCalls, [{ table: "digest_items", column: "created_at", value: "2026-09-09T05:00:00.000Z" }]);
   assert.deepEqual(db.rpcCalls, [{ name: "refresh_must_read", args: { p_issue: "2026-W39" } }]);
 });

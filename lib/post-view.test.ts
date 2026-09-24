@@ -26,7 +26,7 @@ test("readMinutes is null for youtube regardless of block content", () => {
 
 test("readMinutes is null for empty or near-empty extractions, not '1 min'", () => {
   assert.equal(readMinutes([], "article"), null); // extractionFailed / 0 blocks
-  assert.equal(readMinutes(assignIds([p("")]), "article"), null); // the "".split bug case
+  assert.equal(readMinutes(assignIds([p("")]), "article"), null); // "".split(/\s+/) is [""], one empty "word"
   assert.equal(readMinutes(assignIds([p("only three words")]), "article"), null);
 });
 

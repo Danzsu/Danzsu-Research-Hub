@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FetchError } from "../fetch.ts";
 import { fakeDb } from "../fake-db.ts";
-import { geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, TEST_IP, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
+import { endlessBody, geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, TEST_IP, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
 import { extract, isHtml, metadataOnly } from "./index.ts";
 
 const db = fakeDb();
@@ -177,11 +177,10 @@ test("isHtml treats a missing content-type, case variation and whitespace before
 
 test("metadataOnly cancels the body of a non-HTML response instead of leaving it open", async (t) => {
   mockDns(t);
-  let cancelled = false;
-  const body = new ReadableStream({ cancel: () => { cancelled = true; } });
+  const { body, cancelled } = endlessBody();
   mockFetch(t, async () => new Response(body, { headers: { "content-type": "application/pdf" } }));
   await metadataOnly(`http://${TEST_IP}/paper.pdf`);
-  assert.equal(cancelled, true);
+  assert.equal(cancelled(), true);
 });
 
 test("metadataOnly builds a title from the URL's filename for a non-HTML response, without reading the body", async (t) => {
@@ -194,13 +193,12 @@ test("metadataOnly builds a title from the URL's filename for a non-HTML respons
   assert.deepEqual(result.blocks, []);
 });
 
-// P1's second symptom: under the 2 MB cap, the old code had no content-type check at all, so the PDF
-// bytes were parsed as (garbage) HTML and the title silently fell back to the URL.
+// Under the 2 MB cap too, a PDF must never be parsed as (garbage) HTML, which would leave the URL as the title.
 test("metadataOnly names a small non-HTML response by its filename too, not by parsing it as HTML", async (t) => {
   mockDns(t);
   mockFetch(t, async () => new Response("%PDF-1.4", { headers: { "content-type": "application/pdf" } }));
   const result = await metadataOnly(`http://${TEST_IP}/paper.pdf`);
-  assert.equal(result.title, "paper.pdf"); // not the URL — the old bug's symptom
+  assert.equal(result.title, "paper.pdf"); // not the URL
 });
 
 test("metadataOnly falls back to the URL itself when a non-HTML response has no path segment to name it by", async (t) => {

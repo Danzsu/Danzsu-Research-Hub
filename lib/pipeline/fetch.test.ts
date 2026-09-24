@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import dns from "node:dns/promises";
 import { test, type TestContext } from "node:test";
 import { apiFetch, ensureOk, FetchError, readLimited, safeFetch, USER_AGENT } from "./fetch.ts";
-import { mockFetch, TEST_HOST } from "./mock-fetch.ts";
+import { endlessBody, mockFetch, TEST_HOST } from "./mock-fetch.ts";
 
 // A public IP literal: dns.lookup() resolves it locally without a real DNS query, so these
 // run offline. The mocked global fetch stands in for the actual network hop.
@@ -83,41 +83,33 @@ test("safeFetch treats a malformed redirect Location as blocked, not a crash", a
 });
 
 test("safeFetch cancels the body of an intermediate redirect response", async (t) => {
-  let cancelled = false;
+  const hopBody = endlessBody();
   let hop = 0;
   mockFetch(t, async () => {
     hop++;
-    if (hop === 1) return new Response(new ReadableStream({ cancel: () => { cancelled = true; } }), { status: 302, headers: { location: `${PUB}/b` } });
+    if (hop === 1) return new Response(hopBody.body, { status: 302, headers: { location: `${PUB}/b` } });
     return new Response("ok");
   });
   const response = await safeFetch(`${PUB}/a`);
   assert.equal(await response.text(), "ok");
-  assert.equal(cancelled, true);
+  assert.equal(hopBody.cancelled(), true);
 });
 
 test("readLimited cancels the body when the declared content-length exceeds the limit", async () => {
-  let cancelled = false;
-  const body = new ReadableStream({
-    pull: (controller) => controller.enqueue(new Uint8Array(10)),
-    cancel: () => { cancelled = true; },
-  });
+  const { body, cancelled } = endlessBody(10);
   const response = new Response(body, { headers: { "content-length": String(10 * 1024 * 1024) } });
   await assert.rejects(() => readLimited(response, 5 * 1024 * 1024), /larger than/);
-  assert.equal(cancelled, true);
+  assert.equal(cancelled(), true);
 });
 
 test("readLimited rejects a body that outgrows a lying content-length, and cancels the stream", async () => {
   // A stream fully buffered-and-closed before the limit check runs has already reached the
   // spec's terminal "closed" state, where cancel() is a no-op — so this stays open via pull(),
   // still mid-flight when the size cap trips.
-  let cancelled = false;
-  const body = new ReadableStream({
-    pull: (controller) => controller.enqueue(new Uint8Array(1024 * 1024)),
-    cancel: () => { cancelled = true; },
-  });
+  const { body, cancelled } = endlessBody(1024 * 1024);
   const response = new Response(body, { headers: { "content-length": "10" } });
   await assert.rejects(() => readLimited(response, 5 * 1024 * 1024), /larger than/);
-  assert.equal(cancelled, true);
+  assert.equal(cancelled(), true);
 });
 
 test("readLimited wraps a mid-stream read failure as FetchError", async () => {
@@ -138,25 +130,20 @@ test("readLimited wraps an aborted read as FetchError", async () => {
 });
 
 test("readLimited with `truncate` returns the prefix read so far instead of throwing, on both a lying content-length and an oversized stream", async () => {
-  let cancelled = false;
-  const body = new ReadableStream({
-    pull: (controller) => controller.enqueue(new Uint8Array(1024 * 1024)),
-    cancel: () => { cancelled = true; },
-  });
+  const { body, cancelled } = endlessBody(1024 * 1024);
   // A declared content-length far over the limit would normally reject before a single byte is read.
   const response = new Response(body, { headers: { "content-length": String(10 * 1024 * 1024) } });
   const result = await readLimited(response, 2 * 1024 * 1024, { truncate: true });
   assert.ok(result.length > 0 && result.length <= 2 * 1024 * 1024);
-  assert.equal(cancelled, true); // the rest of the stream is still released, not left hanging
+  assert.equal(cancelled(), true); // the rest of the stream is still released, not left hanging
 });
 
 test("ensureOk passes an ok response through and otherwise cancels the body and throws FetchError('<label> <status>')", async () => {
   const ok = new Response("fine");
   assert.equal(await ensureOk(ok, "github"), ok);
-  let cancelled = false;
-  const gone = new Response(new ReadableStream({ cancel: () => void (cancelled = true) }), { status: 404 });
-  await assert.rejects(() => ensureOk(gone, "github"), (error: unknown) => error instanceof FetchError && error.message === "github 404");
-  assert.equal(cancelled, true);
+  const { body, cancelled } = endlessBody();
+  await assert.rejects(() => ensureOk(new Response(body, { status: 404 }), "github"), (error: unknown) => error instanceof FetchError && error.message === "github 404");
+  assert.equal(cancelled(), true);
 });
 
 test("apiFetch sends this app's user agent and keeps the caller's own headers", async (t) => {
