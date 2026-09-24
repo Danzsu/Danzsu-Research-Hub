@@ -105,7 +105,9 @@ export async function mirrorImages(
       results.set(image.id, { ...image, path: old.path, format: old.format, widths: old.widths, width: old.width, height: old.height, placeholder: old.placeholder });
       return;
     }
-    if (Date.now() > deadline) {
+    // >= , not >: with a zero (or already-exhausted) budget, `deadline` can equal "now" to the
+    // millisecond, and a strict > would let the download start anyway on a lucky tick.
+    if (Date.now() >= deadline) {
       results.set(image.id, { ...image, path: null });
       return;
     }

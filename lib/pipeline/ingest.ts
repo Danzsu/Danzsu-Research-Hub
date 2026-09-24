@@ -14,10 +14,12 @@ const MAX_ATTEMPTS = 3;
 // and running the prompt on them risks dropping real content instead.
 const AI_CLEANUP_KINDS: ReadonlySet<SourceKind> = new Set(["article", "github", "arxiv"]);
 
-// retryPendingSources' own "don't start one more source" gate: a Gemini call's worst-case
-// latency (its fallback route retried once more), so starting this close to the deadline would
-// likely be killed mid-flight instead of finishing.
-const START_GATE_RESERVE_MS = 120_000;
+// retryPendingSources' own "don't start one more source" gate. A single model task's true worst
+// case is up to 2×120s (main route, then its one fallback — see retryPendingSources' own ponytail
+// note below); this reserve is deliberately smaller than that, so it doesn't just refuse to ever
+// start the last source in a batch — a source that does hit the full worst case can still outlive
+// `deadline` regardless.
+export const START_GATE_RESERVE_MS = 120_000;
 
 // The image budget's own reserve, held back for the summarize() call that follows mirrorImages
 // inside buildPost. Sized for the *typical* case, not the worst case above: reserving the full
@@ -37,6 +39,16 @@ export async function removeUnusedMedia(db: SupabaseClient, sourceId: number, bl
   const { data } = await db.storage.from(MEDIA_BUCKET).list(String(sourceId), { limit: 1000 });
   const unused = unusedMediaPaths((data ?? []).map((object) => `${sourceId}/${object.name}`), blocks);
   if (unused.length) await db.storage.from(MEDIA_BUCKET).remove(unused);
+}
+
+/** A fresh read of a source's current post blocks, taken right before failure-path media cleanup —
+ *  not the start-of-run snapshot, which a concurrent run could have moved past by publishing new
+ *  images since. `null` means the read itself failed; the caller skips cleanup rather than risk
+ *  deleting images a fresher (unseen) post still references. */
+async function currentPostBlocks(db: SupabaseClient, sourceId: number): Promise<Block[] | null> {
+  const { data, error } = await db.from("posts").select("blocks").eq("source_id", sourceId).maybeSingle();
+  if (error) return null;
+  return data ? parseBlocks(data.blocks) : [];
 }
 
 /** The image budget for a source whose processing must fit before `deadline` (epoch ms), leaving
@@ -94,6 +106,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
   const { data: existing, error: existingError } = await db.from("posts").select("id, blocks").eq("source_id", id).maybeSingle();
   if (existingError) throw existingError;
   const previous = existing ? parseBlocks(existing.blocks) : [];
+  let saved = false;
 
   try {
     const post = await buildPost(db, source, previous, options.deadline);
@@ -102,17 +115,24 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
       { onConflict: "source_id" },
     );
     if (saveError) throw saveError;
+    saved = true;
     await removeUnusedMedia(db, source.id, post.blocks);
     await db.from("sources").update({ status: "done", error: null }).eq("id", id);
   } catch (failure) {
     const message = failure instanceof Error ? failure.message : String(failure);
-    // Anything this failed attempt uploaded (the post itself was never saved) is orphaned: nothing
-    // in `previous` — the still-valid prior post, `[]` if there is none — references it. A failure
-    // in this cleanup itself is logged, never allowed to overwrite the real failure message below.
-    try {
-      await removeUnusedMedia(db, id, previous);
-    } catch (cleanupError) {
-      console.warn(`orphaned-media cleanup failed for source ${id}: ${cleanupError instanceof Error ? cleanupError.message : cleanupError}`);
+    // Once the upsert itself has succeeded, the new post's images are live and referenced — nothing
+    // here is orphaned, and cleaning up against a stale read could delete them. Only a failure
+    // before that point gets cleanup, and even then not against `previous` (a start-of-run snapshot
+    // a concurrent run could have moved past) but a fresh read of what's live right now; a failed
+    // re-read just skips cleanup rather than risk deleting images a fresher post still references.
+    // A failure in this cleanup itself is logged, never allowed to overwrite the message below.
+    if (!saved) {
+      try {
+        const current = await currentPostBlocks(db, id);
+        if (current) await removeUnusedMedia(db, id, current);
+      } catch (cleanupError) {
+        console.warn(`orphaned-media cleanup failed for source ${id}: ${cleanupError instanceof Error ? cleanupError.message : cleanupError}`);
+      }
     }
     await db.from("sources").update(failureUpdate(Boolean(existing), message)).eq("id", id);
   }

@@ -102,7 +102,7 @@ test("unusedMediaPaths keeps every variant still referenced", () => {
 const HOST = TEST_HOST;
 const image = (id: string, url: string): Block => ({ id, type: "image", originalUrl: url, alt: "", path: null });
 
-function fakeDb(fail: (path: string) => boolean = () => false) {
+function fakeStorageDb(fail: (path: string) => boolean = () => false) {
   const uploads: { path: string; bytes: number }[] = [];
   const db = {
     storage: {
@@ -118,7 +118,7 @@ function fakeDb(fail: (path: string) => boolean = () => false) {
 }
 
 test("mirrorImages applies the 30-image cap before any download starts", async () => {
-  const { db } = fakeDb();
+  const { db } = fakeStorageDb();
   let fetches = 0;
   const restore = mockFetch(async () => {
     fetches++;
@@ -135,7 +135,7 @@ test("mirrorImages applies the 30-image cap before any download starts", async (
 });
 
 test("mirrorImages reuses a previously mirrored image by URL without re-fetching", async () => {
-  const { db } = fakeDb();
+  const { db } = fakeStorageDb();
   let fetches = 0;
   const restore = mockFetch(async () => {
     fetches++;
@@ -156,7 +156,7 @@ test("mirrorImages reuses a previously mirrored image by URL without re-fetching
 });
 
 test("mirrorImages drops an image too small to be content", async () => {
-  const { db } = fakeDb();
+  const { db } = fakeStorageDb();
   const restore = mockFetch(async () => new Response(await png(32, 32), { headers: { "content-type": "image/png" } }));
   try {
     const out = await mirrorImages(db, 1, [image("i1", `${HOST}/icon.png`)]);
@@ -167,7 +167,7 @@ test("mirrorImages drops an image too small to be content", async () => {
 });
 
 test("mirrorImages keeps the block with path: null when the download fails, and cancels its body", async () => {
-  const { db } = fakeDb();
+  const { db } = fakeStorageDb();
   let cancelled = false;
   const restore = mockFetch(async () => new Response(new ReadableStream({ cancel: () => { cancelled = true; } }), { status: 404 }));
   try {
@@ -181,7 +181,7 @@ test("mirrorImages keeps the block with path: null when the download fails, and 
 });
 
 test("mirrorImages ignores a wrong content-type and lets sharp sniff the bytes", async () => {
-  const { db, uploads } = fakeDb();
+  const { db, uploads } = fakeStorageDb();
   const restore = mockFetch(async () => new Response(await png(200, 150), { headers: { "content-type": "binary/octet-stream" } }));
   try {
     const out = await mirrorImages(db, 1, [image("i1", `${HOST}/data.bin`)]);
@@ -193,7 +193,7 @@ test("mirrorImages ignores a wrong content-type and lets sharp sniff the bytes",
 });
 
 test("mirrorImages drops images past its time budget without fetching them", async () => {
-  const { db } = fakeDb();
+  const { db } = fakeStorageDb();
   let fetches = 0;
   const restore = mockFetch(async () => {
     fetches++;
@@ -212,8 +212,27 @@ test("mirrorImages drops images past its time budget without fetching them", asy
   }
 });
 
+test("mirrorImages with budgetMs: 0 starts no downloads at all (fix round 2, item 7)", async () => {
+  const { db } = fakeStorageDb();
+  let fetches = 0;
+  const restore = mockFetch(async () => {
+    fetches++;
+    return new Response(await png(200, 150), { headers: { "content-type": "image/png" } });
+  });
+  try {
+    const blocks = Array.from({ length: 4 }, (_, i) => image(`i${i}`, `${HOST}/${i}.png`));
+    const out = await mirrorImages(db, 1, blocks, [], { budgetMs: 0 });
+    const images = out.filter((b) => b.type === "image") as ImageBlock[];
+    assert.equal(fetches, 0); // a zero (or already-exhausted) budget must not start even the first download
+    assert.equal(images.length, 4);
+    assert.ok(images.every((b) => b.path === null));
+  } finally {
+    restore();
+  }
+});
+
 test("mirrorImages keys uploaded variants by the downloaded bytes, not the URL", async () => {
-  const { db, uploads } = fakeDb();
+  const { db, uploads } = fakeStorageDb();
   const bytes = await png(200, 150);
   // Two different URLs, byte-identical response: a URL-derived key would give them different paths.
   const restore = mockFetch(async () => new Response(bytes, { headers: { "content-type": "image/png" } }));
@@ -232,7 +251,7 @@ test("mirrorImages keys uploaded variants by the downloaded bytes, not the URL",
 });
 
 test("mirrorImages bounds each download with its own fetch timeout", async () => {
-  const { db } = fakeDb();
+  const { db } = fakeStorageDb();
   const seenTimeouts: number[] = [];
   const realTimeout = AbortSignal.timeout;
   // safeFetch calls AbortSignal.timeout(init.timeoutMs ?? 20_000); spying on it pins the exact

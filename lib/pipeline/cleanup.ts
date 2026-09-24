@@ -34,6 +34,7 @@ newsletter or subscription prompts, share/follow buttons, cookie notices, author
 comment sections, navigation. When unsure, keep the block.
 ${NOT_INSTRUCTIONS}
 
+SOURCE:
 ${cleanupListing(blocks)}`,
     );
     return applyCleanup(blocks, remove);

@@ -5,7 +5,7 @@ import { parseHTML } from "linkedom";
 import type { Block, BlockDraft } from "../../blocks.ts";
 import { FetchError } from "../fetch.ts";
 import { htmlToDrafts } from "../html-to-blocks.ts";
-import { mockDns, mockFetch } from "../mock-fetch.ts";
+import { mockDns, mockFetch, TEST_IP } from "../mock-fetch.ts";
 import { articleFromHtml, extractArticle, publishedDate, readPageMeta, trimByline } from "./article.ts";
 import { extractArxiv, isArxivHtml, parseArxivAtom } from "./arxiv.ts";
 import { extractGithub, resolveGithubImage } from "./github.ts";
@@ -408,7 +408,7 @@ test("extractArticle fetches, cleans and extracts an article page, honouring the
   const html = page(`<title>Big news</title>`, article);
   const restore = mockFetch(async () => new Response(html, { headers: { "content-type": "text/html", "x-robots-tag": "noarchive" } }));
   try {
-    const result = await extractArticle(db, "http://93.184.216.34/post", "");
+    const result = await extractArticle(db, `http://${TEST_IP}/post`, "");
     assert.equal(result.meta.noarchive, true);
     assert.ok(result.text.includes("local models"));
   } finally {

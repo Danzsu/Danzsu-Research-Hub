@@ -29,20 +29,27 @@ test("applyCleanup refuses to remove 2 of 4 blocks (half+1 boundary, M23)", () =
   assert.equal(applyCleanup(four, [four[0].id, four[1].id]).length, 4);
 });
 
-// M24: below the (now 4-block) minimum, aiCleanup makes no model call at all — not even a broken one.
-test("aiCleanup makes no model call below the minimum block count (M24)", async () => {
-  const three = paragraphs(3, "r");
+// M24/M24b: exactly at the boundary. Both need an ambient key — without one, `generate()` never
+// fetches regardless of the block-count guard, and the "no call" half would pass for the wrong reason.
+test("aiCleanup makes no model call below the minimum block count, and exactly one at it (M24/M24b)", async () => {
+  const restoreKey = withGeminiKey();
   let calls = 0;
   const restore = mockFetch(async () => {
     calls++;
     return geminiResponse({ remove: [] });
   });
   try {
+    const three = paragraphs(3, "r");
     const result = await aiCleanup(fakeDb(), three);
     assert.equal(calls, 0);
     assert.deepEqual(result, three);
+
+    const four = paragraphs(4, "t");
+    await aiCleanup(fakeDb(), four);
+    assert.equal(calls, 1);
   } finally {
     restore();
+    restoreKey();
   }
 });
 

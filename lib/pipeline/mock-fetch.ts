@@ -178,22 +178,25 @@ export function fakeDb(
 
   const storage = {
     from: () => ({
+      // `writes` records the attempt before the storageError check in all three: a caller that
+      // swallows this failure (e.g. skips cleanup once the post is already saved) should still be
+      // distinguishable, by call count, from one that let the attempt through and it just failed.
       list: async () => {
-        if (tables.storageError) throw new Error("storage down");
         writes.push("storage.list");
+        if (tables.storageError) throw new Error("storage down");
         return { data: [...objects].map((name) => ({ name })), error: null };
       },
       upload: async (path: string) => {
+        writes.push("storage.upload");
         if (tables.storageError) throw new Error("storage down");
         objects.add(bareObjectName(path));
-        writes.push("storage.upload");
         return { data: { path }, error: null };
       },
       remove: async (paths: string[]) => {
+        writes.push("storage.remove");
         if (tables.storageError) throw new Error("storage down");
         for (const path of paths) objects.delete(bareObjectName(path));
         removedMedia.push(...paths);
-        writes.push("storage.remove");
         return { data: null, error: null };
       },
     }),

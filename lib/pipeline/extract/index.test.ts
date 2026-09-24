@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FetchError } from "../fetch.ts";
-import { fakeDb, geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
+import { fakeDb, geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, TEST_IP, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
 import { extract, isHtml, metadataOnly } from "./index.ts";
 
 const db = fakeDb();
@@ -30,7 +30,7 @@ test("extract() rethrows FetchError for kind='article' instead of falling back t
     return new Response("", { status: 500 });
   });
   try {
-    await assert.rejects(() => extract(db, "article", "http://93.184.216.34/post", ""), FetchError);
+    await assert.rejects(() => extract(db, "article", `http://${TEST_IP}/post`, ""), FetchError);
     assert.equal(calls, 1); // only the one failed article fetch — metadataOnly was never tried
   } finally {
     restore();
@@ -47,7 +47,7 @@ test("extract() never re-runs extractArticle as its own fallback for kind='artic
     return new Response(tinyHtml, { headers: { "content-type": "text/html" } });
   });
   try {
-    const result = await extract(db, "article", "http://93.184.216.34/post", "");
+    const result = await extract(db, "article", `http://${TEST_IP}/post`, "");
     assert.equal(calls, 2); // extractArticle's own attempt + metadataOnly — never a second extractArticle attempt
     assert.equal(result.meta.extractionFailed, true);
   } finally {
@@ -80,7 +80,7 @@ test("extract() skips the article fallback for pdf and reaches metadata-only aft
   const bigPdf = () => new Response(`%PDF-1.4\n${"A".repeat(2 * 1024 * 1024 + 1024)}`, { headers: { "content-type": "application/pdf" } });
   const restore = mockFetch(brokenGeminiHandler(counters, () => bigPdf()));
   try {
-    const result = await extract(db, "pdf", "http://93.184.216.34/paper.pdf", "");
+    const result = await extract(db, "pdf", `http://${TEST_IP}/paper.pdf`, "");
     assert.equal(counters.gemini, 1);
     assert.equal(counters.other, 2); // extractPdf's fetch + metadataOnly's — an article-fallback attempt would make it 3
     assert.equal(result.meta.extractionFailed, true);
@@ -280,7 +280,7 @@ test("metadataOnly cancels the body of a non-HTML response instead of leaving it
   const body = new ReadableStream({ cancel: () => { cancelled = true; } });
   const restore = mockFetch(async () => new Response(body, { headers: { "content-type": "application/pdf" } }));
   try {
-    await metadataOnly("http://93.184.216.34/paper.pdf");
+    await metadataOnly(`http://${TEST_IP}/paper.pdf`);
     assert.equal(cancelled, true);
   } finally {
     restore();
@@ -292,9 +292,9 @@ test("metadataOnly builds a title from the URL's filename for a non-HTML respons
   mockDns(t);
   const restore = mockFetch(async () => new Response("A".repeat(3_000_000), { headers: { "content-type": "image/png" } }));
   try {
-    const result = await metadataOnly("http://93.184.216.34/reports/annual%20report.png");
+    const result = await metadataOnly(`http://${TEST_IP}/reports/annual%20report.png`);
     assert.equal(result.title, "annual report.png");
-    assert.equal(result.siteName, "93.184.216.34");
+    assert.equal(result.siteName, TEST_IP);
     assert.equal(result.meta.extractionFailed, true);
     assert.deepEqual(result.blocks, []);
   } finally {
@@ -308,7 +308,7 @@ test("metadataOnly names a small non-HTML response by its filename too, not by p
   mockDns(t);
   const restore = mockFetch(async () => new Response("%PDF-1.4", { headers: { "content-type": "application/pdf" } }));
   try {
-    const result = await metadataOnly("http://93.184.216.34/paper.pdf");
+    const result = await metadataOnly(`http://${TEST_IP}/paper.pdf`);
     assert.equal(result.title, "paper.pdf"); // not the URL — the old bug's symptom
   } finally {
     restore();
@@ -319,8 +319,8 @@ test("metadataOnly falls back to the URL itself when a non-HTML response has no 
   mockDns(t);
   const restore = mockFetch(async () => new Response("binary", { headers: { "content-type": "application/octet-stream" } }));
   try {
-    const result = await metadataOnly("http://93.184.216.34/");
-    assert.equal(result.title, "http://93.184.216.34/");
+    const result = await metadataOnly(`http://${TEST_IP}/`);
+    assert.equal(result.title, `http://${TEST_IP}/`);
   } finally {
     restore();
   }
@@ -332,7 +332,7 @@ test("metadataOnly reads a bounded HTML prefix instead of throwing when the page
   const html = `<!doctype html><html>${head}<body>${"x".repeat(3_000_000)}</body></html>`;
   const restore = mockFetch(async () => new Response(html, { headers: { "content-type": "text/html" } }));
   try {
-    const result = await metadataOnly("http://93.184.216.34/big-page");
+    const result = await metadataOnly(`http://${TEST_IP}/big-page`);
     assert.equal(result.title, "Big page");
     assert.ok(result.text.includes("Still readable."));
   } finally {

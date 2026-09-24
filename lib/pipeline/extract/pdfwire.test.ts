@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeDb, geminiResponse, mockFetch, withGeminiKey } from "../mock-fetch.ts";
+import { fakeDb, geminiResponse, mockFetch, TEST_IP, withGeminiKey } from "../mock-fetch.ts";
 import { extractArticle } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
 
@@ -16,7 +16,7 @@ for (const [name, run] of [["extractPdf", extractPdf], ["extractArticle pdf bran
     try {
       let restore = mockFetch(handler("googlebot: noarchive"));
       try {
-        const result = await run(db, "http://93.184.216.34/paper.pdf", "");
+        const result = await run(db, `http://${TEST_IP}/paper.pdf`, "");
         assert.equal(result.meta.noarchive, true);
         assert.equal(result.author, null); // the model's "  " (whitespace-only) author must become null, not ""
       } finally {
@@ -24,7 +24,7 @@ for (const [name, run] of [["extractPdf", extractPdf], ["extractArticle pdf bran
       }
       restore = mockFetch(handler(null));
       try {
-        assert.equal((await run(db, "http://93.184.216.34/paper.pdf", "")).meta.noarchive, undefined);
+        assert.equal((await run(db, `http://${TEST_IP}/paper.pdf`, "")).meta.noarchive, undefined);
       } finally {
         restore();
       }
