@@ -1,6 +1,6 @@
 import { parseHTML } from "linkedom";
 import { assignIds, inlineText, type BlockDraft, type Inline } from "../../blocks.ts";
-import { cancelBody, FetchError } from "../fetch.ts";
+import { cancelBody, FetchError, readJsonObject } from "../fetch.ts";
 import { inlineSpans } from "../html-to-blocks.ts";
 import type { Extractor } from "./types.ts";
 
@@ -50,7 +50,9 @@ export const extractX: Extractor = async (_db, url) => {
     await cancelBody(response);
     throw new FetchError(`x oembed ${response.status}`);
   }
-  const data = (await response.json()) as { author_name?: string; html?: string };
+  const parsed = await readJsonObject(response);
+  if (!parsed) throw new FetchError("x oembed returned no post");
+  const data = parsed as { author_name?: string; html?: string };
   const post = parseTweetHtml(data.html ?? "");
   if (!post.text) throw new FetchError("x post has no text");
   const author = data.author_name ?? null;

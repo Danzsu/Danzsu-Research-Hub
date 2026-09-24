@@ -108,3 +108,19 @@ export async function readLimited(response: Response, limit: number, options: { 
 
 export const readText = async (response: Response, limit: number, options?: { truncate?: boolean }) =>
   new TextDecoder().decode(await readLimited(response, limit, options));
+
+/**
+ * Parses a response body as JSON, returning it only if it's a plain object — never `null`, an array,
+ * or a primitive, and never throws: a non-JSON body (or any other read failure) also becomes `null`.
+ * An oEmbed 200 can legitimately answer with any of those instead of the expected `{ ... }`; a caller
+ * that blindly reads a field off the raw parse result turns that into a TypeError or silent `undefined`.
+ */
+export async function readJsonObject(response: Response): Promise<Record<string, unknown> | null> {
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    return null;
+  }
+  return data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
+}

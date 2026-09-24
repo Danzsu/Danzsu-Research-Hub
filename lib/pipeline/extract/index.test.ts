@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FetchError } from "../fetch.ts";
-import { fakeModelDb, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
+import { fakeModelDb, geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
 import { extract, isHtml, metadataOnly } from "./index.ts";
 
 const db = fakeModelDb();
@@ -137,6 +137,37 @@ test("extract() rethrows FetchError('youtube video not found') for kind='youtube
   }
 });
 
+// fix round 3, item 1: an oEmbed 200 whose body isn't a plain JSON object (non-JSON, JSON null, or a
+// JSON array/primitive) is the rest of round-2 item 2 — closed here for youtube's null case below too.
+test("extract() still calls Gemini and keeps the video block for youtube when oEmbed returns a JSON null body, never fetching the watch page", async (t) => {
+  mockDns(t);
+  const restoreKey = withGeminiKey();
+  const counters = { oembed: 0, gemini: 0, other: 0 };
+  const restore = mockFetch(async (url) => {
+    if (url.includes("/oembed")) {
+      counters.oembed++;
+      return new Response("null", { status: 200 });
+    }
+    if (url.includes("googleapis.com")) {
+      counters.gemini++;
+      return geminiResponse({ title: { hu: "C", en: "T" }, summary: { hu: "Ö", en: "S" }, keyPoints: { hu: [], en: [] }, tags: [], chapters: [] });
+    }
+    counters.other++; // the watch page, if it were ever fetched
+    return new Response("", { status: 404 });
+  });
+  try {
+    const result = await extract(db, "youtube", youtubeUrl, "");
+    assert.equal(counters.oembed, 1);
+    assert.equal(counters.gemini, 1);
+    assert.equal(counters.other, 0);
+    assert.deepEqual(result.blocks.map((b) => b.type), ["video"]);
+    assert.equal(result.title, youtubeUrl); // no oEmbed title — falls back to the watch URL
+  } finally {
+    restore();
+    restoreKey();
+  }
+});
+
 // (f) a deleted/nonexistent X post: FetchError from extract(), fetching only the oEmbed host.
 test("extract() rethrows FetchError for a deleted X post (oEmbed 404), fetching only the oEmbed host", async (t) => {
   mockDns(t);
@@ -183,6 +214,36 @@ test("extract() rethrows FetchError('x post has no text') for an empty x post, f
       () => extract(db, "x", "https://x.com/someone/status/1", ""),
       (error: unknown) => error instanceof FetchError && error.message === "x post has no text",
     );
+    assert.equal(calls, 1);
+  } finally {
+    restore();
+  }
+});
+
+test("extract() rethrows FetchError for an x oEmbed 200 with a non-JSON body, fetching only the oEmbed host", async (t) => {
+  mockDns(t);
+  let calls = 0;
+  const restore = mockFetch(async () => {
+    calls++;
+    return new Response("not json", { status: 200 });
+  });
+  try {
+    await assert.rejects(() => extract(db, "x", "https://x.com/someone/status/1", ""), FetchError);
+    assert.equal(calls, 1);
+  } finally {
+    restore();
+  }
+});
+
+test("extract() rethrows FetchError for an x oEmbed 200 with a JSON null body, fetching only the oEmbed host", async (t) => {
+  mockDns(t);
+  let calls = 0;
+  const restore = mockFetch(async () => {
+    calls++;
+    return new Response("null", { status: 200 });
+  });
+  try {
+    await assert.rejects(() => extract(db, "x", "https://x.com/someone/status/1", ""), FetchError);
     assert.equal(calls, 1);
   } finally {
     restore();

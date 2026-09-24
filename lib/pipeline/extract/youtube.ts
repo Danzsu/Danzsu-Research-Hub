@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 import { assignIds, type BlockDraft } from "../../blocks.ts";
 import { generate } from "../../llm.ts";
-import { cancelBody, FetchError } from "../fetch.ts";
+import { cancelBody, FetchError, readJsonObject } from "../fetch.ts";
 import { SUMMARY_INSTRUCTIONS, summarySchema } from "../summary.ts";
 import { youtubeId } from "../util.ts";
 import type { Extracted, Extractor } from "./types.ts";
@@ -22,12 +22,13 @@ async function fetchOembed(watchUrl: string): Promise<OembedInfo> {
   let response: Response;
   try {
     response = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(15_000) });
-    // A non-JSON 200 body is as good as no info at all — caught here, not left to escape past
-    // extractYoutube's own error handling (which used to turn it into a video-less watch-page post).
-    if (response.ok) return (await response.json()) as OembedInfo;
   } catch {
     return {};
   }
+  // A non-JSON, null, array or primitive 200 body is as good as no info at all — readJsonObject
+  // folds all of those to null, never left to escape as a TypeError past extractYoutube's own error
+  // handling (which used to turn that into a video-less watch-page post).
+  if (response.ok) return ((await readJsonObject(response)) as OembedInfo | null) ?? {};
   await cancelBody(response);
   if (response.status === 400 || response.status === 404) throw new FetchError("youtube video not found");
   return {};

@@ -33,3 +33,21 @@ for (const [name, run] of [["extractPdf", extractPdf], ["extractArticle pdf bran
     }
   });
 }
+
+// fix round 3, item 2 (5a): the model's title is empty, so extractPdfResponse falls back to the
+// URL's own decoded filename via the shared filenameOf helper.
+test("extractPdf falls back to the URL's decoded filename when the model gives no title", async () => {
+  const restoreKey = withGeminiKey();
+  const restore = mockFetch(async (url) =>
+    url.includes("googleapis.com")
+      ? geminiResponse({ title: "", blocks: [{ type: "paragraph", text: "Body" }] })
+      : new Response("%PDF-1.4", { headers: { "content-type": "application/pdf" } }),
+  );
+  try {
+    const result = await extractPdf(db, "https://1.2.3.4/docs/annual%20report.pdf", "");
+    assert.equal(result.title, "annual report.pdf");
+  } finally {
+    restore();
+    restoreKey();
+  }
+});
