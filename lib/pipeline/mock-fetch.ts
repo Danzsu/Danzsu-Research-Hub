@@ -4,6 +4,11 @@ import type { TestContext } from "node:test";
 import dns from "node:dns/promises";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** A public IP literal: `dns.lookup()` resolves it locally, no real DNS query, so `safeFetch` tests
+ *  run offline just by using it as the host — no `mockDns(t)` needed. The one place this IP is spelled out. */
+export const TEST_IP = "93.184.216.34";
+export const TEST_HOST = `http://${TEST_IP}`;
+
 /**
  * Replaces `globalThis.fetch` for the duration of a test; call the returned function to restore it.
  * `init` is passed through so a test can assert on the request body — existing handlers that only
@@ -24,34 +29,51 @@ export function mockFetch(handler: (url: string, init?: RequestInit) => Response
  * its exports are frozen); the test's own mock tracker restores it automatically afterward, no
  * production-side hook involved. Pair with `mockFetch` for the actual response.
  */
-export function mockDns(t: TestContext, address = "93.184.216.34"): void {
+export function mockDns(t: TestContext, address = TEST_IP): void {
   t.mock.method(dns, "lookup", async () => [{ address, family: 4 }]);
 }
 
-/** Rows the `sources`/`posts` tables of a {@link fakeModelDb} answer with, offline. */
+/** Extracts the text prompt from a captured Gemini `generateContent` request body — the first
+ *  `parts` entry with a `text` field. Pair with `mockFetch`'s `init` to inspect what a test's
+ *  handler actually asked the model, e.g. to route a cleanup vs. summarize call differently. */
+export function geminiPrompt(init?: RequestInit): string {
+  const body = JSON.parse(String(init?.body)) as { contents: { parts: { text?: string }[] }[] };
+  return body.contents[0].parts.find((part) => part.text)?.text ?? "";
+}
+
+/** Rows the `sources`/`posts` tables of a {@link fakeDb} answer with, offline. */
 export type FakeIngestTables = {
   /** The row `sources`' `select().eq().single()` resolves to; omit to make it "not found". */
   source?: Record<string, unknown>;
   /** The row `posts`' `select().eq().maybeSingle()` resolves to; omit/null for "no existing post". */
   post?: Record<string, unknown> | null;
+  /** Forces the `posts` lookup's `maybeSingle()` to resolve with this error instead of `post`. */
+  postError?: unknown;
   /** Bare object names (no `<sourceId>/` prefix) the media bucket already holds for this source. */
   media?: string[];
   /** Rows `retryPendingSources`' pending-sources listing resolves to. */
   pending?: Record<string, unknown>[];
+  /** Every `storage.from().list/upload/remove` call rejects, for testing failure-path cleanup. */
+  storageError?: boolean;
 };
 
 export type FakeIngestDb = SupabaseClient & {
-  /** Every `model_settings` task queried, in call order — see the `fakeModelDb` doc comment. */
+  /** Every `model_settings` task queried, in call order — see the `fakeDb` doc comment. */
   tasks: string[];
   /** Every `sources` UPDATE payload, in call order (the attempts bump, then the final status write). */
   sourceUpdates: Record<string, unknown>[];
   /** Every `posts` UPSERT payload, in call order. */
   postUpserts: Record<string, unknown>[];
+  /** Every `posts` UPSERT's second (options) argument, same order as `postUpserts`. */
+  postUpsertOptions: Record<string, unknown>[];
+  /** Every `.eq(column, value)` call against `sources`/`posts`, in call order. */
+  eqCalls: { table: "sources" | "posts"; column: string; value: unknown }[];
   /** Every media path passed to `storage.remove`, across all calls. */
   removedMedia: string[];
-  /** Every write across every table/bucket above, in the single order it actually happened — for
-   *  cross-table ordering assertions (e.g. "attempts is bumped before the post is upserted"). */
-  writes: ("sources.update" | "posts.upsert" | "media.remove")[];
+  /** Every write across every table/bucket above, plus any `"fetch"` entries a test's own mockFetch
+   *  handler chooses to push (same array — `db.writes`), in the single order it actually happened.
+   *  For cross-operation ordering assertions, e.g. "attempts is bumped before the first fetch". */
+  writes: ("sources.update" | "posts.upsert" | "storage.list" | "storage.upload" | "storage.remove" | "fetch")[];
 };
 
 type PendingChain = {
@@ -71,24 +93,33 @@ function pendingChain(rows: Record<string, unknown>[]): PendingChain {
   return chain;
 }
 
+/** A storage path's bare object name: whatever follows the first `/` (the `<sourceId>/` prefix real
+ *  Supabase storage strips when listing a folder), or the whole path if there's no prefix to strip. */
+const bareObjectName = (path: string) => (path.includes("/") ? path.slice(path.indexOf("/") + 1) : path);
+
 /**
  * Offline `model_settings`, `sources`, `posts` and media-storage fake, for tests that exercise real
  * pipeline wiring (`processSource`, `retryPendingSources`) without a Supabase connection.
  * `model_settings`: `from().select().eq().maybeSingle()` resolves to a fixed `route`; `.tasks` records
  * every value queried via `.eq("task", value)`, so a test can assert which task (`ingest_video`,
  * `ingest_cleanup`, …) a call actually asked for, and how many times.
- * `sources`/`posts`/storage: fixed by `tables` (all optional — omit what a test never queries);
- * every write is both applied to the in-memory chain and recorded on `.sourceUpdates`/`.postUpserts`/`.removedMedia`.
+ * `sources`/`posts`/storage: fixed by `tables` (all optional — omit what a test never queries).
+ * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it and
+ * `list` reflects it, so a test can mirror an image and then see it (or its absence) in a later list.
+ * Every write is recorded on `.sourceUpdates`/`.postUpserts`/`.postUpsertOptions`/`.eqCalls`/`.removedMedia`/`.writes`.
  */
-export function fakeModelDb(
+export function fakeDb(
   route: { provider: string; model: string } = { provider: "gemini", model: "m" },
   tables: FakeIngestTables = {},
 ): FakeIngestDb {
   const tasks: string[] = [];
   const sourceUpdates: Record<string, unknown>[] = [];
   const postUpserts: Record<string, unknown>[] = [];
+  const postUpsertOptions: Record<string, unknown>[] = [];
+  const eqCalls: FakeIngestDb["eqCalls"] = [];
   const removedMedia: string[] = [];
   const writes: FakeIngestDb["writes"] = [];
+  const objects = new Set(tables.media ?? []);
 
   const from = (table: string) => {
     if (table === "model_settings") {
@@ -104,14 +135,18 @@ export function fakeModelDb(
     if (table === "sources") {
       return {
         select: () => ({
-          eq: () => ({
-            single: async () =>
-              tables.source ? { data: tables.source, error: null } : { data: null, error: new Error("source not found") },
-          }),
+          eq: (column: string, value: unknown) => {
+            eqCalls.push({ table: "sources", column, value });
+            return {
+              single: async () =>
+                tables.source ? { data: tables.source, error: null } : { data: null, error: new Error("source not found") },
+            };
+          },
           ...pendingChain(tables.pending ?? []),
         }),
         update: (values: Record<string, unknown>) => ({
-          eq: async () => {
+          eq: async (column: string, value: unknown) => {
+            eqCalls.push({ table: "sources", column, value });
             sourceUpdates.push(values);
             writes.push("sources.update");
             return { data: null, error: null };
@@ -122,30 +157,49 @@ export function fakeModelDb(
     if (table === "posts") {
       return {
         select: () => ({
-          eq: () => ({ maybeSingle: async () => ({ data: tables.post ?? null, error: null }) }),
+          eq: (column: string, value: unknown) => {
+            eqCalls.push({ table: "posts", column, value });
+            return {
+              maybeSingle: async () =>
+                tables.postError ? { data: null, error: tables.postError } : { data: tables.post ?? null, error: null },
+            };
+          },
         }),
-        upsert: async (values: Record<string, unknown>) => {
+        upsert: async (values: Record<string, unknown>, options?: Record<string, unknown>) => {
           postUpserts.push(values);
+          postUpsertOptions.push(options ?? {});
           writes.push("posts.upsert");
           return { data: null, error: null };
         },
       };
     }
-    throw new Error(`fakeModelDb: table "${table}" not set up`);
+    throw new Error(`fakeDb: table "${table}" not set up`);
   };
 
   const storage = {
     from: () => ({
-      list: async () => ({ data: (tables.media ?? []).map((name) => ({ name })), error: null }),
+      list: async () => {
+        if (tables.storageError) throw new Error("storage down");
+        writes.push("storage.list");
+        return { data: [...objects].map((name) => ({ name })), error: null };
+      },
+      upload: async (path: string) => {
+        if (tables.storageError) throw new Error("storage down");
+        objects.add(bareObjectName(path));
+        writes.push("storage.upload");
+        return { data: { path }, error: null };
+      },
       remove: async (paths: string[]) => {
+        if (tables.storageError) throw new Error("storage down");
+        for (const path of paths) objects.delete(bareObjectName(path));
         removedMedia.push(...paths);
-        writes.push("media.remove");
+        writes.push("storage.remove");
         return { data: null, error: null };
       },
     }),
   };
 
-  return { from, storage, tasks, sourceUpdates, postUpserts, removedMedia, writes } as unknown as FakeIngestDb;
+  return { from, storage, tasks, sourceUpdates, postUpserts, postUpsertOptions, eqCalls, removedMedia, writes } as unknown as FakeIngestDb;
 }
 
 /** A raw Gemini `generateContent` envelope with `text` as the model's literal (unparsed) output — for building malformed-response fixtures. */

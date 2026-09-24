@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { isMediaKey, variantPath } from "../media.ts";
 import { FETCH_TIMEOUT_MS, encodeImage, imageKey, mirrorImages, unusedMediaPaths } from "./images.ts";
-import { mockFetch } from "./mock-fetch.ts";
+import { mockFetch, TEST_HOST } from "./mock-fetch.ts";
 import type { Block, ImageBlock } from "../blocks.ts";
 
 const png = (width: number, height: number) =>
@@ -99,7 +99,7 @@ test("unusedMediaPaths keeps every variant still referenced", () => {
 // --- mirrorImages: fake Storage, mocked global fetch, public IP-literal URLs ---
 // (an IP literal makes `lookup()` a local, offline operation — safeFetch's DNS check needs no network.)
 
-const HOST = "http://93.184.216.34";
+const HOST = TEST_HOST;
 const image = (id: string, url: string): Block => ({ id, type: "image", originalUrl: url, alt: "", path: null });
 
 function fakeDb(fail: (path: string) => boolean = () => false) {

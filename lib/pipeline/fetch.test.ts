@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FetchError, readLimited, safeFetch } from "./fetch.ts";
-import { mockFetch } from "./mock-fetch.ts";
+import { mockFetch, TEST_HOST } from "./mock-fetch.ts";
 
 // A public IP literal: dns.lookup() resolves it locally without a real DNS query, so these
 // run offline. The mocked global fetch stands in for the actual network hop.
-const PUB = "http://93.184.216.34";
+const PUB = TEST_HOST;
 
 const redirect = (location: string) => new Response(null, { status: 302, headers: { location } });
 

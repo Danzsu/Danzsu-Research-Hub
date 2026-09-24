@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeModelDb, geminiResponse, mockFetch, withGeminiKey } from "../mock-fetch.ts";
+import { fakeDb, geminiResponse, mockFetch, withGeminiKey } from "../mock-fetch.ts";
 import { extractArticle } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
 
-const db = fakeModelDb();
+const db = fakeDb();
 const handler = (robots: string | null) => async (url: string) =>
   url.includes("googleapis.com")
     ? geminiResponse({ title: "T", author: "  ", blocks: [{ type: "paragraph", text: "Body" }] })

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Block } from "../../blocks.ts";
 import { FetchError } from "../fetch.ts";
-import { fakeModelDb, geminiResponse, mockFetch, oembedThenBrokenGemini, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
+import { fakeDb, geminiResponse, mockFetch, oembedThenBrokenGemini, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
 import { extractX, parseTweetHtml } from "./x.ts";
 import { extractYoutube } from "./youtube.ts";
 
@@ -67,7 +67,7 @@ const tweetOembed = (html: string) => new Response(JSON.stringify({ author_name:
 test("extractX turns a live-shaped oEmbed response into paragraph blocks and marks the result truncated", async () => {
   const restore = mockFetch(async () => tweetOembed(SIMPLE_TWEET_HTML));
   try {
-    const result = await extractX(fakeModelDb(), "https://x.com/karpathy/status/1", "");
+    const result = await extractX(fakeDb(), "https://x.com/karpathy/status/1", "");
     assert.deepEqual(result.blocks.map((b) => b.type), ["paragraph"]);
     assert.equal(result.meta.truncated, true);
     assert.equal(result.author, "Andrej Karpathy");
@@ -80,7 +80,7 @@ test("extractX turns a live-shaped oEmbed response into paragraph blocks and mar
 test("extractX throws FetchError when the oEmbed endpoint 404s (live: a deleted or nonexistent post)", async () => {
   const restore = mockFetch(async () => new Response("", { status: 404 }));
   try {
-    await assert.rejects(() => extractX(fakeModelDb(), "https://x.com/karpathy/status/1", ""), FetchError);
+    await assert.rejects(() => extractX(fakeDb(), "https://x.com/karpathy/status/1", ""), FetchError);
   } finally {
     restore();
   }
@@ -90,7 +90,7 @@ test("extractX throws FetchError('x post has no text') when the oEmbed post has 
   const restore = mockFetch(async () => tweetOembed(tweetHtml("", "January 1, 2025")));
   try {
     await assert.rejects(
-      () => extractX(fakeModelDb(), "https://x.com/someone/status/9", ""),
+      () => extractX(fakeDb(), "https://x.com/someone/status/9", ""),
       (error: unknown) => error instanceof FetchError && error.message === "x post has no text",
     );
   } finally {
@@ -103,7 +103,7 @@ test("extractX wraps a network error (the oEmbed fetch itself rejects) as FetchE
     throw new Error("network down");
   });
   try {
-    await assert.rejects(() => extractX(fakeModelDb(), "https://x.com/someone/status/9", ""), FetchError);
+    await assert.rejects(() => extractX(fakeDb(), "https://x.com/someone/status/9", ""), FetchError);
   } finally {
     restore();
   }
@@ -130,7 +130,7 @@ test("extractYoutube embeds the video and sorts chapters by seconds, keeping cha
         }),
   );
   try {
-    const result = await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    const result = await extractYoutube(fakeDb(), youtubeUrl, "");
     assert.deepEqual(result.blocks.map((b) => b.type), ["video", "chapters"]);
     assert.equal(videoOf(result)?.videoId, "dQw4w9WgXcQ");
     assert.deepEqual(chaptersOf(result)?.items, [
@@ -153,7 +153,7 @@ test("extractYoutube adds no chapters block when the model returns none", async 
     url.includes("/oembed") ? new Response(JSON.stringify({ title: "A video", author_name: "A Channel" })) : geminiResponse(noChapters),
   );
   try {
-    const result = await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    const result = await extractYoutube(fakeDb(), youtubeUrl, "");
     assert.deepEqual(result.blocks.map((b) => b.type), ["video"]);
   } finally {
     restore();
@@ -171,7 +171,7 @@ test("extractYoutube throws FetchError('youtube video not found') when oEmbed sa
     });
     try {
       await assert.rejects(
-        () => extractYoutube(fakeModelDb(), youtubeUrl, ""),
+        () => extractYoutube(fakeDb(), youtubeUrl, ""),
         (error: unknown) => error instanceof FetchError && error.message === "youtube video not found",
       );
       assert.equal(geminiCalled, false);
@@ -190,7 +190,7 @@ test("extractYoutube still calls Gemini when the oEmbed request itself errors ov
     return geminiResponse(noChapters);
   });
   try {
-    const result = await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    const result = await extractYoutube(fakeDb(), youtubeUrl, "");
     assert.equal(geminiCalled, true);
     assert.equal(result.title, youtubeUrl); // no oEmbed title available — falls back to the watch URL
     assert.equal(result.author, null);
@@ -210,7 +210,7 @@ test("extractYoutube continues without oEmbed info on other non-OK statuses (401
       return geminiResponse(noChapters);
     });
     try {
-      const result = await extractYoutube(fakeModelDb(), youtubeUrl, "");
+      const result = await extractYoutube(fakeDb(), youtubeUrl, "");
       assert.equal(geminiCalled, true);
       assert.equal(result.title, youtubeUrl);
     } finally {
@@ -229,7 +229,7 @@ test("extractYoutube treats an oEmbed 200 with a non-JSON body the same as no in
     return geminiResponse(noChapters);
   });
   try {
-    const result = await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    const result = await extractYoutube(fakeDb(), youtubeUrl, "");
     assert.equal(geminiCalled, true); // the bad body didn't escape uncaught — Gemini still ran
     assert.equal(result.title, youtubeUrl);
     assert.deepEqual(result.blocks.map((b) => b.type), ["video"]); // still has its video block
@@ -245,7 +245,7 @@ test("extractYoutube cancels the oEmbed response body on a non-ok status instead
   const body = new ReadableStream({ cancel: () => { cancelled = true; } });
   const restore = mockFetch(async (url) => (url.includes("/oembed") ? new Response(body, { status: 403 }) : geminiResponse(noChapters)));
   try {
-    await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    await extractYoutube(fakeDb(), youtubeUrl, "");
     assert.equal(cancelled, true);
   } finally {
     restore();
@@ -258,7 +258,7 @@ test("extractYoutube returns a metadata-only result when the Gemini call fails, 
   const counter = { calls: 0 };
   const restore = mockFetch(oembedThenBrokenGemini({ title: "A video", author_name: "A Channel" }, counter));
   try {
-    const result = await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    const result = await extractYoutube(fakeDb(), youtubeUrl, "");
     assert.equal(counter.calls, 2); // oEmbed + the one Gemini attempt — the watch page itself is never fetched
     assert.deepEqual(result.blocks.map((b) => b.type), ["video"]);
     assert.equal(videoOf(result)?.videoId, "dQw4w9WgXcQ");
@@ -282,7 +282,7 @@ test("extractYoutube logs a warning with the url and error message when the Gemi
   });
   const restore = mockFetch(oembedThenBrokenGemini({ title: "A video", author_name: "A Channel" }));
   try {
-    await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    await extractYoutube(fakeDb(), youtubeUrl, "");
     // generate() itself also warns once per failed route; extractYoutube's own line (the one this
     // fix adds) must be among them, naming both the url and the underlying error, not swallowed.
     assert.ok(logged.length >= 1);
@@ -297,7 +297,7 @@ test("extractYoutube logs a warning with the url and error message when the Gemi
 
 test("extractYoutube normalizes a youtu.be link with a timestamp, and sends the watch URL and ingest_video task to Gemini (Y3, Y4, Y5)", async () => {
   const restoreKey = withGeminiKey();
-  const db = fakeModelDb();
+  const db = fakeDb();
   let oembedUrl = "";
   let fileUri: string | undefined;
   const restore = mockFetch(async (url, init) => {

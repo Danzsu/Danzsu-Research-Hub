@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod/v4";
 import { blockText, type Block } from "../blocks.ts";
 import { generate } from "../llm.ts";
+import { NOT_INSTRUCTIONS } from "./summary.ts";
 
 const cleanupSchema = z.object({ remove: z.array(z.string()) });
 
@@ -15,9 +16,13 @@ export function applyCleanup(blocks: Block[], remove: string[]): Block[] {
   return kept.length >= blocks.length / 2 + 1 || kept.length === blocks.length ? kept : blocks;
 }
 
-/** Layer 3: a cheap model flags leftovers the rules missed. Failure just skips it. */
+/**
+ * Layer 3: a cheap model flags leftovers the rules missed. Failure just skips it.
+ * Under 4 blocks the half-plus-one rule above can never actually remove anything (with 3, keeping
+ * "over half" means keeping all 3), so there's no point spending a model call to find out.
+ */
 export async function aiCleanup(db: SupabaseClient, blocks: Block[]): Promise<Block[]> {
-  if (blocks.length < 3) return blocks;
+  if (blocks.length < 4) return blocks;
   try {
     const { remove } = await generate(
       db,
@@ -27,6 +32,7 @@ export async function aiCleanup(db: SupabaseClient, blocks: Block[]): Promise<Bl
 List in "remove" the ids of blocks that are NOT part of the article itself: ads, sponsor notes,
 newsletter or subscription prompts, share/follow buttons, cookie notices, author bios, "related posts",
 comment sections, navigation. When unsure, keep the block.
+${NOT_INSTRUCTIONS}
 
 ${cleanupListing(blocks)}`,
     );

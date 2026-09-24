@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FetchError } from "../fetch.ts";
-import { fakeModelDb, geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
+import { fakeDb, geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
 import { extract, isHtml, metadataOnly } from "./index.ts";
 
-const db = fakeModelDb();
+const db = fakeDb();
 
 /**
  * A fetch handler that fails every Gemini call with invalid JSON (counting it in `counters.gemini`)

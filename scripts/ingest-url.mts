@@ -1,5 +1,7 @@
-// Dev tool: runs one URL through the real pipeline against the configured Supabase project.
-// Usage: npm run ingest -- <url>   (submits as the first invited user)
+// Dev tool: writes a REAL source and post to the Supabase project configured in .env.local —
+// production, here — visible to every member. Submits as the first listed (invited) user.
+// Re-running the same URL fails: sources.url is unique.
+// Usage: npm run ingest -- <url>
 import { createClient } from "@supabase/supabase-js";
 import { processSource } from "../lib/pipeline/ingest.ts";
 import { detectSource, parseSubmittedUrl } from "../lib/pipeline/util.ts";
@@ -7,7 +9,8 @@ import { detectSource, parseSubmittedUrl } from "../lib/pipeline/util.ts";
 const url = parseSubmittedUrl(process.argv[2] ?? "");
 if (!url) throw new Error("usage: npm run ingest -- <http(s) url>");
 const db = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
-const { data: users } = await db.auth.admin.listUsers();
+const { data: users, error: usersError } = await db.auth.admin.listUsers();
+if (usersError) throw usersError;
 const submitter = users?.users[0]?.id;
 if (!submitter) throw new Error("no user to submit as: invite one first");
 
