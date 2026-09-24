@@ -57,3 +57,6 @@ next-env.d.ts
 .vscode/*
 !.vscode/extensions.json
 .claude/settings.local.json
+
+# Playwright MCP snapshots from local browser checks
+.playwright-mcp/
