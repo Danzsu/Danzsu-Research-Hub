@@ -21,8 +21,13 @@ test("assignIds suffixes repeated identical blocks", () => {
 
 test("safeHref keeps only http(s) and resolves relative links", () => {
   assert.equal(safeHref("/a?b=1", "https://site.test/post/"), "https://site.test/a?b=1");
+  // Protocol-relative is fine: it still resolves to an http(s) URL, just on another host.
   assert.equal(safeHref("//cdn.test/x", "https://site.test/"), "https://cdn.test/x");
   assert.equal(safeHref("javascript:alert(1)", "https://site.test/"), undefined);
+  // React 19 neutralizes `javascript:` on render but not `data:` — safeHref is the actual gate.
+  assert.equal(safeHref("data:text/html,<script>alert(1)</script>", "https://site.test/"), undefined);
+  assert.equal(safeHref("data:image/svg+xml;base64,AAAA", "https://site.test/"), undefined);
+  assert.equal(safeHref("vbscript:msgbox(1)", "https://site.test/"), undefined);
   assert.equal(safeHref("mailto:a@b.c", "https://site.test/"), undefined);
   assert.equal(safeHref("", "https://site.test/"), undefined);
 });

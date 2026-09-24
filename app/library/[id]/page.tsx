@@ -4,10 +4,11 @@ import { LanguageToggle } from "@/app/components/language-toggle";
 import { PageHeader } from "@/app/components/page-header";
 import { PostBlocks } from "@/app/components/post-blocks";
 import { Button } from "@/components/ui/button";
-import { plainText } from "@/lib/blocks";
+import { safeHref } from "@/lib/blocks";
 import { getPost } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
 import { hostOf, parseId } from "@/lib/pipeline/util";
+import { readMinutes, type PostQuery } from "@/lib/post-view";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { PostToolbar } from "./post-toolbar";
 
@@ -40,7 +41,7 @@ export default async function PostPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ text?: string; hidden?: string; t?: string; edit?: string }>;
+  searchParams: Promise<PostQuery>;
 }) {
   const { id } = await params;
   const viewer = await getViewer();
@@ -55,8 +56,11 @@ export default async function PostPage({
   const canEdit = post.submittedBy === viewer.id;
   const showingTranslation = query.text === "hu" && Boolean(post.blocksHu);
   const blocks = showingTranslation ? post.blocksHu! : post.blocks;
-  const minutes = Math.max(1, Math.round(plainText(post.blocks).split(/\s+/).length / 220));
+  const minutes = readMinutes(post.blocks, post.kind);
   const start = Number.parseInt(query.t ?? "", 10);
+  // post.url is already validated at ingest (parseSubmittedUrl), but every href the page emits
+  // goes through safeHref anyway — this is the same choke point PostBlocks uses.
+  const originalHref = safeHref(post.url, post.url);
 
   return (
     <main className="min-h-dvh bg-ink text-paper">
@@ -72,23 +76,41 @@ export default async function PostPage({
               <span>{post.siteName ?? hostOf(post.url)}</span>
               {post.author && <span className="text-ink/60">{post.author}</span>}
               {post.publishedAt && <span className="text-ink/60">{post.publishedAt}</span>}
-              <span className="text-ink/60">{minutes} {t.min}</span>
+              {minutes !== null && <span className="text-ink/60">{minutes} {t.min}</span>}
             </p>
             <h1 className="mt-4 font-display text-[clamp(1.9rem,6vw,4.6rem)] leading-[0.95] tracking-[-0.05em] [overflow-wrap:anywhere]">{post.title[language]}</h1>
             {(post.meta.noarchive || post.meta.extractionFailed) && (
               <p className="mt-4 border-l-4 border-signal pl-4 text-sm">
                 {post.meta.noarchive ? t.noarchive : t.failed}{" "}
-                <a href={post.url} target="_blank" rel="noreferrer" className="text-signal underline [overflow-wrap:anywhere]">{post.url}</a>
+                {originalHref ? (
+                  <a href={originalHref} target="_blank" rel="noreferrer" className="focus-ring text-signal underline [overflow-wrap:anywhere]">{post.url}</a>
+                ) : (
+                  <span className="[overflow-wrap:anywhere]">{post.url}</span>
+                )}
               </p>
             )}
             {post.meta.truncated && <p className="mt-2 font-mono text-xs text-ink/60">{t.truncated}</p>}
             {post.meta.clipped && <p className="mt-2 font-mono text-xs text-ink/60">{t.clipped}</p>}
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <PostToolbar postId={post.id} language={language} hasTranslation={Boolean(post.blocksHu)} showingTranslation={showingTranslation} canEdit={canEdit} />
-              <Button asChild variant="ink" className="min-h-10">
-                <a href={post.url} target="_blank" rel="noreferrer">{t.original} <ExternalLink /></a>
-              </Button>
+              <PostToolbar
+                postId={post.id}
+                language={language}
+                hasTranslation={Boolean(post.blocksHu)}
+                showingTranslation={showingTranslation}
+                canEdit={canEdit}
+                hasBlocks={post.blocks.length > 0}
+              />
+              {originalHref && (
+                <Button asChild variant="ink" className="min-h-10">
+                  <a href={originalHref} target="_blank" rel="noreferrer">{t.original} <ExternalLink /></a>
+                </Button>
+              )}
             </div>
+            {post.tags.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {post.tags.map((tag) => <span key={tag} className="border border-ink/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>)}
+              </div>
+            )}
           </header>
 
           <p className="mt-8 text-lg leading-8">{post.summary[language]}</p>
@@ -102,13 +124,15 @@ export default async function PostPage({
           )}
 
           {blocks.length > 0 && (
-            <section className="mt-12">
+            <section className="mt-12" lang={showingTranslation ? "hu" : undefined}>
               <PostBlocks
                 blocks={blocks}
                 language={language}
+                baseUrl={post.url}
                 hidden={post.hiddenBlocks}
                 showHidden={query.hidden === "show"}
                 videoStart={Number.isFinite(start) && start > 0 ? start : undefined}
+                linkQuery={query}
               />
             </section>
           )}

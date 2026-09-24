@@ -135,7 +135,10 @@ export function sectionsToBlocks(sections: { heading: string; points: string[] }
   ]);
 }
 
-export function limitBlocks(blocks: Block[], maxBlocks = 400, maxChars = 200_000): { blocks: Block[]; clipped: boolean } {
+/** Also the cap for `hidden_blocks` (lib/overrides.ts) — a post can't hide more blocks than it has. */
+export const MAX_BLOCKS = 400;
+
+export function limitBlocks(blocks: Block[], maxBlocks = MAX_BLOCKS, maxChars = 200_000): { blocks: Block[]; clipped: boolean } {
   const kept: Block[] = [];
   let chars = 0;
   for (const block of blocks) {

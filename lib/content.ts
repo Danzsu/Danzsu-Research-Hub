@@ -10,6 +10,7 @@ import type {
 } from "@/data/digest-types";
 import { parseBlocks, type Block } from "@/lib/blocks";
 import { readHiddenBlocks, readOverrides } from "@/lib/overrides";
+import { parseTranslatedBlocks } from "@/lib/post-view";
 import { isoWeek, isoWeekMonday, publishedLabel, type SourceKind } from "@/lib/pipeline/util";
 
 const budapest = new Intl.DateTimeFormat("hu-HU", {
@@ -141,7 +142,7 @@ function toPost(row: Record<string, unknown>): Post {
     keyPoints: row.key_points as Post["keyPoints"],
     tags: row.tags as string[],
     blocks: parseBlocks(row.blocks),
-    blocksHu: row.blocks_hu ? parseBlocks(row.blocks_hu) : null,
+    blocksHu: parseTranslatedBlocks(row.blocks_hu),
     meta: (row.meta ?? {}) as PostMeta,
     hiddenBlocks: readHiddenBlocks(row.hidden_blocks),
     submittedBy: source?.submitted_by ?? null,

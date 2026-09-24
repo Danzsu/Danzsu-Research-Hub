@@ -1,32 +1,35 @@
 import { z } from "zod/v4";
-import { localizedSchema } from "./blocks.ts";
+import { MAX_BLOCKS } from "./blocks.ts";
 
-// `overrides` and `hidden_blocks` are written by the `update_post_overrides` RPC, which any
-// authenticated user can call directly with arbitrary jsonb — bypassing the app entirely. A
-// malformed value must never break the page for other members, so every read goes through here.
+// `overrides` and `hidden_blocks` are written by the `update_post_overrides` RPC. The RPC checks
+// that only the post's submitter may call it, but nothing stops the submitter from calling it
+// directly with malformed jsonb, bypassing the app's own validation. That must never break the
+// page for other readers, so every read goes through here — and both schemas are exported so
+// Task 13's PATCH handler validates against the exact same rules.
+
+const localizedField = (max: number) => z.object({ hu: z.string().min(1).max(max), en: z.string().min(1).max(max) });
 
 export const overridesSchema = z.object({
-  title: localizedSchema.optional(),
-  summary: localizedSchema.optional(),
+  title: localizedField(300).optional(),
+  summary: localizedField(2000).optional(),
 });
 export type Overrides = z.infer<typeof overridesSchema>;
 
-export const MAX_HIDDEN_BLOCKS = 400; // the same cap as limitBlocks' maxBlocks in lib/blocks.ts
-export const hiddenBlocksSchema = z.array(z.string()).max(MAX_HIDDEN_BLOCKS);
+export const hiddenBlocksSchema = z.array(z.string()).max(MAX_BLOCKS);
 
 /** Each field is validated independently, so one malformed field doesn't drop a valid sibling. */
 export function readOverrides(raw: unknown): Overrides {
   if (!raw || typeof raw !== "object") return {};
   const source = raw as Record<string, unknown>;
   const out: Overrides = {};
-  const title = localizedSchema.safeParse(source.title);
-  if (title.success) out.title = title.data;
-  const summary = localizedSchema.safeParse(source.summary);
-  if (summary.success) out.summary = summary.data;
+  const title = overridesSchema.shape.title.safeParse(source.title);
+  if (title.success && title.data) out.title = title.data;
+  const summary = overridesSchema.shape.summary.safeParse(source.summary);
+  if (summary.success && summary.data) out.summary = summary.data;
   return out;
 }
 
 export function readHiddenBlocks(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((value): value is string => typeof value === "string").slice(0, MAX_HIDDEN_BLOCKS);
+  return raw.filter((value): value is string => typeof value === "string").slice(0, MAX_BLOCKS);
 }
