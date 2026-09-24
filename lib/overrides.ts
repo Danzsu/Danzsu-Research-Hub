@@ -7,7 +7,10 @@ import { MAX_BLOCKS } from "./blocks.ts";
 // page for other readers, so every read goes through here — and both schemas are exported so
 // Task 13's PATCH handler validates against the exact same rules.
 
-const localizedField = (max: number) => z.object({ hu: z.string().min(1).max(max), en: z.string().min(1).max(max) });
+const localizedField = (max: number) => {
+  const field = z.string().trim().min(1).max(max);
+  return z.object({ hu: field, en: field });
+};
 
 export const overridesSchema = z.object({
   title: localizedField(300).optional(),
@@ -31,5 +34,5 @@ export function readOverrides(raw: unknown): Overrides {
 
 export function readHiddenBlocks(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((value): value is string => typeof value === "string").slice(0, MAX_BLOCKS);
+  return raw.filter((value): value is string => hiddenBlocksSchema.element.safeParse(value).success).slice(0, MAX_BLOCKS);
 }

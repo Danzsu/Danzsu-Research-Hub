@@ -62,7 +62,8 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
           <Link href={`/library/${postId}?edit=1`}><PenLine /> {t.edit}</Link>
         </Button>
       )}
-      <p role="status" className="font-mono text-xs text-signal empty:hidden">{failed ? t.failed : ""}</p>
+      {/* Always mounted, so the live region exists before the first failure — only its text changes. */}
+      <p role="status" className="font-mono text-xs text-signal">{failed ? t.failed : ""}</p>
     </div>
   );
 }

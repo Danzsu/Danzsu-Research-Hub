@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import type { Language } from "@/data/digest-types";
 import { safeHref, type Block, type ImageBlock, type Inline } from "@/lib/blocks";
-import { mediaUrl } from "@/lib/media";
-import { isValidPlaceholder, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
+import { isValidPlaceholder, mediaSources, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
 import { formatTimestamp } from "@/lib/pipeline/util";
 
 // Plain component (no hooks, no server-only imports) so the editor can reuse it client-side.
@@ -33,7 +32,8 @@ function InlineContent({ spans, baseUrl }: { spans: Inline[]; baseUrl: string })
 }
 
 function ImageView({ block, priority, language, baseUrl }: { block: ImageBlock; priority: boolean; language: Language; baseUrl: string }) {
-  if (!block.path || !block.format || !block.widths?.length) {
+  const sources = mediaSources(block);
+  if (!sources) {
     const href = safeHref(block.originalUrl, baseUrl);
     return (
       <p className="border-2 border-dashed border-ink/35 p-4 font-mono text-xs text-ink/60">
@@ -48,14 +48,13 @@ function ImageView({ block, priority, language, baseUrl }: { block: ImageBlock; 
       </p>
     );
   }
-  const largest = Math.max(...block.widths);
   const placeholder = block.placeholder && isValidPlaceholder(block.placeholder) ? block.placeholder : undefined;
   return (
     <figure>
       {/* eslint-disable-next-line @next/next/no-img-element -- variants are pre-encoded; next/image would re-optimize them */}
       <img
-        src={mediaUrl(block.path, largest, block.format)}
-        srcSet={block.widths.map((w) => `${mediaUrl(block.path!, w, block.format!)} ${w}w`).join(", ")}
+        src={sources.src}
+        srcSet={sources.srcSet}
         sizes="(min-width: 768px) 680px, 100vw"
         alt={block.alt}
         width={block.width}
@@ -212,7 +211,8 @@ export function PostBlocks({
     out.push(
       <a
         key={`hidden-${key}`}
-        href={withQuery(linkQuery, { hidden: "show" })}
+        // Drop `t`: revealing hidden blocks isn't a chapter jump, and keeping it would autoplay the video again.
+        href={withQuery(linkQuery, { hidden: "show", t: undefined })}
         className="focus-ring flex min-h-10 items-center border border-dashed border-ink/35 px-4 font-mono text-xs text-ink/55 hover:text-signal"
       >
         {labels[language].hidden(run)}
@@ -229,8 +229,11 @@ export function PostBlocks({
     flushHidden(block.id);
     const priority = block.type === "image" && firstImage;
     if (block.type === "image") firstImage = false;
-    const primaryVideo = block.type === "video" && firstVideo;
-    if (block.type === "video") firstVideo = false;
+    // Only a video whose id actually validates can claim the #video anchor — otherwise the next
+    // (valid) video block would silently lose id="video" and ?t= to an id that renders nothing.
+    const validVideo = block.type === "video" && videoEmbedSrc(block) !== null;
+    const primaryVideo = validVideo && firstVideo;
+    if (validVideo) firstVideo = false;
     out.push(
       <div key={block.id} id={`b-${block.id}`} data-block-id={block.id} className={`scroll-mt-24 ${controls ? "relative pr-12" : ""} ${isHidden ? "opacity-40" : ""}`}>
         {controls?.(block)}

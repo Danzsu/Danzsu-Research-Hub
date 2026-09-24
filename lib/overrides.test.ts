@@ -31,6 +31,19 @@ test("readOverrides drops an empty or over-length field instead of accepting it"
   assert.equal(atLimit.summary?.hu.length, 2000);
 });
 
+test("readOverrides enforces the non-empty and length caps on en too, not only hu", () => {
+  assert.deepEqual(readOverrides({ title: { hu: "cím", en: "" } }), {});
+  assert.deepEqual(readOverrides({ title: { hu: "cím", en: "x".repeat(301) } }), {});
+  assert.deepEqual(readOverrides({ summary: { hu: "s", en: "" } }), {});
+  assert.deepEqual(readOverrides({ summary: { hu: "s", en: "x".repeat(2001) } }), {});
+});
+
+test("readOverrides rejects a whitespace-only field and trims a real one", () => {
+  assert.deepEqual(readOverrides({ title: { hu: "   ", en: "title" } }), {});
+  assert.deepEqual(readOverrides({ title: { hu: "cím", en: "  \t\n" } }), {});
+  assert.deepEqual(readOverrides({ title: { hu: "  cím  ", en: "title" } }), { title: { hu: "cím", en: "title" } });
+});
+
 test("overridesSchema and hiddenBlocksSchema are the single source of truth readOverrides/readHiddenBlocks build on", () => {
   assert.equal(overridesSchema.safeParse({ title: { hu: "", en: "x" } }).success, false);
   assert.equal(overridesSchema.safeParse({ title: { hu: "x".repeat(301), en: "y" } }).success, false);

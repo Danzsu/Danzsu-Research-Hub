@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assignIds, type BlockDraft } from "./blocks.ts";
+import { assignIds, type BlockDraft, type ImageBlock } from "./blocks.ts";
 import {
   isValidPlaceholder,
   isValidVimeoId,
   isValidYoutubeId,
+  mediaSources,
   parseTranslatedBlocks,
   readMinutes,
   videoEmbedSrc,
   withQuery,
+  type PostQuery,
 } from "./post-view.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
@@ -28,6 +30,11 @@ test("readMinutes is null for empty or near-empty extractions, not '1 min'", () 
 test("readMinutes floors at 1 and rounds by word count for real text", () => {
   assert.equal(readMinutes(assignIds([p(words(20))]), "article"), 1);
   assert.equal(readMinutes(assignIds([p(words(440))]), "article"), 2);
+});
+
+test("readMinutes boundary: 9 words is too few, 10 is enough", () => {
+  assert.equal(readMinutes(assignIds([p(words(9))]), "article"), null);
+  assert.equal(readMinutes(assignIds([p(words(10))]), "article"), 1);
 });
 
 test("parseTranslatedBlocks treats [] and unparseable jsonb as no translation", () => {
@@ -91,4 +98,50 @@ test("withQuery merges updates over the current query, keeping every other param
   assert.equal(withQuery({ text: "hu", hidden: "show" }, { t: "125" }), "?text=hu&hidden=show&t=125");
   assert.equal(withQuery({ hidden: "old" }, { hidden: "show" }), "?hidden=show");
   assert.equal(withQuery({}, {}), "");
+});
+
+test("withQuery keeps the edit key — Task 13's editor depends on it surviving every link", () => {
+  assert.equal(withQuery({ edit: "1" }, { t: "10" }), "?t=10&edit=1");
+  assert.equal(withQuery({}, { edit: "1" }), "?edit=1");
+});
+
+test("withQuery drops keys outside its allowlist and drops empty values", () => {
+  // A key not in PostQuery must never reach the URL, and "" must be treated as absent, not as a real value.
+  const dirty = { text: "hu", hidden: "", evil: "1" } as unknown as PostQuery;
+  assert.equal(withQuery({}, dirty), "?text=hu");
+});
+
+test("withQuery clears a key when the caller explicitly sets it to undefined", () => {
+  assert.equal(withQuery({ hidden: "show", t: "45" }, { hidden: "show", t: undefined }), "?hidden=show");
+});
+
+const imageBlock = (overrides: Partial<ImageBlock>): ImageBlock => ({
+  id: "b1",
+  type: "image",
+  originalUrl: "https://x.test/a.png",
+  alt: "",
+  path: "7/abcdef0123456789",
+  format: "avif",
+  widths: [640, 1280],
+  width: 640,
+  height: 400,
+  ...overrides,
+});
+
+test("mediaSources builds src/srcSet only from a real /media key", () => {
+  const result = mediaSources(imageBlock({}));
+  assert.equal(result?.src, "/media/7/abcdef0123456789-1280.avif");
+  assert.equal(result?.srcSet, "/media/7/abcdef0123456789-640.avif 640w, /media/7/abcdef0123456789-1280.avif 1280w");
+});
+
+test("mediaSources returns null when path/format/widths are missing", () => {
+  assert.equal(mediaSources(imageBlock({ path: null })), null);
+  assert.equal(mediaSources(imageBlock({ format: undefined })), null);
+  assert.equal(mediaSources(imageBlock({ widths: [] })), null);
+});
+
+test("mediaSources returns null for a path that isn't a well-formed media key (off-origin smuggling guard)", () => {
+  assert.equal(mediaSources(imageBlock({ path: "evil.com/x" })), null);
+  assert.equal(mediaSources(imageBlock({ path: "7/tooshort" })), null);
+  assert.equal(mediaSources(imageBlock({ path: "7/abcdef0123456789/../../secret" })), null);
 });

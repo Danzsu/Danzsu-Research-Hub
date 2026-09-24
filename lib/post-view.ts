@@ -1,4 +1,5 @@
-import { parseBlocks, plainText, type Block } from "./blocks.ts";
+import { parseBlocks, plainText, type Block, type ImageBlock } from "./blocks.ts";
+import { isMediaKey, mediaUrl, variantPath } from "./media.ts";
 import type { SourceKind } from "./pipeline/util.ts";
 
 // Pure helpers for the post page and its renderer. Kept framework-free (no React, no
@@ -28,6 +29,24 @@ export const isValidVimeoId = (id: string): boolean => /^\d+$/.test(id);
 
 /** Only a data: URL of an image the pipeline itself produces — never `svg` (stored-XSS risk elsewhere in the pipeline). */
 export const isValidPlaceholder = (value: string): boolean => /^data:image\/(avif|webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(value);
+
+export type MediaSources = { src: string; srcSet: string };
+
+/**
+ * `block.path` is untrusted at render time — it's jsonb the RPC/translation path could hand back
+ * unchanged. Null unless `path`/`format`/every declared width together form a real `/media` key
+ * (the same shape `isMediaKey` guards on the route itself), so a crafted path can't smuggle an
+ * off-origin URL into the srcset.
+ */
+export function mediaSources(block: ImageBlock): MediaSources | null {
+  const { path, format, widths } = block;
+  if (!path || !format || !widths?.length) return null;
+  if (!widths.every((width) => isMediaKey(variantPath(path, width, format)))) return null;
+  return {
+    src: mediaUrl(path, Math.max(...widths), format),
+    srcSet: widths.map((width) => `${mediaUrl(path, width, format)} ${width}w`).join(", "),
+  };
+}
 
 type VideoBlock = Extract<Block, { type: "video" }>;
 
