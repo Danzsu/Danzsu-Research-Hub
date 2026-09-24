@@ -66,16 +66,24 @@ test("translatePost: not_found for a missing post", async () => {
   assert.equal(await translatePost(db, 404), "not_found");
 });
 
-test("translatePost: a successful translation writes blocks_hu", async () => {
+// A real posts row also requires source_id/kind/url/title (NOT NULL); an upsert's proposed insert
+// row is checked against those constraints before conflict resolution even runs, so it 400s on a
+// real translation even though this offline fake can't see that. An update, keyed by id and
+// carrying only blocks_hu, is the only write shape that's safe against the real schema.
+test("translatePost: a successful translation writes blocks_hu via posts.update keyed by id, never an upsert", async () => {
   const restoreKey = withGeminiKey();
   const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null } });
   const restoreFetch = mockFetch(() => geminiResponse(translatedAnswer));
   try {
     const result = await translatePost(db, 7);
     assert.equal(result, "ok");
-    assert.equal(db.postUpserts.length, 1);
-    assert.equal(db.postUpserts[0].id, 7);
-    const saved = db.postUpserts[0].blocks_hu as Array<Record<string, unknown>>;
+    assert.equal(db.postUpserts.length, 0, "must not upsert — an upsert's insert branch fails NOT NULL on a real posts row");
+    assert.equal(db.postUpdates.length, 1);
+    assert.deepEqual(Object.keys(db.postUpdates[0]), ["blocks_hu"]);
+    const idEq = db.eqCalls.filter((call) => call.table === "posts" && call.column === "id").at(-1);
+    assert.ok(idEq, "update must be keyed by .eq(\"id\", ...)");
+    assert.equal(idEq?.value, 7);
+    const saved = db.postUpdates[0].blocks_hu as Array<Record<string, unknown>>;
     assert.equal(saved.length, blocks.length);
     assert.equal(saved[0].text, "Eredmények");
     assert.equal(saved[3].code, "x = 1"); // untouched — nothing to translate in a code block
@@ -96,6 +104,7 @@ test("translatePost: an existing valid blocks_hu makes no model call", async () 
     const result = await translatePost(db, 7);
     assert.equal(result, "ok");
     assert.equal(db.tasks.length, 0); // model_settings never even queried
+    assert.equal(db.postUpdates.length, 0);
     assert.equal(db.postUpserts.length, 0);
   } finally {
     restoreFetch();
@@ -111,7 +120,7 @@ test("translatePost: an existing [] or garbage blocks_hu is re-translated (same 
       try {
         const result = await translatePost(db, 7);
         assert.equal(result, "ok", `blocks_hu = ${JSON.stringify(badHu)}`);
-        assert.equal(db.postUpserts.length, 1, `expected a write for blocks_hu = ${JSON.stringify(badHu)}`);
+        assert.equal(db.postUpdates.length, 1, `expected a write for blocks_hu = ${JSON.stringify(badHu)}`);
       } finally {
         restoreFetch();
       }
@@ -130,6 +139,7 @@ test("translatePost: a shape mismatch (model drops a block) writes nothing", asy
   try {
     const result = await translatePost(db, 7);
     assert.equal(result, "shape");
+    assert.equal(db.postUpdates.length, 0);
     assert.equal(db.postUpserts.length, 0);
   } finally {
     restoreFetch();
@@ -144,6 +154,7 @@ test("translatePost: a model failure writes nothing", async () => {
   try {
     const result = await translatePost(db, 7);
     assert.equal(result, "failed");
+    assert.equal(db.postUpdates.length, 0);
     assert.equal(db.postUpserts.length, 0);
   } finally {
     restoreFetch();
@@ -174,7 +185,7 @@ test("translatePost: chunk calls run with at most 3 in flight", async () => {
     const result = await translatePost(db, 7);
     assert.equal(result, "ok");
     assert.equal(maxInFlight, 3);
-    assert.equal(db.postUpserts.length, 1);
+    assert.equal(db.postUpdates.length, 1);
   } finally {
     restoreFetch();
     restoreKey();

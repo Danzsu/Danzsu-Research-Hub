@@ -130,8 +130,7 @@ export async function translatePost(db: SupabaseClient, postId: number): Promise
     );
     const translated = applyTranslation(blocks, answers.flatMap((answer) => answer.blocks));
     if (!translated) return "shape";
-    // Partial upsert: only `blocks_hu` is in the payload, so the conflict update touches nothing else.
-    const { error } = await db.from("posts").upsert({ id: post.id, blocks_hu: translated });
+    const { error } = await db.from("posts").update({ blocks_hu: translated }).eq("id", post.id);
     if (error) throw error;
     return "ok";
   } catch (error) {

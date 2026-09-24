@@ -55,6 +55,8 @@ export type FakeIngestTables = {
    *  that reads `posts` more than once per run — e.g. the initial existing-post lookup succeeding,
    *  then a later re-read failing. */
   postErrorOnCall?: number;
+  /** Forces `posts`' `update(...).eq(...)` to resolve with this error instead of applying the write. */
+  postUpdateError?: unknown;
   /** Bare object names (no `<sourceId>/` prefix) the media bucket already holds for this source. */
   media?: string[];
   /** Rows `retryPendingSources`' pending-sources listing resolves to. */
@@ -72,14 +74,16 @@ export type FakeIngestDb = SupabaseClient & {
   postUpserts: Record<string, unknown>[];
   /** Every `posts` UPSERT's second (options) argument, same order as `postUpserts`. */
   postUpsertOptions: Record<string, unknown>[];
-  /** Every `.eq(column, value)` call against `sources`/`posts`, in call order. */
+  /** Every `posts` UPDATE payload (the `values` passed to `.update(...)`, before `.eq(...)`), in call order. */
+  postUpdates: Record<string, unknown>[];
+  /** Every `.eq(column, value)` call against `sources`/`posts`, in call order — covers `select`, `update` and (for `sources`) `update` alike. */
   eqCalls: { table: "sources" | "posts"; column: string; value: unknown }[];
   /** Every media path passed to `storage.remove`, across all calls. */
   removedMedia: string[];
   /** Every write across every table/bucket above, plus any `"fetch"` entries a test's own mockFetch
    *  handler chooses to push (same array — `db.writes`), in the single order it actually happened.
    *  For cross-operation ordering assertions, e.g. "attempts is bumped before the first fetch". */
-  writes: ("sources.update" | "posts.upsert" | "storage.list" | "storage.upload" | "storage.remove" | "fetch")[];
+  writes: ("sources.update" | "posts.upsert" | "posts.update" | "storage.list" | "storage.upload" | "storage.remove" | "fetch")[];
 };
 
 type PendingChain = {
@@ -112,7 +116,7 @@ const bareObjectName = (path: string) => (path.includes("/") ? path.slice(path.i
  * `sources`/`posts`/storage: fixed by `tables` (all optional — omit what a test never queries).
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it and
  * `list` reflects it, so a test can mirror an image and then see it (or its absence) in a later list.
- * Every write is recorded on `.sourceUpdates`/`.postUpserts`/`.postUpsertOptions`/`.eqCalls`/`.removedMedia`/`.writes`.
+ * Every write is recorded on `.sourceUpdates`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.eqCalls`/`.removedMedia`/`.writes`.
  */
 export function fakeDb(
   route: { provider: string; model: string } = { provider: "gemini", model: "m" },
@@ -122,6 +126,7 @@ export function fakeDb(
   const sourceUpdates: Record<string, unknown>[] = [];
   const postUpserts: Record<string, unknown>[] = [];
   const postUpsertOptions: Record<string, unknown>[] = [];
+  const postUpdates: Record<string, unknown>[] = [];
   const eqCalls: FakeIngestDb["eqCalls"] = [];
   const removedMedia: string[] = [];
   const writes: FakeIngestDb["writes"] = [];
@@ -186,6 +191,19 @@ export function fakeDb(
           tables.post = values;
           return { data: null, error: null };
         },
+        // Merges into the existing row (real UPDATE only touches the given columns), unlike
+        // `upsert` above which replaces it — so a caller that does a targeted single-column write
+        // (e.g. `.update({ blocks_hu }).eq("id", id)`) doesn't lose the row's other fields here either.
+        update: (values: Record<string, unknown>) => ({
+          eq: async (column: string, value: unknown) => {
+            eqCalls.push({ table: "posts", column, value });
+            postUpdates.push(values);
+            writes.push("posts.update");
+            if (tables.postUpdateError) return { data: null, error: tables.postUpdateError };
+            tables.post = tables.post ? { ...tables.post, ...values } : values;
+            return { data: null, error: null };
+          },
+        }),
       };
     }
     throw new Error(`fakeDb: table "${table}" not set up`);
@@ -217,7 +235,7 @@ export function fakeDb(
     }),
   };
 
-  return { from, storage, tasks, sourceUpdates, postUpserts, postUpsertOptions, eqCalls, removedMedia, writes } as unknown as FakeIngestDb;
+  return { from, storage, tasks, sourceUpdates, postUpserts, postUpsertOptions, postUpdates, eqCalls, removedMedia, writes } as unknown as FakeIngestDb;
 }
 
 /** A raw Gemini `generateContent` envelope with `text` as the model's literal (unparsed) output — for building malformed-response fixtures. */
