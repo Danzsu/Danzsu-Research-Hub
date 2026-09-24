@@ -64,7 +64,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
             <div className="flex flex-wrap gap-2">
               {post.tags.map((tag) => <span key={tag} className="border border-ink/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>)}
             </div>
-            <Button asChild className="rounded-none bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink">
+            <Button asChild variant="ink">
               <a href={post.url} target="_blank" rel="noreferrer">{lang === "hu" ? "Eredeti forrás" : "Original source"} <ExternalLink /></a>
             </Button>
           </div>

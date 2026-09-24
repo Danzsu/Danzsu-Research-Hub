@@ -21,7 +21,7 @@ export function LanguageToggle({ language }: { language: Language }) {
         router.refresh();
       }}
       aria-label={next === "en" ? "Switch to English" : "Váltás magyarra"}
-      className="min-h-9 rounded-full border border-paper/40 px-3 font-mono text-xs hover:border-signal hover:text-signal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+      className="focus-ring min-h-9 rounded-full border border-paper/40 px-3 font-mono text-xs hover:border-signal hover:text-signal"
     >
       {language.toUpperCase()}
     </button>

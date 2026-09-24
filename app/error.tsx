@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 export default function ErrorPage({ reset }: { reset: () => void }) {
   return (
     <main className="grid min-h-dvh place-items-center bg-ink px-4 text-paper">
@@ -13,13 +15,9 @@ export default function ErrorPage({ reset }: { reset: () => void }) {
           <br />
           <span className="text-ink/60">Something broke while loading.</span>
         </p>
-        <button
-          type="button"
-          onClick={reset}
-          className="mt-6 min-h-10 w-full bg-ink px-4 font-mono text-xs text-paper hover:bg-signal hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
-        >
+        <Button type="button" variant="ink" className="mt-6 min-h-10 w-full" onClick={reset}>
           Újra / Retry
-        </button>
+        </Button>
       </section>
     </main>
   );

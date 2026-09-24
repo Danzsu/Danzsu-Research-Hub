@@ -74,7 +74,7 @@ export function SubmitForm({ language }: { language: Language }) {
           aria-label="URL"
           className="min-h-10 min-w-0 flex-1 rounded-none border-2 border-ink bg-cream px-3 py-2 text-sm outline-none placeholder:text-ink/40 focus:border-signal"
         />
-        <Button type="submit" disabled={busy} className="min-h-10 rounded-none border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper">
+        <Button type="submit" variant="signal" className="min-h-10" disabled={busy}>
           <Plus /> {busy ? "…" : t.submit}
         </Button>
       </div>

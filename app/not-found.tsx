@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
@@ -13,12 +14,9 @@ export default function NotFound() {
           <br />
           <span className="text-ink/60">This page does not exist.</span>
         </p>
-        <Link
-          href="/"
-          className="mt-6 flex min-h-10 items-center justify-center bg-ink px-4 font-mono text-xs text-paper hover:bg-signal hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
-        >
-          ← LIVE RADAR
-        </Link>
+        <Button asChild variant="ink" className="mt-6 min-h-10 w-full">
+          <Link href="/">← LIVE RADAR</Link>
+        </Button>
       </section>
     </main>
   );

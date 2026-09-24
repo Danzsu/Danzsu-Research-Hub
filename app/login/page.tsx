@@ -42,7 +42,7 @@ export default async function LoginPage({
                 className="rounded-none border-2 border-ink bg-paper focus-visible:border-signal"
               />
             </div>
-            <Button type="submit" className="w-full rounded-none bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink">
+            <Button type="submit" variant="ink" className="w-full">
               Belépő link küldése / Send link
             </Button>
             {error && (

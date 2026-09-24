@@ -19,6 +19,10 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // House variants. rounded-* is already 0 through --radius, so no rounded-none needed.
+        ink: "bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
+        signal: "border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper",
+        brutal: "border-2 border-ink bg-paper font-mono text-xs text-ink hover:bg-signal",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

@@ -313,7 +313,7 @@ export function DigestDashboard({
             placeholder={t.todoPlaceholder}
             className="min-w-0 flex-1 rounded-none border-2 border-ink bg-paper px-3 py-2 text-sm outline-none placeholder:text-ink/40 focus:border-signal"
           />
-          <Button size="icon" onClick={() => void addTodo()} aria-label={t.add} className="rounded-none border-2 border-ink bg-signal text-ink hover:bg-ink hover:text-paper">
+          <Button size="icon" variant="signal" onClick={() => void addTodo()} aria-label={t.add}>
             <Plus />
           </Button>
         </div>
@@ -473,7 +473,7 @@ export function DigestDashboard({
               type="button"
               aria-pressed={filter === id}
               onClick={() => setFilter(id)}
-              className="flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
             >
               <Icon className="size-3.5" /> {t[key]}
             </button>
@@ -608,7 +608,7 @@ export function DigestDashboard({
                                 <div className="flex flex-wrap gap-2">
                                   {item.tags.map((tag) => <span key={tag} className="border border-ink/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>)}
                                 </div>
-                                <Button asChild className="rounded-none bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink">
+                                <Button asChild variant="ink">
                                   <a href={item.url} target="_blank" rel="noreferrer">{t.open} <ExternalLink /></a>
                                 </Button>
                               </div>
