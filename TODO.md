@@ -126,7 +126,8 @@
   - Új források az arXiv mellé:
     - Hugging Face Daily Papers (a közösség által felszavazott napi cikkek)
     - Semantic Scholar és OpenAlex (a Google Scholar helyett: annak nincs API-ja, és a letöltését a feltételei tiltják)
-    - Google Research, IBM Research és Microsoft Research blog (a DeepMind már bent van)
+    - **research.google** (a felhasználó kérésére, közvetlenül az M1 15. feladata után): a Google Research blogja és a publikációs oldala (`research.google/pubs`). A pontos RSS- vagy API-végpontot a megvalósítás elején ellenőrizni kell.
+    - IBM Research és Microsoft Research blog (a DeepMind már bent van)
   - Szűrés, hogy ne legyen túl sok (döntés, 2026-09-24):
     - naponta legfeljebb kb. 8 kiemelt tétel, csak 60 pont felett;
     - a 40–59 pontosak egy összecsukott „Többi” szakaszba kerülnek, és a keresésben is megtalálhatók;
