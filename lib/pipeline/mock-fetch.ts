@@ -63,6 +63,9 @@ export type FakeIngestTables = {
   pending?: Record<string, unknown>[];
   /** Every `storage.from().list/upload/remove` call rejects, for testing failure-path cleanup. */
   storageError?: boolean;
+  /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g. `{
+   *  code: "42501" }` for the `update_post_overrides` "not the submitter" case. */
+  rpcError?: { code?: string; message?: string };
 };
 
 export type FakeIngestDb = SupabaseClient & {
@@ -88,6 +91,8 @@ export type FakeIngestDb = SupabaseClient & {
   eqCalls: { table: "sources" | "posts"; column: string; value: unknown }[];
   /** Every media path passed to `storage.remove`, across all calls. */
   removedMedia: string[];
+  /** Every `db.rpc(name, args)` call, in call order. */
+  rpcCalls: { name: string; args: Record<string, unknown> }[];
   /** Every write across every table/bucket above, plus any `"fetch"` entries a test's own mockFetch
    *  handler chooses to push (same array — `db.writes`), in the single order it actually happened.
    *  For cross-operation ordering assertions, e.g. "attempts is bumped before the first fetch". */
@@ -117,12 +122,20 @@ const bareObjectName = (path: string) => (path.includes("/") ? path.slice(path.i
 
 /** Projects `row` down to `columns` (comma-separated, `"*"` for everything) the way PostgREST's
  *  `select=` does — a column the fixture never set comes back `undefined`, not silently present
- *  because some other part of the row happened to have it. */
+ *  because some other part of the row happened to have it. A `table(column)` embed (e.g.
+ *  `sources(submitted_by)`) isn't projected per-column — the fake just needs the fixture's own
+ *  embedded object present under its table key, so it reads `row.sources` whole. */
 function project(row: Record<string, unknown> | null, columns: string): Record<string, unknown> | null {
   if (!row) return null;
   if (columns.trim() === "*") return row;
   const keys = columns.split(",").map((column) => column.trim()).filter(Boolean);
-  return Object.fromEntries(keys.map((key) => [key, row[key]]));
+  return Object.fromEntries(
+    keys.map((key) => {
+      const embed = /^(\w+)\(.*\)$/.exec(key);
+      const name = embed ? embed[1] : key;
+      return [name, row[name]];
+    }),
+  );
 }
 
 /**
@@ -149,6 +162,7 @@ export function fakeDb(
   const eqCalls: FakeIngestDb["eqCalls"] = [];
   const removedMedia: string[] = [];
   const writes: FakeIngestDb["writes"] = [];
+  const rpcCalls: FakeIngestDb["rpcCalls"] = [];
   const objects = new Set(tables.media ?? []);
   let postSelectCalls = 0;
 
@@ -278,9 +292,15 @@ export function fakeDb(
     }),
   };
 
+  const rpc = async (name: string, args: Record<string, unknown> = {}) => {
+    rpcCalls.push({ name, args });
+    return tables.rpcError ? { data: null, error: tables.rpcError } : { data: null, error: null };
+  };
+
   return {
     from,
     storage,
+    rpc,
     tasks,
     sourceUpdates,
     postUpserts,
@@ -290,6 +310,7 @@ export function fakeDb(
     eqCalls,
     removedMedia,
     writes,
+    rpcCalls,
   } as unknown as FakeIngestDb;
 }
 

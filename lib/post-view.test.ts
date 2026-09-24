@@ -7,6 +7,7 @@ import {
   isValidYoutubeId,
   mediaSources,
   parseTranslatedBlocks,
+  primaryVideoId,
   readMinutes,
   videoEmbedSrc,
   withQuery,
@@ -144,4 +145,18 @@ test("mediaSources returns null for a path that isn't a well-formed media key (o
   assert.equal(mediaSources(imageBlock({ path: "evil.com/x" })), null);
   assert.equal(mediaSources(imageBlock({ path: "7/tooshort" })), null);
   assert.equal(mediaSources(imageBlock({ path: "7/abcdef0123456789/../../secret" })), null);
+});
+
+test("primaryVideoId picks the first block whose embed actually validates, skipping an invalid one before it", () => {
+  const blocks = assignIds([
+    { type: "video", provider: "youtube", videoId: "not-11-chars" }, // invalid — must not claim the anchor
+    { type: "video", provider: "youtube", videoId: "dQw4w9WgXcQ" },
+    { type: "video", provider: "vimeo", videoId: "76979871" },
+  ]);
+  assert.equal(primaryVideoId(blocks), blocks[1].id);
+});
+
+test("primaryVideoId is null with no video blocks, or none that validate", () => {
+  assert.equal(primaryVideoId(assignIds([p("just text")])), null);
+  assert.equal(primaryVideoId(assignIds([{ type: "video", provider: "vimeo", videoId: "not-numeric" }])), null);
 });

@@ -34,9 +34,10 @@ export type MediaSources = { src: string; srcSet: string };
 
 /**
  * `block.path` is untrusted at render time — it's jsonb the RPC/translation path could hand back
- * unchanged. Null unless `path`/`format`/every declared width together form a real `/media` key
- * (the same shape `isMediaKey` guards on the route itself), so a crafted path can't smuggle an
- * off-origin URL into the srcset.
+ * unchanged, and it only ever comes from `imageKey` (pipeline/images.ts) to begin with. Null unless `path`/
+ * `format`/every declared width together still form a real `/media` key (the same shape
+ * `isMediaKey` guards on the route itself); that render-time check is defense in depth, not the
+ * only thing keeping a crafted path from smuggling an off-origin URL into the srcset.
  */
 export function mediaSources(block: ImageBlock): MediaSources | null {
   const { path, format, widths } = block;
@@ -65,6 +66,19 @@ export function videoEmbedSrc(block: VideoBlock, opts: { start?: number; autopla
   const params = new URLSearchParams({ dnt: "1" });
   const hash = start ? `#t=${start}s` : "";
   return `https://player.vimeo.com/video/${block.videoId}?${params.toString()}${hash}`;
+}
+
+/**
+ * The id of the block that gets the `#video` anchor, the `?t=` override and autoplay: the first
+ * *visible* block (already filtered for hidden/showHidden by the caller) whose embed actually
+ * validates — an invalid video block must not claim the anchor and leave a later, valid one
+ * without it. Null if there's no such block.
+ */
+export function primaryVideoId(visibleBlocks: Block[]): string | null {
+  for (const block of visibleBlocks) {
+    if (block.type === "video" && videoEmbedSrc(block) !== null) return block.id;
+  }
+  return null;
 }
 
 /** The post page's own query params: kept as one shape so every in-page link (chapters, hidden-blocks) can carry all of them forward. */

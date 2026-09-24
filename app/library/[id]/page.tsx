@@ -11,6 +11,7 @@ import { hostOf, parseId } from "@/lib/pipeline/util";
 import { readMinutes, type PostQuery } from "@/lib/post-view";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { translatable } from "@/lib/translate";
+import { PostEditor } from "./post-editor";
 import { PostToolbar } from "./post-toolbar";
 
 export const dynamic = "force-dynamic";
@@ -124,18 +125,24 @@ export default async function PostPage({
             </div>
           )}
 
-          {blocks.length > 0 && (
-            <section className="mt-12" lang={showingTranslation ? "hu" : undefined}>
-              <PostBlocks
-                blocks={blocks}
-                language={language}
-                baseUrl={post.url}
-                hidden={post.hiddenBlocks}
-                showHidden={query.hidden === "show"}
-                videoStart={Number.isFinite(start) && start > 0 ? start : undefined}
-                linkQuery={query}
-              />
+          {query.edit === "1" && canEdit ? (
+            <section className="mt-12">
+              <PostEditor post={post} language={language} />
             </section>
+          ) : (
+            blocks.length > 0 && (
+              <section className="mt-12" lang={showingTranslation ? "hu" : undefined}>
+                <PostBlocks
+                  blocks={blocks}
+                  language={language}
+                  baseUrl={post.url}
+                  hidden={post.hiddenBlocks}
+                  showHidden={query.hidden === "show"}
+                  videoStart={Number.isFinite(start) && start > 0 ? start : undefined}
+                  linkQuery={query}
+                />
+              </section>
+            )
           )}
 
           <p className="mt-12 border-t-2 border-ink pt-4 font-mono text-[10px] tracking-[0.15em] text-ink/55 [overflow-wrap:anywhere]">

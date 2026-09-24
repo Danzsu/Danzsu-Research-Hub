@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Language } from "@/data/digest-types";
 import { safeHref, type Block, type ImageBlock, type Inline } from "@/lib/blocks";
-import { isValidPlaceholder, mediaSources, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
+import { isValidPlaceholder, mediaSources, primaryVideoId, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
 import { formatTimestamp } from "@/lib/pipeline/util";
 
 // Plain component (no hooks, no server-only imports) so the editor can reuse it client-side.
@@ -202,10 +202,13 @@ export function PostBlocks({
   controls?: (block: Block) => ReactNode;
 }) {
   const hiddenSet = new Set(hidden);
+  // Exactly the blocks that end up rendered below (a fully-hidden block is skipped via `continue`,
+  // never pushed) — the same set primaryVideoId must pick its candidate from.
+  const visibleBlocks = blocks.filter((block) => showHidden || controls || !hiddenSet.has(block.id));
+  const primaryId = primaryVideoId(visibleBlocks);
   const out: ReactNode[] = [];
   let run = 0;
   let firstImage = true;
-  let firstVideo = true;
   const flushHidden = (key: string) => {
     if (!run) return;
     out.push(
@@ -229,11 +232,7 @@ export function PostBlocks({
     flushHidden(block.id);
     const priority = block.type === "image" && firstImage;
     if (block.type === "image") firstImage = false;
-    // Only a video whose id actually validates can claim the #video anchor — otherwise the next
-    // (valid) video block would silently lose id="video" and ?t= to an id that renders nothing.
-    const validVideo = block.type === "video" && videoEmbedSrc(block) !== null;
-    const primaryVideo = validVideo && firstVideo;
-    if (validVideo) firstVideo = false;
+    const primaryVideo = block.type === "video" && block.id === primaryId;
     out.push(
       <div key={block.id} id={`b-${block.id}`} data-block-id={block.id} className={`scroll-mt-24 ${controls ? "relative pr-12" : ""} ${isHidden ? "opacity-40" : ""}`}>
         {controls?.(block)}
