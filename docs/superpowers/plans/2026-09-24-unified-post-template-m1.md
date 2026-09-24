@@ -3699,6 +3699,14 @@ Három dolog **nem része** a feladatnak:
     - a tartalék útvonal fut, ha az első elbukik;
     - a hibák összegződnek.
   - A `toPost` átkerül a `lib/post-view.ts`-be. Teszt az `overrides` elsőbbségére és az `archiveAt` dátumszámítására.
+  - **Offline komponens-render tesztek, új függőség nélkül.**
+    - Egy kis segéd, a `lib/test/render.ts`, a meglévő `typescript` devDependency `transpileModule`-jával fordítja a `.tsx`-et, a `next/navigation`-t csonkkal pótolja, és `react-dom/server` `renderToStaticMarkup`-pal renderel.
+    - A 13. feladat reviewja ezt a módszert már sikeresen használta (`scratchpad/r25/build.mjs`).
+    - A tesztek az `npm test` részei, és ezeket a render-szerződéseket fedik le:
+      - `PostBlocks`: a linkek csak `safeHref`-en át jelennek meg, a videó csak érvényes azonosítóval, az elsődleges videó kapja az `id="video"`-t, a `linkQuery` megmarad (`edit=1`), a vezérlő-módban `min-h-10`, a halványítás csak a tartalmon;
+      - `PostEditor`: állandó kapcsoló-felirat és `aria-pressed`, a címke–mező kapcsolat (`htmlFor`/`id`), mindig csatolt élő régió;
+      - `PostToolbar`: a fordítás gomb csak akkor, ha van mit lefordítani.
+    - A 13. feladatban túlélő komponens-mutánsokat (T1–T6) ezek a tesztek öljék meg.
 - [ ] **Step 4: Függőségek** (supply-chain szabály).
   - Minden `^` tartomány a lockfile-ban szereplő pontos verzióra rögzül.
   - A `jscpd@4.3.0` pontos devDependency lesz, és az `npm run dup` a helyi binárist hívja (`jscpd …`, nem `npx -y`).
