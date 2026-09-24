@@ -194,6 +194,22 @@ export function parseSubmittedUrl(raw: string): URL | null {
   return url;
 }
 
+const SAME_SITE = "http://same.site";
+
+/**
+ * Only same-site paths survive; anything else falls back to `/`. Checked on the parsed URL, not the
+ * string: the URL parser drops tab/newline and reads `\` as `/`, so `/\t/evil.com` becomes `//evil.com`.
+ */
+export function safeNext(value: unknown): string {
+  if (typeof value !== "string" || !value.startsWith("/")) return "/";
+  try {
+    const url = new URL(value, SAME_SITE);
+    return url.origin === SAME_SITE ? `${url.pathname}${url.search}${url.hash}` : "/";
+  } catch {
+    return "/";
+  }
+}
+
 /** Display label for the 96px meta gutter: '09 / 22'. */
 export function publishedLabel(isoDate: string): string {
   const [, month, day] = isoDate.split("-");

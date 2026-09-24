@@ -33,11 +33,7 @@ export function createAdminClient() {
   });
 }
 
-/** Only same-site paths: `//evil.com` and absolute URLs fall back to `/`. */
-export function safeNext(value: unknown): string {
-  const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
-}
+export { safeNext } from "@/lib/pipeline/util";
 
 export type Viewer = { id: string; email: string };
 

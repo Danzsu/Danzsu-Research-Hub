@@ -17,11 +17,26 @@ import {
   parseId,
   parseSubmittedUrl,
   publishedLabel,
+  safeNext,
   slugify,
   xmlText,
   xStatusId,
   youtubeId,
 } from "./util.ts";
+
+test("safeNext keeps same-site paths", () => {
+  assert.equal(safeNext("/library"), "/library");
+  assert.equal(safeNext("/archive/2026-W38?text=hu#top"), "/archive/2026-W38?text=hu#top");
+  assert.equal(safeNext("/%09/evil.com"), "/%09/evil.com"); // stays an encoded path on this site
+});
+
+test("safeNext rejects anything that resolves off-site", () => {
+  for (const hostile of ["//evil.com", "/\\evil.com", "/\t/evil.com", "/\n/evil.com", "/\r\n/evil.com", "https://evil.com", "javascript:alert(1)", "evil.com", ""]) {
+    assert.equal(safeNext(hostile), "/", JSON.stringify(hostile));
+  }
+  assert.equal(safeNext(null), "/");
+  assert.equal(safeNext(["/library"]), "/");
+});
 
 test("isoWeek handles year boundaries", () => {
   assert.equal(isoWeek(new Date("2026-09-23T10:00:00Z")).id, "2026-W39");
