@@ -26,6 +26,19 @@ test("editPayload: a changed HU title only sends the title, not the unchanged su
   assert.deepEqual(editPayload(generated, draft, []), { title: draft.title, hidden: [] });
 });
 
+test("editPayload: a changed EN-only title also sends the title (N2 — a HU-only comparison would miss this)", () => {
+  const draft = { title: { hu: generated.generatedTitle.hu, en: "a new EN title" }, summary: generated.generatedSummary };
+  assert.deepEqual(editPayload(generated, draft, []), { title: draft.title, hidden: [] });
+});
+
+test("editPayload: trailing/leading whitespace alone doesn't count as a change (N3 — the server trims on save)", () => {
+  const draft = {
+    title: { hu: `${generated.generatedTitle.hu} `, en: generated.generatedTitle.en },
+    summary: { hu: generated.generatedSummary.hu, en: `  ${generated.generatedSummary.en}` },
+  };
+  assert.deepEqual(editPayload(generated, draft, ["b1"]), { hidden: ["b1"] });
+});
+
 test("editPayload: a field reset back to the model text is omitted, clearing any existing override", () => {
   const edited = { title: { hu: "ideiglenes cím", en: generated.generatedTitle.en }, summary: generated.generatedSummary };
   assert.deepEqual(editPayload(generated, edited, []).title, edited.title);

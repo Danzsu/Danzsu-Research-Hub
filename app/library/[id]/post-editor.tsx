@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { PostBlocks } from "@/app/components/post-blocks";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ const copy = {
     title: "Cím",
     summary: "Összefoglaló",
     original: "Eredeti",
+    resetTitle: (lang: string) => `Eredeti cím (${lang})`,
+    resetSummary: (lang: string) => `Eredeti összefoglaló (${lang})`,
     save: "Mentés",
     cancel: "Mégse",
     saving: "Mentés…",
@@ -33,6 +35,8 @@ const copy = {
     title: "Title",
     summary: "Summary",
     original: "Original",
+    resetTitle: (lang: string) => `Original title (${lang})`,
+    resetSummary: (lang: string) => `Original summary (${lang})`,
     save: "Save",
     cancel: "Cancel",
     saving: "Saving…",
@@ -48,6 +52,9 @@ const copy = {
 export function PostEditor({ post, language, query, videoStart }: { post: Post; language: Language; query: PostQuery; videoStart?: number }) {
   const router = useRouter();
   const t = copy[language];
+  const fieldId = useId();
+  const titleId = (lang: "hu" | "en") => `${fieldId}-title-${lang}`;
+  const summaryId = (lang: "hu" | "en") => `${fieldId}-summary-${lang}`;
   const [title, setTitle] = useState(post.title);
   const [summary, setSummary] = useState(post.summary);
   const [hidden, setHidden] = useState(() => new Set(post.hiddenBlocks));
@@ -91,14 +98,22 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
       <div className="grid gap-4 border-2 border-ink bg-paper p-5 sm:grid-cols-2">
         {(["hu", "en"] as const).map((lang) => (
           <div key={lang} className="space-y-3">
-            <label className="block space-y-1 font-mono text-xs">
-              <span className="flex items-center justify-between gap-2">
-                <span>{t.title} ({lang.toUpperCase()})</span>
-                <Button type="button" variant="brutal" size="xs" className="min-h-10" onClick={() => setTitle({ ...title, [lang]: post.generatedTitle[lang] })}>
+            <div className="space-y-1 font-mono text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor={titleId(lang)}>{t.title} ({lang.toUpperCase()})</label>
+                <Button
+                  type="button"
+                  variant="brutal"
+                  size="xs"
+                  className="min-h-10"
+                  aria-label={t.resetTitle(lang.toUpperCase())}
+                  onClick={() => setTitle({ ...title, [lang]: post.generatedTitle[lang] })}
+                >
                   {t.original}
                 </Button>
-              </span>
+              </div>
               <Input
+                id={titleId(lang)}
                 value={title[lang]}
                 onChange={(e) => setTitle({ ...title, [lang]: e.target.value })}
                 className="min-h-10 border-2 border-ink bg-paper"
@@ -106,15 +121,23 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
                 maxLength={TITLE_MAX}
                 lang={lang}
               />
-            </label>
-            <label className="block space-y-1 font-mono text-xs">
-              <span className="flex items-center justify-between gap-2">
-                <span>{t.summary} ({lang.toUpperCase()})</span>
-                <Button type="button" variant="brutal" size="xs" className="min-h-10" onClick={() => setSummary({ ...summary, [lang]: post.generatedSummary[lang] })}>
+            </div>
+            <div className="space-y-1 font-mono text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor={summaryId(lang)}>{t.summary} ({lang.toUpperCase()})</label>
+                <Button
+                  type="button"
+                  variant="brutal"
+                  size="xs"
+                  className="min-h-10"
+                  aria-label={t.resetSummary(lang.toUpperCase())}
+                  onClick={() => setSummary({ ...summary, [lang]: post.generatedSummary[lang] })}
+                >
                   {t.original}
                 </Button>
-              </span>
+              </div>
               <Textarea
+                id={summaryId(lang)}
                 value={summary[lang]}
                 onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })}
                 rows={5}
@@ -123,7 +146,7 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
                 maxLength={SUMMARY_MAX}
                 lang={lang}
               />
-            </label>
+            </div>
           </div>
         ))}
       </div>
@@ -131,7 +154,8 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
         <Button variant="ink" className="min-h-10" onClick={() => void save()} disabled={busy}>{busy ? t.saving : t.save}</Button>
         <Button asChild variant="brutal" className="min-h-10"><Link href={`/library/${post.id}`}>{t.cancel}</Link></Button>
         <Button variant="brutal" className="min-h-10" onClick={() => void reextract()} disabled={reextracting}><RefreshCw /> {t.reextract}</Button>
-        {/* Always mounted, so a screen reader hears the eventual status even if it looked away before it changed. */}
+        {/* Always mounted: a live region must already be in the accessibility tree before its text
+            changes, or screen readers may not announce the change at all. */}
         <p role="status" className={`font-mono text-xs ${status?.failed ? "text-signal" : "text-ink/70"}`}>{status?.text ?? ""}</p>
       </div>
       <PostBlocks

@@ -14,14 +14,16 @@ const patchSchema = overridesSchema.extend({ hidden: hiddenBlocksSchema });
  * The PATCH body for a save: `title`/`summary` are included only when `draft` differs from the
  * model's own text (`post.generatedTitle`/`generatedSummary`) — an unchanged or reset field must
  * not freeze the model's text as a permanent override, and omitting a field that currently has one
- * clears it (the RPC replaces `overrides` wholesale, it doesn't merge).
+ * clears it (the RPC replaces `overrides` wholesale, it doesn't merge). Compared trimmed: the
+ * server trims on save (`localizedField` in overrides.ts), so an untrimmed comparison here would
+ * treat "Model " as a real edit and send a same-content override just for the trailing space.
  */
 export function editPayload(
   post: { generatedTitle: Localized; generatedSummary: Localized },
   draft: { title: Localized; summary: Localized },
   hidden: string[],
 ): { title?: Localized; summary?: Localized; hidden: string[] } {
-  const sameAs = (a: Localized, b: Localized) => a.hu === b.hu && a.en === b.en;
+  const sameAs = (a: Localized, b: Localized) => a.hu.trim() === b.hu.trim() && a.en.trim() === b.en.trim();
   const title = sameAs(draft.title, post.generatedTitle) ? undefined : draft.title;
   const summary = sameAs(draft.summary, post.generatedSummary) ? undefined : draft.summary;
   return { ...(title && { title }), ...(summary && { summary }), hidden };
