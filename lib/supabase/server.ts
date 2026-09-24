@@ -41,10 +41,14 @@ export function safeNext(value: unknown): string {
 
 export type Viewer = { id: string; email: string };
 
-export async function getViewer(): Promise<Viewer | null> {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
+/** The signed-in reader's client, or null: the one auth check every API route starts with. */
+export async function getReader(): Promise<{ db: Awaited<ReturnType<typeof createClient>>; viewer: Viewer } | null> {
+  const db = await createClient();
+  const { data } = await db.auth.getClaims();
   const claims = data?.claims;
-  if (!claims?.sub) return null;
-  return { id: claims.sub, email: String(claims.email ?? "") };
+  return claims?.sub ? { db, viewer: { id: claims.sub, email: String(claims.email ?? "") } } : null;
+}
+
+export async function getViewer(): Promise<Viewer | null> {
+  return (await getReader())?.viewer ?? null;
 }

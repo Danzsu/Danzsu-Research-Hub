@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isPrivateAddress, isoWeek, isoWeekMonday, itemId, parseSubmittedUrl, publishedLabel, slugify, sourceKind } from "./util.ts";
+import {
+  arxivId,
+  cooldownRemaining,
+  detectSource,
+  formatTimestamp,
+  githubRepo,
+  hostOf,
+  isPrivateAddress,
+  isoWeek,
+  isoWeekMonday,
+  itemId,
+  parseId,
+  parseSubmittedUrl,
+  publishedLabel,
+  slugify,
+  xStatusId,
+  youtubeId,
+} from "./util.ts";
 
 test("isoWeek handles year boundaries", () => {
   assert.equal(isoWeek(new Date("2026-09-23T10:00:00Z")).id, "2026-W39");
@@ -48,9 +65,45 @@ test("isPrivateAddress covers v4, v6 and mapped forms", () => {
   }
 });
 
-test("sourceKind and publishedLabel", () => {
-  assert.equal(sourceKind(new URL("https://youtu.be/abc")), "youtube");
-  assert.equal(sourceKind(new URL("https://m.youtube.com/watch?v=abc")), "youtube");
-  assert.equal(sourceKind(new URL("https://blog.example.com/post")), "article");
+test("detectSource and its URL helpers", () => {
+  const kind = (u: string) => detectSource(new URL(u));
+  assert.equal(kind("https://youtu.be/dQw4w9WgXcQ?si=abc"), "youtube");
+  assert.equal(kind("https://m.youtube.com/watch?v=dQw4w9WgXcQ&t=10"), "youtube");
+  assert.equal(kind("https://www.youtube.com/shorts/dQw4w9WgXcQ"), "youtube");
+  assert.equal(kind("https://www.youtube.com/@channel"), "article");
+  assert.equal(kind("https://arxiv.org/abs/2401.00001v2"), "arxiv");
+  assert.equal(kind("https://arxiv.org/pdf/2401.00001"), "arxiv");
+  assert.equal(kind("https://arxiv.org/html/2401.00001v1/"), "arxiv");
+  assert.equal(kind("https://github.com/ggml-org/llama.cpp"), "github");
+  assert.equal(kind("https://github.com/ggml-org/llama.cpp/tree/master/docs"), "github");
+  assert.equal(kind("https://github.com/ggml-org/llama.cpp/issues/1"), "article");
+  assert.equal(kind("https://github.com/topics/llm"), "article");
+  assert.equal(kind("https://x.com/karpathy/status/1886192184808149383"), "x");
+  assert.equal(kind("https://twitter.com/a/status/123"), "x");
+  assert.equal(kind("https://site.test/paper.PDF"), "pdf");
+  assert.equal(kind("https://blog.test/post"), "article");
+  assert.equal(youtubeId(new URL("https://youtu.be/dQw4w9WgXcQ")), "dQw4w9WgXcQ");
+  assert.equal(youtubeId(new URL("https://youtube.com/watch?v=short")), null);
+  assert.equal(arxivId(new URL("https://arxiv.org/abs/2401.00001v2")), "2401.00001");
+  assert.deepEqual(githubRepo(new URL("https://github.com/a/b.git")), { owner: "a", repo: "b" });
+  assert.equal(xStatusId(new URL("https://x.com/a/status/42?s=20")), "42");
+});
+
+test("cooldownRemaining and formatTimestamp", () => {
+  const now = new Date("2026-09-24T10:00:00Z");
+  assert.equal(cooldownRemaining(null, now), 0);
+  assert.equal(cooldownRemaining("2026-09-24T09:55:00Z", now), 300);
+  assert.equal(cooldownRemaining("2026-09-24T09:40:00Z", now), 0);
+  assert.equal(formatTimestamp(65), "1:05");
+  assert.equal(formatTimestamp(3725), "1:02:05");
+});
+
+test("hostOf and parseId", () => {
+  assert.equal(hostOf("https://www.blog.test/a"), "blog.test");
+  assert.equal(parseId("42"), 42);
+  for (const bad of ["", "0", "4.2", "-1", "abc", "1e3", "12345678901234567"]) assert.equal(parseId(bad), null, bad);
+});
+
+test("publishedLabel", () => {
   assert.equal(publishedLabel("2026-09-22"), "09 / 22");
 });

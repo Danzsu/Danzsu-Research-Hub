@@ -1,21 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { jsonError } from "@/lib/api";
+import { getReader } from "@/lib/supabase/server";
 
 // Per-reader state. RLS limits every query to the caller's own rows, and
 // user_id defaults to auth.uid(), so no query here names the user.
 
-async function reader() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  return data?.claims ? supabase : null;
-}
-
-const unauthorized = () => NextResponse.json({ error: "unauthorized" }, { status: 401 });
-const failed = () => NextResponse.json({ error: "db_error" }, { status: 500 });
+const failed = () => jsonError(500, "db_error");
 
 export async function GET() {
-  const db = await reader();
-  if (!db) return unauthorized();
+  const reader = await getReader();
+  if (!reader) return jsonError(401, "unauthorized");
+  const db = reader.db;
 
   const [stateResult, todoResult] = await Promise.all([
     db.from("item_states").select("item_id, is_read, is_saved"),
@@ -31,8 +26,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const db = await reader();
-  if (!db) return unauthorized();
+  const reader = await getReader();
+  if (!reader) return jsonError(401, "unauthorized");
+  const db = reader.db;
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const action = String(body.action ?? "");
@@ -41,7 +37,7 @@ export async function POST(request: Request) {
 
   if (action === "set_read" || action === "set_saved") {
     const itemId = String(body.itemId ?? "").slice(0, 120);
-    if (!itemId) return NextResponse.json({ error: "missing_item" }, { status: 400 });
+    if (!itemId) return jsonError(400, "missing_item");
     const column = action === "set_read" ? "is_read" : "is_saved";
     // Upsert only touches the named column, so the other flag survives.
     const { error } = await db
@@ -52,7 +48,7 @@ export async function POST(request: Request) {
 
   if (action === "add_todo") {
     const text = String(body.text ?? "").trim().slice(0, 180);
-    if (!text) return NextResponse.json({ error: "missing_text" }, { status: 400 });
+    if (!text) return jsonError(400, "missing_text");
     const itemId = body.itemId ? String(body.itemId).slice(0, 120) : null;
     const { data, error } = await db.from("todos").insert({ text, item_id: itemId }).select("id").single();
     return error ? failed() : NextResponse.json({ ok: true, id: data.id });
@@ -60,7 +56,7 @@ export async function POST(request: Request) {
 
   const id = Number(body.id);
   if ((action === "set_todo" || action === "delete_todo") && !Number.isInteger(id)) {
-    return NextResponse.json({ error: "invalid_id" }, { status: 400 });
+    return jsonError(400, "invalid_id");
   }
 
   if (action === "set_todo") {
@@ -73,5 +69,5 @@ export async function POST(request: Request) {
     return error ? failed() : NextResponse.json({ ok: true });
   }
 
-  return NextResponse.json({ error: "unknown_action" }, { status: 400 });
+  return jsonError(400, "unknown_action");
 }

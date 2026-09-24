@@ -63,10 +63,67 @@ export function itemId(category: string, week: Week, title: string, url: string)
   return `${category}-${week.compact}-${slugify(title) || "item"}-${shortHash(url)}`.slice(0, 120);
 }
 
-export function sourceKind(url: URL): "youtube" | "article" {
-  const host = url.hostname.replace(/^(www|m)\./, "");
-  return host === "youtube.com" || host === "youtu.be" ? "youtube" : "article";
+export type SourceKind = "article" | "youtube" | "arxiv" | "github" | "x" | "pdf";
+
+export function youtubeId(url: URL): string | null {
+  const host = url.hostname.replace(/^(www|m|music)\./, "");
+  let id: string | null | undefined = null;
+  if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0];
+  else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+    id = url.searchParams.get("v") ?? /^\/(?:shorts|embed|live)\/([\w-]+)/.exec(url.pathname)?.[1];
+  }
+  return id && /^[\w-]{11}$/.test(id) ? id : null;
 }
+
+export function arxivId(url: URL): string | null {
+  if (!/(^|\.)arxiv\.org$/.test(url.hostname)) return null;
+  const match = /^\/(?:abs|pdf|html)\/(\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?\/\d{7})(?:v\d+)?(?:\.pdf)?\/?$/i.exec(url.pathname);
+  return match?.[1] ?? null;
+}
+
+const GITHUB_RESERVED = new Set(["orgs", "topics", "features", "settings", "marketplace", "sponsors", "about", "search", "explore"]);
+
+export function githubRepo(url: URL): { owner: string; repo: string } | null {
+  if (url.hostname !== "github.com" && url.hostname !== "www.github.com") return null;
+  const [owner, repo, section] = url.pathname.split("/").filter(Boolean);
+  if (!owner || !repo || GITHUB_RESERVED.has(owner) || (section && section !== "tree")) return null;
+  return { owner, repo: repo.replace(/\.git$/, "") };
+}
+
+export function xStatusId(url: URL): string | null {
+  const host = url.hostname.replace(/^(www|mobile)\./, "");
+  if (host !== "x.com" && host !== "twitter.com") return null;
+  return /^\/[^/]+\/status\/(\d+)/.exec(url.pathname)?.[1] ?? null;
+}
+
+/** Which extractor handles a submitted link. PDFs served without a .pdf path are caught later by content type. */
+export function detectSource(url: URL): SourceKind {
+  if (youtubeId(url)) return "youtube";
+  if (arxivId(url)) return "arxiv";
+  if (githubRepo(url)) return "github";
+  if (xStatusId(url)) return "x";
+  if (/\.pdf$/i.test(url.pathname)) return "pdf";
+  return "article";
+}
+
+/** Seconds until a post may be re-extracted again. */
+export function cooldownRemaining(extractedAt: string | null, now: Date, minutes = 10): number {
+  if (!extractedAt) return 0;
+  const ready = new Date(extractedAt).getTime() + minutes * 60_000;
+  return Math.max(0, Math.ceil((ready - now.getTime()) / 1000));
+}
+
+export function formatTimestamp(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = String(Math.floor(seconds % 60)).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
+export const hostOf = (url: string) => new URL(url).hostname.replace(/^www\./, "");
+
+/** Route and page ids: positive integers only. */
+export const parseId = (raw: string): number | null => (/^[1-9]\d{0,15}$/.test(raw) ? Number(raw) : null);
 
 /** Loopback, private, link-local, CGNAT, multicast/reserved, and their IPv4-mapped IPv6 forms. */
 export function isPrivateAddress(ip: string): boolean {
