@@ -1,26 +1,10 @@
-import { lookup } from "node:dns/promises";
+import dns from "node:dns/promises";
 import { isPrivateAddress, parseSubmittedUrl } from "./util.ts";
 
 export const USER_AGENT = "Mozilla/5.0 (compatible; NeonRadar/1.0; private research digest)";
 
 /** The source itself is unreachable: the fallback chain cannot help, the submission fails. */
 export class FetchError extends Error {}
-
-type DnsLookup = (hostname: string, options: { all: true }) => Promise<{ address: string }[]>;
-let resolveHost: DnsLookup = lookup;
-
-/**
- * Test seam only: `safeFetch` always resolves through this. A few extractors hit a fixed real
- * hostname (arxiv.org) that a test can't parameterize away, so tests point this at a fake
- * resolver instead of requiring a live DNS query; production code never calls it.
- */
-export function setDnsLookup(fn: DnsLookup): () => void {
-  const previous = resolveHost;
-  resolveHost = fn;
-  return () => {
-    resolveHost = previous;
-  };
-}
 
 /** Standard GitHub REST headers: accept, this app's user agent, and an optional token. */
 export function githubHeaders(accept: string): Record<string, string> {
@@ -44,7 +28,7 @@ async function checkedHop(raw: string): Promise<URL> {
   if (!url) throw new FetchError("blocked url");
   let addresses: { address: string }[];
   try {
-    addresses = await resolveHost(url.hostname, { all: true });
+    addresses = await dns.lookup(url.hostname, { all: true });
   } catch {
     throw new FetchError(`cannot resolve ${url.hostname}`);
   }

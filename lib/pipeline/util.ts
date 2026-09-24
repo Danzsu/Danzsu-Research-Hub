@@ -194,6 +194,15 @@ export function list<T>(value: T | T[] | undefined): T[] {
   return value === undefined ? [] : Array.isArray(value) ? value : [value];
 }
 
+/** An XML-parsed leaf value as a string: a plain string, a number (parseTagValue), or an
+ * attributes-mixed `{ "#text": ... }` wrapper (ignoreAttributes: false). */
+export function xmlText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (value && typeof value === "object" && "#text" in value) return xmlText((value as { "#text": unknown })["#text"]);
+  return "";
+}
+
 /** True if any of the given robots-directive strings turns off archiving, case-insensitively. */
 export function hasNoarchive(...values: (string | null | undefined)[]): boolean {
   return values.some((value) => value && /noarchive/i.test(value));

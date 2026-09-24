@@ -49,13 +49,20 @@ test("publishedDate keeps a stated calendar date instead of reinterpreting its t
   assert.equal(publishedDate(undefined), null);
 });
 
-test("trimByline cuts a long author list at the last comma instead of mid-name", () => {
-  const names = ["Alex Kim", "Bao Nguyen", "Chen Wei", "Dara Osei", "Elin Park", "Farah Khan", "Grace Lynn Tan", "Cody Reyes"];
-  const byline = names.join(", "); // longer than 120 chars, cuts inside "Cody Reyes" without the fix
-  const trimmed = trimByline(byline);
-  assert.ok(trimmed && trimmed.length <= 120);
-  assert.ok(names.slice(0, -1).every((name) => trimmed!.includes(name))); // every full name up to the cut survives
-  assert.ok(!trimmed!.endsWith(","));
+test("publishedDate rejects a YYYY-MM-DD prefix that isn't a real calendar date", () => {
+  // posts.published_at is a Postgres date column; any of these would fail that write and lose the post.
+  assert.equal(publishedDate("0000-00-00T00:00:00Z"), null);
+  assert.equal(publishedDate("2026-13-01"), null); // month 13
+  assert.equal(publishedDate("2026-02-30"), null); // Date would silently roll this over to March 2
+});
+
+test("trimByline cuts a long author list at a name boundary, not mid-name", () => {
+  const names = ["Alex Kim", "Bao Nguyen", "Chen Wei", "Dara Osei", "Elin Park", "Farah Khan", "Grace Lynn Tan", "Cody Reyes", "Priya Sharma", "Omar Abdulrahman Haddad-Lindqvist"];
+  const byline = names.join(", "); // 141 chars: a plain slice(0, 120) lands mid "Abdulrahman", not at a comma
+  assert.equal(
+    trimByline(byline),
+    "Alex Kim, Bao Nguyen, Chen Wei, Dara Osei, Elin Park, Farah Khan, Grace Lynn Tan, Cody Reyes, Priya Sharma",
+  );
   assert.equal(trimByline(null), null);
   assert.equal(trimByline("Short Name"), "Short Name");
 });
@@ -89,11 +96,68 @@ const substackJsonLd = `<script type="application/ld+json">${JSON.stringify({
 test("readPageMeta and articleFromHtml take date and site name from body JSON-LD when no meta tag has them", () => {
   const doc = parseHTML(page("", substackJsonLd + article)).document as unknown as Document;
   const meta = readPageMeta(doc);
-  assert.equal(meta.published, "2026-09-18T17:54:32+00:00");
+  assert.equal(meta.published, undefined); // no article:published_time meta on this page
+  assert.equal(meta.jsonLdPublished, "2026-09-18T17:54:32+00:00");
   assert.equal(meta.siteName, "One Useful Thing");
   const result = articleFromHtml(page("", substackJsonLd + article), "https://www.oneusefulthing.org/p/the-overhang");
   assert.equal(result.publishedAt, "2026-09-18");
   assert.equal(result.siteName, "One Useful Thing");
+});
+
+test("readJsonLd finds the date inside a top-level array of nodes, skipping ones with no useful fields", () => {
+  // A charset-suffixed, mixed-case type — "Application/Ld+Json; charset=utf-8" — must still match.
+  const html = page(
+    "",
+    `<script type="Application/Ld+Json; charset=utf-8">${JSON.stringify([
+      { "@type": "BreadcrumbList", itemListElement: [] },
+      { "@type": "NewsArticle", datePublished: "2026-09-18T17:54:32+00:00", publisher: { name: "One Useful Thing" } },
+    ])}</script>${article}`,
+  );
+  const result = articleFromHtml(html, "https://www.oneusefulthing.org/p/the-overhang");
+  assert.equal(result.publishedAt, "2026-09-18");
+  assert.equal(result.siteName, "One Useful Thing");
+});
+
+test("readJsonLd finds the date inside an @graph array", () => {
+  const html = page(
+    "",
+    `<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "WebSite", name: "Some Site" },
+        { "@type": "NewsArticle", datePublished: "2026-09-18T17:54:32+00:00", publisher: { name: "One Useful Thing" } },
+      ],
+    })}</script>${article}`,
+  );
+  const result = articleFromHtml(html, "https://www.oneusefulthing.org/p/the-overhang");
+  assert.equal(result.publishedAt, "2026-09-18");
+  assert.equal(result.siteName, "One Useful Thing");
+});
+
+test("readJsonLd never throws on an array, a non-object, or malformed JSON", () => {
+  for (const body of ["[]", "null", "42", "not json at all", "{}"]) {
+    assert.doesNotThrow(() => readPageMeta(parseHTML(page("", `<script type="application/ld+json">${body}</script>${article}`)).document as unknown as Document));
+  }
+});
+
+test("a garbage JSON-LD date does not shadow a valid date Readability found elsewhere", () => {
+  // No article:published_time meta. The JSON-LD has no @context, so Readability's own JSON-LD
+  // reader (which requires one) ignores it and falls through to a meta name it recognises that our
+  // own readPageMeta doesn't check at all — "parsely-pub-date" — landing on a genuinely valid date.
+  // Our readJsonLd (which doesn't require @context) still reads the garbage "yesterday" into
+  // jsonLdPublished; the old `page.published ?? parsed?.publishedTime` chain (page.published
+  // already merged with the JSON-LD date) would have let that garbage win outright.
+  const head = `<meta name="parsely-pub-date" content="2026-09-20T10:00:00Z">
+    <script type="application/ld+json">${JSON.stringify({ "@type": "NewsArticle", datePublished: "yesterday" })}</script>`;
+  const result = articleFromHtml(page(head, article), "https://blog.test/p");
+  assert.equal(result.publishedAt, "2026-09-20");
+});
+
+test("articleFromHtml falls back to Readability's own site name when no og/JSON-LD site name is found", () => {
+  // Our own selector is an exact-case CSS attribute match; Readability's is a case-insensitive
+  // regex over every meta element, so a shouty-case property is a genuine (not contrived) divergence.
+  const result = articleFromHtml(page(`<meta property="OG:SITE_NAME" content="Shouty Site">`, article), "https://blog.test/p");
+  assert.equal(result.siteName, "Shouty Site");
 });
 
 test("fromLlmBlock maps the flat model schema and drops malformed blocks", () => {
@@ -153,9 +217,11 @@ const emptyFeed = `<?xml version='1.0' encoding='UTF-8'?>
   <opensearch:startIndex>0</opensearch:startIndex>
 </feed>`;
 
-// Live export.arxiv.org/api/query?id_list=foo response, verbatim: a malformed id instead gets a 200
-// with one entry shaped like an error report — id containing "/api/errors#", title "Error", author
-// "arXiv api core" — not an HTTP failure and not an empty result set either.
+// Live export.arxiv.org/api/query?id_list=foo response body, verbatim: an error-shaped entry — id
+// containing "/api/errors#", title "Error", author "arXiv api core". Live probing found arXiv
+// actually serves this over HTTP 400, not 200 (extractArxiv's own metadata() already throws on that
+// before parseArxivAtom ever runs), so this pins parseArxivAtom's defense in depth on the body shape
+// alone, independent of whatever status code a caller wraps it in.
 const errorEntryFeed = `<?xml version='1.0' encoding='UTF-8'?>
 <feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
   <id>https://arxiv.org/</id>
@@ -214,8 +280,8 @@ ${Array.from({ length: 12 }, (_, i) => `<p class="ltx_p">Paragraph ${i} on facto
 <figure class="ltx_figure"><img src="2401.00001v1/return_difference.png" alt="Return difference" width="640" height="480"><figcaption class="ltx_caption">Figure 1: Return difference.</figcaption></figure>
 </article></div></body></html>`;
 
-test("extractArxiv resolves an HTML paper's figure against the real (unslashed) page URL", async () => {
-  const restoreDns = mockDns();
+test("extractArxiv resolves an HTML paper's figure against the real (unslashed) page URL", async (t) => {
+  mockDns(t);
   const restoreFetch = mockFetch(async (url) => {
     if (url.includes("export.arxiv.org")) return new Response(singleAuthorFeed, { status: 200 });
     if (url.includes("/html/")) return new Response(arxivHtmlFixture, { status: 200, headers: { "content-type": "text/html" } });
@@ -228,12 +294,11 @@ test("extractArxiv resolves an HTML paper's figure against the real (unslashed) 
     assert.equal(image(result.blocks)?.originalUrl, "https://arxiv.org/html/2401.00001v1/return_difference.png");
   } finally {
     restoreFetch();
-    restoreDns();
   }
 });
 
-test("extractArxiv falls back to the abstract when neither an HTML nor a PDF version can be read", async () => {
-  const restoreDns = mockDns();
+test("extractArxiv falls back to the abstract when neither an HTML nor a PDF version can be read", async (t) => {
+  mockDns(t);
   const restoreFetch = mockFetch(async (url) => {
     if (url.includes("export.arxiv.org")) return new Response(singleAuthorFeed, { status: 200 });
     return new Response("", { status: 404 }); // no HTML version, no PDF either
@@ -247,7 +312,6 @@ test("extractArxiv falls back to the abstract when neither an HTML nor a PDF ver
     assert.ok(result.text.includes("monotonic expression for the Ricci flow"));
   } finally {
     restoreFetch();
-    restoreDns();
   }
 });
 
@@ -274,7 +338,7 @@ const repoInfoFixture = {
 // image-resolution assertion runs, since filterNoise is part of the same htmlToDrafts call. GitHub's
 // rendering never rewrote that relative src at all — it only proxies absolute external images
 // through camo; the root-relative, differently-cased, and blob-vs-raw shapes below are constructed
-// to match a failure mode observed via live probing on repos with root-relative README links.
+// (not observed live) to exercise resolveGithubImage's own branches.
 const readmeFixture = `
   <img src=".github/Detectron2-Horz.svg" width="300" style="max-width: 100%;">
   <img src="/docs/banner.png" alt="banner">
@@ -296,8 +360,8 @@ test("resolveGithubImage resolves root-relative and blob/raw-prefixed paths case
   assert.deepEqual(urls, [
     "https://raw.githubusercontent.com/facebookresearch/detectron2/main/.github/Detectron2-Horz.svg", // plain relative
     "https://raw.githubusercontent.com/facebookresearch/detectron2/main/docs/banner.png", // root-relative
-    "https://github.com/facebookresearch/detectron2/raw/main/docs/x.png", // already repo-qualified
-    "https://github.com/Facebookresearch/Detectron2/blob/main/img/y.png", // different case, "blob" not "raw" — not doubled
+    "https://raw.githubusercontent.com/facebookresearch/detectron2/main/docs/x.png", // already repo-qualified ("raw") — rebuilt, not just re-hosted on github.com
+    "https://raw.githubusercontent.com/facebookresearch/detectron2/main/img/y.png", // different case, "blob" not "raw" — a github.com/.../blob/... URL would be the HTML viewer page, not image bytes
     "https://camo.githubusercontent.com/4b99b5f67e5e01f9ba4d88092d59b81a473b8f8fba65b8d3b5dd638fafdcee58/68747470733a2f2f7777772e74656e736f72666c6f772e6f72672f696d616765732f74665f6c6f676f5f686f72697a6f6e74616c2e706e67", // absolute camo, untouched
   ]);
 });

@@ -2,7 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
 import { githubHeaders, USER_AGENT } from "./fetch.ts";
 import { feeds, githubTopics, hnQueries } from "./feeds.ts";
-import { list } from "./util.ts";
+import { list, xmlText } from "./util.ts";
 
 export type Candidate = {
   url: string;
@@ -26,15 +26,9 @@ async function get(url: string, headers: Record<string, string> = {}): Promise<R
   return response;
 }
 
-const text = (value: unknown): string => {
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  if (value && typeof value === "object" && "#text" in value) return text((value as { "#text": unknown })["#text"]);
-  return "";
-};
 const stripHtml = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
 const isoDate = (value: unknown) => {
-  const date = new Date(text(value));
+  const date = new Date(xmlText(value));
   return Number.isNaN(date.getTime()) ? new Date().toISOString().slice(0, 10) : date.toISOString().slice(0, 10);
 };
 
@@ -51,15 +45,15 @@ export function parseFeed(body: string, feed: { name: string; hint: DigestCatego
     const links = list(entry.link as unknown);
     const link = typeof links[0] === "string"
       ? links[0]
-      : text((links.find((l) => (l as FeedEntry)["@_rel"] !== "self" && (l as FeedEntry)["@_rel"] !== "replies") as FeedEntry | undefined)?.["@_href"]);
+      : xmlText((links.find((l) => (l as FeedEntry)["@_rel"] !== "self" && (l as FeedEntry)["@_rel"] !== "replies") as FeedEntry | undefined)?.["@_href"]);
     const published = entry.pubDate ?? entry.published ?? entry.updated ?? entry["dc:date"];
-    const date = new Date(text(published));
+    const date = new Date(xmlText(published));
     if (!link || (!Number.isNaN(date.getTime()) && date < since)) return [];
     return [{
       url: link.trim(),
-      title: stripHtml(text(entry.title)),
+      title: stripHtml(xmlText(entry.title)),
       source: feed.name,
-      snippet: stripHtml(text(entry.description ?? entry.summary ?? entry.content)).slice(0, 400),
+      snippet: stripHtml(xmlText(entry.description ?? entry.summary ?? entry.content)).slice(0, 400),
       publishedAt: isoDate(published),
       hint: feed.hint,
     }];

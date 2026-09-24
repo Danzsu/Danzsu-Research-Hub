@@ -23,18 +23,21 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&
 /**
  * A root-relative README image src ("/docs/banner.png") isn't relative to the domain — it's
  * relative to the repo, so it needs the repo+branch re-inserted before raw.githubusercontent.com
- * will serve it. One that already names the repo ("/<owner>/<repo>/(blob|raw)/<branch>/docs/x.png")
- * already resolves on github.com as-is; re-inserting the repo+branch there would double them up, so
- * that shape is matched case-insensitively (repo names and README links aren't always the same case)
- * and routed to the github.com origin instead. A plain relative src ("docs/x.png") and an absolute
- * one resolve correctly already, so this returns undefined for those and lets the caller fall back
- * to normal resolution.
+ * will serve it. One that already names the repo ("/<owner>/<repo>/(blob|raw)/<branch>/docs/x.png",
+ * matched case-insensitively since repo names and README links aren't always the same case) also
+ * needs rebuilding, not just an origin swap to github.com: a "/blob/" link is the HTML file-viewer
+ * page, not image bytes, so `mirrorImages` would drop it. Both shapes are rebuilt directly as a
+ * raw.githubusercontent.com URL, keeping the branch the link itself named (a README can point at a
+ * pinned tag or an old snapshot, not always the repo's current default branch). A plain relative src
+ * ("docs/x.png") and an absolute one resolve correctly already, so this returns undefined for those
+ * and lets the caller fall back to normal resolution.
  */
 export function resolveGithubImage(fullName: string, branch: string): ImageResolver {
-  const repoLinkPrefix = new RegExp(`^/${escapeRegExp(fullName)}/(?:blob|raw)/`, "i");
+  const repoLink = new RegExp(`^/${escapeRegExp(fullName)}/(?:blob|raw)/([^/]+)/(.*)$`, "i");
   return (raw: string) => {
     if (!raw.startsWith("/") || raw.startsWith("//")) return undefined;
-    if (repoLinkPrefix.test(raw)) return `https://github.com${raw}`;
+    const match = repoLink.exec(raw);
+    if (match) return `https://raw.githubusercontent.com/${fullName}/${match[1]}/${match[2]}`;
     return `https://raw.githubusercontent.com/${fullName}/${branch}${raw}`;
   };
 }

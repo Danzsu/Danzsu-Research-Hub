@@ -17,6 +17,7 @@ import {
   parseSubmittedUrl,
   publishedLabel,
   slugify,
+  xmlText,
   xStatusId,
   youtubeId,
 } from "./util.ts";
@@ -118,6 +119,14 @@ test("list normalizes an XML-parsed field that's absent, a single value, or an a
   assert.deepEqual(list(undefined), []);
   assert.deepEqual(list({ name: "Grisha Perelman" }), [{ name: "Grisha Perelman" }]); // a single tag, not split apart
   assert.deepEqual(list([{ name: "a" }, { name: "b" }]), [{ name: "a" }, { name: "b" }]);
+});
+
+test("xmlText normalizes a string, a number, an attributes-mixed #text wrapper, and absent values", () => {
+  assert.equal(xmlText("plain"), "plain");
+  assert.equal(xmlText(0.1), "0.1");
+  assert.equal(xmlText({ "@_rel": "self", "#text": "wrapped" }), "wrapped");
+  assert.equal(xmlText(undefined), "");
+  assert.equal(xmlText(null), "");
 });
 
 test("hasNoarchive matches case-insensitively across several robots-directive strings", () => {

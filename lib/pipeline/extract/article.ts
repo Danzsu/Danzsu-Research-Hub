@@ -10,7 +10,15 @@ import type { Extracted, Extractor } from "./types.ts";
 const MAX_HTML = 8 * 1024 * 1024;
 const ROBOTS_META_NAMES = new Set(["robots", "googlebot"]);
 
-export type PageMeta = { title?: string; description?: string; siteName?: string; published?: string; robots: string[] };
+export type PageMeta = {
+  title?: string;
+  description?: string;
+  siteName?: string;
+  /** From `meta[property=article:published_time]` only — the JSON-LD date is `jsonLdPublished`, kept separate so the fallback chain can validate each candidate instead of one shadowing the other. */
+  published?: string;
+  jsonLdPublished?: string;
+  robots: string[];
+};
 
 /** Every `meta[name=robots|googlebot]` content value, name matched case-insensitively. */
 function robotsMetaValues(document: Document): string[] {
@@ -19,26 +27,46 @@ function robotsMetaValues(document: Document): string[] {
     .map((meta) => meta.getAttribute("content") ?? "");
 }
 
+type JsonLdNode = { datePublished?: unknown; publisher?: { name?: unknown } };
+const hasJsonLdFields = (node: unknown): node is JsonLdNode => {
+  if (!node || typeof node !== "object") return false;
+  const { datePublished, publisher } = node as JsonLdNode;
+  return typeof datePublished === "string" || (!!publisher && typeof publisher === "object" && typeof publisher.name === "string");
+};
+
+/** A JSON-LD document can be one object, a top-level array of nodes, or an object with an `@graph`
+ * array — takes the first node (in whichever shape) that actually carries a date or a publisher. */
+function jsonLdNode(data: unknown): JsonLdNode | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  if (Array.isArray(data)) return data.find(hasJsonLdFields);
+  const graph = (data as { "@graph"?: unknown })["@graph"];
+  if (Array.isArray(graph)) return graph.find(hasJsonLdFields);
+  return hasJsonLdFields(data) ? data : undefined;
+}
+
 /**
  * `datePublished`/`publisher.name` from the page's own JSON-LD, read across every
- * `application/ld+json` script and merged (first value found wins per field). Some sites (Substack)
- * set no `article:published_time` meta and rely on JSON-LD alone — and that JSON-LD can live in the
- * body, so this must run before `cleanDocument` strips `<script>` tags.
+ * `application/ld+json` script (type matched case-insensitively, with or without a `; charset=...`
+ * suffix) and merged (first value found wins per field). Some sites (Substack) set no
+ * `article:published_time` meta and rely on JSON-LD alone — and that JSON-LD can live in the body,
+ * so this must run before `cleanDocument` strips `<script>` tags. Never throws: a malformed or
+ * unrecognised script is simply skipped.
  */
 function readJsonLd(document: Document): { datePublished?: string; siteName?: string } {
   let datePublished: string | undefined;
   let siteName: string | undefined;
-  for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
-    let data: unknown;
+  for (const script of document.querySelectorAll("script")) {
+    if (!/^application\/ld\+json(;|$)/i.test((script.getAttribute("type") ?? "").trim())) continue;
+    let parsed: unknown;
     try {
-      data = JSON.parse(script.textContent ?? "");
+      parsed = JSON.parse(script.textContent ?? "");
     } catch {
       continue;
     }
-    if (!data || typeof data !== "object") continue;
-    const { datePublished: date, publisher } = data as { datePublished?: unknown; publisher?: { name?: unknown } };
-    datePublished ??= typeof date === "string" ? date : undefined;
-    siteName ??= publisher && typeof publisher === "object" && typeof publisher.name === "string" ? publisher.name : undefined;
+    const node = jsonLdNode(parsed);
+    if (!node) continue;
+    datePublished ??= typeof node.datePublished === "string" ? node.datePublished : undefined;
+    siteName ??= typeof node.publisher?.name === "string" ? node.publisher.name : undefined;
   }
   return { datePublished, siteName };
 }
@@ -51,15 +79,28 @@ export function readPageMeta(document: Document): PageMeta {
     title: content('meta[property="og:title"]') ?? (document.querySelector("title")?.textContent?.trim() || undefined),
     description: content('meta[property="og:description"]') ?? content('meta[name="description"]'),
     siteName: content('meta[property="og:site_name"]') ?? jsonLd.siteName,
-    published: content('meta[property="article:published_time"]') ?? jsonLd.datePublished,
+    published: content('meta[property="article:published_time"]'),
+    jsonLdPublished: jsonLd.datePublished,
     robots: robotsMetaValues(document),
   };
 }
 
-/** A raw date's own YYYY-MM-DD is kept as-is; converting it to UTC first can shift it a day. */
-export function publishedDate(raw: string | undefined): string | null {
+/**
+ * A raw date's own YYYY-MM-DD prefix is kept only if it's a real calendar date that round-trips —
+ * `posts.published_at` is a Postgres `date`, and a value like "2026-13-01" or "2026-02-30" (which
+ * JS's Date silently rolls over to March, not rejects) would fail that column's write. Anything else
+ * with a matching prefix is rejected outright, not handed to the generic parser below: a bad prefix
+ * isn't a "non-ISO format", it's a bad date. A prefix-less, non-ISO format still goes through
+ * Date.parse/toISOString — converting through UTC there can shift the calendar day, but there's no
+ * better general answer for an arbitrary date string without a date library.
+ */
+export function publishedDate(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const prefix = /^\d{4}-\d{2}-\d{2}/.exec(raw)?.[0];
+  if (prefix) {
+    const date = new Date(`${prefix}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === prefix ? prefix : null;
+  }
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? null : new Date(parsed).toISOString().slice(0, 10);
 }
@@ -83,13 +124,16 @@ export function articleFromHtml(html: string, finalUrl: string, robotsHeader?: s
   const text = plainText(blocks);
   if (text.length < 200) throw new Error("no readable article text found");
 
-  const date = page.published ?? parsed?.publishedTime ?? undefined;
+  // First *valid* date wins — meta, then JSON-LD, then Readability's own detection — so a garbage
+  // JSON-LD date (e.g. "yesterday") can't shadow a genuinely valid one further down the chain the
+  // way a plain `??` merge would (any truthy string, garbage or not, stops a `??` chain cold).
+  const publishedAt = publishedDate(page.published) ?? publishedDate(page.jsonLdPublished) ?? publishedDate(parsed?.publishedTime);
   return {
     blocks,
     title: parsed?.title?.trim() || page.title || finalUrl,
     author: trimByline(parsed?.byline),
     siteName: page.siteName ?? parsed?.siteName ?? hostOf(finalUrl),
-    publishedAt: publishedDate(date),
+    publishedAt,
     meta: hasNoarchive(...page.robots, robotsHeader) ? { noarchive: true } : {},
     text,
   };

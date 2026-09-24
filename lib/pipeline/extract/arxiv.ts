@@ -2,7 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import { assignIds, plainText, withoutIds, type Block, type BlockDraft } from "../../blocks.ts";
 import { cancelBody, readText, safeFetch } from "../fetch.ts";
 import { collapse } from "../html-to-blocks.ts";
-import { arxivId, list } from "../util.ts";
+import { arxivId, list, xmlText } from "../util.ts";
 import { articleFromHtml } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
 import type { Extractor } from "./types.ts";
@@ -14,13 +14,16 @@ const MAX_ARXIV_HTML = 16 * 1024 * 1024;
 // parseTagValue: false — otherwise a purely numeric-looking title or summary ("0.10") is parsed as
 // the JS number 0.1, silently dropping a trailing zero and changing its type.
 const xml = new XMLParser({ parseTagValue: false });
-const text = (value: unknown) => collapse(typeof value === "string" ? value : undefined);
+const text = (value: unknown) => collapse(xmlText(value));
 
 export function parseArxivAtom(body: string): ArxivMeta {
   const entry = (xml.parse(body) as { feed?: { entry?: Record<string, unknown> } }).feed?.entry;
   if (!entry) throw new Error("arxiv: no matching paper");
-  // A malformed/unrecognised id still gets a 200 with one entry shaped like an error report,
-  // not empty results — <id> contains "/api/errors#", title "Error", author "arXiv api core".
+  // A malformed id can get an error-shaped entry in the body — <id> containing "/api/errors#",
+  // title "Error", author "arXiv api core" — though live probing found arXiv actually serves that
+  // case over HTTP 400 (metadata()'s !response.ok already throws first), and every id shape that
+  // reaches here has already passed arxivId()'s own format gate. Kept as defense in depth in case
+  // either of those holds less reliably than observed.
   if (text(entry.id).includes("/api/errors#")) throw new Error(`arxiv: ${text(entry.title) || "error"} — ${text(entry.summary)}`);
   const authors = list(entry.author as { name?: string }[] | { name?: string } | undefined);
   const published = text(entry.published);
