@@ -13,11 +13,11 @@ It was reconstructed from a flat archive (see [docs/ARCHIVE-MAP.md](docs/ARCHIVE
 Nothing runs on a personal machine. Two writers, both server-side with the Supabase **secret key**:
 
 1. **Daily pipeline** — Vercel Cron (`vercel.json`, 05:00 UTC) → `app/api/cron/daily` → `lib/pipeline/daily.ts`: collects RSS + Hacker News + GitHub search (`lib/pipeline/collect.ts`, sources in `feeds.ts`), shortlists with **Groq** (optional), curates with **Gemini** into the current ISO-week issue, refreshes the top-3 via the `refresh_must_read` RPC, and retries unfinished link submissions.
-2. **Link submissions** — `/library` form → `app/api/sources` inserts a `sources` row as the reader, then `after()` runs `lib/pipeline/ingest.ts`: YouTube goes to Gemini as a video (`file_data.file_uri`), articles are extracted with linkedom + Readability, mirrored into `posts.body`, and summarized.
+2. **Link submissions** — `/library` form → `app/api/sources` inserts a `sources` row as the reader, then `after()` runs `lib/pipeline/ingest.ts`: `detectSource` picks the source kind → the matching `lib/pipeline/extract/<kind>.ts` extractor (falling back to the article extractor, then to metadata-only, on failure) → three-layer noise filtering (`html-to-blocks.ts`'s DOM cleanup and block filter, then `cleanup.ts`'s cheap-model pass) → `limitBlocks` → `mirrorImages` (re-encodes to AVIF under `media/<source_id>/…`, served by the `/media` route) → `summarize` / `writeNotes` (for `noarchive` sources) → save. The post is replaced only on success, and `overrides` / `hidden_blocks` are never written by the pipeline.
 
-Manual run: `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/daily`.
+Manual run: `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/daily`. A single link, without going through `/library`: `npm run ingest -- <url>` — a dev tool that submits and processes one URL against whatever Supabase project `.env.local` points at (production, once deployed — see Commands).
 
-`lib/llm.ts` is two `fetch` wrappers (no SDKs) behind `generate(db, task, schema, prompt)`; every model response is validated with a zod schema (`zod/v4`, which also produces the JSON Schema sent to the model). **Which model runs which task lives in the `model_settings` table** (`daily_shortlist`, `daily_curate`, `ingest_article`, `ingest_video`), each with a fallback; editing a row takes effect on the next run, no redeploy. Pin exact versions there, not `*-latest` aliases. A route whose API key is unset is skipped.
+`lib/llm.ts` is two `fetch` wrappers (no SDKs) behind `generate(db, task, schema, prompt)`; every model response is validated with a zod schema (`zod/v4`, which also produces the JSON Schema sent to the model). **Which model runs which task lives in the `model_settings` table** (`daily_shortlist`, `daily_curate`, `ingest_article`, `ingest_video`, `ingest_pdf`, `ingest_cleanup`, `translate_post`), each with a fallback; editing a row takes effect on the next run, no redeploy. Pin exact versions there, not `*-latest` aliases. A route whose API key is unset is skipped.
 
 ## Auth
 
@@ -31,12 +31,14 @@ Email templates (Supabase → Authentication → Email Templates) should link to
 
 Schema lives in `supabase/migrations/` and is applied with `supabase db push` (Supabase CLI). RLS is on for every table:
 
-- Content (`issues`, `digest_items`, `github_top`, `posts`): readers `select`; only the secret key writes.
+- Content (`issues`, `digest_items`, `github_top`, `posts`): readers `select`; only the secret key writes. The one exception: `update_post_overrides(p_post, p_overrides, p_hidden)`, a `security definer` RPC that checks the caller submitted the post's source before writing its `overrides` / `hidden_blocks` columns — RLS can't restrict individual columns, so this RPC is the only way a reader writes to `posts` (`lib/post-edit.ts`'s `savePostEdits`).
 - `sources`: readers `select` and `insert` (stamped with `auth.uid()`).
 - `item_states`, `todos`: own rows only; `user_id` defaults to `auth.uid()`, so app code never names the user.
 - `model_settings`: RLS on with no policies — only the secret key reads it.
 
 `lib/supabase/server.ts`: `createClient()` acts as the reader (RLS applies) — use it everywhere except the pipeline; `createAdminClient()` bypasses RLS — pipeline only.
+
+**Storage:** a private `media` bucket holds mirrored images, keyed `<source_id>/<hash>-<width>.<avif|webp>` — only the pipeline's admin client writes to it. Reads go through the session-checked `app/media/[...path]/route.ts` (`getViewer()` gate, `Cache-Control: private`), never a signed URL. Deleting a `sources` row cascades to its post in Postgres, but not to its Storage objects — those are removed separately by `removeUnusedMedia(db, sourceId, [])`.
 
 ## Commands
 
@@ -47,8 +49,10 @@ cp .env.example .env.local   # or: vercel env pull .env.local
 npm run dev        # next dev on :3000
 npm run build
 npm run lint
-npm test           # node --test lib/pipeline/*.test.ts (pure helpers)
+npm test           # node --experimental-strip-types --test lib/**/*.test.ts (pure helpers)
 npx tsc --noEmit
+npm run dup         # jscpd clone check across app, lib, proxy.ts, scripts — max 1% duplication
+npm run ingest -- <url>   # dev tool: submits and processes one link against the Supabase project in .env.local
 ```
 
 `corepack enable` fails with EPERM under nvm-for-windows, so pnpm is invoked through corepack directly. Requires Node `>=22.13.0`. Files under `lib/pipeline/` and `lib/llm.ts` use relative `.ts` imports (no `@/`) so `node --test` can load them without a bundler.
@@ -58,13 +62,17 @@ npx tsc --noEmit
 ```text
 app/              pages (/, /archive, /archive/[week], /library, /library/[id], /login),
                   loading/error/not-found, manifest, auth routes, API routes
-app/components/   digest-dashboard, page-header, language-toggle
-app/api/          state (read/saved/todos), sources (link submit), cron/daily
+app/components/   digest-dashboard, page-header, language-toggle, post-blocks (block renderer)
+app/api/          state (read/saved/todos), sources (link submit), posts/[id] (edit, translate, reextract), cron/daily
+app/media/        [...path]/route.ts — session-checked mirrored-image serving
 lib/pipeline/     collect, daily, ingest, feeds, util (+ util.test.ts)
+lib/pipeline/extract/  per-kind extractors (article, youtube, arxiv, github, x, pdf) + the fallback chain
+lib/blocks.ts     the block schema (`zod/v4`), parseBlocks, safeHref — the one content model every source becomes
+lib/translate.ts  translatePost — on-demand Hungarian translation, chunked with bounded concurrency
 lib/llm.ts        Gemini + Groq
 lib/content.ts    DB rows → the UI's content types
 lib/language.ts   getLanguage() — the `lang` cookie (hu | en)
-lib/supabase/     server + admin clients, getViewer, safeNext
+lib/supabase/     server + admin clients, getViewer, safeNext (defined in lib/pipeline/util.ts, re-exported here)
 data/             digest-types.ts — the content contract and tag vocabulary
 components/ui/    39 vendored shadcn components
 supabase/         migrations
@@ -99,9 +107,11 @@ vendor/           shadcn Tailwind 4 utility pack, imported by app/globals.css
 
 `githubTop10` is an array of **positional 3-tuples** `[repo, focus, url]`, not objects. Exactly 3 items per issue have `must_read` — enforced by `refresh_must_read`; the `nth-child(2)/(3)` stagger in `globals.css` only reads as deliberate at exactly three.
 
+**Library posts use a separate block model, not `DigestItem`.** `lib/blocks.ts`'s `blockSchema` — a `zod/v4` discriminated union (`heading`, `paragraph`, `list`, `quote`, `code`, `image`, `video`, `chapters`, `repo`, `divider`) — is the one shape every source is converted into and the one shape `app/components/post-blocks.tsx` renders from; there is no raw HTML on the page, no `dangerouslySetInnerHTML`. A block's `id` is derived from its type and normalized text via `assignIds` (content-addressed, not positional), so it stays stable across re-extraction — `hidden_blocks` and, in M2, annotations refer to a block by this id. `posts.blocks` holds the original-language blocks, `posts.blocks_hu` the on-demand Hungarian translation; both are read through `parseBlocks`, which drops any individual block that fails validation rather than failing the whole page.
+
 ## Content and copyright
 
-`robots: noindex` in `app/layout.tsx` and the invite gate are load-bearing, not cosmetic — the Library mirrors article text. A `noarchive` robots signal downgrades an article to summary-only (`posts.body = null`). Deleting a `sources` row cascades to its post.
+`robots: noindex` in `app/layout.tsx` and the invite gate are load-bearing, not cosmetic — the Library mirrors article content. A `noarchive` robots signal downgrades a post to AI-written notes in its own words instead of mirrored blocks (`writeNotes` in `lib/pipeline/summary.ts`, `meta.mirrored = false` / `meta.noarchive = true`) — the block pipeline, not `posts.body`, which no longer holds anything. Deleting a `sources` row cascades to its post, but not to its mirrored images; those are removed separately by `removeUnusedMedia` (see Database → Storage).
 
 <!-- BEGIN:nextjs-agent-rules -->
 

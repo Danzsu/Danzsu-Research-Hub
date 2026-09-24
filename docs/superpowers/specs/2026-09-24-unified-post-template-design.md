@@ -161,11 +161,11 @@ Futás: `after()` a beküldés után, legfeljebb 300 másodpercig. Ha nem fér b
 | --- | --- |
 | Letöltés | `safeFetch` (a kép-URL is idegen oldaltól jön, belső címre is mutathatna); tartalomtípus-ellenőrzés; legfeljebb 5 MB; legfeljebb 30 kép posztonként; 4 párhuzamosan |
 | Feldolgozás | `sharp` (a `package.json`-ba pontos verzióval felvéve), `limitInputPixels` bekapcsolva; AVIF 640 és 1280 px szélességben; animált kép → animált WebP; SVG változatlanul |
-| Útvonal | `media/<post_id>/<az eredeti URL sha1-e>-<szélesség>.avif`, tartalom alapján, így újrafelhasználható |
+| Útvonal | `media/<source_id>/<az eredeti URL sha1-e>-<szélesség>.avif`, tartalom alapján, így újrafelhasználható. `source_id`, mert egy forráshoz egy poszt tartozik, és a poszt azonosítója még nem létezik, amikor a képek feltöltődnek. |
 | Elrendezés-ugrás ellen | A blokk tárolja a `width`/`height`-et és egy kb. 300 bájtos elmosott `placeholder`-t |
 | Kiszolgálás | `app/media/[...path]/route.ts`: belépés ellenőrzése, streamelés a Storage-ból. Fejlécek: `Cache-Control: private, max-age=31536000, immutable`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'`. (Aláírt URL nem jó, mert minden oldalbetöltéskor más, és a böngésző újratöltené.) |
 | Megjelenítés | `<img srcset sizes loading="lazy" decoding="async">`; az első kép `fetchpriority="high"`. A Next.js `<Image>` optimalizálóját nem használjuk. |
-| Törlés | A forrás törlésekor (takedown) a `media/<post_id>/` mappa is törlődik |
+| Törlés | A forrás törlésekor (takedown) a `media/<source_id>/` mappa is törlődik |
 
 ## 4. Megjelenítés
 

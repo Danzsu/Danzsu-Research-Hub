@@ -5,7 +5,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub. Published as **NEON N
 It has two views:
 
 - **Radar** — the weekly digest, refreshed daily and automatically: a curated issue, a top-3 must-read, a scored signal feed, a GitHub top-10, and a weekly archive.
-- **Library** — links readers submit (YouTube videos, articles). The AI summarizes each one in both languages; article text is **mirrored** so it survives the original link going dead. The canonical source link is always shown.
+- **Library** — links readers submit (articles, YouTube, arXiv, PDF, GitHub, X). The AI summarizes each one in both languages; content is split into typed blocks and mirrored, images included, so it survives the original link going dead. The canonical source link is always shown.
 
 ## Stack
 

@@ -74,7 +74,9 @@
 - [x] **Márkanév:** NEON NEWS RADAR
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
-- [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md). M1: blokkok, kinyerők, zajszűrés, képek, fordítás, kis javítások. M2: kiemelés és komment, Key insights, Fogalmak.
+- [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
+  - [x] **M1:** blokkok, kinyerők, zajszűrés, képek, fordítás, kis javítások.
+  - [ ] **M2 olvasóeszközök** — terv szükséges. Kiemelés és komment, Key insights, Fogalmak.
 - [ ] **2. Privát gyűjtemény:** linkek, idézetek (a kiemelésekből is), toolok, jegyzetek; címkék, Inbox / Később / Archív, keresés, export.
 - [ ] **3. Statisztika oldal:** heti mentések, hőtérkép, top források, címkézetlen és halott linkek.
 - [ ] **4. Discord-bemenet:** slash-parancs és üzenet-menü, ugyanarra a mentési útvonalra.
