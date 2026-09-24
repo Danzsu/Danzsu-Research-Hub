@@ -22,10 +22,12 @@ async function fetchOembed(watchUrl: string): Promise<OembedInfo> {
   let response: Response;
   try {
     response = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watchUrl)}`, { signal: AbortSignal.timeout(15_000) });
+    // A non-JSON 200 body is as good as no info at all — caught here, not left to escape past
+    // extractYoutube's own error handling (which used to turn it into a video-less watch-page post).
+    if (response.ok) return (await response.json()) as OembedInfo;
   } catch {
     return {};
   }
-  if (response.ok) return (await response.json()) as OembedInfo;
   await cancelBody(response);
   if (response.status === 400 || response.status === 404) throw new FetchError("youtube video not found");
   return {};
@@ -63,7 +65,8 @@ export const extractYoutube: Extractor = async (db, url, note) => {
       `${SUMMARY_INSTRUCTIONS}\n- chapters: the video's sections in order, each with its start time in whole seconds (empty if it has no clear sections).\nThe source is the attached YouTube video "${title}".${note}`,
       { youtubeUrl: watchUrl },
     );
-  } catch {
+  } catch (error) {
+    console.warn(`youtube gemini failed for ${url}: ${error instanceof Error ? error.message : String(error)}`);
     return videoOnly(id, title, author);
   }
 

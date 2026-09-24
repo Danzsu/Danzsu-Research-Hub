@@ -86,13 +86,24 @@ test("extractX throws FetchError when the oEmbed endpoint 404s (live: a deleted 
   }
 });
 
-test("extractX throws a plain Error when the oEmbed post has no text (X4, e.g. an image-only tweet)", async () => {
+test("extractX throws FetchError('x post has no text') when the oEmbed post has no text (X4, e.g. an image-only tweet; fix round 2, item 2)", async () => {
   const restore = mockFetch(async () => tweetOembed(tweetHtml("", "January 1, 2025")));
   try {
     await assert.rejects(
       () => extractX(fakeModelDb(), "https://x.com/someone/status/9", ""),
-      (error: unknown) => error instanceof Error && !(error instanceof FetchError) && /empty post/.test(error.message),
+      (error: unknown) => error instanceof FetchError && error.message === "x post has no text",
     );
+  } finally {
+    restore();
+  }
+});
+
+test("extractX wraps a network error (the oEmbed fetch itself rejects) as FetchError, not a bare Error (fix round 2, item 2)", async () => {
+  const restore = mockFetch(async () => {
+    throw new Error("network down");
+  });
+  try {
+    await assert.rejects(() => extractX(fakeModelDb(), "https://x.com/someone/status/9", ""), FetchError);
   } finally {
     restore();
   }
@@ -209,6 +220,39 @@ test("extractYoutube continues without oEmbed info on other non-OK statuses (401
   }
 });
 
+test("extractYoutube treats an oEmbed 200 with a non-JSON body the same as no info, instead of escaping into a video-less metadata post (fix round 2, item 2)", async () => {
+  const restoreKey = withGeminiKey();
+  let geminiCalled = false;
+  const restore = mockFetch(async (url) => {
+    if (url.includes("/oembed")) return new Response("not json", { status: 200 });
+    geminiCalled = true;
+    return geminiResponse(noChapters);
+  });
+  try {
+    const result = await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    assert.equal(geminiCalled, true); // the bad body didn't escape uncaught — Gemini still ran
+    assert.equal(result.title, youtubeUrl);
+    assert.deepEqual(result.blocks.map((b) => b.type), ["video"]); // still has its video block
+  } finally {
+    restore();
+    restoreKey();
+  }
+});
+
+test("extractYoutube cancels the oEmbed response body on a non-ok status instead of leaving it open (fix round 2, item 4)", async () => {
+  const restoreKey = withGeminiKey();
+  let cancelled = false;
+  const body = new ReadableStream({ cancel: () => { cancelled = true; } });
+  const restore = mockFetch(async (url) => (url.includes("/oembed") ? new Response(body, { status: 403 }) : geminiResponse(noChapters)));
+  try {
+    await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    assert.equal(cancelled, true);
+  } finally {
+    restore();
+    restoreKey();
+  }
+});
+
 test("extractYoutube returns a metadata-only result when the Gemini call fails, without ever fetching the watch page", async () => {
   const restoreKey = withGeminiKey();
   const counter = { calls: 0 };
@@ -224,6 +268,27 @@ test("extractYoutube returns a metadata-only result when the Gemini call fails, 
     assert.equal(result.meta.videoId, "dQw4w9WgXcQ");
     assert.equal(result.text, "A video — A Channel");
     assert.ok(!("generated" in result));
+  } finally {
+    restore();
+    restoreKey();
+  }
+});
+
+test("extractYoutube logs a warning with the url and error message when the Gemini call fails (fix round 2, item 1)", async (t) => {
+  const restoreKey = withGeminiKey();
+  const logged: string[] = [];
+  t.mock.method(console, "warn", (...args: unknown[]) => {
+    logged.push(args.join(" "));
+  });
+  const restore = mockFetch(oembedThenBrokenGemini({ title: "A video", author_name: "A Channel" }));
+  try {
+    await extractYoutube(fakeModelDb(), youtubeUrl, "");
+    // generate() itself also warns once per failed route; extractYoutube's own line (the one this
+    // fix adds) must be among them, naming both the url and the underlying error, not swallowed.
+    assert.ok(logged.length >= 1);
+    const own = logged.find((line) => line.includes("youtube") && line.includes(youtubeUrl));
+    assert.ok(own, `no logged line named both "youtube" and the url; got: ${JSON.stringify(logged)}`);
+    assert.match(own, /is not valid JSON|Unexpected token/); // the underlying Gemini/JSON error, not swallowed
   } finally {
     restore();
     restoreKey();

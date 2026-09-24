@@ -2,7 +2,7 @@ import { z } from "zod/v4";
 import { assignIds, plainText, type BlockDraft } from "../../blocks.ts";
 import { generate } from "../../llm.ts";
 import { cancelBody, FetchError, readLimited, safeFetch } from "../fetch.ts";
-import { hasNoarchive, hostOf } from "../util.ts";
+import { filenameOf, hasNoarchive, hostOf } from "../util.ts";
 import type { Extracted, Extractor } from "./types.ts";
 
 const MAX_PDF = 20 * 1024 * 1024;
@@ -53,7 +53,7 @@ export async function extractPdfResponse(db: Parameters<Extractor>[0], url: stri
   const blocks = assignIds(result.blocks.map(fromLlmBlock).filter((block): block is BlockDraft => block !== null));
   return {
     blocks,
-    title: result.title || new URL(url).pathname.split("/").pop() || url,
+    title: result.title || filenameOf(url) || url,
     author: result.author?.trim() || null,
     siteName: hostOf(url),
     publishedAt: null,

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FetchError } from "../fetch.ts";
 import { fakeModelDb, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
-import { extract, metadataOnly } from "./index.ts";
+import { extract, isHtml, metadataOnly } from "./index.ts";
 
 const db = fakeModelDb();
 
@@ -137,22 +137,6 @@ test("extract() rethrows FetchError('youtube video not found') for kind='youtube
   }
 });
 
-// The video-block splice that used to live in extract() itself is gone: reaching the generic
-// metadata-only tail for kind="youtube" (an edge case — extractYoutube's own guard threw a plain
-// Error before any fetch) no longer gets special treatment.
-test("extract() no longer special-cases youtube's video block in the generic metadata-only fallback", async (t) => {
-  mockDns(t);
-  const html = `<!doctype html><html><head><title>Not a real youtube URL</title></head><body></body></html>`;
-  const restore = mockFetch(async () => new Response(html, { headers: { "content-type": "text/html" } }));
-  try {
-    const result = await extract(db, "youtube", "https://example.com/not-a-video", "");
-    assert.deepEqual(result.blocks, []);
-    assert.equal(result.meta.extractionFailed, true);
-  } finally {
-    restore();
-  }
-});
-
 // (f) a deleted/nonexistent X post: FetchError from extract(), fetching only the oEmbed host.
 test("extract() rethrows FetchError for a deleted X post (oEmbed 404), fetching only the oEmbed host", async (t) => {
   mockDns(t);
@@ -169,6 +153,42 @@ test("extract() rethrows FetchError for a deleted X post (oEmbed 404), fetching 
   }
 });
 
+// fix round 2, item 2: every extractX failure is a FetchError, so extract() rethrows for x instead
+// of falling through to a metadata post scraped from the x.com login shell.
+test("extract() rethrows FetchError for an x network error (oEmbed fetch itself fails), fetching only the oEmbed host", async (t) => {
+  mockDns(t);
+  let calls = 0;
+  const restore = mockFetch(async () => {
+    calls++;
+    throw new Error("network down");
+  });
+  try {
+    await assert.rejects(() => extract(db, "x", "https://x.com/someone/status/1", ""), FetchError);
+    assert.equal(calls, 1);
+  } finally {
+    restore();
+  }
+});
+
+test("extract() rethrows FetchError('x post has no text') for an empty x post, fetching only the oEmbed host", async (t) => {
+  mockDns(t);
+  let calls = 0;
+  const emptyPost = `<blockquote class="twitter-tweet"><p lang="en" dir="ltr"></p>&mdash; Someone (@someone) <a href="https://x.com/someone/status/1">January 1, 2025</a></blockquote>`;
+  const restore = mockFetch(async () => {
+    calls++;
+    return new Response(JSON.stringify({ author_name: "Someone", html: emptyPost }));
+  });
+  try {
+    await assert.rejects(
+      () => extract(db, "x", "https://x.com/someone/status/1", ""),
+      (error: unknown) => error instanceof FetchError && error.message === "x post has no text",
+    );
+    assert.equal(calls, 1);
+  } finally {
+    restore();
+  }
+});
+
 // The generic "everything unreachable" path: a kind with neither special case (github) still falls
 // all the way through to metadataOnly, which itself throws when the page can't be reached at all.
 test("extract() throws FetchError from metadataOnly when the page is unreachable after every extractor fails", async (t) => {
@@ -176,6 +196,31 @@ test("extract() throws FetchError from metadataOnly when the page is unreachable
   const restore = mockFetch(async () => new Response("", { status: 503 }));
   try {
     await assert.rejects(() => extract(db, "github", "https://github.com/owner/repo", ""), FetchError);
+  } finally {
+    restore();
+  }
+});
+
+// fix round 2, item 3.
+test("isHtml treats a missing content-type, case variation and whitespace before the charset all as HTML; a pdf as not", () => {
+  assert.equal(isHtml("text/html; charset=UTF-8"), true);
+  assert.equal(isHtml("TEXT/HTML"), true);
+  assert.equal(isHtml("application/xhtml+xml"), true);
+  assert.equal(isHtml(""), true); // missing entirely — the request itself asked for text/html
+  assert.equal(isHtml("text/html ; charset=utf-8"), true); // whitespace before the ;
+  assert.equal(isHtml("application/pdf"), false);
+});
+
+// fix round 2, item 4: cancelBody was called in metadataOnly's non-HTML branch, but nothing
+// verified the cancel actually fired — only that the right (filename) title came out.
+test("metadataOnly cancels the body of a non-HTML response instead of leaving it open", async (t) => {
+  mockDns(t);
+  let cancelled = false;
+  const body = new ReadableStream({ cancel: () => { cancelled = true; } });
+  const restore = mockFetch(async () => new Response(body, { headers: { "content-type": "application/pdf" } }));
+  try {
+    await metadataOnly("http://93.184.216.34/paper.pdf");
+    assert.equal(cancelled, true);
   } finally {
     restore();
   }

@@ -36,16 +36,23 @@ export function parseTweetHtml(html: string): { paragraphs: Inline[][]; text: st
 
 // oEmbed returns a single post without login; threads and images are out of reach.
 export const extractX: Extractor = async (_db, url) => {
-  const response = await fetch(`https://publish.twitter.com/oembed?omit_script=true&url=${encodeURIComponent(url)}`, {
-    signal: AbortSignal.timeout(15_000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`https://publish.twitter.com/oembed?omit_script=true&url=${encodeURIComponent(url)}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    // Every failure here must be a FetchError: extract() rethrows it for x (never falls back to a
+    // metadata post scraped from the x.com login shell), and the source ends up retried later.
+    throw new FetchError(`x oembed fetch failed: ${error instanceof Error ? error.message : error}`);
+  }
   if (!response.ok) {
     await cancelBody(response);
     throw new FetchError(`x oembed ${response.status}`);
   }
   const data = (await response.json()) as { author_name?: string; html?: string };
   const post = parseTweetHtml(data.html ?? "");
-  if (!post.text) throw new Error("empty post");
+  if (!post.text) throw new FetchError("x post has no text");
   const author = data.author_name ?? null;
   return {
     blocks: assignIds(post.paragraphs.map((content): BlockDraft => ({ type: "paragraph", content }))),

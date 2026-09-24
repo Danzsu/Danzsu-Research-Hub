@@ -123,6 +123,17 @@ export function formatTimestamp(seconds: number): string {
 
 export const hostOf = (url: string) => new URL(url).hostname.replace(/^www\./, "");
 
+/** The URL's own last path segment, decoded — for naming a source by its filename when nothing better is available. */
+export function filenameOf(url: string): string | undefined {
+  const segment = new URL(url).pathname.split("/").findLast(Boolean);
+  if (!segment) return undefined;
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 /** Route and page ids: positive integers only. */
 export const parseId = (raw: string): number | null => (/^[1-9]\d{0,15}$/.test(raw) ? Number(raw) : null);
 

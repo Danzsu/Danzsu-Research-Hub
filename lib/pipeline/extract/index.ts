@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseHTML } from "linkedom";
 import { cancelBody, FetchError, readText, safeFetch } from "../fetch.ts";
-import { hostOf, type SourceKind } from "../util.ts";
+import { filenameOf, hostOf, type SourceKind } from "../util.ts";
 import { extractArticle, readPageMeta } from "./article.ts";
 import { extractArxiv } from "./arxiv.ts";
 import { extractGithub } from "./github.ts";
@@ -28,18 +28,9 @@ const NO_ARTICLE_FALLBACK: ReadonlySet<SourceKind> = new Set(["pdf", "youtube", 
 
 const failure = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-const isHtml = (contentType: string) => /^(text\/html|application\/xhtml\+xml)(;|$)/i.test(contentType);
-
-/** The URL's own last path segment, decoded, for a non-HTML response with nothing else to name it by. */
-function filenameOf(url: string): string | undefined {
-  const segment = new URL(url).pathname.split("/").findLast(Boolean);
-  if (!segment) return undefined;
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-}
+// A missing content-type still counts as HTML — the request itself asked for `Accept: text/html`.
+// Whitespace before the `;` (a real server can send "text/html ; charset=...") is allowed too.
+export const isHtml = (contentType: string) => !contentType || /^(text\/html|application\/xhtml\+xml)\s*(;|$)/i.test(contentType);
 
 /**
  * Last resort: title and description only. Throws FetchError when the page itself is unreachable.

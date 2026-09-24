@@ -322,7 +322,9 @@ function pushParagraph(nodes: Node[], ctx: Ctx) {
  * Inline spans from a run of DOM nodes, merged and trimmed — the paragraph converter's own span
  * builder, but without `cleanDocument`'s noise stripping or `filterNoise`'s block-level noise removal
  * (which would drop a hashtag-only line or a same-site link as navigation). For markup outside the
- * article pipeline — e.g. a tweet's own HTML — where that content is real, not chrome.
+ * article pipeline — e.g. a tweet's own HTML — where that content is real, not chrome. A deferred
+ * element (img, iframe, pre, table) is silently dropped, not turned into its own block: `flushPending`
+ * is what does that elsewhere, and there is no block-level output here to flush it into.
  */
 export function inlineSpans(nodes: Node[], baseUrl: string): Inline[] {
   const ctx: Ctx = { base: baseUrl, imageBase: baseUrl, out: [], pending: [] };
