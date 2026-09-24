@@ -58,11 +58,15 @@ test("limitBlocks clips by count and by characters", () => {
   assert.equal(limitBlocks(assignIds([p("short")])).clipped, false);
 });
 
-test("parseBlocks turns bad stored data into an empty list instead of throwing", () => {
+test("parseBlocks keeps valid blocks and drops malformed ones", () => {
   assert.deepEqual(parseBlocks([{ id: "x", type: "nope" }]), []);
   assert.deepEqual(parseBlocks(null), []);
   const valid = assignIds([p("ok")]);
   assert.deepEqual(parseBlocks(valid), valid);
+  // Keeps valid blocks and drops invalid ones (not blanking entire array)
+  const mixed = assignIds([p("first"), p("second")]);
+  const withInvalid = [mixed[0], { id: "x", type: "nope" }, mixed[1]];
+  assert.deepEqual(parseBlocks(withInvalid), [mixed[0], mixed[1]]);
 });
 
 test("fnv1a refactor keeps existing digest item ids unchanged", () => {

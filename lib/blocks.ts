@@ -59,8 +59,11 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 /** A block before `assignIds`; extractors build these. */
 export type BlockDraft = DistributiveOmit<Block, "id">;
 
-/** Stored JSON → blocks. Bad data renders as an empty post instead of crashing the page. */
-export const parseBlocks = (value: unknown): Block[] => blocksSchema.catch([]).parse(value ?? []);
+/** Stored JSON → blocks. Validates each block independently; drops malformed blocks and keeps valid ones. */
+export function parseBlocks(value: unknown): Block[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((block) => (blockSchema.safeParse(block).success ? [blockSchema.parse(block)] : []));
+}
 
 export function safeHref(raw: string | null | undefined, base: string): string | undefined {
   if (!raw) return undefined;
