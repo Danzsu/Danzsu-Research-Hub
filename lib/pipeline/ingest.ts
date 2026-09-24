@@ -3,9 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseHTML } from "linkedom";
 import { z } from "zod/v4";
 import { digestTags } from "../../data/digest-types.ts";
-import { lookup } from "node:dns/promises";
 import { generate } from "../llm.ts";
-import { isPrivateAddress, parseSubmittedUrl } from "./util.ts";
+import { safeFetch } from "./fetch.ts";
 
 const MAX_ATTEMPTS = 3;
 const MAX_BODY = 200_000;
@@ -27,33 +26,6 @@ const INSTRUCTIONS = `Write a bilingual (Hungarian + English) library entry for 
 - Only state what the source says.`;
 
 type Article = { title: string; author: string | null; body: string | null; text: string };
-
-/**
- * Fetches a user-submitted URL without reaching internal hosts: every hop is
- * re-parsed, DNS-resolved and checked, and redirects are followed by hand.
- * ponytail: a DNS answer can still change between lookup and connect
- * (rebinding); pin the resolved IP with an undici Agent if submitters stop being invited.
- */
-async function safeFetch(raw: string): Promise<Response> {
-  let current = raw;
-  for (let hop = 0; hop < 5; hop++) {
-    const url = parseSubmittedUrl(current);
-    if (!url) throw new Error("blocked url");
-    const addresses = await lookup(url.hostname, { all: true });
-    if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) {
-      throw new Error("blocked address");
-    }
-    const response = await fetch(url, {
-      headers: { "user-agent": "Mozilla/5.0 (compatible; NeonRadar/1.0; private research digest)" },
-      signal: AbortSignal.timeout(20_000),
-      redirect: "manual",
-    });
-    const location = response.headers.get("location");
-    if (response.status < 300 || response.status >= 400 || !location) return response;
-    current = new URL(location, url).toString();
-  }
-  throw new Error("too many redirects");
-}
 
 async function readArticle(url: string): Promise<Article> {
   const response = await safeFetch(url);
