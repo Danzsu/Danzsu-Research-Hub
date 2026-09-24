@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Language } from "@/data/digest-types";
 import { safeHref, type Block, type ImageBlock, type Inline } from "@/lib/blocks";
-import { isValidPlaceholder, mediaSources, primaryVideoId, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
+import { isBlockVisible, isValidPlaceholder, mediaSources, primaryVideoId, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
 import { formatTimestamp } from "@/lib/pipeline/util";
 
 // Plain component (no hooks, no server-only imports) so the editor can reuse it client-side.
@@ -204,7 +204,7 @@ export function PostBlocks({
   const hiddenSet = new Set(hidden);
   // Exactly the blocks that end up rendered below (a fully-hidden block is skipped via `continue`,
   // never pushed) — the same set primaryVideoId must pick its candidate from.
-  const visibleBlocks = blocks.filter((block) => showHidden || controls || !hiddenSet.has(block.id));
+  const visibleBlocks = blocks.filter((block) => isBlockVisible(block.id, hiddenSet, showHidden, Boolean(controls)));
   const primaryId = primaryVideoId(visibleBlocks);
   const out: ReactNode[] = [];
   let run = 0;
@@ -225,7 +225,7 @@ export function PostBlocks({
   };
   for (const block of blocks) {
     const isHidden = hiddenSet.has(block.id);
-    if (isHidden && !showHidden && !controls) {
+    if (!isBlockVisible(block.id, hiddenSet, showHidden, Boolean(controls))) {
       run++;
       continue;
     }
@@ -234,9 +234,11 @@ export function PostBlocks({
     if (block.type === "image") firstImage = false;
     const primaryVideo = block.type === "video" && block.id === primaryId;
     out.push(
-      <div key={block.id} id={`b-${block.id}`} data-block-id={block.id} className={`scroll-mt-24 ${controls ? "relative pr-12" : ""} ${isHidden ? "opacity-40" : ""}`}>
+      <div key={block.id} id={`b-${block.id}`} data-block-id={block.id} className={`scroll-mt-24 ${controls ? "relative pr-12 min-h-10" : ""}`}>
         {controls?.(block)}
-        <BlockView block={block} priority={priority} primaryVideo={primaryVideo} videoStart={videoStart} language={language} baseUrl={baseUrl} linkQuery={linkQuery} />
+        <div className={isHidden ? "opacity-40" : undefined}>
+          <BlockView block={block} priority={priority} primaryVideo={primaryVideo} videoStart={videoStart} language={language} baseUrl={baseUrl} linkQuery={linkQuery} />
+        </div>
       </div>,
     );
   }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft, type ImageBlock } from "./blocks.ts";
 import {
+  isBlockVisible,
   isValidPlaceholder,
   isValidVimeoId,
   isValidYoutubeId,
@@ -101,7 +102,7 @@ test("withQuery merges updates over the current query, keeping every other param
   assert.equal(withQuery({}, {}), "");
 });
 
-test("withQuery keeps the edit key — Task 13's editor depends on it surviving every link", () => {
+test("withQuery keeps the edit key — the post editor depends on it surviving every link, including a chapter jump", () => {
   assert.equal(withQuery({ edit: "1" }, { t: "10" }), "?t=10&edit=1");
   assert.equal(withQuery({}, { edit: "1" }), "?edit=1");
 });
@@ -159,4 +160,13 @@ test("primaryVideoId picks the first block whose embed actually validates, skipp
 test("primaryVideoId is null with no video blocks, or none that validate", () => {
   assert.equal(primaryVideoId(assignIds([p("just text")])), null);
   assert.equal(primaryVideoId(assignIds([{ type: "video", provider: "vimeo", videoId: "not-numeric" }])), null);
+});
+
+test("isBlockVisible: a hidden block only renders with showHidden or controls mode, a plain one always does", () => {
+  const hidden = new Set(["h1"]);
+  assert.equal(isBlockVisible("h1", hidden, false, false), false);
+  assert.equal(isBlockVisible("h1", hidden, true, false), true);
+  assert.equal(isBlockVisible("h1", hidden, false, true), true);
+  assert.equal(isBlockVisible("h1", hidden, true, true), true);
+  assert.equal(isBlockVisible("other", hidden, false, false), true);
 });

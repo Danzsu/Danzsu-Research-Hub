@@ -111,6 +111,10 @@ export type Post = {
   publishedAt: string | null;
   title: Localized;
   summary: Localized;
+  /** The model's own text, before any submitter override — the editor's "reset" target and the
+   *  baseline `editPayload` (lib/post-edit.ts) diffs a draft against to decide what to save. */
+  generatedTitle: Localized;
+  generatedSummary: Localized;
   keyPoints: Record<"hu" | "en", string[]>;
   tags: string[];
   blocks: Block[];
@@ -139,6 +143,8 @@ function toPost(row: Record<string, unknown>): Post {
     // Submitter edits win over the model's text; re-extraction never overwrites them.
     title: overrides.title ?? (row.title as Localized),
     summary: overrides.summary ?? (row.summary as Localized),
+    generatedTitle: row.title as Localized,
+    generatedSummary: row.summary as Localized,
     keyPoints: row.key_points as Post["keyPoints"],
     tags: row.tags as string[],
     blocks: parseBlocks(row.blocks),

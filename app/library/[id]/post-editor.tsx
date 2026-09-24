@@ -10,11 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Language } from "@/data/digest-types";
 import type { Post } from "@/lib/content";
+import { SUMMARY_MAX, TITLE_MAX } from "@/lib/overrides";
+import { editPayload } from "@/lib/post-edit";
+import type { PostQuery } from "@/lib/post-view";
 
 const copy = {
   hu: {
     title: "Cím",
     summary: "Összefoglaló",
+    original: "Eredeti",
     save: "Mentés",
     cancel: "Mégse",
     saving: "Mentés…",
@@ -22,12 +26,13 @@ const copy = {
     started: "Az újrakinyerés elindult, pár perc múlva frissül.",
     cooldown: (s: number) => `Újrakinyerés ${Math.ceil(s / 60)} perc múlva lehetséges.`,
     failed: "Nem sikerült, próbáld újra.",
-    hide: "Elrejtés",
-    show: "Megjelenítés",
+    invalid: "A cím vagy az összefoglaló érvénytelen vagy túl hosszú.",
+    toggleHidden: "Blokk elrejtése",
   },
   en: {
     title: "Title",
     summary: "Summary",
+    original: "Original",
     save: "Save",
     cancel: "Cancel",
     saving: "Saving…",
@@ -35,19 +40,20 @@ const copy = {
     started: "Re-extraction started; the post updates in a few minutes.",
     cooldown: (s: number) => `Re-extraction possible in ${Math.ceil(s / 60)} min.`,
     failed: "That failed, try again.",
-    hide: "Hide",
-    show: "Show",
+    invalid: "The title or summary is invalid or too long.",
+    toggleHidden: "Hide block",
   },
 };
 
-export function PostEditor({ post, language }: { post: Post; language: Language }) {
+export function PostEditor({ post, language, query, videoStart }: { post: Post; language: Language; query: PostQuery; videoStart?: number }) {
   const router = useRouter();
   const t = copy[language];
   const [title, setTitle] = useState(post.title);
   const [summary, setSummary] = useState(post.summary);
   const [hidden, setHidden] = useState(() => new Set(post.hiddenBlocks));
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [reextracting, setReextracting] = useState(false);
+  const [status, setStatus] = useState<{ text: string; failed: boolean } | null>(null);
 
   const toggle = (id: string) =>
     setHidden((current) => {
@@ -62,19 +68,22 @@ export function PostEditor({ post, language }: { post: Post; language: Language 
     const response = await fetch(`/api/posts/${post.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title, summary, hidden: [...hidden] }),
+      body: JSON.stringify(editPayload(post, { title, summary }, [...hidden])),
     }).catch(() => null);
     setBusy(false);
-    if (!response?.ok) return setStatus(t.failed);
+    if (!response?.ok) return setStatus({ text: response?.status === 400 ? t.invalid : t.failed, failed: true });
     router.push(`/library/${post.id}`);
     router.refresh();
   }
 
   async function reextract() {
+    setReextracting(true);
     const response = await fetch(`/api/posts/${post.id}/reextract`, { method: "POST" }).catch(() => null);
     const data = (await response?.json().catch(() => ({}))) as { retryAfter?: number };
-    if (response?.status === 429 && data.retryAfter) setStatus(t.cooldown(data.retryAfter));
-    else setStatus(response?.ok ? t.started : t.failed);
+    setReextracting(false);
+    if (response?.status === 429 && data.retryAfter) setStatus({ text: t.cooldown(data.retryAfter), failed: false });
+    else if (response?.ok) setStatus({ text: t.started, failed: false });
+    else setStatus({ text: t.failed, failed: true });
   }
 
   return (
@@ -83,12 +92,37 @@ export function PostEditor({ post, language }: { post: Post; language: Language 
         {(["hu", "en"] as const).map((lang) => (
           <div key={lang} className="space-y-3">
             <label className="block space-y-1 font-mono text-xs">
-              <span>{t.title} ({lang.toUpperCase()})</span>
-              <Input value={title[lang]} onChange={(e) => setTitle({ ...title, [lang]: e.target.value })} className="min-h-10 border-2 border-ink bg-paper" />
+              <span className="flex items-center justify-between gap-2">
+                <span>{t.title} ({lang.toUpperCase()})</span>
+                <Button type="button" variant="brutal" size="xs" className="min-h-10" onClick={() => setTitle({ ...title, [lang]: post.generatedTitle[lang] })}>
+                  {t.original}
+                </Button>
+              </span>
+              <Input
+                value={title[lang]}
+                onChange={(e) => setTitle({ ...title, [lang]: e.target.value })}
+                className="min-h-10 border-2 border-ink bg-paper"
+                required
+                maxLength={TITLE_MAX}
+                lang={lang}
+              />
             </label>
             <label className="block space-y-1 font-mono text-xs">
-              <span>{t.summary} ({lang.toUpperCase()})</span>
-              <Textarea value={summary[lang]} onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })} rows={5} className="border-2 border-ink bg-paper" />
+              <span className="flex items-center justify-between gap-2">
+                <span>{t.summary} ({lang.toUpperCase()})</span>
+                <Button type="button" variant="brutal" size="xs" className="min-h-10" onClick={() => setSummary({ ...summary, [lang]: post.generatedSummary[lang] })}>
+                  {t.original}
+                </Button>
+              </span>
+              <Textarea
+                value={summary[lang]}
+                onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })}
+                rows={5}
+                className="border-2 border-ink bg-paper"
+                required
+                maxLength={SUMMARY_MAX}
+                lang={lang}
+              />
             </label>
           </div>
         ))}
@@ -96,20 +130,23 @@ export function PostEditor({ post, language }: { post: Post; language: Language 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ink" className="min-h-10" onClick={() => void save()} disabled={busy}>{busy ? t.saving : t.save}</Button>
         <Button asChild variant="brutal" className="min-h-10"><Link href={`/library/${post.id}`}>{t.cancel}</Link></Button>
-        <Button variant="brutal" className="min-h-10" onClick={() => void reextract()}><RefreshCw /> {t.reextract}</Button>
-        {status && <p role="status" className="font-mono text-xs text-ink/70">{status}</p>}
+        <Button variant="brutal" className="min-h-10" onClick={() => void reextract()} disabled={reextracting}><RefreshCw /> {t.reextract}</Button>
+        {/* Always mounted, so a screen reader hears the eventual status even if it looked away before it changed. */}
+        <p role="status" className={`font-mono text-xs ${status?.failed ? "text-signal" : "text-ink/70"}`}>{status?.text ?? ""}</p>
       </div>
       <PostBlocks
         blocks={post.blocks}
         language={language}
         baseUrl={post.url}
         hidden={[...hidden]}
+        videoStart={videoStart}
+        linkQuery={query}
         controls={(block) => (
           <Button
             variant="brutal"
             size="icon-lg"
             onClick={() => toggle(block.id)}
-            aria-label={hidden.has(block.id) ? t.show : t.hide}
+            aria-label={t.toggleHidden}
             aria-pressed={hidden.has(block.id)}
             className="absolute top-0 right-0"
           >

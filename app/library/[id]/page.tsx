@@ -60,6 +60,7 @@ export default async function PostPage({
   const blocks = showingTranslation ? post.blocksHu! : post.blocks;
   const minutes = readMinutes(post.blocks, post.kind);
   const start = Number.parseInt(query.t ?? "", 10);
+  const videoStart = Number.isFinite(start) && start > 0 ? start : undefined;
   // post.url is already validated at ingest (parseSubmittedUrl), but every href the page emits
   // goes through safeHref anyway — this is the same choke point PostBlocks uses.
   const originalHref = safeHref(post.url, post.url);
@@ -127,7 +128,7 @@ export default async function PostPage({
 
           {query.edit === "1" && canEdit ? (
             <section className="mt-12">
-              <PostEditor post={post} language={language} />
+              <PostEditor post={post} language={language} query={query} videoStart={videoStart} />
             </section>
           ) : (
             blocks.length > 0 && (
@@ -138,7 +139,7 @@ export default async function PostPage({
                   baseUrl={post.url}
                   hidden={post.hiddenBlocks}
                   showHidden={query.hidden === "show"}
-                  videoStart={Number.isFinite(start) && start > 0 ? start : undefined}
+                  videoStart={videoStart}
                   linkQuery={query}
                 />
               </section>

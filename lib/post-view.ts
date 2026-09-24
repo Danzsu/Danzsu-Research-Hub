@@ -33,11 +33,11 @@ export const isValidPlaceholder = (value: string): boolean => /^data:image\/(avi
 export type MediaSources = { src: string; srcSet: string };
 
 /**
- * `block.path` is untrusted at render time — it's jsonb the RPC/translation path could hand back
- * unchanged, and it only ever comes from `imageKey` (pipeline/images.ts) to begin with. Null unless `path`/
- * `format`/every declared width together still form a real `/media` key (the same shape
- * `isMediaKey` guards on the route itself); that render-time check is defense in depth, not the
- * only thing keeping a crafted path from smuggling an off-origin URL into the srcset.
+ * `path` only ever comes from `imageKey` (pipeline/images.ts) — neither the RPC nor the
+ * translation path can set or touch it. Null unless `path`/`format`/every declared width together
+ * still form a real `/media` key (the same shape `isMediaKey` guards on the route itself); that
+ * render-time check is defense in depth, not the only thing keeping a crafted path from smuggling
+ * an off-origin URL into the srcset.
  */
 export function mediaSources(block: ImageBlock): MediaSources | null {
   const { path, format, widths } = block;
@@ -79,6 +79,16 @@ export function primaryVideoId(visibleBlocks: Block[]): string | null {
     if (block.type === "video" && videoEmbedSrc(block) !== null) return block.id;
   }
   return null;
+}
+
+/**
+ * Whether a block should render at all: a block that isn't hidden always does; a hidden one only
+ * renders when the caller asked to see hidden blocks (`showHidden`) or is in edit mode
+ * (`controlsMode`, dimmed rather than skipped). The one rule `PostBlocks` needs in two places —
+ * building its `visibleBlocks` list and deciding whether to skip a block in its render loop.
+ */
+export function isBlockVisible(blockId: string, hiddenSet: Set<string>, showHidden: boolean, controlsMode: boolean): boolean {
+  return showHidden || controlsMode || !hiddenSet.has(blockId);
 }
 
 /** The post page's own query params: kept as one shape so every in-page link (chapters, hidden-blocks) can carry all of them forward. */

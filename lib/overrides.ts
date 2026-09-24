@@ -4,8 +4,12 @@ import { MAX_BLOCKS } from "./blocks.ts";
 // `overrides` and `hidden_blocks` are written by the `update_post_overrides` RPC. The RPC checks
 // that only the post's submitter may call it, but nothing stops the submitter from calling it
 // directly with malformed jsonb, bypassing the app's own validation. That must never break the
-// page for other readers, so every read goes through here — and both schemas are exported so
-// Task 13's PATCH handler validates against the exact same rules.
+// page for other readers, so every read goes through here — and both schemas are exported so the
+// post edit PATCH handler validates against the exact same rules.
+
+/** Caps shared with the editor's own `maxLength` attributes, so the client and the server agree. */
+export const TITLE_MAX = 300;
+export const SUMMARY_MAX = 2000;
 
 const localizedField = (max: number) => {
   const field = z.string().trim().min(1).max(max);
@@ -13,8 +17,8 @@ const localizedField = (max: number) => {
 };
 
 export const overridesSchema = z.object({
-  title: localizedField(300).optional(),
-  summary: localizedField(2000).optional(),
+  title: localizedField(TITLE_MAX).optional(),
+  summary: localizedField(SUMMARY_MAX).optional(),
 });
 export type Overrides = z.infer<typeof overridesSchema>;
 

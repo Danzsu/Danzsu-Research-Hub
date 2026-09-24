@@ -107,8 +107,12 @@ export function detectSource(url: URL): SourceKind {
   return "article";
 }
 
+/** Minutes a post must sit between re-extraction attempts — the single source of truth for both
+ *  `cooldownRemaining`'s own default and `requestReextract`'s explicit claim window. */
+export const REEXTRACT_COOLDOWN_MINUTES = 10;
+
 /** Seconds until a post may be re-extracted again. */
-export function cooldownRemaining(extractedAt: string | null, now: Date, minutes = 10): number {
+export function cooldownRemaining(extractedAt: string | null, now: Date, minutes = REEXTRACT_COOLDOWN_MINUTES): number {
   if (!extractedAt) return 0;
   const ready = new Date(extractedAt).getTime() + minutes * 60_000;
   return Math.max(0, Math.ceil((ready - now.getTime()) / 1000));
