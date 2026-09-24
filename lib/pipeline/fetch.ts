@@ -3,12 +3,16 @@ import { errorMessage, isPrivateAddress, parseSubmittedUrl } from "./util.ts";
 
 export const USER_AGENT = "Mozilla/5.0 (compatible; NeonRadar/1.0; private research digest)";
 
-/** Fetching the source itself failed. `extract()` decides per kind whether a fallback can still help. */
+/**
+ * A fetch failed: the source itself (`safeFetch`) or a fixed host the pipeline calls (feeds, images,
+ * the arXiv and GitHub APIs, oEmbed), via `ensureOk`. `extract()` rethrows it, failing the whole
+ * submission, only for article, x and youtube; every other kind still tries its fallbacks.
+ */
 export class FetchError extends Error {}
 
-/** Standard GitHub REST headers: accept, this app's user agent, and an optional token. */
+/** Standard GitHub REST headers: accept and an optional token. `apiFetch` adds the user agent. */
 export function githubHeaders(accept: string): Record<string, string> {
-  const headers: Record<string, string> = { accept, "user-agent": USER_AGENT };
+  const headers: Record<string, string> = { accept };
   if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   return headers;
 }

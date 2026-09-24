@@ -2,7 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
 import { apiFetch, ensureOk, githubHeaders } from "./fetch.ts";
 import { feeds, githubTopics, hnQueries } from "./feeds.ts";
-import { list, publishedDate, xmlText } from "./util.ts";
+import { errorMessage, list, publishedDate, xmlText } from "./util.ts";
 
 export type Candidate = {
   url: string;
@@ -56,7 +56,7 @@ async function fromFeeds(since: Date): Promise<Candidate[]> {
   );
   return results.flatMap((result, i) => {
     if (result.status === "fulfilled") return result.value;
-    console.warn(`feed failed: ${feeds[i].name}: ${result.reason}`);
+    console.warn(`feed failed: ${feeds[i].name}: ${errorMessage(result.reason)}`);
     return [];
   });
 }

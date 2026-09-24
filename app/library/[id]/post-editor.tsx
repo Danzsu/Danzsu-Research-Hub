@@ -49,8 +49,8 @@ const copy = {
 };
 
 /** A field with its label and its reset-to-the-model's-text button. */
-function FieldRow({ id, label, resetLabel, resetText, onReset, children }: {
-  id: string;
+function FieldRow({ htmlFor, label, resetLabel, resetText, onReset, children }: {
+  htmlFor: string;
   label: string;
   resetLabel: string;
   resetText: string;
@@ -61,7 +61,7 @@ function FieldRow({ id, label, resetLabel, resetText, onReset, children }: {
     <div className="space-y-1 font-mono text-xs">
       <div className="flex items-center justify-between gap-2">
         {/* Beside the label, never inside it: a button inside a <label> becomes the label's control. */}
-        <label htmlFor={id}>{label}</label>
+        <label htmlFor={htmlFor}>{label}</label>
         <Button type="button" variant="brutal" size="xs" className="min-h-10" aria-label={resetLabel} onClick={onReset}>
           {resetText}
         </Button>
@@ -121,7 +121,7 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
         {(["hu", "en"] as const).map((lang) => (
           <div key={lang} className="space-y-3">
             <FieldRow
-              id={titleId(lang)}
+              htmlFor={titleId(lang)}
               label={`${t.title} (${lang.toUpperCase()})`}
               resetLabel={t.resetTitle(lang.toUpperCase())}
               resetText={t.original}
@@ -138,7 +138,7 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
               />
             </FieldRow>
             <FieldRow
-              id={summaryId(lang)}
+              htmlFor={summaryId(lang)}
               label={`${t.summary} (${lang.toUpperCase()})`}
               resetLabel={t.resetSummary(lang.toUpperCase())}
               resetText={t.original}

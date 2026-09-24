@@ -4,7 +4,7 @@ import { localizedSchema } from "../blocks.ts";
 import { digestCategories, digestTags } from "../../data/digest-types.ts";
 import { generate } from "../llm.ts";
 import { collectCandidates, collectRepos, type Candidate, type Repo } from "./collect.ts";
-import { isoWeek, itemId, type Week } from "./util.ts";
+import { errorMessage, isoWeek, itemId, type Week } from "./util.ts";
 
 const DAY = 86_400_000;
 const SHORTLIST = 40;
@@ -52,7 +52,7 @@ async function shortlist(db: SupabaseClient, candidates: Candidate[]): Promise<C
     const picked = [...new Set(keep)].filter((i) => candidates[i]).map((i) => candidates[i]);
     return picked.length ? picked : candidates.slice(0, SHORTLIST);
   } catch (error) {
-    console.warn(`shortlist failed, keeping the first ${SHORTLIST}: ${error}`);
+    console.warn(`shortlist failed, keeping the first ${SHORTLIST}: ${errorMessage(error)}`);
     return candidates.slice(0, SHORTLIST);
   }
 }

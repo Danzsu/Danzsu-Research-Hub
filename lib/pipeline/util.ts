@@ -229,9 +229,10 @@ export function safeNext(value: unknown): string {
 }
 
 /**
- * A raw date as YYYY-MM-DD, or null. An ISO-looking prefix is kept only if it is a real calendar
- * date: `published_at` is a Postgres `date`, and JS's Date silently rolls "2026-02-30" into March.
- * Anything without that prefix goes through Date.parse, which reads it in UTC.
+ * A raw date as YYYY-MM-DD, or null. An ISO-looking prefix is kept as written (its own calendar
+ * day, whatever the offset) only if it is a real date: `published_at` is a Postgres `date`, and JS's
+ * Date silently rolls "2026-02-30" into March. Anything else goes through Date.parse and is reported
+ * as its UTC day; a string with no zone of its own is read in the server's local time first.
  */
 export function publishedDate(raw: string | null | undefined): string | null {
   if (!raw) return null;

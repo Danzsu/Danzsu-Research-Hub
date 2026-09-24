@@ -44,7 +44,7 @@ function isContentContainer(el: Element): boolean {
   return (el.getAttribute("class") ?? "").split(/\s+/).some((token) => CONTENT_CLASS_TOKENS.has(token));
 }
 
-/** Replaces a blunt size-ratio guard: protects real content by what it *is*, not how big it is. */
+/** Real content is protected by what it is (a known content container, or an ancestor of one), and otherwise by holding half the page's text. */
 function isProtectedContainer(el: Element, rootTextLength: number): boolean {
   if (isContentContainer(el) || el.querySelector(CONTENT_CONTAINER_SELECTOR)) return true;
   return rootTextLength > 0 && (el.textContent ?? "").length >= rootTextLength * 0.5;
