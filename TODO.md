@@ -102,7 +102,18 @@
   - kedvenc (szív), plusz like / dislike a Radar-híreknél és a Library-posztoknál
   - a „nem hasznos” tétel az archívumban marad, csak halványítva jelenik meg, és kiszűrhető
 - [ ] **Habit tracker a dashboardon:** saját szokások napi pipálással és sorozatszámlálóval. A statisztika alprojekthez kapcsolódik.
-- [ ] **Kapcsolatok és kategorizálás:** Obsidian-szerű gráf a posztok között, jobb kategóriák és címkék. A UI/UX design után írunk rá tervet.
+- [ ] **Kapcsolatok és kategorizálás, GitHub-archívum** (Obsidian-vault). A UI/UX design után írunk rá tervet. Döntés, 2026-09-24:
+  - **1. lépés: export.** Hetente egy privát GitHub-repóba mentünk, heti mappákba (`2026/W38/cím.md` + JSON + képek). A fájlok frontmattert (címkék, forrás, értékelés) és `[[wikilinkeket]]` kapnak a kapcsolódó posztokhoz, így az Obsidian gráfnézete magától működik. Minden poszt kap egy `last_active_at` időbélyeget. A Supabase-ből ekkor még semmi nem törlődik.
+  - **2. lépés: hideg tárolás.**
+    - Ami egy hónapja nem változott, annak a nehéz tartalma (blokkok, képek) a GitHubról töltődik be.
+    - Tartalmi változáskor (újrakinyerés, fordítás) visszatöltjük a Supabase-be, és új időbélyeget kap.
+    - A saját jelölések (értékelés, olvasottság, kiemelés, komment) mindig a Supabase-ben maradnak, ezért nem kell hozzájuk visszatöltés.
+  - **Szabályok:**
+    - Törölni csak akkor szabad, ha a GitHub-commitot visszaolvastuk és egyezik.
+    - Ha a GitHub nem érhető el, a poszt a megmaradt adatokból jelenik meg.
+    - A token lejárata ellen GitHub Appot vagy lejárat előtti figyelmeztetést használunk.
+    - A repó privát.
+  - **Nyitott kérdés:** a chat-indexhez a szövegdarabokat is a DB-ben tartjuk-e, vagy a GitHubról olvassuk. Ezt a chat tervezésekor döntjük el.
 - [ ] **Kabala (mascot) az oldalra**, hogy barátságosabb legyen.
 - [ ] **Kutatási források bővítése és priorizálás:**
   - Új források az arXiv mellé:
