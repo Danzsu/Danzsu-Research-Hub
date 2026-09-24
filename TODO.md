@@ -92,7 +92,12 @@
 - [ ] **Jövőbeli:** saját online könyvtár, ahol a PDF-ek és könyvek egy GitHub-repóban vannak, nem a Supabase bucketban.
 
 ### Új ötletek (2026-09-24), a tervezés sorrendjében
-- [ ] **UI/UX és keresés** (tervezés alatt):
+- [ ] **Neked: az asztali navigáció kiválasztása**
+  - Három változat közül: **A** oldalsáv, **B** felső sáv, **C** keskeny ikonsáv.
+  - A mockup: `.superpowers/brainstorm/741-1790274605/content/navigation.html`. Szólj, és újra megnyitom a vizuális segédben.
+  - Ha nem döntesz, az **A** lesz.
+  - A spec: [docs/superpowers/specs/2026-09-24-ux-signals-search-design.md](docs/superpowers/specs/2026-09-24-ux-signals-search-design.md)
+- [ ] **UI/UX és keresés** (spec kész, terv következik):
   - egységes navigáció: asztalon oldalsáv vagy felső sáv, mobilon alsó sáv
   - mobilos ergonómia
   - okos keresés a címekben: elgépelés-tűrő, jelentés szerint is talál, szűrők
