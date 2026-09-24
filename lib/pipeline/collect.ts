@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
+import { USER_AGENT } from "./fetch.ts";
 import { feeds, githubTopics, hnQueries } from "./feeds.ts";
 
 export type Candidate = {
@@ -13,7 +14,6 @@ export type Candidate = {
 
 export type Repo = { repo: string; focus: string; url: string; stars: number };
 
-const USER_AGENT = "Mozilla/5.0 (compatible; NeonRadar/1.0; private research digest)";
 const DAY = 86_400_000;
 
 async function get(url: string, headers: Record<string, string> = {}): Promise<Response> {

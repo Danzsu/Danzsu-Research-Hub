@@ -31,7 +31,7 @@ export const blockSchema = z.discriminatedUnion("type", [
     caption: z.string().optional(),
     /** Storage key without width/extension; null when the image could not be mirrored. */
     path: z.string().nullable(),
-    format: z.enum(["avif", "webp", "svg"]).optional(),
+    format: z.enum(["avif", "webp"]).optional(),
     widths: z.array(z.number()).optional(),
     width: z.number().optional(),
     height: z.number().optional(),

@@ -154,7 +154,7 @@ export function isPrivateAddress(ip: string): boolean {
 
 /**
  * Parses a user-submitted link. Rejects non-http(s) and obvious internal hosts at
- * the API boundary; `safeFetch` in ingest.ts additionally resolves DNS and
+ * the API boundary; `safeFetch` in fetch.ts additionally resolves DNS and
  * re-checks every redirect hop.
  */
 export function parseSubmittedUrl(raw: string): URL | null {
