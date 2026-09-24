@@ -131,6 +131,11 @@
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
 - [ ] **Hibajelzés.** Ha a napi futás elbukik (Gemini-limit, lejárt kulcs), senki nem kap értesítést. Telegram-bot vagy email kellene. Addig a hiba a Vercel cron-logjában látszik.
+- [ ] **GitHub-token lejárat-figyelmeztető** (a GitHub-archívumhoz és a `GITHUB_TOKEN`-hez).
+  - A GitHub a fine-grained token minden API-válaszában visszaküldi a lejárati dátumot (`GitHub-Authentication-Token-Expiration` fejléc).
+  - A napi cron ezt kiolvassa, és 14, 7 és 1 nappal a lejárat előtt figyelmeztet a hibajelző csatornán (email vagy Telegram).
+  - A lejárt tokent logban és a cron válaszában is jelezze, ne hibázzon csendben.
+  - Alternatíva: GitHub App, amelynek a tokenje nem jár le.
 - [ ] **Library keresés.** Postgres full-text search egy `search_posts` RPC-vel, a Library fejlécében egy keresőmezővel.
 - [ ] **Tag-szűrő.** A hírkártyák `#tag`-jei legyenek kattinthatók, és szűrjék a feedet.
 
