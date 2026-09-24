@@ -10,6 +10,7 @@ import { getLanguage } from "@/lib/language";
 import { hostOf, parseId } from "@/lib/pipeline/util";
 import { readMinutes, type PostQuery } from "@/lib/post-view";
 import { createClient, getViewer } from "@/lib/supabase/server";
+import { translatable } from "@/lib/translate";
 import { PostToolbar } from "./post-toolbar";
 
 export const dynamic = "force-dynamic";
@@ -98,7 +99,7 @@ export default async function PostPage({
                 hasTranslation={Boolean(post.blocksHu)}
                 showingTranslation={showingTranslation}
                 canEdit={canEdit}
-                hasBlocks={post.blocks.length > 0}
+                hasTranslatable={translatable(post.blocks).length > 0}
               />
               {originalHref && (
                 <Button asChild variant="ink" className="min-h-10">

@@ -12,14 +12,14 @@ const copy = {
   en: { original: "Original", translated: "Hungarian", translate: "Translate to Hungarian", working: "Translating…", failed: "Translation failed, try again.", edit: "Edit", group: "Text language" },
 };
 
-export function PostToolbar({ postId, language, hasTranslation, showingTranslation, canEdit, hasBlocks }: {
+export function PostToolbar({ postId, language, hasTranslation, showingTranslation, canEdit, hasTranslatable }: {
   postId: number;
   language: Language;
   hasTranslation: boolean;
   showingTranslation: boolean;
   canEdit: boolean;
-  /** No body text yet (extraction failed / a bare video) — nothing to translate. */
-  hasBlocks: boolean;
+  /** No translatable text (extraction failed / a bare video / an all-code or all-repo post) — nothing to translate. */
+  hasTranslatable: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -52,7 +52,7 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
             <Link href={`/library/${postId}?text=hu`} aria-current={showingTranslation}>{t.translated}</Link>
           </Button>
         </div>
-      ) : hasBlocks ? (
+      ) : hasTranslatable ? (
         <Button variant="brutal" className="min-h-10" onClick={() => void translate()} disabled={busy}>
           <Languages /> {busy ? t.working : t.translate}
         </Button>

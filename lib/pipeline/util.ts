@@ -218,3 +218,27 @@ export function xmlText(value: unknown): string {
 export function hasNoarchive(...values: (string | null | undefined)[]): boolean {
   return values.some((value) => value && /noarchive/i.test(value));
 }
+
+/**
+ * Runs `items` through `work`, at most `limit` in flight, results kept in the original order.
+ * Once any `work()` call rejects, no further items are dispatched — calls already in flight still
+ * run to completion, but `mapLimited` itself rejects with the first error once every worker settles.
+ */
+export async function mapLimited<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  let failed = false;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (let i = next++; i < items.length && !failed; i = next++) {
+        try {
+          results[i] = await work(items[i]);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
+      }
+    }),
+  );
+  return results;
+}

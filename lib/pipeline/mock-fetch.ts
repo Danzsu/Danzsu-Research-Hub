@@ -74,9 +74,15 @@ export type FakeIngestDb = SupabaseClient & {
   postUpserts: Record<string, unknown>[];
   /** Every `posts` UPSERT's second (options) argument, same order as `postUpserts`. */
   postUpsertOptions: Record<string, unknown>[];
-  /** Every `posts` UPDATE payload (the `values` passed to `.update(...)`, before `.eq(...)`), in call order. */
+  /** Every `posts` UPDATE payload (the `values` passed to `.update(...)`, before `.eq(...)`/`.is(...)`), in call order. */
   postUpdates: Record<string, unknown>[];
-  /** Every `.eq(column, value)` call against `sources`/`posts`, in call order — covers `select`, `update` and (for `sources`) `update` alike. */
+  /** Every `posts` UPDATE's own filters (every `.eq(...)`/`.is(...)` chained onto that `.update(...)`,
+   *  in the order they were chained), same order as `postUpdates` — so a test can check exactly what
+   *  a write was scoped to (e.g. `.eq("id", 7).eq("extracted_at", "2026-01-01")`) without depending
+   *  on `eqCalls`' cross-table, cross-operation ordering. */
+  postUpdateFilters: { column: string; value: unknown }[][];
+  /** Every `.eq(column, value)` call against `sources`' `update` or either table's `select`, in call
+   *  order. `posts`' `update` filters (which can also be `.is(...)`) are on `postUpdateFilters` instead. */
   eqCalls: { table: "sources" | "posts"; column: string; value: unknown }[];
   /** Every media path passed to `storage.remove`, across all calls. */
   removedMedia: string[];
@@ -116,7 +122,7 @@ const bareObjectName = (path: string) => (path.includes("/") ? path.slice(path.i
  * `sources`/`posts`/storage: fixed by `tables` (all optional — omit what a test never queries).
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it and
  * `list` reflects it, so a test can mirror an image and then see it (or its absence) in a later list.
- * Every write is recorded on `.sourceUpdates`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.eqCalls`/`.removedMedia`/`.writes`.
+ * Every write is recorded on `.sourceUpdates`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
  */
 export function fakeDb(
   route: { provider: string; model: string } = { provider: "gemini", model: "m" },
@@ -127,6 +133,7 @@ export function fakeDb(
   const postUpserts: Record<string, unknown>[] = [];
   const postUpsertOptions: Record<string, unknown>[] = [];
   const postUpdates: Record<string, unknown>[] = [];
+  const postUpdateFilters: FakeIngestDb["postUpdateFilters"] = [];
   const eqCalls: FakeIngestDb["eqCalls"] = [];
   const removedMedia: string[] = [];
   const writes: FakeIngestDb["writes"] = [];
@@ -194,16 +201,38 @@ export function fakeDb(
         // Merges into the existing row (real UPDATE only touches the given columns), unlike
         // `upsert` above which replaces it — so a caller that does a targeted single-column write
         // (e.g. `.update({ blocks_hu }).eq("id", id)`) doesn't lose the row's other fields here either.
-        update: (values: Record<string, unknown>) => ({
-          eq: async (column: string, value: unknown) => {
-            eqCalls.push({ table: "posts", column, value });
+        // Chainable (`.eq(...).eq(...)`, `.is(...)`) and awaitable with or without a trailing
+        // `.select(...)` — like the real client, only `.select(...)` (or an explicit `Prefer:
+        // return=representation`, which the real translatePost gets via `.select()`) reports which
+        // rows matched; a bare `.update().eq()` reports `data: null` like a real minimal-return update.
+        update: (values: Record<string, unknown>) => {
+          const filters: { column: string; value: unknown }[] = [];
+          const run = async (withRepresentation: boolean) => {
             postUpdates.push(values);
+            postUpdateFilters.push(filters);
             writes.push("posts.update");
             if (tables.postUpdateError) return { data: null, error: tables.postUpdateError };
-            tables.post = tables.post ? { ...tables.post, ...values } : values;
-            return { data: null, error: null };
-          },
-        }),
+            const row = tables.post as Record<string, unknown> | null;
+            const matched = row !== null && filters.every((f) => (row[f.column] ?? null) === f.value);
+            if (matched) tables.post = { ...row, ...values };
+            if (!withRepresentation) return { data: null, error: null };
+            return { data: matched ? [{ id: row!.id }] : [], error: null };
+          };
+          const builder = {
+            eq: (column: string, value: unknown) => {
+              filters.push({ column, value });
+              return builder;
+            },
+            is: (column: string, value: unknown) => {
+              filters.push({ column, value });
+              return builder;
+            },
+            select: () => run(true),
+            then: (onFulfilled: (result: { data: unknown; error: unknown }) => unknown, onRejected?: (reason: unknown) => unknown) =>
+              run(false).then(onFulfilled, onRejected),
+          };
+          return builder;
+        },
       };
     }
     throw new Error(`fakeDb: table "${table}" not set up`);
@@ -235,7 +264,19 @@ export function fakeDb(
     }),
   };
 
-  return { from, storage, tasks, sourceUpdates, postUpserts, postUpsertOptions, postUpdates, eqCalls, removedMedia, writes } as unknown as FakeIngestDb;
+  return {
+    from,
+    storage,
+    tasks,
+    sourceUpdates,
+    postUpserts,
+    postUpsertOptions,
+    postUpdates,
+    postUpdateFilters,
+    eqCalls,
+    removedMedia,
+    writes,
+  } as unknown as FakeIngestDb;
 }
 
 /** A raw Gemini `generateContent` envelope with `text` as the model's literal (unparsed) output — for building malformed-response fixtures. */

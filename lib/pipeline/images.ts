@@ -4,6 +4,7 @@ import sharp from "sharp";
 import type { Block, ImageBlock } from "../blocks.ts";
 import { MEDIA_BUCKET, MEDIA_TYPES, variantPath, type MediaFormat } from "../media.ts";
 import { cancelBody, readLimited, safeFetch } from "./fetch.ts";
+import { mapLimited } from "./util.ts";
 
 const MAX_IMAGES = 30;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -70,13 +71,6 @@ export async function encodeImage(input: Buffer): Promise<Encoded | null> {
   return { format, width, height, placeholder: `data:image/webp;base64,${tiny.toString("base64")}`, variants };
 }
 
-async function eachLimited<T>(items: T[], limit: number, work: (item: T) => Promise<void>) {
-  const queue = [...items];
-  await Promise.all(Array.from({ length: Math.min(limit, queue.length) }, async () => {
-    for (let item = queue.shift(); item !== undefined; item = queue.shift()) await work(item);
-  }));
-}
-
 const isMirrored = (block: Block): block is ImageBlock => block.type === "image" && Boolean(block.path);
 
 /**
@@ -99,7 +93,7 @@ export async function mirrorImages(
   const allowed = new Set(images.slice(0, MAX_IMAGES).map((image) => image.id));
   const results = new Map<string, ImageBlock | null>();
 
-  await eachLimited(images.filter((image) => allowed.has(image.id)), CONCURRENCY, async (image) => {
+  await mapLimited(images.filter((image) => allowed.has(image.id)), CONCURRENCY, async (image) => {
     const old = reuse.get(image.originalUrl);
     if (old) {
       results.set(image.id, { ...image, path: old.path, format: old.format, widths: old.widths, width: old.width, height: old.height, placeholder: old.placeholder });

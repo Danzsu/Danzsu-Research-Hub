@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft } from "./blocks.ts";
-import { fakeDb, geminiPrompt, geminiResponse, geminiText, mockFetch, withGeminiKey } from "./pipeline/mock-fetch.ts";
+import { fakeDb, geminiPrompt, geminiResponse, geminiText, mockFetch, withGeminiKey, type FakeIngestTables } from "./pipeline/mock-fetch.ts";
 import { applyTranslation, chunkTranslatable, translatable, translatePost } from "./translate.ts";
+
+const EXTRACTED_AT = "2026-01-01T00:00:00Z";
 
 const blocks = assignIds([
   { type: "heading", level: 2, text: "Results" },
@@ -54,6 +56,70 @@ test("applyTranslation rejects a missing block", () => {
   assert.equal(applyTranslation(blocks, [{ id: blocks[0].id, text: "Eredmények" }]), null);
 });
 
+// Important #1: an answer that returns only ids (every other field missing) used to silently keep
+// the original English text and report "ok" — permanently, since a filled blocks_hu hides the
+// Translate button. Each probe below must reject to null instead.
+test("applyTranslation rejects an answer that translates nothing (ids only, every field missing)", () => {
+  const onlyIds = translatable(blocks).map((item) => ({ id: item.id }));
+  assert.equal(applyTranslation(blocks, onlyIds), null);
+});
+
+test("applyTranslation rejects a list whose items array is shorter than the original (2 items, 1 translated)", () => {
+  const result = applyTranslation(blocks, [
+    { id: blocks[0].id, text: "Eredmények" },
+    { id: blocks[1].id, spans: ["Olvasd el a ", "cikket", " most."] },
+    { id: blocks[2].id, items: [["egy"]] },
+    { id: blocks[4].id, alt: "grafikon", caption: "Sebesség" },
+  ]);
+  assert.equal(result, null);
+});
+
+test("applyTranslation rejects a non-empty original coming back empty", () => {
+  const result = applyTranslation(blocks, [
+    { id: blocks[0].id, text: "" },
+    { id: blocks[1].id, spans: ["Olvasd el a ", "cikket", " most."] },
+    { id: blocks[2].id, items: [["egy"], ["kettő"]] },
+    { id: blocks[4].id, alt: "grafikon", caption: "Sebesség" },
+  ]);
+  assert.equal(result, null);
+});
+
+test("applyTranslation rejects an answer ~10x the original length (degenerate repetition loop)", () => {
+  const original = "A fairly long heading that is definitely not a short string to translate";
+  const longBlocks = assignIds([{ type: "heading", level: 2, text: original }] satisfies BlockDraft[]);
+  const result = applyTranslation(longBlocks, [{ id: longBlocks[0].id, text: "x".repeat(original.length * 10) }]);
+  assert.equal(result, null);
+});
+
+// Minor #7: block.caption is optional; a model that invents one for a block that never had one
+// must not have that invention saved.
+test("applyTranslation applies a translated caption only when the original block had one", () => {
+  const noCaptionBlocks = assignIds([
+    { type: "image", originalUrl: "https://a.test/j.png", alt: "chart", path: "1/def", placeholder: "data:image/webp;base64,BBB" },
+  ] satisfies BlockDraft[]);
+  const result = applyTranslation(noCaptionBlocks, [{ id: noCaptionBlocks[0].id, alt: "grafikon", caption: "kitalált alcím" }]);
+  assert.ok(result);
+  assert.equal(result[0].type === "image" && result[0].caption, undefined);
+});
+
+// Minor #8-F: a chapters fixture, kept separate from the shared 5-block fixture above so its item
+// count doesn't shift `translatable sends text only`'s assertion of 4 items.
+const chaptersBlocks = assignIds([
+  { type: "chapters", items: [{ seconds: 0, title: "Intro" }, { seconds: 30, title: "Details" }] },
+] satisfies BlockDraft[]);
+
+test("applyTranslation translates chapter titles, keeping their seconds untouched", () => {
+  const result = applyTranslation(chaptersBlocks, [{ id: chaptersBlocks[0].id, chapters: ["Bevezető", "Részletek"] }]);
+  assert.ok(result);
+  assert.equal(result[0].type === "chapters" && result[0].items[0].title, "Bevezető");
+  assert.equal(result[0].type === "chapters" && result[0].items[1].title, "Részletek");
+  assert.equal(result[0].type === "chapters" && result[0].items[0].seconds, 0); // only titles go to the model
+});
+
+test("applyTranslation rejects a chapters answer whose array is shorter than the original", () => {
+  assert.equal(applyTranslation(chaptersBlocks, [{ id: chaptersBlocks[0].id, chapters: ["Bevezető"] }]), null);
+});
+
 test("chunkTranslatable splits by size and keeps order", () => {
   const items = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}`, text: "x".repeat(4000) }));
   const chunks = chunkTranslatable(items, 10_000);
@@ -61,18 +127,34 @@ test("chunkTranslatable splits by size and keeps order", () => {
   assert.deepEqual(chunks.flat().map((item) => item.id), items.map((item) => item.id));
 });
 
+// Minor #8-H: the first item alone can already exceed maxChars — it must still get its own chunk,
+// never dropped and never silently merged past the limit.
+test("chunkTranslatable gives an oversized first item its own chunk", () => {
+  const items = [{ id: "big", text: "x".repeat(20_000) }, { id: "a", text: "small" }, { id: "b", text: "small" }];
+  const chunks = chunkTranslatable(items, 10_000);
+  assert.deepEqual(chunks[0].map((item) => item.id), ["big"]);
+  assert.deepEqual(chunks.flat().map((item) => item.id), ["big", "a", "b"]);
+});
+
 test("translatePost: not_found for a missing post", async () => {
   const db = fakeDb({ provider: "gemini", model: "m" }, { post: null });
   assert.equal(await translatePost(db, 404), "not_found");
+});
+
+// Minor #9: a real select failure (RLS glitch, network blip) is not the same as "no such post" —
+// it must not be reported as 404-shaped.
+test("translatePost: a select error is failed, not not_found", async () => {
+  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null, extracted_at: EXTRACTED_AT }, postError: new Error("db down") });
+  assert.equal(await translatePost(db, 7), "failed");
 });
 
 // A real posts row also requires source_id/kind/url/title (NOT NULL); an upsert's proposed insert
 // row is checked against those constraints before conflict resolution even runs, so it 400s on a
 // real translation even though this offline fake can't see that. An update, keyed by id and
 // carrying only blocks_hu, is the only write shape that's safe against the real schema.
-test("translatePost: a successful translation writes blocks_hu via posts.update keyed by id, never an upsert", async () => {
+test("translatePost: a successful translation writes blocks_hu via posts.update keyed by id and extracted_at, never an upsert", async () => {
   const restoreKey = withGeminiKey();
-  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null } });
+  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null, extracted_at: EXTRACTED_AT } });
   const restoreFetch = mockFetch(() => geminiResponse(translatedAnswer));
   try {
     const result = await translatePost(db, 7);
@@ -80,14 +162,60 @@ test("translatePost: a successful translation writes blocks_hu via posts.update 
     assert.equal(db.postUpserts.length, 0, "must not upsert — an upsert's insert branch fails NOT NULL on a real posts row");
     assert.equal(db.postUpdates.length, 1);
     assert.deepEqual(Object.keys(db.postUpdates[0]), ["blocks_hu"]);
-    const idEq = db.eqCalls.filter((call) => call.table === "posts" && call.column === "id").at(-1);
-    assert.ok(idEq, "update must be keyed by .eq(\"id\", ...)");
-    assert.equal(idEq?.value, 7);
+    assert.deepEqual(db.postUpdateFilters.at(-1), [
+      { column: "id", value: 7 },
+      { column: "extracted_at", value: EXTRACTED_AT },
+    ]);
     const saved = db.postUpdates[0].blocks_hu as Array<Record<string, unknown>>;
     assert.equal(saved.length, blocks.length);
-    assert.equal(saved[0].text, "Eredmények");
+    assert.equal(saved[0].text, "Eredmények"); // heading
+    assert.deepEqual(saved[2].items, [[{ text: "egy" }], [{ text: "kettő" }]]); // list — D
     assert.equal(saved[3].code, "x = 1"); // untouched — nothing to translate in a code block
+    assert.equal(saved[4].alt, "grafikon"); // image alt — E
+    assert.equal(saved[4].caption, "Sebesség"); // image caption — E
     assert.equal(saved[4].placeholder, "data:image/webp;base64,AAA"); // image data copied, not sent to the model
+  } finally {
+    restoreFetch();
+    restoreKey();
+  }
+});
+
+test("translatePost: writes successfully when extracted_at is null, guarded with .is(...)", async () => {
+  const restoreKey = withGeminiKey();
+  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null, extracted_at: null } });
+  const restoreFetch = mockFetch(() => geminiResponse(translatedAnswer));
+  try {
+    const result = await translatePost(db, 7);
+    assert.equal(result, "ok");
+    assert.deepEqual(db.postUpdateFilters.at(-1), [
+      { column: "id", value: 7 },
+      { column: "extracted_at", value: null },
+    ]);
+  } finally {
+    restoreFetch();
+    restoreKey();
+  }
+});
+
+// Important #2: processSource can re-extract (upsert fresh blocks, blocks_hu: null) while the model
+// call below is still running (up to 300s) — the write must not land on top of that newer row.
+test("translatePost: a re-extraction mid-run makes the write stale, overwriting nothing", async () => {
+  const restoreKey = withGeminiKey();
+  const tables: FakeIngestTables = { post: { id: 7, blocks, blocks_hu: null, extracted_at: EXTRACTED_AT } };
+  const db = fakeDb({ provider: "gemini", model: "m" }, tables);
+  const restoreFetch = mockFetch(() => {
+    // Simulates a concurrent processSource() run landing its own upsert while our model call is
+    // in flight — a new object, not a mutation, so the post already captured by translatePost keeps
+    // its own (now stale) extracted_at reading.
+    tables.post = { id: 7, blocks, blocks_hu: null, extracted_at: "2026-02-02T00:00:00Z" };
+    return geminiResponse(translatedAnswer);
+  });
+  try {
+    const result = await translatePost(db, 7);
+    assert.equal(result, "stale");
+    assert.equal(db.postUpdates.length, 1); // the write was attempted...
+    assert.equal(tables.post?.blocks_hu, null); // ...but never applied — the concurrent row survives untouched
+    assert.equal(tables.post?.extracted_at, "2026-02-02T00:00:00Z");
   } finally {
     restoreFetch();
     restoreKey();
@@ -96,7 +224,7 @@ test("translatePost: a successful translation writes blocks_hu via posts.update 
 
 test("translatePost: an existing valid blocks_hu makes no model call", async () => {
   const validHu = assignIds([{ type: "paragraph", content: [{ text: "már van fordítás" }] }] satisfies BlockDraft[]);
-  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: validHu } });
+  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: validHu, extracted_at: EXTRACTED_AT } });
   const restoreFetch = mockFetch(() => {
     throw new Error("must not call the model when blocks_hu is already translated");
   });
@@ -115,7 +243,7 @@ test("translatePost: an existing [] or garbage blocks_hu is re-translated (same 
   const restoreKey = withGeminiKey();
   try {
     for (const badHu of [[], "garbage", [{ id: "x", type: "nope" }]]) {
-      const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: badHu } });
+      const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: badHu, extracted_at: EXTRACTED_AT } });
       const restoreFetch = mockFetch(() => geminiResponse(translatedAnswer));
       try {
         const result = await translatePost(db, 7);
@@ -130,9 +258,28 @@ test("translatePost: an existing [] or garbage blocks_hu is re-translated (same 
   }
 });
 
+// Minor #6: nothing to translate (a bare video post: only a video/repo/divider/code block) must not
+// call the model and must not write — but it's still "ok", not an error the reader needs to retry.
+test("translatePost: no translatable text means no model call and no write", async () => {
+  const bareVideo = assignIds([{ type: "video", provider: "youtube", videoId: "dQw4w9WgXcQ" }] satisfies BlockDraft[]);
+  assert.equal(translatable(bareVideo).length, 0, "test setup: this fixture must have nothing translatable");
+  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 9, blocks: bareVideo, blocks_hu: null, extracted_at: EXTRACTED_AT } });
+  const restoreFetch = mockFetch(() => {
+    throw new Error("must not call the model when there is nothing translatable");
+  });
+  try {
+    const result = await translatePost(db, 9);
+    assert.equal(result, "ok");
+    assert.equal(db.tasks.length, 0);
+    assert.equal(db.postUpdates.length, 0);
+  } finally {
+    restoreFetch();
+  }
+});
+
 test("translatePost: a shape mismatch (model drops a block) writes nothing", async () => {
   const restoreKey = withGeminiKey();
-  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null } });
+  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null, extracted_at: EXTRACTED_AT } });
   const restoreFetch = mockFetch(() =>
     geminiResponse({ blocks: translatedAnswer.blocks.filter((item) => item.id !== blocks[1].id) }),
   );
@@ -149,13 +296,31 @@ test("translatePost: a shape mismatch (model drops a block) writes nothing", asy
 
 test("translatePost: a model failure writes nothing", async () => {
   const restoreKey = withGeminiKey();
-  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null } });
+  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks, blocks_hu: null, extracted_at: EXTRACTED_AT } });
   const restoreFetch = mockFetch(() => geminiText("not valid json"));
   try {
     const result = await translatePost(db, 7);
     assert.equal(result, "failed");
     assert.equal(db.postUpdates.length, 0);
     assert.equal(db.postUpserts.length, 0);
+  } finally {
+    restoreFetch();
+    restoreKey();
+  }
+});
+
+// Minor #8-P: `if (error) throw error` right after the update — an update error must not be
+// swallowed as a silent "ok".
+test("translatePost: an update error is failed, not ok", async () => {
+  const restoreKey = withGeminiKey();
+  const db = fakeDb(
+    { provider: "gemini", model: "m" },
+    { post: { id: 7, blocks, blocks_hu: null, extracted_at: EXTRACTED_AT }, postUpdateError: new Error("db down") },
+  );
+  const restoreFetch = mockFetch(() => geminiResponse(translatedAnswer));
+  try {
+    const result = await translatePost(db, 7);
+    assert.equal(result, "failed");
   } finally {
     restoreFetch();
     restoreKey();
@@ -172,7 +337,7 @@ test("translatePost: chunk calls run with at most 3 in flight", async () => {
 
   let inFlight = 0;
   let maxInFlight = 0;
-  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks: headingBlocks, blocks_hu: null } });
+  const db = fakeDb({ provider: "gemini", model: "m" }, { post: { id: 7, blocks: headingBlocks, blocks_hu: null, extracted_at: EXTRACTED_AT } });
   const restoreFetch = mockFetch(async (_url, init) => {
     inFlight++;
     maxInFlight = Math.max(maxInFlight, inFlight);

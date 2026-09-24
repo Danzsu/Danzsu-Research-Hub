@@ -13,6 +13,7 @@ import {
   isoWeekMonday,
   itemId,
   list,
+  mapLimited,
   parseId,
   parseSubmittedUrl,
   publishedLabel,
@@ -135,4 +136,50 @@ test("hasNoarchive matches case-insensitively across several robots-directive st
   assert.equal(hasNoarchive("NOARCHIVE"), true);
   assert.equal(hasNoarchive(null, undefined, "noarchive"), true); // a header alongside absent metas
   assert.equal(hasNoarchive(), false);
+});
+
+test("mapLimited runs at most `limit` items concurrently and keeps result order", async () => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const items = Array.from({ length: 7 }, (_, i) => i);
+  const results = await mapLimited(items, 3, async (i) => {
+    inFlight++;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    inFlight--;
+    return i * 10;
+  });
+  assert.equal(maxInFlight, 3);
+  assert.deepEqual(results, items.map((i) => i * 10));
+});
+
+test("mapLimited propagates the first error", async () => {
+  await assert.rejects(
+    mapLimited([0, 1, 2], 2, async (i) => {
+      if (i === 1) throw new Error("boom");
+      return i;
+    }),
+    /boom/,
+  );
+});
+
+test("mapLimited stops dispatching new items once one has failed, without cancelling in-flight ones", async () => {
+  const started: number[] = [];
+  const items = [0, 1, 2, 3, 4, 5];
+  await assert.rejects(
+    mapLimited(items, 2, async (i) => {
+      started.push(i);
+      // item 1 fails fast; item 0 (the other in-flight slot) keeps running well past that —
+      // long enough that if the failure didn't stop new dispatches, a 3rd item would start too.
+      await new Promise((resolve) => setTimeout(resolve, i === 1 ? 5 : 20));
+      if (i === 1) throw new Error("boom");
+      return i;
+    }),
+    /boom/,
+  );
+  // mapLimited's own promise rejects as soon as item 1 fails — well before item 0's still-running
+  // worker loop reaches the point of trying to grab a 3rd item. Wait past that window before
+  // checking what actually got dispatched, or this assertion would pass even without the guard.
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.deepEqual(started, [0, 1]); // 2, 3, 4, 5 were never dispatched once item 1 failed
 });

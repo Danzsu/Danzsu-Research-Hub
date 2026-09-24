@@ -2,11 +2,16 @@ import { z } from "zod/v4";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseBlocks, type Block, type Inline } from "./blocks.ts";
 import { generate } from "./llm.ts";
+import { mapLimited } from "./pipeline/util.ts";
 import { parseTranslatedBlocks } from "./post-view.ts";
 
 // Only text goes to the model and only text comes back; structure, links and
 // image data are copied from the original, so a translation cannot corrupt them.
 
+// Not a discriminated union: an item carries no `type`, only whichever of these fields its block
+// asked for, so `translationSchema` can't require fields per block type without also adding a type
+// discriminator to what's sent to (and echoed back by) the model. `applyTranslation`'s `shapeOk`
+// check below is what actually enforces the per-type shape at runtime.
 export const translationItemSchema = z.object({
   id: z.string(),
   text: z.string().optional(),
@@ -64,10 +69,60 @@ function spansFrom(original: Inline[], translated: string[] | undefined): Inline
   return [{ text: translated.join("") }];
 }
 
-/** Null when a translatable block is missing from the answer: the caller must not save it. */
+/** True unless `translated` is an obviously bad answer for `original`: empty/whitespace when the
+ *  source wasn't, or absurdly long — a degenerate repetition loop. */
+function validText(original: string, translated: string): boolean {
+  if (original.trim() && !translated.trim()) return false;
+  return translated.length <= original.length * 3 + 200;
+}
+
+/**
+ * Whether `item` is a well-formed translation of `block`: every expected field is present, `items`/
+ * `chapters` array lengths match the original, and no text field looks broken. A span-count
+ * mismatch inside one paragraph/quote/list-item is NOT rejected here — `spansFrom` above degrades
+ * just that block to plain text instead, per the Review Focus.
+ */
+function shapeOk(block: Block, item: TranslationItem): boolean {
+  switch (block.type) {
+    case "heading":
+      return item.text !== undefined && validText(block.text, item.text);
+    case "paragraph":
+    case "quote":
+      return (
+        item.spans !== undefined &&
+        (item.spans.length !== block.content.length || item.spans.every((span, i) => validText(block.content[i].text, span)))
+      );
+    case "list":
+      return (
+        item.items !== undefined &&
+        item.items.length === block.items.length &&
+        item.items.every((spans, i) => spans.length !== block.items[i].length || spans.every((text, j) => validText(block.items[i][j].text, text)))
+      );
+    case "image":
+      return (
+        item.alt !== undefined &&
+        validText(block.alt, item.alt) &&
+        (block.caption === undefined || item.caption === undefined || validText(block.caption, item.caption))
+      );
+    case "chapters":
+      return (
+        item.chapters !== undefined &&
+        item.chapters.length === block.items.length &&
+        item.chapters.every((title, i) => validText(block.items[i].title, title))
+      );
+    default:
+      return true;
+  }
+}
+
+/** Null when a translatable block is missing from the answer, or the answer's shape for a block is
+ *  broken (wrong field, wrong array length, empty/degenerate text) — the caller must not save it. */
 export function applyTranslation(blocks: Block[], translated: TranslationItem[]): Block[] | null {
   const byId = new Map(translated.map((item) => [item.id, item]));
-  if (translatable(blocks).some((item) => !byId.has(item.id))) return null;
+  const expected = translatable(blocks);
+  if (expected.some((item) => !byId.has(item.id))) return null;
+  const blockById = new Map(blocks.map((block) => [block.id, block]));
+  if (expected.some((item) => !shapeOk(blockById.get(item.id)!, byId.get(item.id)!))) return null;
   return blocks.map((block): Block => {
     const item = byId.get(block.id);
     if (!item) return block;
@@ -80,7 +135,7 @@ export function applyTranslation(blocks: Block[], translated: TranslationItem[])
       case "list":
         return { ...block, items: block.items.map((spans, i) => spansFrom(spans, item.items?.[i])) };
       case "image":
-        return { ...block, alt: item.alt ?? block.alt, caption: item.caption ?? block.caption };
+        return { ...block, alt: item.alt ?? block.alt, caption: block.caption === undefined ? undefined : (item.caption ?? block.caption) };
       case "chapters":
         return { ...block, items: block.items.map((chapter, i) => ({ ...chapter, title: item.chapters?.[i] ?? chapter.title })) };
       default:
@@ -98,40 +153,52 @@ export const TRANSLATE_INSTRUCTIONS = `Translate every text field of these conte
  *  unbounded would trip free-tier model rate limits. */
 const CHUNK_CONCURRENCY = 3;
 
-/** Runs `items` through `work`, at most `limit` in flight, results kept in the original order. */
-async function mapLimited<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      for (let i = next++; i < items.length; i = next++) results[i] = await work(items[i]);
-    }),
-  );
-  return results;
-}
-
-export type TranslateResult = "ok" | "not_found" | "shape" | "failed";
+export type TranslateResult = "ok" | "not_found" | "shape" | "failed" | "stale";
 
 /**
  * Translates a post's blocks to Hungarian and saves them to `blocks_hu`. A no-op ("ok" without a
  * model call) once `blocks_hu` already holds a real translation — `parseTranslatedBlocks` decides
- * that, same rule as the read path, so `[]`/garbage jsonb there is retried here too.
+ * that, same rule as the read path, so `[]`/garbage jsonb there is retried here too — or once there
+ * is nothing translatable at all (e.g. a bare video post).
+ *
+ * The write is guarded on `extracted_at`, read alongside `blocks`: a re-extraction (`processSource`)
+ * can upsert fresh blocks with `blocks_hu: null` while the model call below is still running (up to
+ * 300s), and without this guard that write would land on top of the newer extraction. `"stale"`
+ * means the guard matched 0 rows — the caller should tell the reader to retry, not treat it as done.
  */
 export async function translatePost(db: SupabaseClient, postId: number): Promise<TranslateResult> {
-  const { data: post } = await db.from("posts").select("id, blocks, blocks_hu").eq("id", postId).maybeSingle();
+  const { data: post, error: selectError } = await db
+    .from("posts")
+    .select("id, blocks, blocks_hu, extracted_at")
+    .eq("id", postId)
+    .maybeSingle();
+  if (selectError) {
+    console.warn(`translate ${postId}: select failed: ${selectError instanceof Error ? selectError.message : selectError}`);
+    return "failed";
+  }
   if (!post) return "not_found";
   if (parseTranslatedBlocks(post.blocks_hu)) return "ok";
 
   const blocks = parseBlocks(post.blocks);
-  const chunks = chunkTranslatable(translatable(blocks));
+  const items = translatable(blocks);
+  if (items.length === 0) return "ok"; // nothing to translate — e.g. a bare video post
+
+  const chunks = chunkTranslatable(items);
   try {
     const answers = await mapLimited(chunks, CHUNK_CONCURRENCY, (chunk) =>
       generate(db, "translate_post", translationSchema, `${TRANSLATE_INSTRUCTIONS}\n\n${JSON.stringify(chunk)}`),
     );
     const translated = applyTranslation(blocks, answers.flatMap((answer) => answer.blocks));
     if (!translated) return "shape";
-    const { error } = await db.from("posts").update({ blocks_hu: translated }).eq("id", post.id);
+
+    // ponytail: a chunk that falls back to the slower model can push a 400-block post past the
+    // 300s function budget; a kill then loses every chunk this run already translated. Upgrade
+    // path: persist chunks as they finish, or move translation to a background job.
+    const scoped = db.from("posts").update({ blocks_hu: translated }).eq("id", post.id);
+    const guarded = post.extracted_at === null ? scoped.is("extracted_at", null) : scoped.eq("extracted_at", post.extracted_at);
+    const { data: updated, error } = await guarded.select("id");
     if (error) throw error;
+    if (!updated || updated.length === 0) return "stale"; // re-extracted while the model was running
     return "ok";
   } catch (error) {
     console.warn(`translate ${post.id}: ${error instanceof Error ? error.message : error}`);
