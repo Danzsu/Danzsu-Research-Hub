@@ -63,7 +63,7 @@ export function ReaderPanel({ language, progress, readCount, total, syncing, tod
           <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
           <span className="font-display text-3xl text-signal">{progress}%</span>
         </div>
-        <Progress value={progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
+        <Progress value={progress} aria-label={t.progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
         <p className="mt-3 font-mono text-[11px] text-ink/55">
           {readCount} / {total} · {syncing ? t.syncing : t.synced}
         </p>

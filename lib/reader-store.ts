@@ -80,6 +80,8 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
   const confirmed = new Map<string, boolean>();
   /** The newest write per key: only its failure decides what is shown. */
   const newest = new Map<string, number>();
+  /** In-flight write count per key: >0 means the key's confirmed value is not yet server-acknowledged. */
+  const pendingCount = new Map<string, number>();
   /** Flags changed before the first load finished; the load must not overwrite them. */
   const changedEarly: { itemId: string; flag: Flag }[] = [];
   let writeCount = 0;
@@ -95,21 +97,41 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
     queues.set(key, (queues.get(key) ?? Promise.resolve()).then(task));
   }
 
+  /** Drops every changedEarly entry for `key`: once its write has failed, hydrate must use the server's own value, not the rolled-back one. */
+  function dropChangedEarly(key: string) {
+    for (let i = changedEarly.length - 1; i >= 0; i--) {
+      if (`${changedEarly[i].flag}:${changedEarly[i].itemId}` === key) changedEarly.splice(i, 1);
+    }
+  }
+
+  /** Keeps the first row for each id: a temp id resolving to an id hydrate already brought in, or hydrate bringing
+   *  an id a resolved temp already has, must not leave two rows (and two React keys) for the same to-do. */
+  function dedupeTodos(todos: Todo[]): Todo[] {
+    const seen = new Set<number>();
+    return todos.filter((item) => (seen.has(item.id) ? false : (seen.add(item.id), true)));
+  }
+
   function writeBoolean(key: string, current: boolean, value: boolean, show: (value: boolean) => void, write: StateWrite) {
     if (!confirmed.has(key)) confirmed.set(key, current);
     const writeId = ++writeCount;
     newest.set(key, writeId);
+    pendingCount.set(key, (pendingCount.get(key) ?? 0) + 1);
     show(value);
     queue(key, () =>
-      send(write).then(
-        () => {
-          confirmed.set(key, value);
-        },
-        () => {
-          onError();
-          if (newest.get(key) === writeId) show(confirmed.get(key) ?? current);
-        },
-      ),
+      send(write)
+        .then(
+          () => {
+            confirmed.set(key, value);
+          },
+          () => {
+            onError();
+            dropChangedEarly(key);
+            if (newest.get(key) === writeId) show(confirmed.get(key) ?? current);
+          },
+        )
+        .finally(() => {
+          pendingCount.set(key, (pendingCount.get(key) ?? 1) - 1);
+        }),
     );
   }
 
@@ -150,13 +172,17 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
     hydrate(data: ReaderData) {
       const states = { ...data.states };
       for (const { itemId, flag } of changedEarly) {
+        const key = `${flag}:${itemId}`;
+        // The write for this key hasn't been server-acknowledged yet: this load is itself the freshest
+        // confirmation, so it — not the stale pre-write baseline — is what a later failure must roll back to.
+        if ((pendingCount.get(key) ?? 0) > 0) confirmed.set(key, (data.states[itemId] ?? EMPTY_ITEM_STATE)[flag]);
         states[itemId] = { ...(states[itemId] ?? EMPTY_ITEM_STATE), [flag]: (snapshot.states[itemId] ?? EMPTY_ITEM_STATE)[flag] };
       }
       const localIds = new Set(snapshot.todos.map((item) => item.id));
       update({
         states,
         loadedStates: data.states,
-        todos: [...snapshot.todos, ...data.todos.filter((item) => !localIds.has(item.id))],
+        todos: dedupeTodos([...snapshot.todos, ...data.todos.filter((item) => !localIds.has(item.id))]),
         syncing: false,
       });
     },
@@ -176,7 +202,8 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
         send(write)
           .then(({ id }) => {
             if (typeof id !== "number") throw new Error("add_todo answered without an id");
-            setTodos(snapshot.todos.map((item) => (item.id === tempId ? { ...item, id } : item)));
+            // A hydrate that raced ahead of this response may already have brought this same row in.
+            setTodos(dedupeTodos(snapshot.todos.map((item) => (item.id === tempId ? { ...item, id } : item))));
           })
           .catch(() => {
             setTodos(snapshot.todos.filter((item) => item.id !== tempId));

@@ -167,8 +167,13 @@ export function DigestDashboard({
           <SheetContent
             side="right"
             closeLabel={t.close}
-            // Focusing the to-do input on open would pop the phone keyboard over the panel.
-            onOpenAutoFocus={(event) => event.preventDefault()}
+            // Focus the panel itself (tabIndex={-1} on SheetPrimitive.Content), not the to-do input — that
+            // would pop the phone keyboard — but the trigger-only default lets the very next Tab, on a sheet
+            // portaled to the end of body, dismiss it instead of reaching the panel.
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              (event.currentTarget as HTMLElement).focus();
+            }}
             // Non-modal, so the undo toast above it stays clickable, reachable by Tab and announced.
             onInteractOutside={(event) => {
               if (isUndoToast(event.target)) event.preventDefault();

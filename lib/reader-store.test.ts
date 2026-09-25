@@ -184,3 +184,66 @@ test("post read state is item_states post:<id>, within the 120-character key lim
   const ids = readPostIds(["post:42", "post:7", "local-2026-W38-x-1a2b3c4d", "post:", "post:0", "post:12abc"]);
   assert.deepEqual([...ids].sort((a, b) => a - b), [7, 42]);
 });
+
+test("an early write that fails after the hydrate still rolls back to the server's own value", async () => {
+  const { calls, send } = manual();
+  const store = createReaderStore(send, noop); // no initial: syncing
+  store.setFlag("a", "saved", true); // clicked before GET /api/state answered
+  await tick();
+  store.hydrate({ states: { a: { read: false, saved: true } }, todos: [] });
+  assert.equal(store.getSnapshot().states.a.saved, true, "hydrate keeps showing the local value");
+  calls[0].reject(new TypeError("Failed to fetch")); // the write itself now fails
+  await store.settled();
+  assert.equal(store.getSnapshot().states.a.saved, true, "the server already confirmed true via the load");
+});
+
+test("an early write that fails before the hydrate does not force the rolled-back value over the server's", async () => {
+  const { calls, send } = manual();
+  const store = createReaderStore(send, noop); // no initial: syncing
+  store.setFlag("a", "saved", true); // clicked before GET /api/state answered
+  await tick();
+  calls[0].reject(new TypeError("Failed to fetch")); // the write fails first
+  await tick();
+  assert.equal(store.getSnapshot().states.a.saved, false, "rolled back to the pre-write default");
+  store.hydrate({ states: { a: { read: false, saved: true } }, todos: [] }); // the load answers afterwards
+  assert.equal(store.getSnapshot().states.a.saved, true, "the server's own value wins, not the rolled-back local one");
+});
+
+test("pins the newest-write guard: an old failure must not override two newer successes", async () => {
+  const { calls, send } = manual();
+  const store = createReaderStore(send, noop, empty);
+  store.toggleFlag("a", "read"); // 1st write: true
+  store.toggleFlag("a", "read"); // 2nd write: false
+  store.toggleFlag("a", "read"); // 3rd write: true
+  await tick();
+  calls[0].reject(new TypeError("Failed to fetch")); // the 1st fails, but by now it is no longer the newest write
+  await tick();
+  calls[1].resolve({}); // 2nd succeeds
+  await tick();
+  calls[2].resolve({}); // 3rd succeeds
+  await store.settled();
+  assert.equal(store.getSnapshot().states.a.read, true);
+});
+
+test("hydrate bringing an already-added to-do does not duplicate it once the add resolves", async () => {
+  const { calls, send } = manual();
+  const store = createReaderStore(send, noop); // no initial: syncing
+  store.addTodo("read the paper"); // tempId -1, its write not yet answered
+  await tick();
+  store.hydrate({ states: {}, todos: [{ id: 7, itemId: null, text: "read the paper", done: false }] });
+  assert.deepEqual(store.getSnapshot().todos.map((item) => item.id), [-1, 7], "both rows visible until the add resolves");
+  calls[0].resolve({ id: 7 }); // the add's own response finally arrives, with the id hydrate already brought
+  await store.settled();
+  assert.deepEqual(store.getSnapshot().todos.map((item) => item.id), [7]);
+});
+
+test("a to-do add that resolves before the hydrate is not duplicated when hydrate brings the same id back", async () => {
+  const { calls, send } = manual();
+  const store = createReaderStore(send, noop); // no initial: syncing
+  store.addTodo("read the paper");
+  await tick();
+  calls[0].resolve({ id: 7 });
+  await store.settled();
+  store.hydrate({ states: {}, todos: [{ id: 7, itemId: null, text: "read the paper", done: false }] });
+  assert.deepEqual(store.getSnapshot().todos.map((item) => item.id), [7]);
+});
