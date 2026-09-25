@@ -3,6 +3,7 @@ import type { ArchiveIssue, CurrentIssue, DigestItem, GithubTopEntry } from "../
 import type { SubmittedSource } from "./content.ts";
 import { publishedLabel } from "./pipeline/util.ts";
 import type { Post } from "./post-view.ts";
+import type { ReaderData } from "./reader-store.ts";
 import { testPost } from "./test/fixtures.ts";
 
 // Sample data for the offline preview (app/dev/preview): every block type, all four post banners,
@@ -155,3 +156,16 @@ export const previewPosts: Post[] = [
   post(-4, { kind: "x", meta: { truncated: true } }),
   post(-5, { kind: "youtube", meta: { mirrored: true, clipped: true } }),
 ];
+
+/** One read item (sorted to the end of the feed), one saved Top 3 item, a linked to-do, a long one and a done one. */
+export const previewReader: ReaderData = {
+  states: {
+    "local-2026-W39-read": { read: true, saved: false },
+    "companies-2026-W39-must-2": { read: false, saved: true },
+  },
+  todos: [
+    { id: 1, itemId: null, text: `Hosszú teendő: ${LONG_WORD}`, done: false },
+    { id: 2, itemId: "local-2026-W39-must-3", text: "Minta hír: local-2026-W39-must-3", done: false },
+    { id: 3, itemId: null, text: "Kész teendő", done: true },
+  ],
+};

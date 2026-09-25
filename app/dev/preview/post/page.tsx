@@ -12,7 +12,7 @@ export default async function PreviewPostPage() {
   const [language, navMode] = await Promise.all([getLanguage(), getNavMode()]);
   return (
     <AppShell language={language} email={previewEmail} initialNavMode={navMode}>
-      <PreviewNav current="post" />
+      <PreviewNav current="post" failWrites={false} />
       <main className="min-h-dvh bg-ink">
         {previewPosts.map((post) => (
           <PostArticle key={post.id} post={post} language={language} query={{}} canEdit={false} />

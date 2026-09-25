@@ -4,7 +4,8 @@ import { z } from "zod/v4";
 // Each field's schema carries the error code the route answers 400 with as its message.
 
 const ITEM_ID_MAX = 120;
-const TODO_TEXT_MAX = 180;
+/** Also the reader store's own cap (lib/reader-store.ts): one limit, trimmed the same way client and server. */
+export const TODO_TEXT_MAX = 180;
 
 const ERRORS = ["missing_item", "invalid_item", "missing_text", "invalid_id"] as const;
 export type StateActionError = (typeof ERRORS)[number] | "unknown_action";

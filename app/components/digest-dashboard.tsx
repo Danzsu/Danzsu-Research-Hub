@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bookmark,
   BookmarkCheck,
   Building2,
-  Check,
   ChevronRight,
   Clock3,
   ExternalLink,
@@ -13,21 +12,20 @@ import {
   GitFork,
   ListTodo,
   Newspaper,
-  Plus,
   Radar,
-  Trash2,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { CurrentIssue, DigestCategory, DigestItem, GithubTopEntry } from "@/data/digest-types";
 import { useLanguage } from "./language-context";
+import { EMPTY_ITEM_STATE } from "@/lib/reader-store";
+import { ReaderPanel } from "./reader-panel";
+import { isUndoToast, toasts } from "./undo-toast";
+import { useModelContextTools } from "./use-model-context-tools";
+import { useReaderState, type ReaderPreview } from "./use-reader-state";
 
-type ItemState = { read: boolean; saved: boolean };
-const EMPTY_ITEM_STATE: ItemState = { read: false, saved: false };
-type Todo = { id: number; itemId: string | null; text: string; done: boolean };
 type Filter = "all" | DigestCategory | "saved";
 
 const ui = {
@@ -50,10 +48,7 @@ const ui = {
     open: "Megnyitás",
     read: "Elolvastam",
     save: "Mentés",
-    progress: "Heti haladás",
-    todo: "Személyes To-do",
-    todoPlaceholder: "Mit olvassak el később?",
-    add: "Hozzáadás",
+    close: "Bezárás",
     empty: "Ebben a nézetben még nincs elem.",
     sample: "Ez a heti kiadás még üres — a napi automatikus futás tölti fel.",
     tracked: "FIGYELT REPO",
@@ -77,10 +72,7 @@ const ui = {
     open: "Open source",
     read: "Mark as read",
     save: "Save",
-    progress: "Weekly progress",
-    todo: "Personal to-do",
-    todoPlaceholder: "What should I read later?",
-    add: "Add",
+    close: "Close",
     empty: "Nothing in this view yet.",
     sample: "This week's issue is still empty — the daily automated run fills it.",
     tracked: "TRACKED REPO",
@@ -100,104 +92,26 @@ const filters: Array<{
   { id: "saved", icon: Bookmark, key: "saved" },
 ];
 
-async function mutate(payload: Record<string, unknown>) {
-  const response = await fetch("/api/state", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error("State update failed");
-  return response.json();
-}
-
 export function DigestDashboard({
   issue: currentIssue,
   items: digestItems,
   githubTop10,
   archived = false,
+  preview,
 }: {
   issue: CurrentIssue;
   items: DigestItem[];
   githubTop10: GithubTopEntry[];
   /** A closed week opened from /archive: same reading UI, no "live" framing. */
   archived?: boolean;
+  /** The offline preview (app/dev/preview): seeded reader state, no network. */
+  preview?: ReaderPreview;
 }) {
   const { language } = useLanguage();
   const [filter, setFilter] = useState<Filter>("all");
-  const [states, setStates] = useState<Record<string, ItemState>>({});
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [todoText, setTodoText] = useState("");
-  const [syncing, setSyncing] = useState(true);
+  const { store, states, todos, syncing } = useReaderState(preview);
+  useModelContextTools(store);
   const t = ui[language];
-
-  const refreshState = useCallback(async () => {
-    try {
-      const response = await fetch("/api/state", { cache: "no-store" });
-      if (!response.ok) return;
-      const data = (await response.json()) as {
-        states: Record<string, ItemState>;
-        todos: Todo[];
-      };
-      setStates(data.states);
-      setTodos(data.todos);
-    } finally {
-      setSyncing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshState();
-  }, [refreshState]);
-
-  useEffect(() => {
-    const context = (document as Document & {
-      modelContext?: {
-        registerTool: (tool: Record<string, unknown>, options?: { signal?: AbortSignal }) => void | Promise<void>;
-      };
-    }).modelContext;
-    if (!context?.registerTool) return;
-    const lifecycle = new AbortController();
-    const register = (tool: Record<string, unknown>) => {
-      void Promise.resolve(context.registerTool(tool, { signal: lifecycle.signal })).catch(() => undefined);
-    };
-    register({
-      name: "mark_digest_item_read",
-      title: "Mark digest item read",
-      description: "Mark one visible AI digest item as read for the signed-in reader.",
-      inputSchema: {
-        type: "object",
-        properties: { itemId: { type: "string" }, value: { type: "boolean" } },
-        required: ["itemId", "value"],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: false },
-      execute: async (input: unknown) => {
-        const value = input as { itemId: string; value: boolean };
-        await mutate({ action: "set_read", ...value });
-        await refreshState();
-        return { itemId: value.itemId, read: value.value };
-      },
-    });
-    register({
-      name: "add_digest_todo",
-      title: "Add digest to-do",
-      description: "Add a short personal follow-up to the signed-in reader's digest list.",
-      inputSchema: {
-        type: "object",
-        properties: { text: { type: "string", minLength: 1, maxLength: 180 } },
-        required: ["text"],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: false },
-      execute: async (input: unknown) => {
-        const value = input as { text: string };
-        await mutate({ action: "add_todo", text: value.text });
-        await refreshState();
-        return { created: true };
-      },
-    });
-    return () => lifecycle.abort();
-  }, [refreshState]);
 
   const visibleItems = useMemo(() => {
     if (filter === "all") return digestItems;
@@ -209,96 +123,24 @@ export function DigestDashboard({
   const progress = digestItems.length ? Math.round((readCount / digestItems.length) * 100) : 0;
   const openTodos = todos.filter((todo) => !todo.done).length;
 
-  async function setItemState(itemId: string, key: "read" | "saved", value: boolean) {
-    setStates((current) => ({
-      ...current,
-      [itemId]: { ...EMPTY_ITEM_STATE, ...current[itemId], [key]: value },
-    }));
-    try {
-      await mutate({
-        action: key === "read" ? "set_read" : "set_saved",
-        itemId,
-        value,
-      });
-    } catch {
-      await refreshState();
-    }
-  }
-
-  async function addTodo() {
-    const text = todoText.trim();
-    if (!text) return;
-    setTodoText("");
-    await mutate({ action: "add_todo", text });
-    await refreshState();
-  }
-
-  async function setTodo(id: number, value: boolean) {
-    setTodos((current) => current.map((todo) => (todo.id === id ? { ...todo, done: value } : todo)));
-    await mutate({ action: "set_todo", id, value });
-  }
-
-  async function deleteTodo(id: number) {
-    setTodos((current) => current.filter((todo) => todo.id !== id));
-    await mutate({ action: "delete_todo", id });
+  function deleteTodo(id: number) {
+    const removal = store.removeTodo(id);
+    if (removal) toasts.show({ kind: "todoDeleted", ...removal });
   }
 
   // Rendered twice: as the 2xl side column, and inside the header Sheet below 2xl.
   const readerPanel = (
-    <>
-      <section className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_#141414]">
-        <div className="flex items-center justify-between">
-          <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
-          <span className="font-display text-3xl text-signal">{progress}%</span>
-        </div>
-        <Progress value={progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
-        <p className="mt-3 font-mono text-[11px] text-ink/55">{readCount} / {digestItems.length} · {syncing ? "SYNC…" : "SYNCED"}</p>
-      </section>
-
-      <section className="mt-7">
-        <div className="mb-4 flex items-center justify-between border-b-2 border-ink pb-3">
-          <div className="flex items-center gap-2">
-            <ListTodo className="size-5 text-signal" />
-            <h2 className="font-display text-2xl">{t.todo}</h2>
-          </div>
-          <span className="font-mono text-xs">{openTodos}</span>
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={todoText}
-            onChange={(event) => setTodoText(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") void addTodo(); }}
-            placeholder={t.todoPlaceholder}
-            className="min-w-0 flex-1 rounded-none border-2 border-ink bg-paper px-3 py-2 text-sm outline-none placeholder:text-ink/40 focus:border-signal"
-          />
-          <Button size="icon" variant="signal" onClick={() => void addTodo()} aria-label={t.add}>
-            <Plus />
-          </Button>
-        </div>
-        <div className="mt-4 space-y-2">
-          {todos.map((todo) => (
-            <div key={todo.id} className="group flex items-start gap-3 border border-ink/25 bg-paper/60 p-3">
-              <Checkbox
-                checked={todo.done}
-                onCheckedChange={(checked) => void setTodo(todo.id, checked === true)}
-                className="mt-0.5 border-ink data-[state=checked]:bg-ink"
-              />
-              <span className={`min-w-0 flex-1 text-sm leading-5 ${todo.done ? "text-ink/40 line-through" : ""}`}>{todo.text}</span>
-              <Button variant="ghost" size="icon-xs" onClick={() => void deleteTodo(todo.id)} aria-label="Delete" className="size-8 opacity-60 hover:bg-signal/20 group-hover:opacity-100 sm:size-6">
-                <Trash2 />
-              </Button>
-            </div>
-          ))}
-          {!todos.length && <p className="py-7 text-center font-mono text-xs text-ink/45">(づ ◕‿◕ )づ · QUEUE EMPTY</p>}
-        </div>
-      </section>
-
-      <section className="mt-8 border-t-2 border-ink pt-5 font-mono text-[11px] leading-5 text-ink/55">
-        <p className="flex items-center gap-2 text-signal"><Check className="size-3" /> INVITE-ONLY PROFILES</p>
-        <p>DAILY RUN · 07:00</p>
-        <p>WEEKLY FREEZE · SUN 24:00</p>
-      </section>
-    </>
+    <ReaderPanel
+      language={language}
+      progress={progress}
+      readCount={readCount}
+      total={digestItems.length}
+      syncing={syncing}
+      todos={todos}
+      onAdd={(text) => store.addTodo(text)}
+      onToggle={(id, done) => store.setTodoDone(id, done)}
+      onDelete={deleteTodo}
+    />
   );
 
   return (
@@ -311,7 +153,7 @@ export function DigestDashboard({
             <p className="font-display text-lg leading-none">{currentIssue.label}</p>
           </div>
         </div>
-        <Sheet>
+        <Sheet modal={false}>
           <SheetTrigger asChild>
             <Button
               variant="outline"
@@ -324,8 +166,13 @@ export function DigestDashboard({
           </SheetTrigger>
           <SheetContent
             side="right"
+            closeLabel={t.close}
             // Focusing the to-do input on open would pop the phone keyboard over the panel.
             onOpenAutoFocus={(event) => event.preventDefault()}
+            // Non-modal, so the undo toast above it stays clickable, reachable by Tab and announced.
+            onInteractOutside={(event) => {
+              if (isUndoToast(event.target)) event.preventDefault();
+            }}
             className="w-[88vw] max-w-sm overflow-y-auto border-l-2 border-ink bg-cream p-5 pt-12 text-ink"
           >
             <SheetHeader className="sr-only">
@@ -437,7 +284,7 @@ export function DigestDashboard({
                   <SectionLabel icon={Newspaper} label={t.feed} />
                   <div className="space-y-4">
                     {visibleItems.length ? visibleItems.map((item) => {
-                      const state = states[item.id] ?? { read: false, saved: false };
+                      const state = states[item.id] ?? EMPTY_ITEM_STATE;
                       return (
                         <article key={item.id} className={`story-card border-2 border-ink bg-paper p-5 sm:p-6 ${state.read ? "story-read" : ""}`}>
                           <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
@@ -457,7 +304,7 @@ export function DigestDashboard({
                                     variant="ghost"
                                     size="icon-sm"
                                     aria-label={t.save}
-                                    onClick={() => void setItemState(item.id, "saved", !state.saved)}
+                                    onClick={() => store.toggleFlag(item.id, "saved")}
                                     className="size-10 rounded-full hover:bg-signal/15 sm:size-8"
                                   >
                                     {state.saved ? <BookmarkCheck className="text-signal" /> : <Bookmark />}
@@ -465,7 +312,7 @@ export function DigestDashboard({
                                   <label className="flex min-h-10 cursor-pointer items-center gap-2 font-mono text-[11px] sm:min-h-0">
                                     <Checkbox
                                       checked={state.read}
-                                      onCheckedChange={(checked) => void setItemState(item.id, "read", checked === true)}
+                                      onCheckedChange={(checked) => store.setFlag(item.id, "read", checked === true)}
                                       className="border-ink data-[state=checked]:border-signal data-[state=checked]:bg-signal data-[state=checked]:text-ink"
                                     />
                                     {t.read}
