@@ -1,8 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isPublicPath } from "@/lib/public-paths";
+import { isDevPreviewPath, isPublicPath } from "@/lib/public-paths";
 
 export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  // Before any Supabase call: the preview has to work with no keys and no network.
+  if (isDevPreviewPath(pathname, process.env.NODE_ENV)) return NextResponse.next();
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
@@ -19,7 +23,6 @@ export async function proxy(request: NextRequest) {
 
   // getClaims() verifies the JWT and refreshes an expired session.
   const { data } = await supabase.auth.getClaims();
-  const { pathname, search } = request.nextUrl;
 
   if (!data?.claims && !isPublicPath(pathname)) {
     const login = request.nextUrl.clone();

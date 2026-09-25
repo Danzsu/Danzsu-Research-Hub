@@ -1,4 +1,4 @@
-// Test helper only (not *.test.ts, so `npm test`'s glob skips it as its own suite).
+// Test helper, and the base of the offline preview's posts (lib/fixtures.ts). Not *.test.ts, so `npm test`'s glob skips it as its own suite.
 
 import type { Post } from "../post-view.ts";
 
