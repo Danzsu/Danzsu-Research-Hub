@@ -8,8 +8,9 @@ import { useState } from "react";
  * (arXiv, GitHub figures) never shows blur bleeding through a transparent pixel afterwards (spec
  * 1.4.12). The only stateful piece of the post renderer, split out so post-blocks.tsx can stay
  * hook-free and keep rendering inside a Server Component (see its own header comment).
- * A cached image can finish loading before hydration, when onLoad has no listener yet, so the ref
- * callback also checks `complete`; the img is `relative` so it paints above the placeholder layer.
+ * A cached image can finish loading, or fail, before hydration, when onLoad/onError have no listener
+ * yet, so the ref callback also settles on `complete` alone; the img is `relative` so it paints above
+ * the placeholder layer.
  */
 export function PostImage({
   src,
@@ -52,7 +53,7 @@ export function PostImage({
         fetchPriority={priority ? "high" : "auto"}
         decoding="async"
         ref={(img) => {
-          if (img?.complete && img.naturalWidth > 0) setSettled(true);
+          if (img?.complete) setSettled(true);
         }}
         onLoad={() => setSettled(true)}
         onError={() => setSettled(true)}
