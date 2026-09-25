@@ -65,7 +65,7 @@ The seeds are in `supabase/migrations/20260923010000_model_settings.sql` and `20
 
 Supabase Auth, magic link. **Sign-ups are disabled in the Supabase dashboard** — that is the invite allowlist; members are added with *Authentication → Invite user*. `app/auth/login` calls `signInWithOtp({ shouldCreateUser: false })` and always answers the same, so it cannot enumerate members.
 
-`proxy.ts` refreshes the session on every request and redirects signed-out requests to `/login?next=…`, except under `/login`, `/auth/`, `/api/` and `/media/` (`isPublicPath` in `lib/public-paths.ts`; the `/api/*` and `/media` routes return 401 themselves). Pages and API routes that act as the reader call `getReader()` from `lib/supabase/server.ts`, which returns the RLS-scoped client and the viewer together, or null; `getViewer()` is the identity-only form (the `/media` and reextract routes). The five identity pages (`/`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) declare `export const dynamic = "force-dynamic"`.
+`proxy.ts` refreshes the session on every request and redirects signed-out requests to `/login?next=…`, except under `/login`, `/auth/`, `/api/` and `/media/` (`isPublicPath` in `lib/public-paths.ts`; the `/api/*` and `/media` routes return 401 themselves). Pages and API routes that act as the reader call `getReader()` from `lib/supabase/server.ts`, which returns the RLS-scoped client and the viewer together, or null; `getViewer()` is the identity-only form (the `/media` route). The five identity pages (`/`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) declare `export const dynamic = "force-dynamic"`.
 
 Email templates (Supabase → Authentication → Email Templates) should link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email` (Magic Link) and `…&type=invite` (Invite user). `app/auth/callback` handles both that and the default `?code=` form; the token-hash form also works when the link is opened on another device. The post-login target always goes through `safeNext`.
 
@@ -97,13 +97,13 @@ RLS is on for every table:
 | `GET /api/state` | `getReader()` | `{ states, todos }` for the caller |
 | `POST /api/state` | `getReader()` | `parseStateAction` (`lib/state.ts`): `set_read`, `set_saved`, `add_todo`, `set_todo`, `delete_todo`. 400 `missing_item` (missing, empty or null `itemId`), `invalid_item` (a non-string one), `missing_text`, `invalid_id`, `unknown_action`. Item ids are cut to 120 chars, todo text to 180; a flag other than `true` counts as false |
 | `POST /api/sources` | `getReader()` | 400 `invalid_url`, 409 `already_submitted`, 500 `insert_failed`, else 202 `{ ok, id }` and `processSource` in `after()` |
-| `PATCH /api/posts/[id]` | `getReader()` | `savePostEdits`: 400 `invalid`, 403 `forbidden` (not the submitter), 404, 500 `db_error` |
+| `PATCH /api/posts/[id]` | `getReader()` | `savePostEdits`: 400 `invalid` (the body), 403 `forbidden` (not the submitter), 404, 500 `db_error` |
 | `POST /api/posts/[id]/translate` | `getReader()`, then admin | 404, 409 `translation_stale`, 502 `translation_shape` / `translation_failed`, else `{ ok: true }` |
-| `POST /api/posts/[id]/reextract` | `getViewer()`, then admin | 403 unless the submitter, 429 `cooldown` with `retryAfter` (seconds), 404, 500 `db_error`, else 202 and `processSource` in `after()` |
+| `POST /api/posts/[id]/reextract` | `getReader()`, then admin | 403 unless the submitter, 429 `cooldown` with `retryAfter` (seconds), 404, 500 `db_error`, else 202 and `processSource` in `after()` |
 | `GET /api/cron/daily` | `Authorization: Bearer $CRON_SECRET` | 401 `unauthorized` when the secret is unset or doesn't match; see How content gets in |
 | `GET /media/[...path]` | `getViewer()` | See Security |
 
-Every JSON error goes through `jsonError` (`lib/api.ts`); `/media` answers plain text. The cron, sources, translate and reextract routes set `maxDuration = 300`.
+Every JSON error goes through `jsonError` (`lib/api.ts`); `/media` answers plain text. The three `posts/[id]` routes are wrapped in `postRoute` (`lib/api.ts`): 401 `unauthorized` when signed out and 404 `not_found` for an id that isn't a positive integer, the same answer as a missing post; their result maps share `POST_ERRORS`. The cron, sources, translate and reextract routes set `maxDuration = 300`.
 
 **Edit, translate and re-extract** (the submitter's tools on `/library/[id]`):
 
@@ -170,7 +170,7 @@ lib/media.ts             the media bucket name, key format and /media URLs
 lib/public-paths.ts      isPublicPath — the paths proxy.ts lets through signed out
 lib/state.ts             parseStateAction — the /api/state body
 lib/llm.ts               Gemini + Groq behind generate()
-lib/api.ts               jsonError
+lib/api.ts               jsonError, postRoute and POST_ERRORS for the posts/[id] routes
 lib/content.ts           DB rows → the Radar and Library content types
 lib/language.ts          getLanguage() — the `lang` cookie (hu | en)
 lib/supabase/server.ts   createClient, createAdminClient, getReader, getViewer, safeNext (re-exported from util)
@@ -187,7 +187,7 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 
 ## Conventions
 
-- **No duplication.** Search (`grep -rn`) before writing a helper or a class list, and reuse the shared homes: `lib/media.ts` (image paths), `lib/api.ts` (`jsonError`), `lib/supabase/server.ts` (`getReader` / `getViewer`), `lib/pipeline/util.ts` (`hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…), `lib/pipeline/fetch.ts` (`safeFetch`, `apiFetch`, `ensureOk`, `readText`), `lib/blocks.ts` (`localizedSchema`, `parseBlocks`), `readPageMeta` in `extract/article.ts`, and in the UI the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHeader` and `PageHero`. `npm run dup` is the gate: at most 1% duplication, and no new clone.
+- **No duplication.** Search (`grep -rn`) before writing a helper or a class list, and reuse the shared homes: `lib/media.ts` (image paths), `lib/api.ts` (`jsonError`, `postRoute`), `lib/supabase/server.ts` (`getReader` / `getViewer`), `lib/pipeline/util.ts` (`hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…), `lib/pipeline/fetch.ts` (`safeFetch`, `apiFetch`, `ensureOk`, `readText`), `lib/blocks.ts` (`localizedSchema`, `parseBlocks`), `readPageMeta` in `extract/article.ts`, and in the UI the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHeader` and `PageHero`. `npm run dup` is the gate: at most 1% duplication, and no new clone.
 - **Relative imports in `lib/`.** Every file under `lib/` uses relative `.ts` imports (no `@/`), so `node --test` loads it without a bundler, and the client editor can import `lib/post-edit.ts` without server-only code. The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which tests never load.
 - **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library. Existing names: `copy` (`submit-form`, `post-toolbar`, `post-editor`), `labels` (`post-blocks`), `notices` (`library/[id]/post-notices.tsx`, also read by the post page), `ui` (`digest-dashboard`). A few inline ternaries remain, for example in `app/library/page.tsx` and `app/archive/page.tsx`; UX milestone A moves them. Code identifiers, comments and model prompts are English.
 - **Tests.** `node --test` with type stripping, no framework. Helpers:
