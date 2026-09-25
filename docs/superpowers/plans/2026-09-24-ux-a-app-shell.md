@@ -5,7 +5,7 @@
 **Goal:** Minden bejelentkezett oldal közös keretet kap (asztalon oldalsáv, mobilon ötgombos alsó sáv). A Radar és a Library kevesebb kattintással és hüvelykujjal is kezelhető, a nyelvváltás a listaoldalakon frissítés nélkül működik, és az egész felület élő adat nélkül, egy fejlesztői előnézeten is ellenőrizhető.
 
 **Architecture:**
-- **Keret:** az `app/(app)/layout.tsx` minden bejelentkezett oldalt az `AppShell`-be csomagol. Ebben van a nyelvi kontextus, a `DesktopNav` (az A változat, egyetlen cserélhető fájl), a mobilos alsó sáv a „Több” panellel, a keresés helyfoglalója, a billentyűsúgó és a visszavonás-csík. Minden menüpont a `lib/nav.ts`-ből jön.
+- **Keret:** az `app/(app)/layout.tsx` minden bejelentkezett oldalt az `AppShell`-be csomagol. Ebben van a nyelvi kontextus, a `DesktopNav` (az A változat, egyetlen cserélhető fájl, ~56 px-es ikonsávvá csukható), a mobilos alsó sáv a „Több” panellel, a keresés helyfoglalója, a billentyűsúgó és a visszavonás-csík. Minden menüpont a `lib/nav.ts`-ből jön. Az oldalsáv állapotát (`full` | `rail`) a `nav` cookie őrzi meg, egy tiszta függvény (`lib/nav-mode.ts`) olvassa, a szerver ez alapján rendereli a keretet, villanás nélkül.
 - **Olvasói állapot:** egy keretrendszer-független tár (`lib/reader-store.ts`) intézi az optimista írást. Egy kulcson a kérések sorban mennek ki, hibánál a felület a szerver által utoljára megerősített értékre áll vissza. A React-kötés (`use-reader-state.ts`) vékony.
 - **Tiszta logika a `lib/`-ben:** menü, billentyűk, rendezés, visszavonás-sor, útvonal-szabályok és mintaadatok. Mindet `node --test` teszteli, a TSX vékony marad.
 - **Előnézet:** az `app/dev/preview` a valódi nézet-komponenseket rendereli mintaadatokkal, hálózat és bejelentkezés nélkül, csak fejlesztői módban.
@@ -74,6 +74,7 @@
 3. **Írás hálózat nélkül:** a `fetch` `TypeError`-t dob, nem `!ok` választ ad. Elvárás: a változás visszaáll a szerver által utoljára megerősített értékre, megjelenik a hibacsík, és a törölt teendő visszakerül. Tesztje: 6. feladat, `an offline write rolls back…`, `when the newest of several writes fails…`, `a committed delete that fails offline…` és `an added to-do shows at once… a failed one disappears`, plusz a 10. feladatban a `?fail=1` Playwright-lépés.
 4. **360 px és az alsó sáv:** semmi nem lóg ki vízszintesen, és a lap alja (az utolsó kártya, a teendő-panel, a visszavonás-csík) nem kerül a sáv alá. A keret a 2. feladaté, de először a 4. feladat előnézete teszi mérhetővé. Ellenőrzőlistája: 4. feladat, 8. lépés, és a 10. feladat.
 5. **Olvasottnak jelölés után ugráló lista.** Az „olvasatlan elöl” rendezés élő állapottal futva a most megjelölt kártyát a lista végére dobná, a kurzor és a `j`/`k` fókusza alól. Elvárás: a kártya a helyén marad, csak halványodik, és a rendezés a betöltéskori állapotot használja. Tesztje: 7. feladat, `feedItems sorts by the loaded states…`; 6. feladat, `marking read after the load leaves loadedStates alone`.
+6. **Hiányzó vagy sérült `nav` cookie.** Nincs cookie, vagy az értéke nem `rail` (törölt, régi vagy kézzel elrontott érték). Elvárás: az oldalsáv kinyitva jelenik meg (`readNavMode` alapértelmezése `full`), a szerver nem dob kivételt, és a felület nem ragad rail módban, ha a cookie eltűnik. Tesztje: 2. feladat, `lib/nav-mode.test.ts`, `anything else means full: missing, garbled, or another value`.
 
 ---
 
@@ -82,6 +83,7 @@
 | Fájl | Felelősség |
 | --- | --- |
 | `lib/nav.ts` (+ teszt) | a menüpontok egy listában, `activeNavId`, `switchesLanguageInPlace` |
+| `lib/nav-mode.ts` (+ teszt) | a `nav` cookie értéke: teljes oldalsáv vagy ikonsáv (`readNavMode`) |
 | `lib/public-paths.ts` (+ teszt) | melyik útvonal kerüli el a belépési átirányítást (a `/dev/` csak fejlesztői módban) |
 | `lib/fixtures.ts` (+ teszt) | az előnézet mintaadatai |
 | `lib/undo-queue.ts` (+ teszt) | az egyszerre-egy visszavonás-sor |
@@ -94,8 +96,8 @@
 | `app/(app)/library/refresh-while-processing.tsx`, `app/(app)/library/[id]/mark-post-read.tsx` | élő frissítés beküldés közben; a megnyitott poszt olvasott |
 | `app/dev/preview/page.tsx`, `post/page.tsx`, `preview-nav.tsx` | az offline előnézet: a listanézetek `?view=`-vel, a poszt-nézet külön útvonalon, mert az szerveren renderelt nyelvvel megy |
 | `app/components/app-shell.tsx` | a keret: nyelvi kontextus, alsó sáv, „Több” panel, párbeszédablakok, csík |
-| `app/components/desktop-nav.tsx` | az asztali navigáció, A változat; a B vagy C erre az egy fájlra cserélődik |
-| `app/components/nav-parts.tsx` | amit minden navigáció használ: ikonok, `NavEntry`, „hamarosan” lista, fiók-sor |
+| `app/components/desktop-nav.tsx` | az asztali navigáció, A változat, ~56 px-es ikonsávvá csukható; a B vagy C erre az egy fájlra cserélődik |
+| `app/components/nav-parts.tsx` | amit minden navigáció használ: ikonok, `NavEntry`, „hamarosan” lista, fiók-sor, a rail hover/fókusz-buborékja (`NavTooltip`) |
 | `app/components/language-context.tsx` | `LanguageProvider`, `useLanguage`, `LocalizedText` |
 | `app/components/shell-dialogs.tsx` | `SearchSoon` (⌘K helye), `ShortcutHelp` |
 | `app/components/undo-toast.tsx` | `toasts`, `UndoToast`, `isUndoToast` |
@@ -214,11 +216,11 @@ git commit -m "feat: add the shared navigation list"
 
 ---
 
-### Task 2: Az app-keret: route group, asztali navigáció, alsó sáv, „Több” panel
+### Task 2: Az app-keret: route group, asztali navigáció (összecsukható oldalsáv), alsó sáv, „Több” panel
 
 **Files:**
 - Move (`git mv`): `app/page.tsx` → `app/(app)/page.tsx`; `app/loading.tsx` → `app/(app)/loading.tsx`; `app/archive` → `app/(app)/archive`; `app/library` → `app/(app)/library`
-- Create: `app/(app)/layout.tsx`, `app/components/app-shell.tsx`, `app/components/desktop-nav.tsx`, `app/components/nav-parts.tsx`, `app/components/language-context.tsx`, `app/components/shell-dialogs.tsx`
+- Create: `lib/nav-mode.ts`, `lib/nav-mode.test.ts`, `app/(app)/layout.tsx`, `app/components/app-shell.tsx`, `app/components/desktop-nav.tsx`, `app/components/nav-parts.tsx`, `app/components/language-context.tsx`, `app/components/shell-dialogs.tsx`
 - Modify:
   - `app/components/language-toggle.tsx`
   - `app/components/page-header.tsx` (a `PageHeader` törlése, `StatusCard`)
@@ -231,11 +233,12 @@ git commit -m "feat: add the shared navigation list"
 **Interfaces:**
 - Consumes: `NAV_ITEMS`, `PRIMARY_NAV`, `SOON_NAV`, `activeNavId`, `NavId`, `NavItem` (1. feladat)
 - Produces:
-  - `AppShell(props: { language: Language; email: string; children: ReactNode })`
-  - `DesktopNav(props: DesktopNavProps)`, ahol `DesktopNavProps = { email: string; onSearch: () => void; children: ReactNode }`. A 9. feladat hozzáad egy `onHelp: () => void` mezőt.
-  - `navIcons: Record<NavId, LucideIcon>`, `NavEntry(props: { item: NavItem; active: boolean; onSearch: () => void; className: string; children: ReactNode })`, `SoonList(props: { className?: string })`, `AccountActions(props: { email: string })`
+  - `type NavMode = "full" | "rail"`, `readNavMode(value: string | undefined): NavMode` (`lib/nav-mode.ts`)
+  - `AppShell(props: { language: Language; email: string; initialNavMode: NavMode; children: ReactNode })`
+  - `DesktopNav(props: DesktopNavProps)`, ahol `DesktopNavProps = { email: string; onSearch: () => void; mode: NavMode; onToggle: () => void; children: ReactNode }`. A 9. feladat hozzáad egy `onHelp: () => void` mezőt.
+  - `navIcons: Record<NavId, LucideIcon>`, `NavEntry(props: { item: NavItem; active: boolean; onSearch: () => void; className: string; children: ReactNode })`, `SoonList(props: { className?: string })`, `NavTooltip(props: { label: string; children: ReactNode })`, `AccountActions(props: { email: string; iconOnly?: boolean })`
   - `LanguageProvider(props: { initial: Language; children: ReactNode })`, `useLanguage(): { language: Language; setLanguage: (language: Language) => void }`
-  - `LanguageToggle()`: nincs props
+  - `LanguageToggle(props?: { iconOnly?: boolean })`
   - `SearchSoon(props: { open: boolean; onOpenChange: (open: boolean) => void })`
   - `StatusCard(props: { eyebrow: string; title: string; brand?: boolean; children: ReactNode })`
   - `DigestDashboard(props: { issue: CurrentIssue; items: DigestItem[]; githubTop10: GithubTopEntry[]; archived?: boolean })`: az `email` és az `initialLanguage` megszűnik
@@ -254,7 +257,51 @@ A `/login`, az `/auth/*`, az `/api/*`, a `/media`, az `error.tsx`, a `not-found.
 
 A `loading.tsx` azért költözik, hogy navigáláskor a keret látszódjon, és csak a tartalom helyén legyen váz. Emellett a `/dev/preview` fölött így nincs töltő-határ, és élesben valódi 404-et ad (lásd Global Constraints, `loading.md`).
 
-- [ ] **Step 2: A nyelvi kontextus** (`app/components/language-context.tsx`)
+- [ ] **Step 2: A `nav` cookie olvasásának tesztje** (`lib/nav-mode.test.ts`)
+
+Az oldalsáv állapotát (2026-09-25-i döntés, spec 1.2) egy `nav` cookie őrzi (`full` | `rail`), ugyanúgy, mint a `lang` cookie-t a nyelv. Ezt a tiszta függvényt a 12. lépésben az `app/(app)/layout.tsx` hívja szerveren, a 4. feladat előnézeti oldalai pedig ugyanígy.
+
+```ts
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { readNavMode } from "./nav-mode.ts";
+
+test("rail only for the exact cookie value", () => {
+  assert.equal(readNavMode("rail"), "rail");
+});
+
+test("anything else means full: missing, garbled, or another value", () => {
+  for (const value of [undefined, "", "full", "RAIL", "rail ", "expanded"]) {
+    assert.equal(readNavMode(value), "full", String(value));
+  }
+});
+```
+
+- [ ] **Step 3: Futtatás, el kell buknia**
+
+Futtatás: `node --experimental-strip-types --no-warnings --test lib/nav-mode.test.ts`
+Elvárt: FAIL, `Cannot find module '…/lib/nav-mode.ts'`.
+
+- [ ] **Step 4: A megvalósítás** (`lib/nav-mode.ts`)
+
+```ts
+// The desktop sidebar's two widths: a full sidebar or a ~56px icon rail (spec 1.2). Read from the
+// `nav` cookie by app/(app)/layout.tsx, so the server renders the right width with no flash.
+
+export type NavMode = "full" | "rail";
+
+/** The `nav` cookie's value. Anything but the exact "rail" — missing, stale, or garbled — means full. */
+export function readNavMode(value: string | undefined): NavMode {
+  return value === "rail" ? "rail" : "full";
+}
+```
+
+- [ ] **Step 5: Futtatás, át kell mennie**
+
+Futtatás: `node --experimental-strip-types --no-warnings --test lib/nav-mode.test.ts && npx tsc --noEmit && npm run dup`
+Elvárt: 2 teszt PASS, a tsc hiba nélkül fut, 0 klón.
+
+- [ ] **Step 6: A nyelvi kontextus** (`app/components/language-context.tsx`)
 
 ```tsx
 "use client";
@@ -291,19 +338,20 @@ export function useLanguage(): LanguageState {
 
 A `lib/language.ts` doc-kommentje legyen ez: `/** The reader's language, written by persistLanguage in app/components/language-context.tsx. */`
 
-- [ ] **Step 3: A nyelvváltó a kontextusra** (`app/components/language-toggle.tsx`, a teljes fájl)
+- [ ] **Step 7: A nyelvváltó a kontextusra, ikon-változattal a railhez** (`app/components/language-toggle.tsx`, a teljes fájl)
 
 ```tsx
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Languages } from "lucide-react";
 import { useLanguage } from "./language-context";
 
 // Each label names the switch in the language it switches to.
 const copy = { hu: { label: "Switch to English" }, en: { label: "Váltás magyarra" } };
 
-/** Switches the whole shell at once; the server-rendered page follows with one refresh. */
-export function LanguageToggle() {
+/** Switches the whole shell at once; the server-rendered page follows with one refresh. `iconOnly` is the rail's ~40px version (desktop-nav.tsx). */
+export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const { language, setLanguage } = useLanguage();
   const router = useRouter();
   return (
@@ -314,9 +362,13 @@ export function LanguageToggle() {
         router.refresh();
       }}
       aria-label={copy[language].label}
-      className="focus-ring min-h-10 rounded-full border border-current/40 px-4 font-mono text-xs hover:border-signal hover:text-signal"
+      className={
+        iconOnly
+          ? "focus-ring grid size-10 place-items-center rounded-full border border-current/40 hover:border-signal hover:text-signal"
+          : "focus-ring min-h-10 rounded-full border border-current/40 px-4 font-mono text-xs hover:border-signal hover:text-signal"
+      }
     >
-      {language.toUpperCase()}
+      {iconOnly ? <Languages className="size-4" /> : language.toUpperCase()}
     </button>
   );
 }
@@ -324,19 +376,20 @@ export function LanguageToggle() {
 
 A `router.refresh()` itt még mindig lefut. A 3. feladat hagyja el ott, ahol a lista már mindkét nyelvet tartalmazza. Addig a szerveren renderelt szöveg így sem marad régi nyelven.
 
-- [ ] **Step 4: A közös navigációs darabok** (`app/components/nav-parts.tsx`)
+- [ ] **Step 8: A közös navigációs darabok, a rail buborék-tippjével** (`app/components/nav-parts.tsx`)
 
 ```tsx
 "use client";
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Archive, BookOpen, ChartColumn, FolderOpen, MessageSquare, Radar, Search, UserRound, type LucideIcon } from "lucide-react";
+import { Archive, BookOpen, ChartColumn, FolderOpen, LogOut, MessageSquare, Radar, Search, UserRound, type LucideIcon } from "lucide-react";
 import { SOON_NAV, type NavId, type NavItem } from "@/lib/nav";
 import { useLanguage } from "./language-context";
 
 // What every navigation variant shares: the icon per lib/nav.ts item, one nav entry, the "soon"
-// list and the account row. A new desktop variant reuses these instead of copying them.
+// list, the account row, and the rail's hover/focus tooltip. A new desktop variant reuses these
+// instead of copying them.
 
 const copy = {
   hu: { soonGroup: "Hamarosan", soon: "hamarosan", signOut: "Kijelentkezés" },
@@ -392,16 +445,46 @@ export function SoonList({ className = "" }: { className?: string }) {
   );
 }
 
-/** The signed-in address and the sign-out button. */
-export function AccountActions({ email }: { email: string }) {
+/**
+ * Wraps an icon-only control with its name as a small popup, shown on hover and on keyboard focus
+ * (house style: paper background, 2px ink border, hard shadow). Used by the rail (desktop-nav.tsx);
+ * the accessible name itself comes from the child's own aria-label or sr-only text, not from this.
+ */
+export function NavTooltip({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="group relative flex">
+      {children}
+      <span
+        role="tooltip"
+        aria-hidden="true"
+        className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap border-2 border-ink bg-paper px-2 py-1 font-mono text-xs text-ink opacity-0 shadow-[3px_3px_0_var(--ink)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+      >
+        {label}
+      </span>
+    </span>
+  );
+}
+
+/** The signed-in address and the sign-out button. `iconOnly` is the rail's ~40px sign-out-only version. */
+export function AccountActions({ email, iconOnly = false }: { email: string; iconOnly?: boolean }) {
   const { language } = useLanguage();
+  const t = copy[language];
+  if (iconOnly) {
+    return (
+      <form action="/auth/signout" method="post" className="flex justify-center">
+        <button type="submit" aria-label={t.signOut} className="focus-ring grid size-10 place-items-center text-paper/70 hover:text-signal">
+          <LogOut className="size-4" />
+        </button>
+      </form>
+    );
+  }
   return (
     <div className="flex items-center gap-3">
       <UserRound className="size-4 shrink-0 opacity-60" />
       <p className="min-w-0 flex-1 truncate font-mono text-[11px] opacity-70">{email}</p>
       <form action="/auth/signout" method="post">
         <button type="submit" className="focus-ring min-h-10 font-mono text-[11px] opacity-70 hover:text-signal hover:opacity-100">
-          {copy[language].signOut} →
+          {t.signOut} →
         </button>
       </form>
     </div>
@@ -409,7 +492,7 @@ export function AccountActions({ email }: { email: string }) {
 }
 ```
 
-- [ ] **Step 5: Az asztali navigáció, A változat** (`app/components/desktop-nav.tsx`)
+- [ ] **Step 9: Az asztali navigáció, A változat, ikonsávvá csukható** (`app/components/desktop-nav.tsx`)
 
 ```tsx
 "use client";
@@ -417,62 +500,88 @@ export function AccountActions({ email }: { email: string }) {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Radar } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Radar } from "lucide-react";
 import { activeNavId, PRIMARY_NAV } from "@/lib/nav";
+import type { NavMode } from "@/lib/nav-mode";
 import { useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
-import { AccountActions, NavEntry, navIcons, SoonList } from "./nav-parts";
+import { AccountActions, NavEntry, NavTooltip, navIcons, SoonList } from "./nav-parts";
 
-// Desktop navigation, variant A: a sidebar. Variants B (top bar) and C (icon rail) replace this one
-// file: same props, the same items from lib/nav.ts, and each lays out `children` (the page) itself.
+// Desktop navigation, variant A: a sidebar, collapsible to a ~56px icon rail (spec 1.2). Variants B
+// (top bar) and C (icon rail as the default) replace this one file: same props, the same items from
+// lib/nav.ts, and each lays out `children` (the page) itself.
 
 const copy = {
-  hu: { nav: "Fő navigáció" },
-  en: { nav: "Main navigation" },
+  hu: { nav: "Fő navigáció", collapse: "Oldalsáv összecsukása", expand: "Oldalsáv kinyitása" },
+  en: { nav: "Main navigation", collapse: "Collapse sidebar", expand: "Expand sidebar" },
 };
 
-const itemClass =
+const itemClassFull =
   "focus-ring flex min-h-10 w-full items-center gap-3 border-l-2 border-transparent px-3 font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
 
-export type DesktopNavProps = { email: string; onSearch: () => void; children: ReactNode };
+const itemClassRail =
+  "focus-ring flex min-h-10 w-full items-center justify-center border-l-2 border-transparent text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
 
-export function DesktopNav({ email, onSearch, children }: DesktopNavProps) {
+export type DesktopNavProps = {
+  email: string;
+  onSearch: () => void;
+  mode: NavMode;
+  onToggle: () => void;
+  children: ReactNode;
+};
+
+export function DesktopNav({ email, onSearch, mode, onToggle, children }: DesktopNavProps) {
   const { language } = useLanguage();
   const active = activeNavId(usePathname());
+  const t = copy[language];
+  const rail = mode === "rail";
   return (
     <div className="md:flex">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-paper/15 bg-ink text-paper md:flex">
-        <Link href="/" className="focus-ring flex items-center gap-3 border-b border-paper/15 p-5">
-          <span className="grid size-10 place-items-center rounded-full border border-signal bg-signal text-ink">
+      <aside
+        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper md:flex ${rail ? "w-14" : "w-64"}`}
+      >
+        <Link href="/" className={`focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}>
+          <span className="grid size-10 shrink-0 place-items-center rounded-full border border-signal bg-signal text-ink">
             <Radar className="size-5" />
           </span>
-          <span className="font-display text-2xl leading-none tracking-tight">
-            NEON
-            <br />
-            NEWS
-            <br />
-            <span className="text-signal">RADAR</span>
-          </span>
+          {!rail && (
+            <span className="font-display text-2xl leading-none tracking-tight">
+              NEON
+              <br />
+              NEWS
+              <br />
+              <span className="text-signal">RADAR</span>
+            </span>
+          )}
         </Link>
-        <nav aria-label={copy[language].nav} className="flex-1 overflow-y-auto px-3 py-4">
+        <nav aria-label={t.nav} className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="space-y-1">
             {PRIMARY_NAV.map((item) => {
               const Icon = navIcons[item.id];
-              return (
-                <li key={item.id}>
-                  <NavEntry item={item} active={active === item.id} onSearch={onSearch} className={itemClass}>
-                    <Icon className="size-4" />
-                    <span className="flex-1 text-left">{item.label[language]}</span>
-                  </NavEntry>
-                </li>
+              const entry = (
+                <NavEntry item={item} active={active === item.id} onSearch={onSearch} className={rail ? itemClassRail : itemClassFull}>
+                  <Icon className="size-4 shrink-0" />
+                  <span className={rail ? "sr-only" : "flex-1 text-left"}>{item.label[language]}</span>
+                </NavEntry>
               );
+              return <li key={item.id}>{rail ? <NavTooltip label={item.label[language]}>{entry}</NavTooltip> : entry}</li>;
             })}
           </ul>
-          <SoonList className="mt-6 px-3" />
+          {!rail && <SoonList className="mt-6 px-3" />}
         </nav>
-        <div className="space-y-3 border-t border-paper/15 p-4">
-          <LanguageToggle />
-          <AccountActions email={email} />
+        <div className={`space-y-3 border-t border-paper/15 ${rail ? "px-2 py-3" : "p-4"}`}>
+          {rail ? <LanguageToggle iconOnly /> : <LanguageToggle />}
+          {rail ? <AccountActions email={email} iconOnly /> : <AccountActions email={email} />}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={!rail}
+            aria-label={rail ? t.expand : t.collapse}
+            className="focus-ring flex min-h-10 w-full items-center justify-center gap-2 border-t border-paper/15 pt-3 font-mono text-[11px] text-paper/55 hover:text-signal"
+          >
+            {rail ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+            {!rail && t.collapse}
+          </button>
         </div>
       </aside>
       <div className="min-w-0 flex-1">{children}</div>
@@ -481,7 +590,9 @@ export function DesktopNav({ email, onSearch, children }: DesktopNavProps) {
 }
 ```
 
-- [ ] **Step 6: A keresés helye** (`app/components/shell-dialogs.tsx`)
+A tartalom oszlopa (`<div className="min-w-0 flex-1">`) magától kiszélesedik, amikor az `aside` 256-ról 56 px-re csukódik: nincs hozzá külön kód. A `NavTooltip` csak rail módban veszi körbe a bejegyzést; teljes módban a névnek nincs szüksége buborékra, mert ki van írva.
+
+- [ ] **Step 10: A keresés helye** (`app/components/shell-dialogs.tsx`)
 
 ```tsx
 "use client";
@@ -531,7 +642,7 @@ export function SearchSoon({ open, onOpenChange }: DialogProps) {
 }
 ```
 
-- [ ] **Step 7: A keret és az alsó sáv** (`app/components/app-shell.tsx`)
+- [ ] **Step 11: A keret és az alsó sáv, az oldalsáv-mód átadásával** (`app/components/app-shell.tsx`)
 
 ```tsx
 "use client";
@@ -542,6 +653,7 @@ import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
 import { activeNavId, PRIMARY_NAV } from "@/lib/nav";
+import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
@@ -553,13 +665,34 @@ const copy = {
   en: { nav: "Menu", more: "More", language: "Language" },
 };
 
+/** Mirrors persistLanguage (language-context.tsx): same cookie shape, read back by app/(app)/layout.tsx via readNavMode. */
+function persistNavMode(mode: NavMode) {
+  document.cookie = `nav=${mode}; path=/; max-age=31536000; samesite=lax`;
+}
+
 /** Every signed-in page: the desktop nav or the mobile bottom bar around the page, plus the shell-wide dialogs. */
-export function AppShell({ language, email, children }: { language: Language; email: string; children: ReactNode }) {
+export function AppShell({
+  language,
+  email,
+  initialNavMode,
+  children,
+}: {
+  language: Language;
+  email: string;
+  initialNavMode: NavMode;
+  children: ReactNode;
+}) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [navMode, setNavMode] = useState<NavMode>(initialNavMode);
   const openSearch = () => setSearchOpen(true);
+  const toggleNav = () => {
+    const next: NavMode = navMode === "rail" ? "full" : "rail";
+    persistNavMode(next);
+    setNavMode(next);
+  };
   return (
     <LanguageProvider initial={language}>
-      <DesktopNav email={email} onSearch={openSearch}>
+      <DesktopNav email={email} onSearch={openSearch} mode={navMode} onToggle={toggleNav}>
         {/* Room for the fixed bottom bar, so it never covers the end of the page. */}
         <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
       </DesktopNav>
@@ -622,26 +755,32 @@ function MobileNav({ email, onSearch }: { email: string; onSearch: () => void })
 }
 ```
 
-- [ ] **Step 8: A layout** (`app/(app)/layout.tsx`)
+Mobilon nincs rail: a `MobileNav` a `LanguageToggle`-t és az `AccountActions`-t is a teljes (nem `iconOnly`) formájukban használja, mert a „Több” panelben elég a hely.
+
+- [ ] **Step 12: A layout, a `nav` cookie olvasásával** (`app/(app)/layout.tsx`)
 
 ```tsx
+import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShell } from "@/app/components/app-shell";
 import { getLanguage } from "@/lib/language";
+import { readNavMode } from "@/lib/nav-mode";
 import { getViewer } from "@/lib/supabase/server";
 
 // Pages still check the session themselves, with their own ?next=: a layout cannot read the path.
 export default async function SignedInLayout({ children }: { children: ReactNode }) {
-  const [language, viewer] = await Promise.all([getLanguage(), getViewer()]);
+  const [language, viewer, cookieStore] = await Promise.all([getLanguage(), getViewer(), cookies()]);
   return (
-    <AppShell language={language} email={viewer?.email ?? ""}>
+    <AppShell language={language} email={viewer?.email ?? ""} initialNavMode={readNavMode(cookieStore.get("nav")?.value)}>
       {children}
     </AppShell>
   );
 }
 ```
 
-- [ ] **Step 9: A dashboard a kereten belül** (`app/components/digest-dashboard.tsx`, pontos cserék)
+Így a szerver már a helyes szélességgel rendereli az oldalsávot, mielőtt bármi kliens-JS lefutna (spec 1.2, „villanás nélkül”).
+
+- [ ] **Step 13: A dashboard a kereten belül** (`app/components/digest-dashboard.tsx`, pontos cserék)
 
 Előbb olvasd újra a fájlt, mert a sorszámok a 2026-09-24-i állapotra vonatkoznak.
 
@@ -798,7 +937,7 @@ Az eredmény:
 - a fejléc gombja legalább 40 px mobilon;
 - a nyelvváltás és a kijelentkezés a keretben van.
 
-- [ ] **Step 10: Az oldalak** (`app/(app)/…`)
+- [ ] **Step 14: Az oldalak** (`app/(app)/…`)
 
 `app/(app)/page.tsx`:
 
@@ -851,7 +990,7 @@ Az `app/(app)/archive/page.tsx`, az `app/(app)/library/page.tsx` és az `app/(ap
 
 Vele együtt törlődik a `LanguageToggle` import, és a `PageHeader` import is (az archívumnál és a Library-nél a `PageHero` import marad). A 3. és a 4. feladat ezeket az oldalakat még átírja.
 
-- [ ] **Step 11: `StatusCard`, a `PageHeader` törlése** (`app/components/page-header.tsx`)
+- [ ] **Step 15: `StatusCard`, a `PageHeader` törlése** (`app/components/page-header.tsx`)
 
 A `PageHeader` függvény és a `Link` / `ArrowLeft` import törlődik: a keret átveszi a helyét. A fájl eleje és a `PageHero` utáni új komponens:
 
@@ -991,7 +1130,7 @@ export default async function LoginPage({
 }
 ```
 
-- [ ] **Step 12: A bezáró gomb legalább 40 px** (`components/ui/sheet.tsx`, `components/ui/dialog.tsx`)
+- [ ] **Step 16: A bezáró gomb legalább 40 px** (`components/ui/sheet.tsx`, `components/ui/dialog.tsx`)
 
 A gyári bezáró gomb nagyjából 16 px-es érintési felület, ez sérti a 40 px-es szabályt a panelekben és a párbeszédablakokban.
 
@@ -1009,7 +1148,7 @@ A `dialog.tsx`-ben a `<DialogPrimitive.Close data-slot="dialog-close" className=
 
 A `CLAUDE.md` „Hand-authored components” szakaszát a 10. feladat frissíti.
 
-- [ ] **Step 13: Ellenőrzés**
+- [ ] **Step 17: Ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
 Elvárt:
@@ -1025,11 +1164,11 @@ grep -rn "initialLanguage\|email=" "app/(app)" --include=page.tsx
 
 A kontroller Playwrighttal a `/login` oldalt (bejelentkezés nélkül is elérhető) 360 és 1280 px-en nézi meg: látszik a `StatusCard`, és nincs vízszintes görgetés. A keret első teljes ellenőrzése a 4. feladat előnézetén lesz.
 
-- [ ] **Step 14: Commit**
+- [ ] **Step 18: Commit**
 
 ```bash
-git add -A app components/ui/sheet.tsx components/ui/dialog.tsx lib/language.ts
-git commit -m "feat: add the app shell with desktop nav and mobile bottom bar"
+git add -A app components/ui/sheet.tsx components/ui/dialog.tsx lib/language.ts lib/nav-mode.ts lib/nav-mode.test.ts
+git commit -m "feat: add the app shell with a collapsible desktop nav and mobile bottom bar"
 ```
 
 ---
@@ -1096,11 +1235,11 @@ export function LocalizedText({ value }: { value: Localized }) {
 
 - [ ] **Step 5: A váltó csak ott frissít, ahol kell** (`app/components/language-toggle.tsx`)
 
-Az importok legyenek ezek: `import { usePathname, useRouter } from "next/navigation";` és `import { switchesLanguageInPlace } from "@/lib/nav";`. A komponens:
+Az importok legyenek ezek: `import { usePathname, useRouter } from "next/navigation";` és `import { switchesLanguageInPlace } from "@/lib/nav";`. A `Languages` (lucide) és a `useLanguage` importja a 2. feladatból marad. A komponens (a 2. feladat `iconOnly`-ja megmarad, csak a frissítés lesz feltételes):
 
 ```tsx
-/** Switches the whole shell at once; only a page whose text the server rendered in one language is refreshed. */
-export function LanguageToggle() {
+/** Switches the whole shell at once; only a page whose text the server rendered in one language is refreshed. `iconOnly` is the rail's ~40px version (desktop-nav.tsx). */
+export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const { language, setLanguage } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
@@ -1112,9 +1251,13 @@ export function LanguageToggle() {
         if (!switchesLanguageInPlace(pathname)) router.refresh();
       }}
       aria-label={copy[language].label}
-      className="focus-ring min-h-10 rounded-full border border-current/40 px-4 font-mono text-xs hover:border-signal hover:text-signal"
+      className={
+        iconOnly
+          ? "focus-ring grid size-10 place-items-center rounded-full border border-current/40 hover:border-signal hover:text-signal"
+          : "focus-ring min-h-10 rounded-full border border-current/40 px-4 font-mono text-xs hover:border-signal hover:text-signal"
+      }
     >
-      {language.toUpperCase()}
+      {iconOnly ? <Languages className="size-4" /> : language.toUpperCase()}
     </button>
   );
 }
@@ -1382,7 +1525,7 @@ git commit -m "feat: switch language without a refresh on list pages"
 - Modify: `proxy.ts`, `app/(app)/library/[id]/page.tsx`
 
 **Interfaces:**
-- Consumes: `AppShell` (2. feladat); `ArchiveView`, `LibraryView` (3. feladat); `DigestDashboard`; `assignIds`, `blockSchema`, `parseBlocks`, `BlockDraft` (`lib/blocks.ts`); `publishedLabel` (`lib/pipeline/util.ts`)
+- Consumes: `AppShell`, `readNavMode` (`lib/nav-mode.ts`) (2. feladat); `ArchiveView`, `LibraryView` (3. feladat); `DigestDashboard`; `assignIds`, `blockSchema`, `parseBlocks`, `BlockDraft` (`lib/blocks.ts`); `publishedLabel` (`lib/pipeline/util.ts`)
 - Produces:
   - `isPublicPath(pathname: string): boolean`, `isDevPreviewPath(pathname: string, nodeEnv: string | undefined): boolean`
   - `lib/fixtures.ts`: `LONG_WORD`, `LONG_URL`, `previewEmail`, `digestItem(id: string, overrides?: Partial<DigestItem>): DigestItem`, `previewIssue`, `previewItems`, `previewGithub`, `previewArchive`, `previewSources`, `previewPosts`. A 6. feladat hozzáadja a `previewReader`-t, a 8. a `previewReadPostIds`-t.
@@ -1863,6 +2006,7 @@ export function PreviewNav({ current }: { current: PreviewView | "post" }) {
 `app/dev/preview/page.tsx`:
 
 ```tsx
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { ArchiveView } from "@/app/(app)/archive/archive-view";
 import { LibraryView } from "@/app/(app)/library/library-view";
@@ -1870,6 +2014,7 @@ import { AppShell } from "@/app/components/app-shell";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
 import { previewArchive, previewEmail, previewGithub, previewIssue, previewItems, previewPosts, previewSources } from "@/lib/fixtures";
 import { getLanguage } from "@/lib/language";
+import { readNavMode } from "@/lib/nav-mode";
 import { PREVIEW_VIEWS, PreviewNav, type PreviewView } from "./preview-nav";
 
 // The real view components on fixtures: no Supabase keys, no network, no sign-in. Development only.
@@ -1877,11 +2022,11 @@ import { PREVIEW_VIEWS, PreviewNav, type PreviewView } from "./preview-nav";
 export default async function PreviewPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   // Before any await: production answers a real 404 and never renders the fixtures.
   if (process.env.NODE_ENV !== "development") notFound();
-  const [{ view: requested }, language] = await Promise.all([searchParams, getLanguage()]);
+  const [{ view: requested }, language, cookieStore] = await Promise.all([searchParams, getLanguage(), cookies()]);
   const view: PreviewView = PREVIEW_VIEWS.find((candidate) => candidate === requested) ?? "radar";
 
   return (
-    <AppShell language={language} email={previewEmail}>
+    <AppShell language={language} email={previewEmail} initialNavMode={readNavMode(cookieStore.get("nav")?.value)}>
       <PreviewNav current={view} />
       {view === "radar" && <DigestDashboard issue={previewIssue} items={previewItems} githubTop10={previewGithub} />}
       {view === "radar-empty" && <DigestDashboard issue={previewIssue} items={[]} githubTop10={[]} />}
@@ -1894,23 +2039,27 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
 }
 ```
 
+A `/dev/preview` így ugyanazt a `nav` sütit olvassa, mint az éles `app/(app)/layout.tsx`: az oldalsáv állapota Playwrighttal is ellenőrizhető újratöltés után (10. feladat).
+
 `app/dev/preview/post/page.tsx`:
 
 ```tsx
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { PostArticle } from "@/app/(app)/library/[id]/post-article";
 import { AppShell } from "@/app/components/app-shell";
 import { previewEmail, previewPosts } from "@/lib/fixtures";
 import { getLanguage } from "@/lib/language";
+import { readNavMode } from "@/lib/nav-mode";
 import { PreviewNav } from "../preview-nav";
 
 /** Every block type and all four banners, one fixture post after the other. */
 export default async function PreviewPostPage() {
   // Before any await: production answers a real 404 and never renders the fixtures.
   if (process.env.NODE_ENV !== "development") notFound();
-  const language = await getLanguage();
+  const [language, cookieStore] = await Promise.all([getLanguage(), cookies()]);
   return (
-    <AppShell language={language} email={previewEmail}>
+    <AppShell language={language} email={previewEmail} initialNavMode={readNavMode(cookieStore.get("nav")?.value)}>
       <PreviewNav current="post" />
       <main className="min-h-dvh bg-ink">
         {previewPosts.map((post) => (
@@ -3908,19 +4057,19 @@ git commit -m "feat: track read posts and refresh the library while links proces
 
 **Files:**
 - Create: `lib/keymap.ts`, `lib/keymap.test.ts`, `app/components/use-shortcuts.ts`
-- Modify: `app/components/story-card.tsx`, `app/components/digest-dashboard.tsx`, `app/components/shell-dialogs.tsx` (`ShortcutHelp`), `app/components/app-shell.tsx`, `app/components/desktop-nav.tsx` (`onHelp`, ⌘K jelzés)
+- Modify: `app/components/story-card.tsx`, `app/components/digest-dashboard.tsx`, `app/components/shell-dialogs.tsx` (`ShortcutHelp`), `app/components/app-shell.tsx`, `app/components/desktop-nav.tsx` (`onHelp`, ⌘K jelzés, a `[` a súgóban)
 
 **Interfaces:**
-- Consumes: `SearchSoon`, `DesktopNavProps` (2. feladat); `StoryCard`, `MustReadCard` (7. feladat); `ReaderStore.toggleFlag` (6. feladat)
+- Consumes: `SearchSoon`, `DesktopNavProps`, `NavMode` (2. feladat); `StoryCard`, `MustReadCard` (7. feladat); `ReaderStore.toggleFlag` (6. feladat)
 - Produces:
-  - `type ShortcutAction = "next" | "previous" | "open" | "read" | "later" | "search" | "help"`
+  - `type ShortcutAction = "next" | "previous" | "open" | "read" | "later" | "search" | "help" | "toggleNav"`
   - `SHORTCUTS: readonly { keys: readonly string[]; action: ShortcutAction; label: Localized }[]`
   - `type KeyPress = { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; isComposing?: boolean }`, `type KeyTarget = { editable: boolean; inDialog: boolean }`
   - `isEditableTarget(element: { tagName?: string; isContentEditable?: boolean } | null): boolean`, `shortcutFor(press: KeyPress, target: KeyTarget): ShortcutAction | null`, `nextCardIndex(current: number, count: number, step: 1 | -1): number | null`
   - `useShortcuts(handlers: Partial<Record<ShortcutAction, () => void>>): void`
   - `story-card.tsx`: `focusedCardId(): string | null`, `moveCardFocus(step: 1 | -1): void`, `openFocusedCard(): void`
   - `ShortcutHelp(props: { open: boolean; onOpenChange: (open: boolean) => void })`
-  - `DesktopNavProps` új mezője: `onHelp: () => void`
+  - `DesktopNavProps` új mezője: `onHelp: () => void` (a `mode`/`onToggle` a 2. feladatból jön, és onnantól `[` már a saját gombjukkal is átváltja őket)
 
 - [ ] **Step 1: A teszt megírása** (`lib/keymap.test.ts`)
 
@@ -3934,14 +4083,14 @@ const page: KeyTarget = { editable: false, inDialog: false };
 
 test("each single key maps to its action", () => {
   assert.deepEqual(
-    ["j", "k", "o", "r", "l", "/", "?"].map((key) => shortcutFor(press(key), page)),
-    ["next", "previous", "open", "read", "later", "search", "help"],
+    ["j", "k", "o", "r", "l", "/", "?", "["].map((key) => shortcutFor(press(key), page)),
+    ["next", "previous", "open", "read", "later", "search", "help", "toggleNav"],
   );
 });
 
 test("nothing fires while typing, whatever the key", () => {
   const typing: KeyTarget = { editable: true, inDialog: false };
-  for (const keyPress of [press("j"), press("r"), press("o"), press("?"), press("/"), press("k", { metaKey: true })]) {
+  for (const keyPress of [press("j"), press("r"), press("o"), press("?"), press("/"), press("["), press("k", { metaKey: true })]) {
     assert.equal(shortcutFor(keyPress, typing), null, keyPress.key);
   }
 });
@@ -3990,7 +4139,7 @@ import type { Localized } from "../data/digest-types.ts";
 
 // Desktop keyboard shortcuts as data plus pure functions; app/components/use-shortcuts.ts binds them to the window.
 
-export type ShortcutAction = "next" | "previous" | "open" | "read" | "later" | "search" | "help";
+export type ShortcutAction = "next" | "previous" | "open" | "read" | "later" | "search" | "help" | "toggleNav";
 
 /** What the help dialog lists. Single-character keys are also what shortcutFor matches; longer ones are display only. */
 export const SHORTCUTS: readonly { keys: readonly string[]; action: ShortcutAction; label: Localized }[] = [
@@ -4000,6 +4149,7 @@ export const SHORTCUTS: readonly { keys: readonly string[]; action: ShortcutActi
   { keys: ["r"], action: "read", label: { hu: "Olvasott ki/be", en: "Toggle read" } },
   { keys: ["l"], action: "later", label: { hu: "Későbbre ki/be", en: "Toggle later" } },
   { keys: ["⌘K", "Ctrl K", "/"], action: "search", label: { hu: "Keresés (hamarosan)", en: "Search (coming soon)" } },
+  { keys: ["["], action: "toggleNav", label: { hu: "Oldalsáv össze/kinyitása", en: "Collapse/expand the sidebar" } },
   { keys: ["?"], action: "help", label: { hu: "Ez a lista", en: "This list" } },
 ];
 
@@ -4179,23 +4329,41 @@ export function ShortcutHelp({ open, onOpenChange }: DialogProps) {
 }
 ```
 
+A `[` sor semmilyen külön kódot nem igényel itt: a `SHORTCUTS`-ba a 3. lépésben már bekerült, és a fenti `.map` automatikusan kilistázza.
+
 - [ ] **Step 9: A keret és az asztali navigáció**
 
 `app/components/app-shell.tsx`:
 - importok: `import { useShortcuts } from "./use-shortcuts";`, a `./shell-dialogs` importba a `ShortcutHelp`;
-- az `AppShell` törzse:
+- az `AppShell` törzse (a 2. feladat `navMode`/`toggleNav`/`persistNavMode`-ja megmarad; csak a súgó-ablak és a `useShortcuts` kerül hozzá, a `toggleNav` pedig bekötődik a `[` billentyűre):
 
 ```tsx
-export function AppShell({ language, email, children }: { language: Language; email: string; children: ReactNode }) {
+export function AppShell({
+  language,
+  email,
+  initialNavMode,
+  children,
+}: {
+  language: Language;
+  email: string;
+  initialNavMode: NavMode;
+  children: ReactNode;
+}) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [navMode, setNavMode] = useState<NavMode>(initialNavMode);
   const openSearch = () => setSearchOpen(true);
   const openHelp = () => setHelpOpen(true);
+  const toggleNav = () => {
+    const next: NavMode = navMode === "rail" ? "full" : "rail";
+    persistNavMode(next);
+    setNavMode(next);
+  };
   // ⌘K and / are reserved for the search palette (milestone C); until then they open its placeholder.
-  useShortcuts({ search: openSearch, help: openHelp });
+  useShortcuts({ search: openSearch, help: openHelp, toggleNav });
   return (
     <LanguageProvider initial={language}>
-      <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp}>
+      <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
         {/* Room for the fixed bottom bar, so it never covers the end of the page. */}
         <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
       </DesktopNav>
@@ -4208,25 +4376,128 @@ export function AppShell({ language, email, children }: { language: Language; em
 }
 ```
 
-`app/components/desktop-nav.tsx`:
-- `DesktopNavProps = { email: string; onSearch: () => void; onHelp: () => void; children: ReactNode }`, a paraméterlistába `onHelp`;
-- a `copy` mindkét nyelve egy `shortcuts` kulcsot kap (`"Billentyűparancsok"` / `"Keyboard shortcuts"`);
-- a lucide-importba kerül a `Keyboard`;
-- a `NavEntry` gyerekei közé, a címke után: `{!item.href && <kbd className="font-mono text-[10px] text-paper/45">⌘K</kbd>}`;
-- a lábléc első sora (a `<LanguageToggle />` helyén):
+`app/components/desktop-nav.tsx`: a lábléc a 2. feladat óta már három sort tart (nyelv, fiók, összecsukó gomb), ezért itt a teljes fájl cserélődik — a `mode`/`onToggle`/rail-logika megmarad, csak az `onHelp` és a súgó-gomb (railben ikon, teljes módban ikon + „?”) kerül hozzá:
 
 ```tsx
-          <div className="flex items-center justify-between gap-2">
-            <LanguageToggle />
-            <button
-              type="button"
-              onClick={onHelp}
-              aria-label={copy[language].shortcuts}
-              className="focus-ring flex min-h-10 items-center gap-2 px-2 font-mono text-[11px] text-paper/55 hover:text-signal"
-            >
-              <Keyboard className="size-4" /> ?
-            </button>
-          </div>
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
+import { ChevronsLeft, ChevronsRight, Keyboard, Radar } from "lucide-react";
+import { activeNavId, PRIMARY_NAV } from "@/lib/nav";
+import type { NavMode } from "@/lib/nav-mode";
+import { useLanguage } from "./language-context";
+import { LanguageToggle } from "./language-toggle";
+import { AccountActions, NavEntry, NavTooltip, navIcons, SoonList } from "./nav-parts";
+
+// Desktop navigation, variant A: a sidebar, collapsible to a ~56px icon rail (spec 1.2). Variants B
+// (top bar) and C (icon rail as the default) replace this one file: same props, the same items from
+// lib/nav.ts, and each lays out `children` (the page) itself.
+
+const copy = {
+  hu: { nav: "Fő navigáció", collapse: "Oldalsáv összecsukása", expand: "Oldalsáv kinyitása", shortcuts: "Billentyűparancsok" },
+  en: { nav: "Main navigation", collapse: "Collapse sidebar", expand: "Expand sidebar", shortcuts: "Keyboard shortcuts" },
+};
+
+const itemClassFull =
+  "focus-ring flex min-h-10 w-full items-center gap-3 border-l-2 border-transparent px-3 font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
+
+const itemClassRail =
+  "focus-ring flex min-h-10 w-full items-center justify-center border-l-2 border-transparent text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
+
+export type DesktopNavProps = {
+  email: string;
+  onSearch: () => void;
+  onHelp: () => void;
+  mode: NavMode;
+  onToggle: () => void;
+  children: ReactNode;
+};
+
+export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }: DesktopNavProps) {
+  const { language } = useLanguage();
+  const active = activeNavId(usePathname());
+  const t = copy[language];
+  const rail = mode === "rail";
+  return (
+    <div className="md:flex">
+      <aside
+        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper md:flex ${rail ? "w-14" : "w-64"}`}
+      >
+        <Link href="/" className={`focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}>
+          <span className="grid size-10 shrink-0 place-items-center rounded-full border border-signal bg-signal text-ink">
+            <Radar className="size-5" />
+          </span>
+          {!rail && (
+            <span className="font-display text-2xl leading-none tracking-tight">
+              NEON
+              <br />
+              NEWS
+              <br />
+              <span className="text-signal">RADAR</span>
+            </span>
+          )}
+        </Link>
+        <nav aria-label={t.nav} className="flex-1 overflow-y-auto px-3 py-4">
+          <ul className="space-y-1">
+            {PRIMARY_NAV.map((item) => {
+              const Icon = navIcons[item.id];
+              const entry = (
+                <NavEntry item={item} active={active === item.id} onSearch={onSearch} className={rail ? itemClassRail : itemClassFull}>
+                  <Icon className="size-4 shrink-0" />
+                  <span className={rail ? "sr-only" : "flex-1 text-left"}>{item.label[language]}</span>
+                  {!rail && !item.href && <kbd className="font-mono text-[10px] text-paper/45">⌘K</kbd>}
+                </NavEntry>
+              );
+              return <li key={item.id}>{rail ? <NavTooltip label={item.label[language]}>{entry}</NavTooltip> : entry}</li>;
+            })}
+          </ul>
+          {!rail && <SoonList className="mt-6 px-3" />}
+        </nav>
+        <div className={`space-y-3 border-t border-paper/15 ${rail ? "px-2 py-3" : "p-4"}`}>
+          {rail ? (
+            <div className="flex flex-col items-center gap-3">
+              <LanguageToggle iconOnly />
+              <button
+                type="button"
+                onClick={onHelp}
+                aria-label={t.shortcuts}
+                className="focus-ring grid size-10 place-items-center text-paper/55 hover:text-signal"
+              >
+                <Keyboard className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <LanguageToggle />
+              <button
+                type="button"
+                onClick={onHelp}
+                aria-label={t.shortcuts}
+                className="focus-ring flex min-h-10 items-center gap-2 px-2 font-mono text-[11px] text-paper/55 hover:text-signal"
+              >
+                <Keyboard className="size-4" /> ?
+              </button>
+            </div>
+          )}
+          {rail ? <AccountActions email={email} iconOnly /> : <AccountActions email={email} />}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={!rail}
+            aria-label={rail ? t.expand : t.collapse}
+            className="focus-ring flex min-h-10 w-full items-center justify-center gap-2 border-t border-paper/15 pt-3 font-mono text-[11px] text-paper/55 hover:text-signal"
+          >
+            {rail ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+            {!rail && t.collapse}
+          </button>
+        </div>
+      </aside>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
 ```
 
 - [ ] **Step 10: Ellenőrzés**
@@ -4270,6 +4541,7 @@ app/components/   app-shell (+ mobile bottom bar), desktop-nav, nav-parts, shell
 
 ```text
 lib/nav.ts        the menu items, the active item, which pages switch language in place
+lib/nav-mode.ts   the `nav` cookie's value: full sidebar or icon rail
 lib/keymap.ts     keyboard shortcuts → actions
 lib/reader-store.ts  optimistic read/later/to-do state; post read state as post:<id>
 lib/feed.ts       feed filter and unread-first order
@@ -4291,7 +4563,7 @@ Every signed-in page lives under `app/(app)/` and gets `app/(app)/layout.tsx` �
 
 - **One list:** `lib/nav.ts` holds the items (Radar, Library, Keresés, Archívum, and the dimmed "hamarosan" views) and `activeNavId()`. Both navigations render from it.
 - **Mobile, below `md`:** the bottom bar in `app-shell.tsx`, five slots; "Több" opens a bottom Sheet with the language toggle, sign-out and the coming views.
-- **Desktop:** `app/components/desktop-nav.tsx`, variant A (sidebar). Variants B (top bar) and C (icon rail) are a new `DesktopNav` with the same props that reuses `nav-parts.tsx`; no other file changes.
+- **Desktop:** `app/components/desktop-nav.tsx`, variant A (sidebar), collapsible to a ~56px icon rail via a toggle button at its foot (`aria-expanded`, localized "Collapse sidebar" / "Expand sidebar"). In rail mode every entry (including search, language and sign-out) shrinks to an icon with its accessible name kept (`aria-label` or sr-only text) and shown as a hover/focus tooltip (`NavTooltip` in `nav-parts.tsx`). The choice persists in the `nav` cookie (`full` | `rail`, same shape as `lang`); `readNavMode()` (`lib/nav-mode.ts`) parses it, and `app/(app)/layout.tsx` reads it server-side so the width is correct on first render. Variants B (top bar) and C (icon rail as the default) are a new `DesktopNav` with the same props that reuses `nav-parts.tsx`; no other file changes.
 - **Search** is a placeholder dialog until milestone C (`SearchSoon`); `⌘K` / `Ctrl K` and `/` already open it.
 - **Undo toast:** `toasts.show({ kind, undo?, commit? })` from `undo-toast.tsx`. One at a time, 5 s, `aria-live="polite"`; a new toast makes the previous action final, and `pagehide` does too. Read, delete and (milestone B) rating use it, and so does every failed write.
 - **Reader state:** `lib/reader-store.ts` (optimistic, writes per key in click order, rollback to the last value the server confirmed) behind `use-reader-state.ts`. Library posts use `item_states` too, keyed `post:<id>`.
@@ -4299,7 +4571,7 @@ Every signed-in page lives under `app/(app)/` and gets `app/(app)/layout.tsx` �
 
 ## Keyboard (desktop)
 
-`lib/keymap.ts` maps keys to actions: `j`/`k` next/previous card, `o` open (marks read), `r` read, `l` later, `⌘K`/`/` search, `?` help. `use-shortcuts.ts` binds it. Nothing fires in an input, textarea, select or contenteditable, inside an open dialog, or with Ctrl/⌘/Alt held (except `⌘K`). Card scrolling honours `prefers-reduced-motion`. A new shortcut is one `SHORTCUTS` row plus a handler; the help dialog lists it by itself.
+`lib/keymap.ts` maps keys to actions: `j`/`k` next/previous card, `o` open (marks read), `r` read, `l` later, `⌘K`/`/` search, `[` collapse/expand the sidebar, `?` help. `use-shortcuts.ts` binds it. Nothing fires in an input, textarea, select or contenteditable, inside an open dialog, or with Ctrl/⌘/Alt held (except `⌘K`). Card scrolling honours `prefers-reduced-motion`. A new shortcut is one `SHORTCUTS` row plus a handler; the help dialog lists it by itself.
 
 ## Offline preview
 
@@ -4319,7 +4591,7 @@ One colocated `copy` object per component; no inline `language === "hu" ? … : 
 
 Az M1 15. feladata onboarding-README-t ír. A „Project tour” szakaszba (ha nincs ilyen, a két nézet felsorolása alá) kerül ez:
 
-> Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop, a five-slot bottom bar on phones. Desktop shortcuts: `j`/`k` move between cards, `o` opens (and marks read), `r` read, `l` later, `?` lists them.
+> Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (collapsible to an icon rail), a five-slot bottom bar on phones. Desktop shortcuts: `j`/`k` move between cards, `o` opens (and marks read), `r` read, `l` later, `[` collapses the sidebar, `?` lists them.
 
 A „Testing” szakaszba:
 
@@ -4327,15 +4599,15 @@ A „Testing” szakaszba:
 
 - [ ] **Step 3: `TODO.md`**
 
-- A „Kész” alá új pont: `- [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (\`/dev/preview\`).`
+- A „Kész” alá új pont: `- [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon összecsukható oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (\`/dev/preview\`).`
 - Az „UI/UX és keresés” pont első sora: `- [ ] **UI/UX és keresés:** az A mérföldkő kész (terv: [docs/superpowers/plans/2026-09-24-ux-a-app-shell.md](docs/superpowers/plans/2026-09-24-ux-a-app-shell.md)); hátra van a B (értékelés, GitHub-fül) és a C (keresés, lapozás).` Az alpontjai közül az egységes navigáció, a mobilos ergonómia és az offline előnézet kikerül, mert kész.
-- A „Neked: az asztali navigáció kiválasztása” pont alá: `  - Most az **A** van bent. A csere egyetlen fájl: \`app/components/desktop-nav.tsx\`.`
+- A „Neked: az asztali navigáció kiválasztása” pont alá: `  - Most az **A** van bent, 2026-09-25-től ~56 px-es ikonsávvá csukható (\`[\`, vagy a lábléc gombja). A csere egyetlen fájl: \`app/components/desktop-nav.tsx\`.`
 - A „Kényelmi funkciók” alatt: `- [x] **Todo cikkhez kötése.** A hírkártya „+ teendő” gombja (UI/UX A).`
 
 - [ ] **Step 4: Végső ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
-Elvárt: minden zöld, 0 klón. A tesztszám a kiinduláshoz képest 37-tel nő: nav 4, public-paths 3, fixtures 4, undo-queue 3, reader-store 13, feed 4, keymap 6. Ha valamelyik fájlban eltér a szám, a tesztneveket vesd össze ezzel a tervvel.
+Elvárt: minden zöld, 0 klón. A tesztszám a kiinduláshoz képest 39-cel nő: nav 4, nav-mode 2, public-paths 3, fixtures 4, undo-queue 3, reader-store 13, feed 4, keymap 6. Ha valamelyik fájlban eltér a szám, a tesztneveket vesd össze ezzel a tervvel.
 
 - [ ] **Step 5: Playwright-ellenőrzőlista** (a kontroller futtatja a Playwright MCP-eszközeivel, `npm run dev` mellett)
 
@@ -4379,9 +4651,12 @@ Nézetek: `http://localhost:3000/dev/preview?view=` + `radar`, `radar-empty`, `l
    - Ablakok:
      - `?` → nyílik a súgó (`role="dialog"`), `Escape` → bezárul;
      - `/` és `Control+k` → a keresés helye nyílik.
+   - Oldalsáv:
+     - `[` → az `aside` szélessége 56-ra csökken, a gomb `aria-expanded="false"`;
+     - `[` még egyszer → visszaáll 256-ra, `aria-expanded="true"`.
    - Gépelés (a Review Focus 1. pontja):
-     - a `library` nézetben kattints a link-mezőbe, és gépeld be: `jkr?/o`;
-     - elvárt: a mező értéke `jkr?/o`, ablak nem nyílt, új lap nem nyílt.
+     - a `library` nézetben kattints a link-mezőbe, és gépeld be: `jkr?/o[`;
+     - elvárt: a mező értéke `jkr?/o[`, ablak nem nyílt, új lap nem nyílt, az oldalsáv nem vált.
      - Ugyanez 1280 px-en a teendő-panel mezőjében (nyisd meg a fejléc gombjával).
 6. **Visszavonás** (360 px, `radar`).
    - Egy kártya „Megnyitás” gombja → megjelenik a csík, és a sáv fölött van: a csík `getBoundingClientRect().bottom` kisebb, mint a `#mobile-nav` teteje. A „Visszavonás” után a kártya nem halvány.
@@ -4393,6 +4668,24 @@ Nézetek: `http://localhost:3000/dev/preview?view=` + `radar`, `radar-empty`, `l
    - A `<html lang>` mindkét esetben követi a váltást.
 9. **Library.** A 8. feladat 8. lépésének két próbája: RSC-kérések 5 másodpercenként `pending` forrásnál, és a `story-read` a 2-es poszton.
 10. **Csökkentett mozgás.** `browser_emulate_media` a `prefers-reduced-motion: reduce` beállítással, `radar`, `j` → a görgetés azonnali. Ellenőrzés: a leütés után 50 ms-mal a kártya már középen van.
+11. **Az oldalsáv összecsukása** (1280 px, `radar`, `library` és `post` nézet).
+    - A lábléc gombjára kattintva (`browser_click`) az `aside` szélessége `256`-ról `56`-ra vált, és a gomb `aria-expanded` értéke `"true"`-ról `"false"`-ra:
+      ```js
+      () => {
+        const aside = document.querySelector("aside");
+        const toggle = aside.querySelector("button[aria-expanded]");
+        return { width: Math.round(aside.getBoundingClientRect().width), expanded: toggle.getAttribute("aria-expanded") };
+      }
+      ```
+    - Frissítés után (`browser_navigate` ugyanarra az URL-re) az `aside` már az első kiértékeléskor is 56 széles: a szerver a `nav` sütiből már a helyes móddal renderel (`app/(app)/layout.tsx`; a `/dev/preview` ugyanígy olvassa, lásd a 4. feladat 7. lépését), nincs olyan köztes állapot, amit a kliens utólag igazítana.
+    - A gomb újbóli kattintására az `aside` visszaáll `256`-ra, `aria-expanded="true"`.
+    - Rail módban egy `Tab`-bal fókuszált menüponthoz buborék tartozik:
+      ```js
+      () => { const tip = document.activeElement.closest("li")?.querySelector('[role="tooltip"]'); return tip ? getComputedStyle(tip).opacity : null; }
+      ```
+      Elvárt fókuszban: `"1"`. Egy további `Tab` után (a fókusz odébb áll) újra `"0"`.
+    - Nincs vízszintes görgetés rail módban sem (az 1. pont szkriptje).
+    - `[` billentyűvel kattintás nélkül is ugyanez történik (lásd az 5. pont Oldalsáv-alpontját).
 
 Minden talált hibára előbb egy tiszta segédfüggvényes teszt a `lib/`-ben, ha a hiba logikai, aztán a javítás, és külön commit (`fix: …`).
 
