@@ -42,12 +42,11 @@ export function UndoToast() {
   const [prevToastId, setPrevToastId] = useState<number | undefined>(undefined);
   const toastId = toast?.id;
 
-  // Reset paused when the toast goes away (browsers don't reliably fire leave/blur on removal).
-  if (prevToastId !== undefined && toastId === undefined) {
-    setPaused(false);
+  if (toastId !== prevToastId) {
+    // Browsers don't reliably fire pointerleave/blur on a removed node, so a toast that goes away clears the pause.
+    setPrevToastId(toastId);
+    if (toastId === undefined) setPaused(false);
   }
-  // eslint-disable-next-line react-hooks/set-state-in-render
-  setPrevToastId(toastId);
 
   useEffect(() => {
     if (toastId === undefined || paused) return;
