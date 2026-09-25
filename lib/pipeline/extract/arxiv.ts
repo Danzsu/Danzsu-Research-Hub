@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import { assignIds, plainText, withoutIds, type BlockDraft } from "../../blocks.ts";
+import { assignIds, plainText, type BlockDraft } from "../../blocks.ts";
 import { apiFetch, cancelBody, ensureOk, readText, safeFetch } from "../fetch.ts";
 import { collapse } from "../html-to-blocks.ts";
 import { arxivId, errorMessage, list, xmlText } from "../util.ts";
@@ -78,7 +78,8 @@ export const extractArxiv: Extractor = async (db, url, note) => {
   } catch (error) {
     console.warn(`arxiv pdf ${id}: ${errorMessage(error)}`);
   }
-  const blocks = assignIds([...abstract, ...withoutIds(pdf.blocks)]);
+  // assignIds replaces the PDF blocks' own ids, so a repeat of the abstract's blocks still gets its own.
+  const blocks = assignIds([...abstract, ...pdf.blocks]);
   return {
     blocks,
     title: info.title,

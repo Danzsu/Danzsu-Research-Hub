@@ -51,7 +51,6 @@ export const blockSchema = z.discriminatedUnion("type", [
   }),
   z.object({ id, type: z.literal("divider") }),
 ]);
-export const blocksSchema = z.array(blockSchema);
 
 export type Block = z.infer<typeof blockSchema>;
 export type ImageBlock = Extract<Block, { type: "image" }>;
@@ -62,7 +61,10 @@ export type BlockDraft = DistributiveOmit<Block, "id">;
 /** Stored JSON → blocks. Validates each block independently; drops malformed blocks and keeps valid ones. */
 export function parseBlocks(value: unknown): Block[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((block) => (blockSchema.safeParse(block).success ? [blockSchema.parse(block)] : []));
+  return value.flatMap((block) => {
+    const parsed = blockSchema.safeParse(block);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 export function safeHref(raw: string | null | undefined, base: string): string | undefined {
@@ -123,10 +125,6 @@ export function assignIds(drafts: BlockDraft[]): Block[] {
     return { ...draft, id: count === 1 ? base : `${base}-${count}` } as Block;
   });
 }
-
-export const withoutIds = (blocks: Block[]): BlockDraft[] =>
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  blocks.map(({ id, ...draft }) => draft as BlockDraft);
 
 export function sectionsToBlocks(sections: { heading: string; points: string[] }[]): BlockDraft[] {
   return sections.flatMap((section): BlockDraft[] => [

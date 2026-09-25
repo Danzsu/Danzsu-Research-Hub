@@ -298,16 +298,17 @@ test("extractArxiv keeps an HTML paper's robots noarchive next to its arXiv meta
   assert.equal(result.meta.arxivId, "2401.00001");
 });
 
-test("extractArxiv keeps the PDF's X-Robots-Tag noarchive when there is no HTML version", async (t) => {
+test("extractArxiv keeps the PDF's X-Robots-Tag noarchive when there is no HTML version, and ids unique past the abstract", async (t) => {
   withGeminiKey(t);
   mockArxiv(t, {
     "/pdf/": () => new Response("%PDF-1.4", { headers: { "content-type": "application/pdf", "x-robots-tag": "noarchive" } }),
-    "googleapis.com": () => geminiResponse({ title: "T", blocks: [{ type: "paragraph", text: "Body" }] }),
+    "googleapis.com": () => geminiResponse({ title: "T", blocks: [{ type: "heading", level: 2, text: "Abstract" }, { type: "paragraph", text: "Body" }] }),
   });
   const result = await extractArxiv(fakeDb(), "https://arxiv.org/abs/math/0211159", "");
   assert.equal(result.meta.noarchive, true);
   assert.equal(result.meta.arxivId, "math/0211159");
-  assert.deepEqual(result.blocks.map((b) => b.type), ["heading", "paragraph", "paragraph"]);
+  assert.deepEqual(result.blocks.map((b) => b.type), ["heading", "paragraph", "heading", "paragraph"]);
+  assert.equal(new Set(result.blocks.map((b) => b.id)).size, 4); // the PDF's own "Abstract" heading id repeats the abstract's
 });
 
 // Trimmed from a live fetch of api.github.com/repos/facebookresearch/detectron2 (Accept:
