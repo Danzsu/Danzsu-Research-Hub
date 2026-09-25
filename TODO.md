@@ -23,14 +23,14 @@
   npx supabase link --project-ref <project-ref>
   npx supabase db push
   ```
-  CLI nélkül: *SQL Editor*, és egymás után mindkét fájl a `supabase/migrations/` mappából (`…_init.sql`, majd `…_model_settings.sql`)
+  CLI nélkül: *SQL Editor*, és egymás után, fájlnév szerinti sorrendben a `supabase/migrations/` fájljai (`…_init.sql`, `…_model_settings.sql`, `…_post_blocks.sql`). A `…_drop_post_body.sql` csak az M1 deployja után jön, lásd lent.
 - [ ] Ellenőrzés a *Table Editor*-ban: 8 tábla (a `model_settings`-szel együtt) és egy `archive_issues` view, mindegyik táblán „RLS enabled”
 - [ ] *Authentication → Users → Invite user*: meghívod magad
 - [x] **Egységes poszt-sablon (M1) migrációja** (`20260924000000_post_blocks.sql`): lefutott és ellenőrizve, 2026-09-24. Megvannak az új `posts`-oszlopok, a privát `media` bucket, a 7 `model_settings` sor, és az `update_post_overrides` jogosultság-ellenőrzése is működik.
   - A Security Advisor két figyelmeztetése szándékos, nem kell javítani:
     - `update_post_overrides` SECURITY DEFINER: a függvény maga ellenőrzi, hogy a hívó a beküldő-e, és csak a saját két oszlopát írja.
     - Leaked Password Protection: jelszó nincs, csak magic link van.
-- [ ] Halasztott élő próbák (ezeket én futtatom): `npm run ingest -- <url>` mind a hat forrástípusra, a képek a `/media` route-on, fordítás, szerkesztés és újrakinyerés.
+- [ ] Halasztott élő próbák (ezeket én futtatom): `npm run ingest -- <url>` mind a hat forrástípusra, a képek a `/media` route-on, fordítás, szerkesztés és újrakinyerés. Egy X-poszt is legyen benne: az X, a YouTube és az arXiv fix hostjai új User-Agentet kapnak (`apiFetch`), ezt élesben még nem próbáltuk.
 - [ ] **Csak az M1 deployja után:** futtasd le a `supabase/migrations/20260925000000_drop_post_body.sql`-t (a régi `posts.body` oszlop törlése)
 
 ### 2. API kulcsok
@@ -68,7 +68,7 @@
 ## B. Funkciók (fontossági sorrendben)
 
 ### Kész
-- [x] **Reszponzív UX:** mobilos chip-sáv a kategóriákhoz, a haladás és a to-do lenyíló panelben (`xl` alatt), 360 px-en sincs vízszintes görgetés, legalább 40 px-es érintési felületek, betöltési, hiba- és 404-oldal, `manifest` (kezdőképernyőre tehető)
+- [x] **Reszponzív UX:** mobilos chip-sáv a kategóriákhoz, a haladás és a to-do lenyíló panelben (`2xl` alatt), 360 px-en sincs vízszintes görgetés, legalább 40 px-es érintési felületek, betöltési, hiba- és 404-oldal, `manifest` (kezdőképernyőre tehető)
 - [x] **Sidebar-hiba:** a Tailwind 3-as szintaxis miatt asztali nézetben hibás volt a sidebar szélessége
 - [x] **Archívum részletoldal:** `/archive/2026-W38`, ugyanazzal az olvasó felülettel
 - [x] **Nyelvválasztás megjegyzése:** `lang` cookie, minden oldal ezt használja
@@ -152,7 +152,7 @@
 - [ ] **Valódi GitHub trending.** Most csak a héten *létrehozott* repókat rangsorolja csillag szerint. A régebbi, de most gyorsan növő repókhoz napi csillagszám-mentés és a különbség számítása kell.
 - [ ] **Beküldött posztok a Radarban.** A Library-posztok nem jelennek meg a heti feedben.
 - [ ] **Paywall-felismerés.** Most csak a `noarchive` jelzést figyeli. A fizetős cikkekből csak a nyilvános eleje kerül be.
-- [ ] **Képek tükrözése** a Supabase Storage-ba. Most a cikkekből csak a szöveg mentődik.
+- [x] **Képek tükrözése** a Supabase Storage-ba. Most a cikkekből csak a szöveg mentődik.
 - [ ] **Forráslink-figyelés.** Nincs ellenőrzés arra, hogy az eredeti link él-e még.
 
 ### Kényelmi funkciók
@@ -163,7 +163,7 @@
 - [ ] **Chat felület** a Library fölött („mit írtak erről?”). Ez a legnagyobb munka.
 
 ### Technikai adósság
-- [ ] **Függőségek pontos verzióra.** A `package.json`-ban `^` tartományok vannak; a lockfile rögzíti őket, de a policy pontos verziót kér.
+- [x] **Függőségek pontos verzióra.** A `package.json`-ban `^` tartományok vannak; a lockfile rögzíti őket, de a policy pontos verziót kér.
 - [ ] **Generált Supabase-típusok** (`supabase gen types`). Most a kliens típus nélkül dolgozik.
-- [ ] **Pipeline-teszt** mockolt LLM-válaszokkal. Most csak a tiszta segédfüggvényeknek van tesztje.
+- [x] **Pipeline-teszt** mockolt LLM-válaszokkal. Most csak a tiszta segédfüggvényeknek van tesztje.
 - [ ] **DNS rebinding** elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.
