@@ -19,7 +19,9 @@ const llmBlockSchema = z.object({
 });
 type LlmBlock = z.infer<typeof llmBlockSchema>;
 
-const pdfSchema = z.object({ title: z.string(), author: z.string().optional(), blocks: z.array(llmBlockSchema).max(400) });
+// No .max() on blocks: Gemini rejects a maxItems on this array with INVALID_ARGUMENT (seen live
+// at 100 and 400). ingest's limitBlocks clips an overlong transcription and sets meta.clipped.
+const pdfSchema = z.object({ title: z.string(), author: z.string().optional(), blocks: z.array(llmBlockSchema) });
 
 export function fromLlmBlock(block: LlmBlock): BlockDraft | null {
   const text = block.text?.trim() ?? "";

@@ -27,6 +27,21 @@ for (const [name, run] of [["extractPdf", extractPdf], ["extractArticle pdf bran
   });
 }
 
+test("extractPdf sends Gemini a blocks array without maxItems and accepts a long answer", async (t) => {
+  withGeminiKey(t);
+  let schema: { properties: { blocks: Record<string, unknown> } } | undefined;
+  const blocks = Array.from({ length: 450 }, (_, i) => ({ type: "paragraph", text: `Paragraph ${i}` }));
+  mockFetch(t, async (url, init) => {
+    if (!url.includes("googleapis.com")) return new Response("%PDF-1.4", { headers: { "content-type": "application/pdf" } });
+    schema = JSON.parse(String(init?.body)).generationConfig.responseJsonSchema;
+    return geminiResponse({ title: "Long", blocks });
+  });
+  const result = await extractPdf(db, `http://${TEST_IP}/long.pdf`, "");
+  // Gemini answers INVALID_ARGUMENT for a maxItems on this array; ingest's limitBlocks clips instead.
+  assert.equal(schema?.properties.blocks.maxItems, undefined);
+  assert.equal(result.blocks.length, 450);
+});
+
 test("extractPdf falls back to the URL's decoded filename when the model gives no title", async (t) => {
   withGeminiKey(t);
   mockFetch(t, async (url) =>
