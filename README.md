@@ -188,6 +188,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [CLAUDE.md](CLAUDE.md#design-language--do-not-erode-it)) |
 | [`supabase/migrations/`](supabase/migrations/) | Schema, RLS, database functions, model seeds |
 | [`scripts/ingest-url.mts`](scripts/ingest-url.mts) | `npm run ingest` |
+| [`.github/`](.github/) | The CI workflow and Dependabot (GitHub Actions only, 7-day cooldown) |
 | [`docs/`](docs/) | Specs and plans, and the provenance map of the original archive |
 
 **Where to start reading**, in this order:
@@ -245,6 +246,8 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 
 `npm test` runs `node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts"`. There is no test framework: tests use `node:test` and `node:assert`, and TypeScript runs through Node's type stripping. Nothing touches the network or Supabase.
 
+**CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the five pre-commit checks (`npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, `npm run dup`) on every push and pull request, with no secrets. Branch protection on `main` is the owner's setting (see [TODO.md](TODO.md)).
+
 - **Helpers:** [`lib/pipeline/fake-db.ts`](lib/pipeline/fake-db.ts) stands in for Supabase and records every write; [`lib/pipeline/mock-fetch.ts`](lib/pipeline/mock-fetch.ts) fakes fetch, DNS, environment variables and model answers, and undoes itself when the test ends. The full list is in [CLAUDE.md](CLAUDE.md#conventions).
 - **Components:** [`lib/test/render.ts`](lib/test/render.ts) compiles `.tsx` with the project's TypeScript and renders it to static HTML, with `next/link` and `next/navigation` stubbed. A component test looks like this:
 
@@ -274,7 +277,7 @@ UI without live data: `npm run dev`, then open `/dev/preview` (development only)
 - **No duplication.** Search before writing a helper, and reuse the shared ones listed in [CLAUDE.md](CLAUDE.md#conventions). `npm run dup` (jscpd) fails above 1% duplication.
 - **Relative imports in `lib/`,** with the `.ts` extension, so `node --test` can load the files without a bundler. The three exceptions are the Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which use `@/` and are never loaded by tests.
 - **Commits** follow Conventional Commits, with lowercase, imperative subjects.
-- **Dependencies** are pinned to exact versions, and `pnpm-lock.yaml` is committed. `pnpm-workspace.yaml` refuses any package published less than 7 days ago (`minimumReleaseAge: 10080`); never lower it. The lockfile is marked `-diff` in `.gitattributes`, so review its changes with `git diff --text`.
+- **Dependencies** are pinned to exact versions, and `pnpm-lock.yaml` is committed. `pnpm-workspace.yaml` refuses any package published less than 7 days ago (`minimumReleaseAge: 10080`); never lower it. The lockfile is marked `-diff` in `.gitattributes`, so review its changes with `git diff --text`. The CI's actions are pinned by commit SHA, and Dependabot proposes their updates no sooner than 7 days after a release.
 
 ## Content and copyright
 

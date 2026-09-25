@@ -1,0 +1,9 @@
+# Only the GitHub Actions in .github/workflows: npm dependencies have no update bot (CLAUDE.md, Supply chain).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

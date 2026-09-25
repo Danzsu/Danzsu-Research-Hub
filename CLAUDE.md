@@ -162,6 +162,8 @@ npm run ingest -- <url>   # node --env-file=.env.local … scripts/ingest-url.mt
 
 Before a commit, all five checks pass: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`.
 
+CI (`.github/workflows/ci.yml`) runs the same five, in this order, on every push and pull request: Node 24.16.0 on `ubuntu-24.04`, `corepack pnpm@11.25.0 install --frozen-lockfile`, no cache. `next build` needs no environment variables, so the workflow holds no secrets and only `contents: read`.
+
 `corepack enable` fails with EPERM under nvm-for-windows, so pnpm is invoked through corepack directly. `engines` requires Node `>=22.13.0`; use Node 24 LTS, the only version the render harness is verified on. Newer Node releases no longer bundle corepack; install the version Node 24.16 ships with (`npm i -g corepack@0.35.0`).
 
 ## Layout
@@ -221,6 +223,7 @@ components/ui/    vendored shadcn components; only a few are reachable from the 
 hooks/use-mobile.ts  useIsMobile: the Radar's to-do panel opens from the bottom below md (the sidebar
                   that also used it is no longer rendered)
 scripts/ingest-url.mts   `npm run ingest`
+.github/                 workflows/ci.yml (the five checks on every push and PR), dependabot.yml (github-actions, 7-day cooldown)
 supabase/migrations/     schema, RLS, RPCs, model_settings seeds, the media bucket
 vendor/                  shadcn Tailwind 4 utility pack, imported by app/globals.css
 ```
@@ -237,7 +240,7 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
   - `lib/pipeline/mock-fetch.ts`: `mockFetch(t, handler)`, `withGeminiKey(t)` and `withEnv(t, name, value)`, which restore themselves with `t.after`; `mockDns(t)`; `endlessBody()` with `reads()` / `cancelled()` to prove a body was released unread; `TEST_IP` / `TEST_HOST`, a public IP literal `safeFetch` resolves offline; `geminiResponse`, `geminiText`, `geminiPrompt`.
   - `lib/test/render.ts`: importing it registers `tsx-hooks.ts` with `module.register`; the hooks resolve `@/` and extensionless relative imports (`./x` → `.ts`/`.tsx`/`index`) from a `.ts`/`.tsx` parent, compile `.tsx` with the project's TypeScript (`transpileModule`), and swap `next/link` and `next/navigation` for `next-stub.ts`. `render(element)` runs `renderToStaticMarkup` and returns a linkedom `Document`. Import `render.ts` first, then the component with `await import("./x.tsx")`. Limits: a static render runs hooks once with no effects, so clicks and state changes are invisible (check those in the browser); verified on Node 24.16 only, Node 22.13 is unverified.
   - `node --test "app/(app)/library/[id]/x.test.ts"` runs 0 tests and exits 0, because `[id]` is read as a glob character class. Use `npm test`, or run one file with the bracket escaped: `node --experimental-strip-types --no-warnings --test "app/(app)/library/[[]id]/post-editor.test.ts"`.
-- **Supply chain.** Every dependency is pinned to an exact version; `pnpm-lock.yaml` is committed and installed with `--frozen-lockfile` (pnpm also defaults to a frozen lockfile under CI). `pnpm-workspace.yaml` sets `minimumReleaseAge: 10080` (7 days) with `minimumReleaseAgeIgnoreMissingTime: false`, and `strictDepBuilds` with only `sharp` and `unrs-resolver` allowed to build — never lower or bypass these. Whether Vercel honours the lockfile depends on its Install Command setting (an open TODO item). `jscpd` is a devDependency, so `npm run dup` uses the local binary. `.gitattributes` marks the lockfile `-diff`: review lockfile changes with `git diff --text`. No update bot is configured; one would need a 7-day cooldown (`cooldown: { default-days: 7 }` in `dependabot.yml`).
+- **Supply chain.** Every dependency is pinned to an exact version; `pnpm-lock.yaml` is committed and installed with `--frozen-lockfile` (pnpm also defaults to a frozen lockfile under CI). `pnpm-workspace.yaml` sets `minimumReleaseAge: 10080` (7 days) with `minimumReleaseAgeIgnoreMissingTime: false`, and `strictDepBuilds` with only `sharp` and `unrs-resolver` allowed to build — never lower or bypass these. Whether Vercel honours the lockfile depends on its Install Command setting (an open TODO item). `jscpd` is a devDependency, so `npm run dup` uses the local binary. `.gitattributes` marks the lockfile `-diff`: review lockfile changes with `git diff --text`. The CI workflow pins each action by its full commit SHA, with the tag as a comment. `.github/dependabot.yml` updates `github-actions` only, weekly, with `cooldown: { default-days: 7 }`. npm dependencies have no update bot; adding one needs the same 7-day cooldown.
 - **Commits.** Conventional Commits with lowercase, imperative subjects, committed with an explicit pathspec.
 
 ## Design language — do not erode it

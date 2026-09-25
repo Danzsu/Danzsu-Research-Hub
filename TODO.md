@@ -70,6 +70,14 @@
 ### 5. Opcionális: hogy én is hozzáférjek
 - [ ] A Supabase és a Vercel MCP engedélyezése a `/mcp` alatt. Utána a migrációt, az env-eket és a logokat én is meg tudom nézni.
 
+### 6. GitHub
+- [ ] **Branch-védelem a `main`-en** (a CI első futása után). *Settings → Rules → Rulesets → New branch ruleset*, cél: a `main` (Default branch).
+  - **Require status checks to pass**: `checks` (a CI egyetlen jobja; a lista az első futás után kínálja fel).
+  - **Block force pushes** és **Restrict deletions**.
+  - **Require a pull request before merging**: ki. PR-kötelezettség nincs, a `main` továbbra is fast-forwarddal kap új commitot.
+  - A `main`-re így csak olyan commit kerülhet, amelyen a CI már zöld. Előbb az ágat pushold, várd meg a zöld futást, utána jöhet a fast-forward `main` pusha.
+- [ ] **Dependabot-PR-ek:** hetente jöhet egy PR a két action frissítéséről, és csak legalább 7 napos kiadásról. Merge előtt a CI legyen zöld, és a kommentben szereplő tag legyen az új.
+
 ---
 
 ## B. Funkciók (fontossági sorrendben)
@@ -86,6 +94,8 @@
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
   - [x] **M1:** blokkok, kinyerők, zajszűrés, képek, fordítás, kis javítások.
   - [ ] **M2 olvasóeszközök** — terv szükséges. Kiemelés és komment, Key insights, Fogalmak.
+    - A teszt-keményítés törölte a `post-article.test.ts`-t (osztálynév-tesztek voltak). Az M2 terv 7. és 10. feladata ezt a fájlt bővíti, ezért ott a fájl újra létrejön a fejlécével: a `testPost` és a `render` importja, és a `renderArticle` segéd.
+    - A teszt-keményítés óta a `fakeDb` `rpcError` mezője `PostgrestErrorShape` típusú, ezért az M2 `rpcError`-fixture-jei a `pgError(...)`-t használják. Az M2 terv `rpcError: { code: "XX000", message: "boom" }` sora (`reader-tools-m2.md:4043`) így `rpcError: pgError("XX000", "boom")` lesz, különben a `tsc` TS2739-cel bukik.
 - [ ] **2. Privát gyűjtemény:** linkek, idézetek (a kiemelésekből is), toolok, jegyzetek; címkék, Inbox / Később / Archív, keresés, export.
 - [ ] **3. Statisztika oldal:** heti mentések, hőtérkép, top források, címkézetlen és halott linkek.
 - [ ] **4. Discord-bemenet:** slash-parancs és üzenet-menü, ugyanarra a mentési útvonalra.
@@ -187,3 +197,25 @@
 - [ ] **Kevesebb getClaims() kérésenként.** A UI/UX A óta kérésenként három fut: a `proxy.ts`-é, az `(app)` layout `getViewer()`-e és az oldal `getReader()`-e. Ha a `getReader`-t és a `getViewer`-t React `cache()`-be csomagoljuk (`lib/supabase/server.ts`), a layout és az oldal egy hívást oszt meg, így kettő marad (a proxy külön fut, azt a `cache()` nem éri el).
 - [ ] **Elvész a fókusz** egy teendő törlése és a „+ teendő” után: a billentyűzettel dolgozó olvasónak újra kell keresnie a helyét.
 - [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, és az ikonsáv gombjainak osztálylistái.
+- [ ] **Playwright e2e a CI-ban** — opció, nincs jóváhagyva (2026-09-25).
+  - Ára: új devDependency (`@playwright/test`, pontos és legalább 7 napos verzió, a lockfile-lal együtt), egy Chromium-letöltés a lockfile-on kívül (a csomag verziója rögzíti, CI-cache kell hozzá), `next dev` a CI-ban (a `/dev/preview` csak fejlesztői módban él), és a flaky tesztek kockázata.
+  - Haszna: a billentyűparancsok, a visszavonás-csík szünete és 5 s-os véglegesítése, a dupla kattintásos törlés, a panel fókusza, a `&fail=1` visszaállás, a konzol- és hidratációs hibák, és a 360 / 768 / 1280 px-es vízszintes görgetés automatikus ellenőrzése (`.superpowers/sdd/test-audit.md`, 4. és 5. fejezet).
+- [ ] **DB-tesztek a CI-ban** — opció, nincs jóváhagyva (2026-09-25).
+  - Ára: egy új CI-job egy digesttel rögzített `postgres` service-konténerrel; egy shim (`auth.uid()` a `request.jwt.claim.sub`-ból, `auth.users`, `storage.buckets`, az `anon` / `authenticated` / `service_role` szerepek); a migrációk és sima SQL-ellenőrzések `psql -v ON_ERROR_STOP=1`-gyel. npm-függőség nélkül is megoldható.
+  - Alternatívák: `@electric-sql/pglite` devDependencyként (hogy a szerepei és az RLS-e elég-e, az ellenőrizetlen), vagy a Supabase CLI helyi stackje (Docker, nehezebb).
+  - Haszna: az RLS, a grantok, az `update_post_overrides` 42501-e és a `refresh_must_read` „pontosan 3” szabálya az egyetlen valódi jogosultsági réteg, és ma egyiket sem teszteli semmi.
+- [ ] **Az audit következő tételei** (`.superpowers/sdd/test-audit.md`, 5. fejezet, „Next after these”):
+  - az arxiv → article tartalék (I2);
+  - a github-kinyerés AI-tisztítása (I5);
+  - egy `arxiv.org/pdf/<id>.pdf` URL felismerése (U10).
+
+  A `Task` ↔ `model_settings_task_check` teszt az M2 terv 1. feladatában van (`TASKS`), ide nem kell.
+- [ ] **A túlélő próbák maradéka és a még teszt nélküli bekötések:**
+  - a `/auth` előtag a `lib/public-paths.ts`-ben (P2, egy tesztsor);
+  - a `proxy.ts` (X4): ehhez a `@supabase/ssr` `createServerClient`-jének helyettese kell a route-rétegben;
+  - az `app/auth/login` és az `app/auth/callback` tényleg a `safeNext`-en át irányít-e;
+  - a `getReaderState` sor-leképezése (`lib/content.ts`).
+- [ ] **A CI Node-ja legalább 24.18.1-re.** A `.github/workflows/ci.yml` ma a `24.16.0`-n fut, mert a render harness csak ezen ellenőrzött.
+  - A nodejs.org `dist/index.json` a 24.17.0-t (2026-06-17) és a 24.18.1-et (2026-07-28) biztonsági kiadásnak jelöli.
+  - A lépések: előbb a render harness (`lib/test/render.ts`, `lib/test/tsx-hooks.ts`) és a teljes `npm test` ellenőrzése az új verzión, aztán a `node-version` sor emelése egy legalább 7 napos kiadásra.
+  - Addig a kockázat kicsi: a job titok nélkül, csak `contents: read`-del fut.
