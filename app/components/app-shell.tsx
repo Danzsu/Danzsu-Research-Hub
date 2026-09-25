@@ -12,6 +12,7 @@ import { LanguageProvider, useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
 import { AccountActions, NavEntry, navIcons, SoonList } from "./nav-parts";
 import { SearchSoon } from "./shell-dialogs";
+import { UndoToast } from "./undo-toast";
 
 const copy = {
   hu: { nav: "Menü", more: "Több", language: "Nyelv", close: "Bezárás" },
@@ -51,6 +52,7 @@ export function AppShell({
       </DesktopNav>
       <MobileNav email={email} onSearch={openSearch} />
       <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+      <UndoToast />
     </LanguageProvider>
   );
 }
