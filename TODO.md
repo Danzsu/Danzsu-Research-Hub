@@ -161,7 +161,9 @@
   - egy poszt megnyitása olvasottnak jelöli az `item_states`-ben (`post:<id>`), és a Library-kártya elhalványul;
   - a Library frissül, amíg egy valódi beküldés feldolgozás alatt van, és utána leáll;
   - Tabbal elérhető az olvasópanel `2xl` alatt;
-  - a `z` visszavon egy valódi Megnyitást.
+  - a `z` visszavon egy valódi Megnyitást;
+  - a Library-be visszalépve (Vissza) az épp elolvasott poszt kártyája halvány;
+  - a Radar sorrendje betöltés után nem változik (az olvasott kártyák nem ugranak át a csoportjuk végére).
 
 ### Tartalom minősége
 - [ ] **Valódi GitHub trending.** Most csak a héten *létrehozott* repókat rangsorolja csillag szerint. A régebbi, de most gyorsan növő repókhoz napi csillagszám-mentés és a különbség számítása kell.
@@ -182,4 +184,6 @@
 - [ ] **Generált Supabase-típusok** (`supabase gen types`). Most a kliens típus nélkül dolgozik.
 - [x] **Pipeline-teszt** mockolt LLM-válaszokkal. Az ingest, a napi futás, a fordítás és az `llm.ts` útválasztása offline tesztekkel fedett, mockolt modellválaszokkal (`fakeDb`, `mockFetch`).
 - [ ] **DNS rebinding** elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.
-- [ ] **Egy getClaims() kérésenként.** A `getReader`-t React `cache()`-be csomagolni (`lib/supabase/server.ts`), hogy az `(app)` layout és az oldal egyetlen `getClaims()`-hívást osszon meg. A UI/UX A óta kérésenként kettő fut: a layout `getViewer()`-e és az oldal `getReader()`-e.
+- [ ] **Kevesebb getClaims() kérésenként.** A UI/UX A óta kérésenként három fut: a `proxy.ts`-é, az `(app)` layout `getViewer()`-e és az oldal `getReader()`-e. Ha a `getReader`-t és a `getViewer`-t React `cache()`-be csomagoljuk (`lib/supabase/server.ts`), a layout és az oldal egy hívást oszt meg, így kettő marad (a proxy külön fut, azt a `cache()` nem éri el).
+- [ ] **Elvész a fókusz** egy teendő törlése és a „+ teendő” után: a billentyűzettel dolgozó olvasónak újra kell keresnie a helyét.
+- [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, és az ikonsáv gombjainak osztálylistái.

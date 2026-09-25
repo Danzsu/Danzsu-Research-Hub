@@ -80,16 +80,16 @@ Every signed-in page lives under `app/(app)/` and gets `app/(app)/layout.tsx` �
 - **Desktop:** `app/components/desktop-nav.tsx`, variant A (sidebar), collapsible to a ~56px icon rail via a toggle button at its foot (`aria-expanded`, localized "Collapse sidebar" / "Expand sidebar"). In rail mode every entry shrinks to an icon with its accessible name kept (`aria-label` or sr-only text; the logo link carries `aria-label="NEON NEWS RADAR"`), and every icon (the menu entries, language, help, sign-out and expand) shows its name as a hover/focus tooltip (`NavTooltip` in `nav-parts.tsx`). The rail's nav has no overflow, since a scroll container would clip the tooltips, and the aside sits at `z-30`, above the Radar's sticky header and chip bar. The choice persists in the `nav` cookie (`full` | `rail`, same shape as `lang`); `getNavMode()` (`lib/language.ts`) reads it server-side through `readNavMode()` (`lib/nav-mode.ts`), for `app/(app)/layout.tsx` and the preview, so the width is correct on first render. Variants B (top bar) and C (icon rail as the default) are a new `DesktopNav` with the same props that reuses `nav-parts.tsx`; no other file changes.
 - **Search** is a placeholder dialog until milestone C (`SearchSoon`); `⌘K` / `Ctrl K` and `/` already open it.
 - **Undo toast:** `toasts.show({ kind, undo?, commit? })` from `undo-toast.tsx`. One at a time, 5 s, `aria-live="polite"`; a new toast makes the previous action final, and `pagehide` does too. Read, delete and (milestone B) rating use it, and so does every failed write.
-- **Reader state:** `lib/reader-store.ts` (optimistic, writes per key in click order, rollback to the last value the server confirmed) behind `use-reader-state.ts`. Library posts use `item_states` too, keyed `post:<id>` (`postStateKey`); opening a post marks it read (`mark-post-read.tsx`) and dims its Library card.
+- **Reader state:** `lib/reader-store.ts` (optimistic, writes per key in click order, rollback to the last value the server confirmed) behind `use-reader-state.ts`. The Radar and archived-week pages seed it on the server with `getReaderState` (`lib/content.ts`, which `GET /api/state` also answers from), so the first paint already has the final unread-first order. A GET on mount still revalidates flags and to-dos, because Back restores a stale seed from the router cache, but never `loadedStates`, which the feed sorts by. Library posts use `item_states` too, keyed `post:<id>` (`postStateKey`); opening a post marks it read (`mark-post-read.tsx`) and dims its Library card. Back restores the Library's cached list, so `opened-posts.tsx` also dims a card whose post was opened in this tab.
 - **WebMCP:** `use-model-context-tools.ts` registers two `document.modelContext` tools for in-browser agents; a no-op elsewhere.
 
 ## Keyboard (desktop)
 
-`lib/keymap.ts`'s `SHORTCUTS` maps keys to actions: `j`/`k` next/previous card, `o` open (marks read), `r` toggle read, `l` toggle later, `z` undo, `⌘K`/`Ctrl K`/`/` search, `[` collapse/expand the sidebar, `?` help. `use-shortcuts.ts` binds it. Nothing fires in an input, textarea, select or contenteditable, inside an open dialog, or mid-composition. Letters fire only with no Ctrl/⌘/Alt held (Ctrl/⌘+K is search); a non-letter key (`/`, `?`, `[`) also fires with Alt or AltGr (Ctrl+Alt), never with ⌘, because the Hungarian layout types `[` as AltGr+F. Card scrolling honours `prefers-reduced-motion`. A new shortcut is one `SHORTCUTS` row plus a handler; the help dialog lists it by itself.
+`lib/keymap.ts`'s `SHORTCUTS` maps keys to actions: `j`/`k` next/previous card, `o` open (marks read), `r` toggle read, `l` toggle later, `z` undo, `⌘K`/`Ctrl K`/`/` search, `[` collapse/expand the sidebar, `?` help. `use-shortcuts.ts` binds it. Nothing fires in an input, textarea, select or contenteditable, or mid-composition; inside an open dialog only `z` does, so Undo works while the non-modal reader panel is open. A held key repeats only `j`/`k`: the toggles ignore key repeat. Letters fire only with no Ctrl/⌘/Alt held (Ctrl/⌘+K is search); a non-letter key (`/`, `?`, `[`) also fires with Alt or AltGr (Ctrl+Alt), never with ⌘, because the Hungarian layout types `[` as AltGr+F. Card scrolling honours `prefers-reduced-motion`. A new shortcut is one `SHORTCUTS` row plus a handler; the help dialog lists it by itself.
 
 ## Offline preview
 
-`npm run dev`, then `/dev/preview?view=radar|radar-empty|library|library-empty|archive|archive-empty` (plus `&fail=1` to make every write fail as if offline) and `/dev/preview/post` (every block type and banner; it is a separate path because it renders in the server's language, so the toggle refreshes it). It renders the real view components on `lib/fixtures.ts`, with no Supabase keys, no network and no sign-in. `proxy.ts` lets `/dev/` through only when `NODE_ENV` is `development`, and both pages call `notFound()` otherwise. `lib/fixtures.ts`'s preview post ids are negative on purpose: `parseId` rejects them, so no click in the preview (translate, a `/library` link) can reach a real post, which matters because local dev points at the production project. UI changes are checked there with Playwright at 360, 768 and 1280 px. Add a fixture with every new block type, banner or empty state; `lib/fixtures.test.ts` fails for a missing block type.
+`npm run dev`, then `/dev/preview?view=radar|radar-empty|library|library-empty|archive|archive-empty` (plus `&fail=1` to make every write fail as if offline) and `/dev/preview/post` (every block type and banner; it is a separate path because it renders in the server's language, so the toggle refreshes it). It renders the real view components on `lib/fixtures.ts`, with no Supabase keys and no sign-in. `proxy.ts` lets `/dev/` through only when `NODE_ENV` is `development`, and both pages call `notFound()` otherwise. Local dev points at the production project, so the preview's own writes send nothing: reader state goes through `memorySend` and the Library form through an in-memory stub (`preview` on `LibraryView`), both failing every write under `fail=1`, and the post page's `MarkPostRead` gets `preview`. `lib/fixtures.ts`'s preview post ids are negative on purpose: `parseId` rejects them, so translate or a Library card link can't reach a real post. Not sandboxed: the app shell's own links and Sign out are the real ones, so with a local session they leave the preview for real pages, real data and a real sign-out. UI changes are checked there with Playwright at 360, 768 and 1280 px. Add a fixture with every new block type, banner or empty state; `lib/fixtures.test.ts` fails for a missing block type.
 
 ## UI text (HU/EN)
 
@@ -118,7 +118,7 @@ RLS is on for every table:
 
 | Route | Auth | Behaviour |
 | --- | --- | --- |
-| `GET /api/state` | `getReader()` | `{ states, todos }` for the caller |
+| `GET /api/state` | `getReader()` | `{ states, todos }` for the caller (`getReaderState`, also the Radar pages' server-side seed); 500 `db_error` |
 | `POST /api/state` | `getReader()` | `parseStateAction` (`lib/state.ts`): `set_read`, `set_saved`, `add_todo`, `set_todo`, `delete_todo`. 400 `missing_item` (missing, empty or null `itemId`), `invalid_item` (a non-string one), `missing_text`, `invalid_id`, `unknown_action`. Item ids are cut to 120 chars, todo text to 180; a flag other than `true` counts as false |
 | `POST /api/sources` | `getReader()` | 400 `invalid_url`, 409 `already_submitted`, 500 `insert_failed`, else 202 `{ ok, id }` and `processSource` in `after()` |
 | `PATCH /api/posts/[id]` | `getReader()` | `savePostEdits`: 400 `invalid` (the body), 403 `forbidden` (not the submitter), 404, 500 `db_error` |
@@ -175,7 +175,8 @@ app/components/   app-shell (+ mobile bottom bar), desktop-nav, nav-parts, shell
                   language-context, language-toggle, undo-toast, digest-dashboard, story-card,
                   reader-panel, tag, page-header (PageHero, StatusCard), post-blocks, post-image,
                   use-reader-state, use-shortcuts, use-model-context-tools
-app/(app)/library/  submit-form, library-view (the list body), refresh-while-processing;
+app/(app)/library/  submit-form, library-view (the list body), refresh-while-processing, opened-posts
+                  (posts opened in this tab, the dimmed card link);
                   [id]/ post-article (the post body), post-toolbar (translate, edit link), post-editor
                   (edit, hide, re-extract), post-notices (the notices under the title, the submitter's
                   last extraction error), mark-post-read; post-article, post-toolbar, post-editor and
@@ -211,7 +212,7 @@ lib/undo-queue.ts the one-at-a-time undo toast
 lib/fixtures.ts   preview data
 lib/llm.ts        Gemini + Groq behind generate()
 lib/api.ts        jsonError, postRoute and POST_ERRORS for the posts/[id] routes
-lib/content.ts    DB rows → the Radar and Library content types
+lib/content.ts    DB rows → the Radar and Library content types; getReaderState (GET /api/state, the Radar's seed)
 lib/language.ts   getLanguage(), getNavMode() — the lang (hu | en) and nav (full | rail) cookies
 lib/supabase/server.ts  createClient, createAdminClient, getReader, getViewer, safeNext (re-exported from util)
 lib/utils.ts      cn() for class names
@@ -255,7 +256,7 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 ## Hand-authored components
 
 - **`components/ui/progress.tsx`, `separator.tsx`, `skeleton.tsx`, `textarea.tsx`** — written in this project's house style (function components, `data-slot`, unified `radix-ui`). The registry still serves forwardRef-era source, so pasting it would have broken the convention *and* omitted `data-slot="progress-indicator"`, which the dashboard targets to paint the bar signal-orange.
-- **`components/ui/sheet.tsx`, `dialog.tsx`**: the close button is patched to a 40px house-style square (`size-10`, ink border, paper → signal on hover); the stock one is a ~16px target.
+- **`components/ui/sheet.tsx`, `dialog.tsx`**: the close button is patched to a 40px house-style square (`size-10`, ink border, paper → signal on hover); the stock one is a ~16px target. Both content components also take an optional `closeLabel` (default `"Close"`), the button's sr-only name, so a caller passes its localized `copy.close`.
 - **`components/ui/sidebar.tsx`** — fetched read-only from the registry and hand-patched (import paths, `Slot.Root`, Tailwind 4 `w-(--sidebar-width)` instead of the v3 square-bracket variable form, which compiles to invalid CSS). See the header comment in the file. The app no longer renders it (the app shell has its own nav); it stays until the unused-component cleanup.
 
 `skeleton.tsx` deliberately uses `bg-primary/10` rather than upstream's `bg-accent`, because `--accent` is the signal orange here and a stock skeleton would pulse bright orange.
