@@ -39,7 +39,15 @@ export function UndoToast() {
   const toast = useSyncExternalStore(toasts.subscribe, toasts.getSnapshot, noToast);
   // Paused while the pointer or focus is on it, so the Undo button can be reached in time.
   const [paused, setPaused] = useState(false);
+  const [prevToastId, setPrevToastId] = useState<number | undefined>(undefined);
   const toastId = toast?.id;
+
+  // Reset paused when the toast goes away (browsers don't reliably fire leave/blur on removal).
+  if (prevToastId !== undefined && toastId === undefined) {
+    setPaused(false);
+  }
+  // eslint-disable-next-line react-hooks/set-state-in-render
+  setPrevToastId(toastId);
 
   useEffect(() => {
     if (toastId === undefined || paused) return;
@@ -68,7 +76,11 @@ export function UndoToast() {
           onFocus={() => setPaused(true)}
           onBlur={(event) => {
             // Only unpause if focus moved outside the toast's container
-            if (!(event.currentTarget instanceof Element) || !event.currentTarget.contains(event.relatedTarget as Node)) {
+            if (
+              !(event.currentTarget instanceof Element) ||
+              !(event.relatedTarget instanceof Node) ||
+              !event.currentTarget.contains(event.relatedTarget)
+            ) {
               setPaused(false);
             }
           }}
@@ -78,7 +90,14 @@ export function UndoToast() {
         >
           <span className="min-w-0 flex-1">{t[toast.kind]}</span>
           {toast.undo && (
-            <Button variant="signal" className="min-h-10" onClick={() => toasts.undo(toast.id)}>
+            <Button
+              variant="signal"
+              className="min-h-10"
+              onClick={() => {
+                setPaused(false);
+                toasts.undo(toast.id);
+              }}
+            >
               {t.undo}
             </Button>
           )}
