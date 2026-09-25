@@ -18,7 +18,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON N
 
 ## How it works
 
-Two server-side writers put content in; both use the Supabase secret key. Nothing runs on a personal machine.
+Two server-side writers put content in. The pipeline work runs with the Supabase secret key; only the submission's `sources` row is inserted as the signed-in reader. Nothing runs on a personal machine.
 
 ```mermaid
 flowchart TD
@@ -31,9 +31,15 @@ flowchart TD
   end
   subgraph submit["Writer 2: a link submission"]
     form["/library form"] --> sourcesRoute["POST /api/sources"]
-    sourcesRoute --> sources[("sources")]
+    sourcesRoute -->|"as the reader"| sources[("sources")]
+  end
+  subgraph postPage["The post page, /library/[id]"]
+    reextractRoute["POST /api/posts/[id]/reextract"]
+    translateRoute["POST /api/posts/[id]/translate"]
+    editRoute["PATCH /api/posts/[id]"]
   end
   sourcesRoute -.->|"after()"| ingest["processSource"]
+  reextractRoute -.->|"after()"| ingest
   retry --> ingest
   ingest --> extract["extract: the kind's extractor, with noise layers 1 and 2"]
   extract --> noarchive{"noarchive?"}
@@ -42,13 +48,15 @@ flowchart TD
   notes --> summarize["summarize, unless the extractor already did"]
   images --> summarize
   summarize --> posts[("posts")]
+  translateRoute -->|"translatePost writes blocks_hu"| posts
+  editRoute -->|"update_post_overrides, as the reader"| posts
 ```
 
-**The daily cron** ([`lib/pipeline/daily.ts`](lib/pipeline/daily.ts)) takes the last two days of candidates, drops anything stored in the last 14 days, shortlists them to 40 with a cheap model when there are more, and curates up to 25 items plus a GitHub top-10 with a stronger one. Every item gets a permanent id (see [Data contract](CLAUDE.md#data-contract)), and a database function marks the top 3 as must-reads. The same run then retries link submissions that never finished.
+**The daily cron** ([`lib/pipeline/daily.ts`](lib/pipeline/daily.ts)) takes the last two days of candidates, drops anything stored in the last 14 days, shortlists them to 40 with a cheap model when there are more, and asks a stronger model for at most 25 items plus a GitHub top-10. Every item gets a permanent id (see [Data contract](CLAUDE.md#data-contract)), and a database function marks the top 3 as must-reads. The same run then retries link submissions that never finished.
 
 **The block pipeline** ([`lib/pipeline/ingest.ts`](lib/pipeline/ingest.ts)) turns a submitted link into a post:
 
-1. **Extractors**, one per source kind in [`lib/pipeline/extract/`](lib/pipeline/extract/). When one fails, the fallback is the generic article extractor (for arXiv and GitHub only) and then a metadata-only post. When the page itself can't be fetched (an article, an X post, or a YouTube video that doesn't exist), the submission fails instead.
+1. **Extractors**, one per source kind in [`lib/pipeline/extract/`](lib/pipeline/extract/). When one fails, the fallback is the generic article extractor (for arXiv and GitHub only), then a metadata-only post with just the page's title and description. That last step fetches the page again, so a submission that gets that far fails when the page can't be reached, whatever its kind. For an article, an X post or a YouTube video, a fetch failure inside the extractor itself (an unreachable page, a video that doesn't exist) fails it straight away, with no fallback.
 2. **Noise filtering in three layers.** Layer 1 strips page chrome from the DOM (nav, ads, share widgets, cookie banners), and layer 2 drops leftover blocks (share links, newsletter prompts, duplicates). Both live in [`html-noise.ts`](lib/pipeline/html-noise.ts). Layer 3 asks a cheap model which blocks are not part of the article ([`cleanup.ts`](lib/pipeline/cleanup.ts)), for articles, GitHub READMEs and arXiv papers only.
 3. **Image mirroring** ([`images.ts`](lib/pipeline/images.ts)). Up to 30 images are downloaded and re-encoded to AVIF, or animated WebP, at 640 and 1280 px. They go into a private Storage bucket and are served by the `/media` route to signed-in readers only.
 4. **Summary or notes.** A model writes the bilingual title, summary, key points and tags. A page that asks not to be archived (`noarchive`) gets no mirrored text at all, only notes in the model's own words.
@@ -59,15 +67,21 @@ Every source ends up as the same block model ([`lib/blocks.ts`](lib/blocks.ts)):
 
 **Auth, RLS and the one reader write to posts.** Sign-in is a Supabase magic link, and sign-ups are disabled, so the member list is whoever was invited. Every table has row-level security: readers may read content, insert sources, and touch only their own read, saved and to-do rows. The pipeline writes content with the secret key. The one exception is the submitter's edits: the `update_post_overrides` database function checks that the caller submitted the post and then writes only its `overrides` and `hidden_blocks` columns.
 
-**`model_settings`** is a table with one row per model task (seven today): a provider and model, plus an optional fallback. Editing a row changes the model on the next run, with no redeploy. API keys stay in environment variables. The task list and the seeded models are in [CLAUDE.md](CLAUDE.md#how-content-gets-in).
+**`model_settings`** is a table with one row per model task: a provider and model, plus an optional fallback. Editing a row changes the model on the next run, with no redeploy. API keys stay in environment variables. The task list and the seeded models are in [CLAUDE.md](CLAUDE.md#how-content-gets-in).
 
 ## Quick start (local)
 
-> ⚠️ **There is one Supabase project, and it is production.** If your `.env.local` points at it, then local cron runs, Library submissions and `npm run ingest` all write real rows that every member sees. Use your own Supabase project to experiment.
+> ⚠️ **There is one shared Supabase project, and it is production.** If your `.env.local` points at it, local cron runs, Library submissions and `npm run ingest` all write real rows that every member sees. Two rules while it is shared: **never change its Site URL**, and **never run `supabase db push` against it** (see [Migrations](#migrations)). To experiment freely, use your own Supabase project.
 
-**Prerequisites:** Node `>=22.13.0` (with corepack, which ships with Node), a Supabase project, and a Gemini API key from [Google AI Studio](https://aistudio.google.com). Optional: a [Groq](https://console.groq.com) key and a GitHub fine-grained token with no scopes.
+### Prerequisites
 
-**1. Install.**
+- **Node 24 LTS** (recommended). `engines` in `package.json` allows `>=22.13.0`, but the component-test harness is verified only on Node 24; Node 22 is unverified.
+- **corepack.** Node 24 bundles it; newer Node releases no longer do, so install it with `npm i -g corepack`.
+- `curl` for the first cron run, `openssl` to generate `CRON_SECRET`, and optionally the [Vercel CLI](https://vercel.com/docs/cli) for `vercel env pull`.
+- A Supabase project: the shared one (ask its owner for an invite and the keys) or your own.
+- A Gemini API key from [Google AI Studio](https://aistudio.google.com). Optional: a [Groq](https://console.groq.com) key and a GitHub fine-grained token with no scopes.
+
+### Install
 
 ```bash
 corepack pnpm@11.25.0 install --frozen-lockfile
@@ -75,38 +89,55 @@ corepack pnpm@11.25.0 install --frozen-lockfile
 
 pnpm is called through corepack directly, because `corepack enable` fails with EPERM under nvm-for-windows. pnpm won't resolve a package version published less than 7 days ago (see [Conventions](#conventions)).
 
-**2. Environment.** Copy [.env.example](.env.example) to `.env.local` and fill it in, or run `vercel env pull .env.local` once the Vercel project exists. Every variable is server-only.
+### Environment
+
+Copy [.env.example](.env.example) to `.env.local` and fill it in. Every variable is server-only.
 
 | Variable | Needed | What for |
 | --- | --- | --- |
-| `SUPABASE_URL` | yes | The project URL |
-| `SUPABASE_PUBLISHABLE_KEY` | yes | Acts as the signed-in reader; RLS applies |
-| `SUPABASE_SECRET_KEY` | yes | Bypasses RLS: the pipeline, and a few routes after their own checks |
+| `SUPABASE_URL` | yes | `https://<project-ref>.supabase.co`; the ref is in the dashboard address, `supabase.com/dashboard/project/<ref>` |
+| `SUPABASE_PUBLISHABLE_KEY` | yes | *Project Settings → API Keys*, the publishable key. Acts as the signed-in reader; RLS applies |
+| `SUPABASE_SECRET_KEY` | yes | *Project Settings → API Keys*, a secret key. Bypasses RLS: the pipeline, and a few routes after their own checks |
 | `GEMINI_API_KEY` | yes | Every Gemini task |
-| `GROQ_API_KEY` | no | Without it, the Groq tasks run on their Gemini fallback |
+| `GROQ_API_KEY` | no | Without it, the tasks seeded on Groq run on their Gemini fallback |
 | `CRON_SECRET` | yes | A long random string (`openssl rand -hex 32`); the cron route's bearer token |
-| `GITHUB_TOKEN` | no | Raises the GitHub search rate limit |
+| `GITHUB_TOKEN` | no | Raises the GitHub API rate limit for the daily repo search and the GitHub extractor |
 
-**3. Supabase.**
+Once the Vercel project exists, `vercel env pull --environment=production .env.local` fills the file from it. A plain `vercel env pull` reads the Development environment, which stays empty unless Development was ticked when the variables were added (see [Deploy](#deploy)).
+
+### Supabase
+
+**On the shared project**, everything is already set up and migrated. Don't change its settings, and don't apply migrations to catch up. Ask the owner to invite you (*Authentication → Users → Invite user*).
+
+To sign in locally against it: request a link on `http://localhost:3000/login`. The email links to the production domain, because the templates build the link from the Site URL. Replace the link's origin with `http://localhost:3000`, keep the path and query, and open it. The token-hash callback ([`app/auth/callback/route.ts`](app/auth/callback/route.ts)) verifies on any origin. A link works only once, so don't open the production one first.
+
+**On your own project**, set it up once:
 
 - *Authentication → Sign In / Providers:* turn off **Allow new users to sign up**. That is the invite list.
-- *Authentication → URL Configuration:* set the Site URL to the address you sign in on, and add `http://localhost:3000/**` (plus the deployed domain) to the Redirect URLs.
+- *Authentication → URL Configuration:* set the Site URL to `http://localhost:3000` (it's your project), and add `http://localhost:3000/**` to the Redirect URLs.
 - *Authentication → Email Templates:* point Magic Link at `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`, and Invite user at the same link with `type=invite`.
-- Apply the migrations in filename order, with the CLI (`npx supabase login`, `npx supabase link --project-ref <ref>`, `npx supabase db push`) or by pasting each file into the SQL Editor:
-
-  | # | File | What it adds |
-  | --- | --- | --- |
-  | 1 | `20260923000000_init.sql` | The Radar, Library and reader-state tables, RLS, the `archive_issues` view, `refresh_must_read` |
-  | 2 | `20260923010000_model_settings.sql` | `model_settings` and its first four tasks |
-  | 3 | `20260924000000_post_blocks.sql` | The block columns on `posts`, six source kinds, three more tasks, the `media` bucket, `update_post_overrides` |
-  | 4 | `20260925000000_drop_post_body.sql` | Drops the old `posts.body` column. Safe on a fresh project; on production, only after the block-based code is deployed |
-
-- Check the *Table Editor*: 8 tables and the `archive_issues` view, each table with RLS enabled.
+- *Authentication → SMTP Settings:* the built-in mailer delivers only to members of the project's Supabase team and only a few emails an hour, so set up a custom SMTP server before inviting anyone else.
+- Apply all four migrations (next section), then check the *Table Editor*: every table has RLS enabled.
 - *Authentication → Users → Invite user:* invite yourself.
 
-**4. Run it.** `npm run dev`, open `http://localhost:3000/login`, and sign in with the invited address.
+### Migrations
 
-**5. The first issue.** Don't wait for 05:00 UTC:
+This table is the one list of migrations; CLAUDE.md and TODO.md point here. Apply them in the Supabase **SQL Editor**, one file at a time, in this order, each only after the previous one succeeded:
+
+| # | File | What it adds |
+| --- | --- | --- |
+| 1 | `20260923000000_init.sql` | The Radar, Library and reader-state tables, RLS, the `archive_issues` view, `refresh_must_read` |
+| 2 | `20260923010000_model_settings.sql` | `model_settings` and its first four tasks |
+| 3 | `20260924000000_post_blocks.sql` | The block columns on `posts`, six source kinds, three more tasks, the `media` bucket, `update_post_overrides` |
+| 4 | `20260925000000_drop_post_body.sql` | Drops the old `posts.body` column. On a fresh project, run it with the rest. On the shared project, only after the block-based code is deployed |
+
+> ⚠️ **Don't run `supabase db push` against the shared project: it would apply the drop migration early**, while production still reads `posts.body`. This warning stays until the TODO.md item "Csak az M1 deployja után" is done. The Supabase CLI isn't set up in this repository anyway (there is no `supabase/config.toml`).
+
+### Sign in and fill it
+
+`npm run dev`, open `http://localhost:3000/login`, and sign in with the invited address (on the shared project, with the origin swap above).
+
+The first issue, without waiting for 05:00 UTC:
 
 ```bash
 curl -H "Authorization: Bearer <CRON_SECRET>" http://localhost:3000/api/cron/daily
@@ -114,7 +145,7 @@ curl -H "Authorization: Bearer <CRON_SECRET>" http://localhost:3000/api/cron/dai
 
 It answers with JSON such as `{ "issue": "2026-W39", "candidates": …, "shortlisted": …, "inserted": …, "repos": …, "retriedSources": … }`, and the Radar fills up.
 
-**6. One link.** Submit it on `/library`, or from the terminal:
+One link: submit it on `/library`, or from the terminal:
 
 ```bash
 npm run ingest -- https://example.com/some-article
@@ -125,10 +156,10 @@ npm run ingest -- https://example.com/some-article
 ## Deploy
 
 1. **Vercel:** *Add New → Project*, import the repository. Next.js and pnpm are detected automatically.
-2. **Environment variables:** everything from the table above, for Production and Preview. Environment changes take effect on the next deploy.
+2. **Environment variables:** everything from the [Environment](#environment) table, for Production and Preview. Tick Development too if you want a plain `vercel env pull` to work; otherwise pull with `--environment=production`. Environment changes take effect on the next deploy.
 3. **Cron:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 5 * * *` (05:00 UTC). With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, translation and re-extraction routes may run for up to 300 s.
 4. **Install command:** check that Vercel installs from `pnpm-lock.yaml` in frozen mode with pnpm 11, so the 7-day age gate applies. This is an open item in [TODO.md](TODO.md).
-5. **Supabase:** set the Site URL and Redirect URLs to the Vercel domain, and send a new invite after changing them.
+5. **Supabase:** the shared project's Site URL is the production domain, and its Redirect URLs include that domain and `http://localhost:3000/**`. The Site URL changes only when the production domain does (for example after renaming the Vercel project); never point it at localhost or a preview URL, because every member's magic link follows it. After a domain change, send new invites.
 6. **First run:** the same `curl` against `https://<domain>/api/cron/daily`. The next morning, check *Vercel → Logs* and *Cron Jobs*.
 
 Schema changes go in before the code that needs them, and a migration may only add while older code is still deployed. A column is dropped only after no deployed code reads it, as `drop_post_body` does.
@@ -174,15 +205,16 @@ Schema changes go in before the code that needs them, and a migration may only a
 3. Register it in `extractors` in [`extract/index.ts`](lib/pipeline/extract/index.ts), and decide whether the kind belongs in `RETHROW_FETCH_ERROR` and `NO_ARTICLE_FALLBACK`, and in `AI_CLEANUP_KINDS` in `ingest.ts`.
 4. Add a migration that widens `sources_kind_check` and `posts_kind_check`.
 5. Add the kind's label and icon on the post page and the Library page; `tsc` reports the missing entry.
-6. Test it offline with `mockFetch` and `mockDns` (see [Testing](#testing)).
+6. Test it offline with the fetch and DNS fakes (see [Testing](#testing)).
 
 **Change a model, or add a model task.** To change a model, edit the task's row in `model_settings` in the Supabase Table Editor. Pin an exact version, not a `*-latest` alias. To add a task:
 
 1. Add it to the `Task` union in [`lib/llm.ts`](lib/llm.ts).
 2. Add a migration that widens `model_settings_task_check` and inserts the seed row.
 3. Call `generate(db, "<task>", zodSchema, prompt)`. A task that sends a YouTube URL or a PDF runs only on Gemini.
+4. Add a row to the task table in [CLAUDE.md](CLAUDE.md#how-content-gets-in).
 
-**Add a migration.** Create `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql`. Keep it additive while older code is deployed; drop things in a later migration, once no deployed code reads them. Enable RLS on every new table. Apply it with `npx supabase db push`, or paste it into the SQL Editor. Then update the Database section of [CLAUDE.md](CLAUDE.md).
+**Add a migration.** Create `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql`. Keep it additive while older code is deployed; drop things in a later migration, once no deployed code reads them. Enable RLS on every new table. Apply it in the SQL Editor (never `supabase db push`; see [Migrations](#migrations)). Then add it to the [Migrations](#migrations) table, and update the Database section of [CLAUDE.md](CLAUDE.md).
 
 **Add a UI string.** Put it in the component's own copy object, in both languages, and read it through the reader's language:
 
@@ -207,8 +239,7 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 
 `npm test` runs `node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts"`. There is no test framework: tests use `node:test` and `node:assert`, and TypeScript runs through Node's type stripping. Nothing touches the network or Supabase.
 
-- **Pipeline wiring without a database:** `fakeDb()` in [`lib/pipeline/fake-db.ts`](lib/pipeline/fake-db.ts) stands in for Supabase and records every write, so a test can assert what `processSource`, `runDaily` or `translatePost` wrote, and in what order.
-- **Network without a network:** [`lib/pipeline/mock-fetch.ts`](lib/pipeline/mock-fetch.ts) has `mockFetch(t, handler)`, `mockDns(t)`, `withGeminiKey(t)` and `withEnv(t, …)`, which undo themselves when the test ends. It also has `geminiResponse(…)` for model answers, `endlessBody()` to prove a response body was never read, and `TEST_IP`, a public IP literal that `safeFetch` accepts offline.
+- **Helpers:** [`lib/pipeline/fake-db.ts`](lib/pipeline/fake-db.ts) stands in for Supabase and records every write; [`lib/pipeline/mock-fetch.ts`](lib/pipeline/mock-fetch.ts) fakes fetch, DNS, environment variables and model answers, and undoes itself when the test ends. The full list is in [CLAUDE.md](CLAUDE.md#conventions).
 - **Components:** [`lib/test/render.ts`](lib/test/render.ts) compiles `.tsx` with the project's TypeScript and renders it to static HTML, with `next/link` and `next/navigation` stubbed. A component test looks like this:
 
   ```ts
@@ -219,17 +250,21 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
   const doc = render(createElement(PostToolbar, { postId: 7, language: "en" /* … */ }));
   ```
 
-  A static render runs hooks once and no effects, so it cannot see clicks or state changes. It is verified on Node 24.16; Node 22.13 is untested.
-- **A path with `[id]` in it** is read as a glob character class: `node --test "app/library/[id]/post-editor.test.ts"` runs 0 tests and still exits 0. Use `npm test`, or escape it as `[[]id]`.
+  A static render runs hooks once and no effects, so it cannot see clicks or state changes. It is verified on Node 24; Node 22 is unverified.
+- **One test file** runs with the same flags as `npm test`. A path with `[id]` in it is read as a glob character class, so `"app/library/[id]/post-editor.test.ts"` runs 0 tests and still exits 0. Escape the bracket:
+
+  ```bash
+  node --experimental-strip-types --no-warnings --test "app/library/[[]id]/post-editor.test.ts"
+  ```
 
 **What the tests don't cover:** the interactive UI, real RLS policies, live model calls and live websites. Those are checked by hand in a browser (Playwright) against a deployment: sign in, the Radar's read, saved and to-do state, an archived week, one link per source kind, the post page (blocks, images, video and chapters), translation, editing, hiding, re-extraction and its 10-minute cooldown, a `noarchive` page, and no horizontal scroll at 360 and 1280 px.
 
 ## Conventions
 
 - **Design language.** Hard corners (`--radius` is 0), system fonts only, hard offset shadows, one fixed theme, and everything fits 360 px with at least 40 px touch targets. The full rules: [CLAUDE.md](CLAUDE.md#design-language--do-not-erode-it).
-- **Bilingual.** Every UI string exists in Hungarian and English, in the component's copy object; the reader's choice is the `lang` cookie. Model output that readers see (titles, summaries, key points) is written in both languages. Code, comments and prompts are English.
+- **Bilingual.** Every UI string should exist in Hungarian and English, in the component's copy object; the reader's choice is the `lang` cookie. Some labels are still English-only: the post kind labels (`kindLabel`), the Library's FAILED / PROCESSING… and MIRRORED tags, the archive's ITEMS / MIN, the header back links and the dashboard's SYNCED. Model output that readers see (titles, summaries, key points) is written in both languages. Code, comments and prompts are English.
 - **No duplication.** Search before writing a helper, and reuse the shared ones listed in [CLAUDE.md](CLAUDE.md#conventions). `npm run dup` (jscpd) fails above 1% duplication.
-- **Relative imports in `lib/`,** with the `.ts` extension, so `node --test` can load the files without a bundler.
+- **Relative imports in `lib/`,** with the `.ts` extension, so `node --test` can load the files without a bundler. The three exceptions are the Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which use `@/` and are never loaded by tests.
 - **Commits** follow Conventional Commits, with lowercase, imperative subjects.
 - **Dependencies** are pinned to exact versions, and `pnpm-lock.yaml` is committed. `pnpm-workspace.yaml` refuses any package published less than 7 days ago (`minimumReleaseAge: 10080`); never lower it. The lockfile is marked `-diff` in `.gitattributes`, so review its changes with `git diff --text`.
 
@@ -241,13 +276,15 @@ Mirroring other people's articles is a managed risk, not a solved problem. What 
 - **Invite-only.** Every page except `/login` and every API route needs a signed-in member (the cron needs its secret instead), and so do the mirrored images.
 - **`noarchive` is honoured.** A page whose robots meta tag or `X-Robots-Tag` header says `noarchive` is not mirrored. The post holds AI-written notes in the model's own words instead, with a link to the original.
 - **Attribution.** Every post shows its canonical source link, the author or site, and a © line.
-- **Takedown.** Deleting a `sources` row deletes its post. The mirrored images are not deleted with it; remove them with `removeUnusedMedia(db, sourceId, [])`. There is no takedown button yet (see [TODO.md](TODO.md)).
+- **Takedown.** Delete the `sources` row in the Table Editor; its post goes with it. The mirrored images stay, so then delete the `<source_id>` folder in the `media` bucket under *Storage*. There is no takedown button yet (see [TODO.md](TODO.md)).
 
 `noindex` and the auth gate are load-bearing, not cosmetic. This posture does not survive the site becoming public, ad-supported or search-indexed.
 
 ## Troubleshooting
 
-**The magic link opens the wrong address.** The email templates build the link from `{{ .SiteURL }}`, so it always points at *Authentication → URL Configuration → Site URL*, whichever site you requested it from. Set the Site URL to the address you sign in on, keep that address in the Redirect URLs, and request a new link: old emails keep the old address. A link that fails to verify (expired or already used) lands on `/login?error=1`. If no email arrives, the address may not be invited (the form answers the same either way), or the built-in mailer's hourly limit may be used up; a custom SMTP server fixes that.
+**The magic link opens the wrong address.** The email templates build the link from `{{ .SiteURL }}`, so it always points at *Authentication → URL Configuration → Site URL*, whichever site you requested it from. On the shared project that is the production domain, and it must stay that way: to sign in locally, replace the link's origin with `http://localhost:3000` (see [Supabase](#supabase)). On your own project, set the Site URL to where you sign in. Old emails keep the old address. A link that fails to verify (expired or already used) lands on `/login?error=1`.
+
+**No email arrives.** The address may not be invited: the form answers the same either way. Or the mail never left: Supabase's built-in mailer delivers only to members of the project's Supabase team and only a few emails an hour, so a project with other members needs a custom SMTP server (*Authentication → SMTP Settings*).
 
 **The cron answers 401.** The route rejects every request when `CRON_SECRET` is unset in that environment, and any request whose header isn't exactly `Authorization: Bearer <CRON_SECRET>`. On Vercel, redeploy after setting the variable; locally, compare the value in `.env.local` with the one in your `curl`.
 
@@ -257,10 +294,10 @@ Mirroring other people's articles is a managed risk, not a solved problem. What 
 
 - `model_settings has no row for "<task>" — apply supabase/migrations`: a migration is missing. The last three tasks come from `20260924000000_post_blocks.sql`.
 - `violates check constraint "sources_kind_check"`, or `column posts.blocks does not exist`: `20260924000000_post_blocks.sql` hasn't run.
-- `relation "…" already exists`: the file already ran. The migrations are not idempotent; `supabase db push` tracks what ran, but in the SQL Editor you have to.
+- `relation "…" already exists`: the file already ran. The migrations are not idempotent, and the SQL Editor doesn't record which files ran, so keep track yourself.
 - Old pages break after `20260925000000_drop_post_body.sql`: that deployment still read `posts.body`. Deploy the block-based code first.
 
-**The GitHub token expired.** GitHub answers 401 to every request carrying an expired token. The daily run then gets no repositories: the cron answer shows `"repos": 0` and the issue has no GitHub top-10, without a warning in the log. GitHub links in the Library fall back to the article extractor (`github extractor failed for <url>: github 401`). Create a new fine-grained token and update `GITHUB_TOKEN`, or remove the variable: GitHub still answers without it, at a lower rate limit. An expiry warning is planned in [TODO.md](TODO.md).
+**The GitHub token expired.** GitHub answers 401 to every request carrying an expired token. The daily run then gets no repositories, without a warning in the log: the cron answer shows `"repos": 0`, and the GitHub top-10 stops updating. It keeps whatever an earlier run that week wrote, so it goes stale; a new week starts without one. GitHub links in the Library fall back to the article extractor (`github extractor failed for <url>: github 401`). Create a new fine-grained token and update `GITHUB_TOKEN`, or remove the variable: GitHub still answers without it, at a lower rate limit. An expiry warning is planned in [TODO.md](TODO.md).
 
 **Submissions are stuck after three failed attempts.** A source gets 3 attempts, counting the one right after submission; the daily cron retries the rest. During an outage that hits every source (a bad key, a used-up quota), each daily run spends one attempt, so after about three days those sources are no longer retried. There is no button to reset them yet (the TODO item "Hibás beküldések kezelése" in [TODO.md](TODO.md)). Once the cause is fixed, reset them in the SQL Editor, and the next cron run picks them up, 10 at a time:
 

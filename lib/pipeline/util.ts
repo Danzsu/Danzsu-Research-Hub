@@ -56,7 +56,7 @@ export function shortHash(text: string): string {
 }
 
 /**
- * `<category>-<isoweek>-<slug>-<urlhash>`. The URL hash makes the id a function of
+ * `<category>-<yyyy>w<ww>-<slug>-<urlhash>`. The URL hash makes the id a function of
  * the URL, so two stories with the same headline never collide on the PK.
  */
 export function itemId(category: string, week: Week, title: string, url: string): string {
