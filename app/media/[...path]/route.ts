@@ -9,6 +9,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
   if (!isMediaKey(key)) return new Response("not found", { status: 404 });
 
   const { data, error } = await createAdminClient().storage.from(MEDIA_BUCKET).download(key);
+  if (error) console.warn(`media ${key}: ${error.message}`);
   if (error || !data) return new Response("not found", { status: 404 });
 
   const extension = key.slice(key.lastIndexOf(".") + 1) as keyof typeof MEDIA_TYPES;
