@@ -26,6 +26,8 @@ export type FakeIngestTables = {
   media?: string[];
   /** Rows `retryPendingSources`' pending-sources listing filters (`eq`/`neq`/`lt`), then limits. */
   pending?: Record<string, unknown>[];
+  /** Forces `sources`' `insert(...).select().single()` to resolve with this error, e.g. `pgError("23505", …)`. */
+  sourceInsertError?: PostgrestErrorShape;
   /** Every `storage.from().list/upload/remove` call rejects, for testing failure-path cleanup. */
   storageError?: boolean;
   /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g.
@@ -40,6 +42,8 @@ export type FakeIngestDb = SupabaseClient & {
   tasks: string[];
   /** Every `sources` UPDATE payload, in call order (the attempts bump, then the final status write). */
   sourceUpdates: Record<string, unknown>[];
+  /** Every `sources` INSERT payload, in call order. */
+  sourceInserts: Record<string, unknown>[];
   /** Every `posts` UPSERT payload, in call order. */
   postUpserts: Record<string, unknown>[];
   /** Every `posts` UPSERT's second (options) argument, same order as `postUpserts`. */
@@ -161,6 +165,7 @@ export function fakeDb(
 ): FakeIngestDb {
   const tasks: string[] = [];
   const sourceUpdates: Record<string, unknown>[] = [];
+  const sourceInserts: Record<string, unknown>[] = [];
   const postUpserts: Record<string, unknown>[] = [];
   const postUpsertOptions: Record<string, unknown>[] = [];
   const postUpdates: Record<string, unknown>[] = [];
@@ -189,6 +194,14 @@ export function fakeDb(
       const lookedUp = tables.sources ?? (tables.source ? [tables.source] : []);
       return {
         select: () => sourcesQuery(tables.pending ?? [], lookedUp, (column, value) => eqCalls.push({ table: "sources", column, value })),
+        insert: (values: Record<string, unknown>) => ({
+          select: () => ({
+            single: async () => {
+              sourceInserts.push(values);
+              return tables.sourceInsertError ? { data: null, error: tables.sourceInsertError } : { data: { id: lookedUp.length + 1 }, error: null };
+            },
+          }),
+        }),
         update: (values: Record<string, unknown>) => ({
           eq: async (column: string, value: unknown) => {
             eqCalls.push({ table: "sources", column, value });
@@ -321,6 +334,7 @@ export function fakeDb(
     rpc,
     tasks,
     sourceUpdates,
+    sourceInserts,
     postUpserts,
     postUpsertOptions,
     postUpdates,
