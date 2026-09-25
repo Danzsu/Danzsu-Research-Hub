@@ -76,9 +76,13 @@ export const pgError = (code: string, message: string, details: string | null = 
 type Filter = { column: string; op: "eq" | "neq" | "lt"; value: unknown };
 
 /** Whether `row` passes `filter` as PostgREST compares it. A column the fixture never set passes every
- *  filter, so a sparse fixture (`{ id: 1 }`) still stands in for whichever row a test needs. */
+ *  filter, so a sparse fixture (`{ id: 1 }`) still stands in for whichever row a test needs. SQL's
+ *  `eq`/`neq`/`lt` all compare to `NULL` as UNKNOWN (never true), so a null filter value, or a null
+ *  row value, never passes here either — only `.is(...)` (the `posts` update chain below) matches
+ *  null explicitly, and that chain doesn't share this function; see its own comment. */
 function passes(row: Record<string, unknown>, { column, op, value }: Filter): boolean {
   if (!(column in row)) return true;
+  if (value === null || row[column] === null) return false;
   if (op === "eq") return row[column] === value;
   if (op === "neq") return row[column] !== value;
   return (row[column] as number) < (value as number);
@@ -140,8 +144,9 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * `ingest_cleanup`, …) a call actually asked for, and how many times.
  * `sources`/`posts`/storage: fixed by `tables` (all optional — omit what a test never queries).
  * Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows, and a column the fixture never
- * set passes every filter; a `sources` `single()` that matches no row, or several, answers PostgREST's
- * PGRST116 error.
+ * set passes every filter; a null filter value, or a null row value, never passes (SQL's own rule —
+ * only `.is(...)` matches null); a `sources` `single()` that matches no row, or several, answers
+ * PostgREST's PGRST116 error.
  * Any other table only upserts (recorded on `.upserts`) and answers `select().gte()` from `tables.rows`.
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it and
  * `list` reflects it, so a test can mirror an image and then see it (or its absence) in a later list.
@@ -233,6 +238,10 @@ export function fakeDb(
             writes.push("posts.update");
             if (tables.postUpdateError) return { data: null, error: tables.postUpdateError };
             const row = tables.post as Record<string, unknown> | null;
+            // Unlike `passes()` above, this doesn't distinguish "eq" from "is" — both compare directly
+            // with `===`, so a hypothetical `.eq(col, null)` here would (wrongly, by SQL's own rule)
+            // match a null row. Every real caller only ever reaches for `.is(...)` on the null case
+            // (translatePost, requestReextract), so this fake has never needed to enforce that rule here.
             const matched = row !== null && filters.every((f) => (row[f.column] ?? null) === f.value);
             if (matched) tables.post = { ...row, ...values };
             if (!withRepresentation) return { data: null, error: null };

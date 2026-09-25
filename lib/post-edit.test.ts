@@ -112,14 +112,14 @@ test("savePostEdits and requestReextract read the post by its id, never by its s
 });
 
 test("requestReextract: a non-submitter is forbidden", async () => {
-  const db = fakeDb(undefined, { post: { source_id: 5, extracted_at: null, sources: { submitted_by: "owner" } } });
+  const db = fakeDb(undefined, { post: { id: 1, source_id: 5, extracted_at: null, sources: { submitted_by: "owner" } } });
   const result = await requestReextract(db, "someone-else", 1, new Date());
   assert.deepEqual(result, { status: "forbidden" });
   assert.equal(db.postUpdates.length, 0);
 });
 
 test("requestReextract: a null source (orphaned post) never passes the ownership check — forbidden, not a crash", async () => {
-  const db = fakeDb(undefined, { post: { source_id: 5, extracted_at: null, sources: null } });
+  const db = fakeDb(undefined, { post: { id: 1, source_id: 5, extracted_at: null, sources: null } });
   const result = await requestReextract(db, "owner", 1, new Date());
   assert.deepEqual(result, { status: "forbidden" });
   assert.equal(db.postUpdates.length, 0);
@@ -143,7 +143,7 @@ test("requestReextract: a missing post gives not_found", async () => {
 test("requestReextract: inside the cooldown window returns a sane retryAfter, no CAS attempted", async () => {
   const now = new Date("2026-01-01T00:05:00Z");
   const extractedAt = "2026-01-01T00:00:00Z"; // 5 minutes ago, cooldown is 10 minutes
-  const db = fakeDb(undefined, { post: { source_id: 5, extracted_at: extractedAt, sources: { submitted_by: "owner" } } });
+  const db = fakeDb(undefined, { post: { id: 1, source_id: 5, extracted_at: extractedAt, sources: { submitted_by: "owner" } } });
   const result = await requestReextract(db, "owner", 1, now);
   assert.equal(result.status, "cooldown");
   assert.ok(result.status === "cooldown" && result.retryAfter > 0 && result.retryAfter <= 300, JSON.stringify(result));
