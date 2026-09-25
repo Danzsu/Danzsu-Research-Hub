@@ -12,7 +12,7 @@ import {
   START_GATE_RESERVE_MS,
   SUMMARY_RESERVE_MS,
 } from "./ingest.ts";
-import { fakeDb } from "./fake-db.ts";
+import { fakeDb, pgError } from "./fake-db.ts";
 import { geminiPrompt, geminiResponse, geminiText, mockDns, mockFetch, TEST_HOST, withGeminiKey, youtubeUrl } from "./mock-fetch.ts";
 
 test("failureUpdate keeps a published post when re-extraction fails", () => {
@@ -657,4 +657,22 @@ test("retryPendingSources() never retries a source whose status is null (SQL nul
   const db = fakeDb(undefined, { sources, post: null, pending: sources });
   assert.equal(await retryPendingSources(db), 0);
   assert.deepEqual(fetched, []);
+});
+
+// Fix round 1: a real production bug — a failed posts upsert can hand back a plain PostgREST error
+// object (`{ message, code, details, hint }`, never an Error instance), and errorMessage must read
+// its message field, or the submitter's post page shows "[object Object]" instead of a real reason.
+test("processSource(): a plain-object upsert error (PostgREST shape) is stored as its message, not [object Object]", async (t) => {
+  mockDns(t);
+  withGeminiKey(t);
+  const source = newSource(26);
+  const db = fakeDb(undefined, {
+    source,
+    post: null,
+    postUpsertError: pgError("23505", "duplicate key value violates unique constraint"),
+  });
+  mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
+  await processSource(db, source.id);
+  assert.equal(db.postUpserts.length, 1); // the attempt was recorded even though it errored
+  assert.deepEqual(db.sourceUpdates.at(-1), { status: "failed", error: "duplicate key value violates unique constraint" });
 });

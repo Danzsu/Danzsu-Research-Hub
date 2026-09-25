@@ -5,6 +5,7 @@ import {
   arxivId,
   cooldownRemaining,
   detectSource,
+  errorMessage,
   formatTimestamp,
   githubRepo,
   hasNoarchive,
@@ -182,6 +183,20 @@ test("hasNoarchive matches case-insensitively across several robots-directive st
   assert.equal(hasNoarchive("NOARCHIVE"), true);
   assert.equal(hasNoarchive(null, undefined, "noarchive"), true); // a header alongside absent metas
   assert.equal(hasNoarchive(), false);
+});
+
+// Fix round 1: a real production bug — supabase-js resolves a failed call's `error` to a plain
+// object (`{ message, code, details, hint }`), never an Error instance; without this, a failed posts
+// upsert wrote "[object Object]" into sources.error, and the post page showed that to the submitter.
+test("errorMessage reads an Error's own message, a plain error object's message field, or stringifies anything else", () => {
+  assert.equal(errorMessage(new Error("boom")), "boom");
+  assert.equal(
+    errorMessage({ message: "duplicate key value violates unique constraint", code: "23505", details: null, hint: null }),
+    "duplicate key value violates unique constraint",
+  );
+  assert.equal(errorMessage("plain string"), "plain string");
+  assert.equal(errorMessage({ code: "23505" }), "[object Object]"); // no message field: falls back to String()
+  assert.equal(errorMessage(null), "null");
 });
 
 test("settledValues keeps the fulfilled values in order and logs each rejection with its label", async (t) => {

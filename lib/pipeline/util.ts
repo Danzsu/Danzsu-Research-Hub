@@ -298,7 +298,14 @@ export function xmlText(value: unknown): string {
   return "";
 }
 
-export const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+/** A thrown value's message: an `Error`'s own, or a plain error object's `message` field — the shape
+ *  supabase-js resolves `error` to (`{ message, code, details, hint }`), never an `Error` instance —
+ *  otherwise the value stringified. */
+export const errorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  const message = typeof error === "object" && error !== null ? (error as { message?: unknown }).message : undefined;
+  return typeof message === "string" ? message : String(error);
+};
 
 /** The fulfilled values, in order; each rejection is logged as `<label(index)>: <reason>` and skipped. */
 export function settledValues<T>(results: PromiseSettledResult<T>[], label: (index: number) => string): T[] {

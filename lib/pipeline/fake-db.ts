@@ -18,6 +18,8 @@ export type FakeIngestTables = {
    *  that reads `posts` more than once per run — e.g. the initial existing-post lookup succeeding,
    *  then a later re-read failing. */
   postErrorOnCall?: number;
+  /** Forces `posts`' `upsert(...)` to resolve with this error instead of applying the write. */
+  postUpsertError?: unknown;
   /** Forces `posts`' `update(...).eq(...)` to resolve with this error instead of applying the write. */
   postUpdateError?: unknown;
   /** Bare object names (no `<sourceId>/` prefix) the media bucket already holds for this source. */
@@ -220,6 +222,7 @@ export function fakeDb(
           postUpserts.push(values);
           postUpsertOptions.push(options ?? {});
           writes.push("posts.upsert");
+          if (tables.postUpsertError) return { data: null, error: tables.postUpsertError };
           tables.post = values;
           return { data: null, error: null };
         },
