@@ -21,7 +21,11 @@ export function feedItems(
   loadedStates: Record<string, ItemState>,
 ): DigestItem[] {
   const visible = items.filter((item) =>
-    filter === "all" ? !item.mustRead : filter === "saved" ? states[item.id]?.saved : item.category === filter,
+    filter === "all"
+      ? !item.mustRead
+      : filter === "saved"
+        ? states[item.id]?.saved || loadedStates[item.id]?.saved // stays until the next load: its own undo (m14) needs the card to not vanish
+        : item.category === filter,
   );
   return sortUnreadFirst(visible, loadedStates);
 }

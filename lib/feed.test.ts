@@ -27,3 +27,10 @@ test("the saved view follows the live state", () => {
   const items = [digestItem("a"), digestItem("b", { mustRead: true })];
   assert.deepEqual(ids(feedItems(items, "saved", { b: { read: false, saved: true } }, {})), ["b"]);
 });
+
+test("the saved view keeps a card saved at load time even after it's un-saved live, until the next load", () => {
+  const items = [digestItem("a"), digestItem("b")];
+  const states = { a: { read: false, saved: false } };
+  const loadedStates = { a: { read: false, saved: true } };
+  assert.deepEqual(ids(feedItems(items, "saved", states, loadedStates)), ["a"]);
+});
