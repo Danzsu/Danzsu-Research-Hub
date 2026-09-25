@@ -18,7 +18,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import type { CurrentIssue, DigestItem, GithubTopEntry } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { feedItems, type Filter } from "@/lib/feed";
-import { EMPTY_ITEM_STATE, type Flag } from "@/lib/reader-store";
+import { EMPTY_ITEM_STATE, type Flag, type ReaderData } from "@/lib/reader-store";
 import { useLanguage } from "./language-context";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
@@ -100,6 +100,7 @@ export function DigestDashboard({
   items,
   githubTop10,
   archived = false,
+  readerState,
   preview,
 }: {
   issue: CurrentIssue;
@@ -107,12 +108,14 @@ export function DigestDashboard({
   githubTop10: GithubTopEntry[];
   /** A closed week opened from /archive: same reading UI, no "live" framing. */
   archived?: boolean;
+  /** The reader's flags and to-dos from the server render (getReaderState); null when that query failed. */
+  readerState?: ReaderData | null;
   /** The offline preview (app/dev/preview): seeded reader state, no network. */
   preview?: ReaderPreview;
 }) {
   const { language } = useLanguage();
   const [filter, setFilter] = useState<Filter>("all");
-  const { store, states, loadedStates, todos, syncing } = useReaderState(preview);
+  const { store, states, loadedStates, todos, syncing } = useReaderState(readerState, preview);
   useModelContextTools(store);
   const isMobile = useIsMobile();
   const t = copy[language];

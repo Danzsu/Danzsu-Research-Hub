@@ -178,6 +178,24 @@ test("marking read after the load leaves loadedStates alone", () => {
   assert.equal(store.getSnapshot().loadedStates.a.read, false, "the feed keeps sorting by this, so the card stays put");
 });
 
+test("a seeded store's revalidation refreshes flags and to-dos but keeps sorting by the seed", async () => {
+  const seed: ReaderData = { states: { a: { read: false, saved: false } }, todos: [todo(1), todo(2), todo(3)] };
+  const store = createReaderStore(memorySend(), noop, seed, true);
+  assert.equal(store.getSnapshot().syncing, true, "the revalidation is still coming");
+  store.setTodoDone(3, true); // ticked before it answered
+  await store.settled();
+  store.hydrate({ states: { a: { read: true, saved: false } }, todos: [{ ...todo(1), done: true }, todo(3), todo(4)] });
+  const snapshot = store.getSnapshot();
+  assert.equal(snapshot.states.a.read, true, "read since the seed was rendered");
+  assert.equal(snapshot.loadedStates.a.read, false, "the feed keeps the order it was first painted in");
+  assert.deepEqual(
+    snapshot.todos.map((item) => [item.id, item.done]),
+    [[1, true], [3, true], [4, false]],
+    "2 was deleted elsewhere; the local tick on 3 stays",
+  );
+  assert.equal(snapshot.syncing, false);
+});
+
 test("post read state is item_states post:<id>, within the 120-character key limit", () => {
   assert.equal(postStateKey(42), "post:42");
   assert.ok(postStateKey(Number.MAX_SAFE_INTEGER).length <= 120);

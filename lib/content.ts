@@ -9,7 +9,7 @@ import type {
 } from "@/data/digest-types";
 import { toPost, type Post } from "@/lib/post-view";
 import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel } from "@/lib/pipeline/util";
-import { POST_STATE_PREFIX, readPostIds } from "@/lib/reader-store";
+import { POST_STATE_PREFIX, readPostIds, type ReaderData } from "@/lib/reader-store";
 
 const budapest = new Intl.DateTimeFormat("hu-HU", {
   timeZone: "Europe/Budapest",
@@ -95,6 +95,22 @@ const POST_COLUMNS = `${LIST_COLUMNS}, blocks, blocks_hu, sources(submitted_by, 
 export async function getPosts(db: SupabaseClient): Promise<Post[]> {
   const { data } = await db.from("posts").select(LIST_COLUMNS).order("created_at", { ascending: false }).limit(100);
   return (data ?? []).map(toPost);
+}
+
+/** The caller's flags and to-dos (RLS: own rows only): GET /api/state, and the Radar's server-rendered seed. Null when a query fails. */
+export async function getReaderState(db: SupabaseClient): Promise<ReaderData | null> {
+  const [stateResult, todoResult] = await Promise.all([
+    db.from("item_states").select("item_id, is_read, is_saved"),
+    db.from("todos").select("id, item_id, text, is_done").order("is_done").order("created_at", { ascending: false }),
+  ]);
+  if (stateResult.error || todoResult.error) {
+    console.error("reader state query failed", stateResult.error ?? todoResult.error);
+    return null;
+  }
+  return {
+    states: Object.fromEntries(stateResult.data.map((row) => [row.item_id, { read: row.is_read, saved: row.is_saved }])),
+    todos: todoResult.data.map((row) => ({ id: row.id, itemId: row.item_id, text: row.text, done: row.is_done })),
+  };
 }
 
 /** The reader's opened posts (item_states `post:<id>`, RLS: own rows only); the Library list dims them. */

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
+import { getReaderState } from "@/lib/content";
 import { parseStateAction } from "@/lib/state";
 import { getReader } from "@/lib/supabase/server";
 
@@ -14,19 +15,8 @@ function failed(error: unknown) {
 export async function GET() {
   const reader = await getReader();
   if (!reader) return jsonError(401, "unauthorized");
-  const db = reader.db;
-
-  const [stateResult, todoResult] = await Promise.all([
-    db.from("item_states").select("item_id, is_read, is_saved"),
-    db.from("todos").select("id, item_id, text, is_done").order("is_done").order("created_at", { ascending: false }),
-  ]);
-  if (stateResult.error || todoResult.error) return failed(stateResult.error ?? todoResult.error);
-
-  const states = Object.fromEntries(
-    stateResult.data.map((row) => [row.item_id, { read: row.is_read, saved: row.is_saved }]),
-  );
-  const todos = todoResult.data.map((row) => ({ id: row.id, itemId: row.item_id, text: row.text, done: row.is_done }));
-  return NextResponse.json({ states, todos });
+  const data = await getReaderState(reader.db);
+  return data ? NextResponse.json(data) : jsonError(500, "db_error");
 }
 
 export async function POST(request: Request) {

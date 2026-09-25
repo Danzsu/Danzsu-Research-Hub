@@ -67,12 +67,17 @@ export function memorySend(fail = false): SendState {
   };
 }
 
-export function createReaderStore(send: SendState, onError: () => void, initial?: ReaderData) {
+/**
+ * `initial` seeds the snapshot (the server render's copy, or the preview's). `loading`: a GET /api/state is
+ * still coming, and `syncing` stays true until hydrate() or hydrateFailed(). A seeded store keeps sorting
+ * by its seed: hydrate() refreshes its flags and to-dos but not `loadedStates`, so the feed never reorders.
+ */
+export function createReaderStore(send: SendState, onError: () => void, initial?: ReaderData, loading = !initial) {
   let snapshot: ReaderSnapshot = {
     states: initial?.states ?? {},
     loadedStates: initial?.states ?? {},
     todos: initial?.todos ?? [],
-    syncing: !initial,
+    syncing: loading,
   };
   const listeners = new Set<() => void>();
   const queues = new Map<string, Promise<void>>();
@@ -84,6 +89,8 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
   const pendingCount = new Map<string, number>();
   /** Flags changed before the first load finished; the load must not overwrite them. */
   const changedEarly: { itemId: string; flag: Flag }[] = [];
+  /** The same for to-dos ticked or deleted before the load finished, by write key (`todo:<id>`). */
+  const todosChangedEarly = new Set<string>();
   let writeCount = 0;
   let nextTempId = -1;
 
@@ -102,6 +109,7 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
     for (let i = changedEarly.length - 1; i >= 0; i--) {
       if (`${changedEarly[i].flag}:${changedEarly[i].itemId}` === key) changedEarly.splice(i, 1);
     }
+    todosChangedEarly.delete(key);
   }
 
   /** Keeps the first row for each id: a temp id resolving to an id hydrate already brought in, or hydrate bringing
@@ -168,7 +176,7 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
     settled: async () => {
       await Promise.all(queues.values());
     },
-    /** The first GET /api/state. Flags and to-dos the reader changed while it loaded keep their local value. */
+    /** GET /api/state: the first load, or a seeded store's revalidation. What the reader changed while it loaded keeps its local value. */
     hydrate(data: ReaderData) {
       const states = { ...data.states };
       for (const { itemId, flag } of changedEarly) {
@@ -178,11 +186,20 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
         if ((pendingCount.get(key) ?? 0) > 0) confirmed.set(key, (data.states[itemId] ?? EMPTY_ITEM_STATE)[flag]);
         states[itemId] = { ...(states[itemId] ?? EMPTY_ITEM_STATE), [flag]: (snapshot.states[itemId] ?? EMPTY_ITEM_STATE)[flag] };
       }
-      const localIds = new Set(snapshot.todos.map((item) => item.id));
+      // To-dos added on this page stay; the seed's rows give way to the server's, unless ticked or deleted meanwhile.
+      const seedIds = new Set(initial?.todos.map((item) => item.id));
+      const local = new Map(snapshot.todos.map((item) => [item.id, item]));
+      const loaded = data.todos.flatMap((item) => {
+        const key = `todo:${item.id}`;
+        if (!todosChangedEarly.has(key)) return [item];
+        if ((pendingCount.get(key) ?? 0) > 0) confirmed.set(key, item.done);
+        const mine = local.get(item.id);
+        return mine ? [mine] : [];
+      });
       update({
         states,
-        loadedStates: data.states,
-        todos: dedupeTodos([...snapshot.todos, ...data.todos.filter((item) => !localIds.has(item.id))]),
+        loadedStates: initial ? snapshot.loadedStates : data.states,
+        todos: dedupeTodos([...snapshot.todos.filter((item) => !seedIds.has(item.id)), ...loaded]),
         syncing: false,
       });
     },
@@ -216,6 +233,7 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
     setTodoDone(id: number, done: boolean): boolean {
       const current = snapshot.todos.find((item) => item.id === id);
       if (id < 0 || !current || current.done === done) return false;
+      if (snapshot.syncing) todosChangedEarly.add(`todo:${id}`);
       const show = (value: boolean) => setTodos(snapshot.todos.map((item) => (item.id === id ? { ...item, done: value } : item)));
       writeBoolean(`todo:${id}`, current.done, done, show, { action: "set_todo", id, value: done });
       return true;
@@ -224,6 +242,7 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
     removeTodo(id: number): PendingRemoval | null {
       const index = snapshot.todos.findIndex((item) => item.id === id);
       if (id < 0 || index === -1) return null;
+      if (snapshot.syncing) todosChangedEarly.add(`todo:${id}`);
       const removed = snapshot.todos[index];
       const restore = () => {
         const todos = [...snapshot.todos];
