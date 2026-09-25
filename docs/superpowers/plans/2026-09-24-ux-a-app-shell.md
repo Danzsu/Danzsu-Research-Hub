@@ -69,10 +69,10 @@
 
 ## Review Focus
 
-1. **Gépelés közben leütött billentyű.** Ilyen például a `j`, `r`, `o`, `?` vagy `/` a teendő-mezőben, a beküldő űrlapon vagy egy `contenteditable` elemen, valamint a Ctrl+R és az AltGr-es karakterek. Elvárás: a parancs nem fut, a karakter a mezőbe kerül, a böngésző saját parancsai működnek. Tesztje: 9. feladat, `nothing fires while typing, whatever the key` és `browser combos stay the browser's…`, plusz a 10. feladat Playwright-lépése.
+1. **Gépelés közben leütött billentyű.** Ilyen például a `j`, `r`, `o`, `?` vagy `/` a teendő-mezőben, a beküldő űrlapon vagy egy `contenteditable` elemen, valamint a Ctrl+R és az AltGr-es karakterek. Elvárás: a parancs nem fut, a karakter a mezőbe kerül, a böngésző saját parancsai működnek. Tesztje: 9. feladat, `nothing fires while typing, whatever the key` és `browser combos stay the browser's…`, plusz a 11. feladat Playwright-lépése.
 2. **Dupla kattintás egy műveleten:** Megnyitás kétszer, „+ teendő” kétszer, Később gyorsan kétszer. Elvárás: egy olvasott-jelölés és egy csík, egy teendő, és a szerver a kattintások sorrendjében kapja az írásokat. Tesztje: 6. feladat, `setting a flag to its current value sends nothing`, `a second to-do for the same item is refused` és `a quick double toggle reaches the server in click order`; 5. feladat, `undo runs once and never commits…`.
-3. **Írás hálózat nélkül:** a `fetch` `TypeError`-t dob, nem `!ok` választ ad. Elvárás: a változás visszaáll a szerver által utoljára megerősített értékre, megjelenik a hibacsík, és a törölt teendő visszakerül. Tesztje: 6. feladat, `an offline write rolls back…`, `when the newest of several writes fails…`, `a committed delete that fails offline…` és `an added to-do shows at once… a failed one disappears`, plusz a 10. feladatban a `?fail=1` Playwright-lépés.
-4. **360 px és az alsó sáv:** semmi nem lóg ki vízszintesen, és a lap alja (az utolsó kártya, a teendő-panel, a visszavonás-csík) nem kerül a sáv alá. A keret a 2. feladaté, de először a 4. feladat előnézete teszi mérhetővé. Ellenőrzőlistája: 4. feladat, 8. lépés, és a 10. feladat.
+3. **Írás hálózat nélkül:** a `fetch` `TypeError`-t dob, nem `!ok` választ ad. Elvárás: a változás visszaáll a szerver által utoljára megerősített értékre, megjelenik a hibacsík, és a törölt teendő visszakerül. Tesztje: 6. feladat, `an offline write rolls back…`, `when the newest of several writes fails…`, `a committed delete that fails offline…` és `an added to-do shows at once… a failed one disappears`, plusz a 11. feladatban a `?fail=1` Playwright-lépés.
+4. **360 px és az alsó sáv:** semmi nem lóg ki vízszintesen, és a lap alja (az utolsó kártya, a teendő-panel, a visszavonás-csík) nem kerül a sáv alá. A keret a 2. feladaté, de először a 4. feladat előnézete teszi mérhetővé. Ellenőrzőlistája: 4. feladat, 8. lépés, és a 11. feladat.
 5. **Olvasottnak jelölés után ugráló lista.** Az „olvasatlan elöl” rendezés élő állapottal futva a most megjelölt kártyát a lista végére dobná, a kurzor és a `j`/`k` fókusza alól. Elvárás: a kártya a helyén marad, csak halványodik, és a rendezés a betöltéskori állapotot használja. Tesztje: 7. feladat, `feedItems sorts by the loaded states…`; 6. feladat, `marking read after the load leaves loadedStates alone`.
 6. **Hiányzó vagy sérült `nav` cookie.** Nincs cookie, vagy az értéke nem `rail` (törölt, régi vagy kézzel elrontott érték). Elvárás: az oldalsáv kinyitva jelenik meg (`readNavMode` alapértelmezése `full`), a szerver nem dob kivételt, és a felület nem ragad rail módban, ha a cookie eltűnik. Tesztje: 2. feladat, `lib/nav-mode.test.ts`, `anything else means full: missing, garbled, or another value`.
 
@@ -93,6 +93,7 @@
 | `app/(app)/layout.tsx` | a bejelentkezett oldalak közös layoutja |
 | `app/(app)/**` | a mostani `app/page.tsx`, `app/archive`, `app/library`, `app/loading.tsx`, ugyanazokkal az URL-ekkel |
 | `app/(app)/archive/archive-view.tsx`, `app/(app)/library/library-view.tsx`, `app/(app)/library/[id]/post-article.tsx` | az oldalak törzse; az előnézet is ezeket rendereli |
+| `app/components/post-image.tsx` | a poszt-kép: a homályos helykitöltő eltűnik betöltés után, `object-contain`, legfeljebb `80dvh` |
 | `app/(app)/library/refresh-while-processing.tsx`, `app/(app)/library/[id]/mark-post-read.tsx` | élő frissítés beküldés közben; a megnyitott poszt olvasott |
 | `app/dev/preview/page.tsx`, `post/page.tsx`, `preview-nav.tsx` | az offline előnézet: a listanézetek `?view=`-vel, a poszt-nézet külön útvonalon, mert az szerveren renderelt nyelvvel megy |
 | `app/components/app-shell.tsx` | a keret: nyelvi kontextus, alsó sáv, „Több” panel, párbeszédablakok, csík |
@@ -251,9 +252,10 @@ git mv app/page.tsx "app/(app)/page.tsx"
 git mv app/loading.tsx "app/(app)/loading.tsx"
 git mv app/archive "app/(app)/archive"
 git mv app/library "app/(app)/library"
+sed -i 's#"\.\./\.\./\.\./lib/#"../../../../lib/#' "app/(app)/library/[id]/post-editor.test.ts" "app/(app)/library/[id]/post-toolbar.test.ts" "app/(app)/library/[id]/post-notices.test.ts"
 ```
 
-A `/login`, az `/auth/*`, az `/api/*`, a `/media`, az `error.tsx`, a `not-found.tsx` és a `manifest.ts` a helyén marad. Az importok `@/`-osak, a relatívak (`./submit-form`, `./post-toolbar`, `./post-editor`) a fájlokkal együtt költöznek.
+A `/login`, az `/auth/*`, az `/api/*`, a `/media`, az `error.tsx`, a `not-found.tsx` és a `manifest.ts` a helyén marad. Az oldalak importjai `@/`-osak, a testvérfájlokra mutatók (`./submit-form`, `./post-toolbar`, `./post-editor`) a fájlokkal együtt költöznek. A három `[id]`-beli teszt viszont relatívan tölti a `lib/`-et (`lib/` alatt nincs `@/`, lásd CLAUDE.md), és egy szinttel mélyebbre kerül, ezért a `sed` a `../../../lib/`-et `../../../../lib/`-re írja. Ellenőrzés: `npm test` ugyanannyi tesztet futtat, mint a költözés előtt.
 
 A `loading.tsx` azért költözik, hogy navigáláskor a keret látszódjon, és csak a tartalom helyén legyen váz. Emellett a `/dev/preview` fölött így nincs töltő-határ, és élesben valódi 404-et ad (lásd Global Constraints, `loading.md`).
 
@@ -1146,7 +1148,7 @@ A `dialog.tsx`-ben a `<DialogPrimitive.Close data-slot="dialog-close" className=
 "focus-ring absolute top-2 right-2 grid size-10 place-items-center border-2 border-ink bg-paper transition-colors hover:bg-signal disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
 ```
 
-A `CLAUDE.md` „Hand-authored components” szakaszát a 10. feladat frissíti.
+A `CLAUDE.md` „Hand-authored components” szakaszát a 11. feladat frissíti.
 
 - [ ] **Step 17: Ellenőrzés**
 
@@ -1507,7 +1509,7 @@ grep -rn 'language === "hu" ?' "app/(app)/archive" "app/(app)/library/page.tsx" 
 grep -rn "getLanguage" "app/(app)/page.tsx" "app/(app)/archive" "app/(app)/library/page.tsx"
 ```
 
-A nyelvváltás Playwright-próbája a 10. feladatban van, az előnézeten.
+A nyelvváltás Playwright-próbája a 11. feladatban van, az előnézeten.
 
 - [ ] **Step 9: Commit**
 
@@ -2039,7 +2041,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
 }
 ```
 
-A `/dev/preview` így ugyanazt a `nav` sütit olvassa, mint az éles `app/(app)/layout.tsx`: az oldalsáv állapota Playwrighttal is ellenőrizhető újratöltés után (10. feladat).
+A `/dev/preview` így ugyanazt a `nav` sütit olvassa, mint az éles `app/(app)/layout.tsx`: az oldalsáv állapota Playwrighttal is ellenőrizhető újratöltés után (11. feladat).
 
 `app/dev/preview/post/page.tsx`:
 
@@ -4503,7 +4505,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
 - [ ] **Step 10: Ellenőrzés**
 
 Futtatás: `npm test && npx tsc --noEmit && npm run lint && npm run build && npm run dup`
-Elvárt: minden zöld, 0 klón. A kézi Playwright-próba a 10. feladat listájában van.
+Elvárt: minden zöld, 0 klón. A kézi Playwright-próba a 11. feladat listájában van.
 
 - [ ] **Step 11: Commit**
 
@@ -4514,7 +4516,352 @@ git commit -m "feat: add keyboard shortcuts and a shortcut help dialog"
 
 ---
 
-### Task 10: Dokumentáció és végső ellenőrzés (Playwright az előnézeten)
+### Task 10: Szélesebb cikkoszlop és egységes képkeret
+
+**Files:**
+- Create: `app/components/post-image.tsx`, `app/(app)/library/[id]/post-article.test.ts`
+- Modify: `app/components/post-blocks.tsx`, `app/components/post-blocks.test.ts`, `app/(app)/library/[id]/post-article.tsx`
+
+**Interfaces:**
+- Consumes: `PostArticle` (a 4. feladat `app/(app)/library/[id]/post-article.tsx`-je), `mediaSources`, `isValidPlaceholder` (`lib/post-view.ts`), `safeHref`, `type Block`, `type ImageBlock` (`lib/blocks.ts`), `testPost` (`lib/test/fixtures.ts`), `render` (`lib/test/render.ts`)
+- Produces: `PostImage(props: { src: string; srcSet: string; sizes: string; alt: string; width?: number; height?: number; priority: boolean; placeholder?: string })` (`app/components/post-image.tsx`)
+
+A spec 1.4.11–12. pontja (`docs/superpowers/specs/2026-09-24-ux-signals-search-design.md`) két ergonómiai javítást kér a poszt-oldalon: szélesebb keret, olvasható sorhosszal, és egységes képkeret. Ez a feladat a 2. feladat utáni útvonalakon dolgozik: a poszt-oldal törzse a 4. feladat óta `app/(app)/library/[id]/post-article.tsx`-ben van (`PostArticle`), a blokkok renderelője változatlanul `app/components/post-blocks.tsx` (`PostBlocks`, benne az `ImageView`). **Olvasd újra mindkét fájlt**, mert a 4., a 6. és a 7. feladat is módosítja őket (a 7. a `repo` blokk `topics`-felsorolását cseréli `Tag`-re) — a lenti kódrészletek a pontosan idézett „előtte” szöveget keresik, a körülöttük lévő sorok a korábbi feladatoktól függően már mások lehetnek.
+
+A blokkséma (`lib/blocks.ts`) ma nem ismer „táblázat” blokktípust, a spec „táblázatok” szava ellenére — ez a feladat ezért csak a ténylegesen létező típusokra vonatkozik: a kép, a kód és a videó blokk lesz teljes szélességű, a többi (bekezdés, lista, cím, idézet, fejezetlista, repó, elválasztó) a 75ch-s olvasási szélességben marad.
+
+- [ ] **Step 1: A tesztek megírása**
+
+`app/components/post-blocks.test.ts`-ben a meglévő `blocks` tömb (és a destructuring-lista) csak bővül — a régi indexek nem változnak, mert két elem a végére kerül:
+
+```ts
+const blocks = assignIds([
+  { type: "video", provider: "youtube", videoId: "bad" },
+  { type: "video", provider: "youtube", videoId: "dQw4w9WgXcQ" },
+  { type: "chapters", items: [{ seconds: 30, title: "Intro" }] },
+  { type: "paragraph", content: [{ text: "docs", href: "/doc" }, { text: " and " }, { text: "a trap", href: "javascript:alert(1)" }] },
+  { type: "video", provider: "vimeo", videoId: "76979871" },
+  { type: "repo", fullName: "owner/repo", url: "javascript:alert(2)", stars: 1, topics: [] },
+  { type: "image", originalUrl: "javascript:alert(3)", alt: "", path: null },
+  { type: "code", language: "ts", code: "const answer = 42;" },
+  {
+    type: "image",
+    originalUrl: "https://blog.test/figure.png",
+    alt: "A chart",
+    caption: "Figure 1",
+    path: "1/0123456789abcdef",
+    format: "avif",
+    widths: [640, 1280],
+    width: 1280,
+    height: 720,
+    placeholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  },
+]);
+const [invalidVideo, youtube, , paragraph, vimeo, repo, missingImage, codeBlock, mirroredImage] = blocks;
+```
+
+A fájl végére öt új teszt:
+
+```ts
+test("both the missing-image box and a loaded image share the same frame", () => {
+  const doc = renderBlocks();
+  const missingFrame = wrapper(doc, missingImage)!.querySelector("figure")!;
+  const loadedFrame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
+  for (const frame of [missingFrame, loadedFrame]) {
+    assert.ok(frame.classList.contains("bg-paper"), frame.className);
+    assert.ok(frame.classList.contains("shadow-[4px_4px_0_var(--ink)]"), frame.className);
+  }
+  assert.ok(missingFrame.classList.contains("border-dashed"), "the missing box's border is dashed");
+  assert.equal(loadedFrame.classList.contains("border-dashed"), false, "a loaded image keeps a solid border");
+});
+
+test("a loaded image's caption sits inside its frame, in mono", () => {
+  const doc = renderBlocks();
+  const frame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
+  const caption = frame.querySelector("figcaption")!;
+  assert.equal(caption.textContent, "Figure 1");
+  assert.ok(caption.classList.contains("font-mono"));
+});
+
+test("the image itself is contained, capped at 80dvh tall, and stacked above the placeholder", () => {
+  const doc = renderBlocks();
+  const img = wrapper(doc, mirroredImage)!.querySelector("img")!;
+  assert.ok(img.classList.contains("relative"), img.className);
+  assert.ok(img.classList.contains("object-contain"), img.className);
+  assert.ok(img.classList.contains("max-h-[80dvh]"), img.className);
+});
+
+test("a loaded image's placeholder sits behind it, ready to be hidden once the browser fires onload", () => {
+  const doc = renderBlocks();
+  const frame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
+  const placeholderLayer = frame.querySelector('span[aria-hidden="true"]')!;
+  assert.match(placeholderLayer.getAttribute("style") ?? "", /background-image/);
+  // The server-rendered markup is always the pre-load state (render.ts runs no effects or refs); the
+  // browser removes this layer once the image has loaded (onLoad, or `complete` at hydration) —
+  // Task 11's Playwright checklist item 12 checks that in a real browser.
+});
+
+test("images, code and video break out of the prose width; paragraphs keep it", () => {
+  const doc = renderBlocks();
+  for (const wide of [mirroredImage, codeBlock, youtube]) {
+    assert.equal(wrapper(doc, wide)!.classList.contains("max-w-[75ch]"), false, wide.id);
+  }
+  assert.ok(wrapper(doc, paragraph)!.classList.contains("max-w-[75ch]"));
+});
+```
+
+`app/(app)/library/[id]/post-article.test.ts` (új fájl; négy `../`, mert az `[id]` a 2. feladat óta négy könyvtárral van a gyökér alatt, mint a szomszédos tesztek):
+
+```ts
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createElement } from "react";
+import { testPost } from "../../../../lib/test/fixtures.ts";
+import { render } from "../../../../lib/test/render.ts";
+
+const { PostArticle } = await import("./post-article.tsx");
+
+const renderArticle = (post = testPost()) => render(createElement(PostArticle, { post, language: "en", query: {}, canEdit: false }));
+
+test("the post column is the widened frame, not the old narrow one", () => {
+  const wrapper = renderArticle().querySelector("article > div")!;
+  assert.ok(wrapper.classList.contains("max-w-5xl"), wrapper.className);
+  assert.equal(wrapper.classList.contains("max-w-3xl"), false);
+});
+
+test("the summary and key points stay at the readable prose width", () => {
+  const post = testPost({ keyPoints: { hu: [], en: ["First point"] } });
+  const doc = renderArticle(post);
+  const summary = [...doc.querySelectorAll("p")].find((p) => p.textContent === post.summary.en)!;
+  assert.ok(summary.classList.contains("max-w-[75ch]"), summary.className);
+  const keyPointsBlock = doc.querySelector("ul")!.closest("div")!;
+  assert.ok(keyPointsBlock.classList.contains("max-w-[75ch]"), keyPointsBlock.className);
+});
+```
+
+- [ ] **Step 2: Futtatás, el kell buknia**
+
+Futtatás: `node --experimental-strip-types --no-warnings --test app/components/post-blocks.test.ts "app/(app)/library/[[]id]/post-article.test.ts"`
+Az `[id]` szögletes zárójelét `[[]id]`-ként kell írni, különben a `node --test` glob-karakterosztálynak veszi, 0 tesztet futtat, és 0-val lép ki (CLAUDE.md, Tests). A kimenet `# tests` sora nem lehet 0.
+Elvárt: FAIL — a mai `ImageView` a hiányzó képet sima `<p>`-ként adja vissza, `<figure>` nélkül, a betöltött képnél pedig a keret osztályai (`bg-paper`, `shadow-[4px_4px_0_var(--ink)]`) még az `img`-en sincsenek meg; a `post-article.test.ts` a modul hiánya miatt bukik.
+
+- [ ] **Step 3: A képkomponens** (`app/components/post-image.tsx`)
+
+```tsx
+"use client";
+
+import { useState } from "react";
+
+/**
+ * The post image itself: a blurred placeholder sits behind it until it has loaded, then this layer
+ * is removed — never left as the image's own permanent CSS background — so a transparent PNG/AVIF
+ * (arXiv, GitHub figures) never shows blur bleeding through a transparent pixel afterwards (spec
+ * 1.4.12). The only stateful piece of the post renderer, split out so post-blocks.tsx can stay
+ * hook-free and keep rendering inside a Server Component (see its own header comment).
+ * A cached image can finish loading before hydration, when onLoad has no listener yet, so the ref
+ * callback also checks `complete`; the img is `relative` so it paints above the placeholder layer.
+ */
+export function PostImage({
+  src,
+  srcSet,
+  sizes,
+  alt,
+  width,
+  height,
+  priority,
+  placeholder,
+}: {
+  src: string;
+  srcSet: string;
+  sizes: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  priority: boolean;
+  placeholder?: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <span className="relative block">
+      {placeholder && !loaded && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url("${placeholder}")` }}
+        />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- variants are pre-encoded; next/image would re-optimize them */}
+      <img
+        src={src}
+        srcSet={srcSet}
+        sizes={sizes}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
+        decoding="async"
+        ref={(img) => {
+          if (img?.complete && img.naturalWidth > 0) setLoaded(true);
+        }}
+        onLoad={() => setLoaded(true)}
+        className="relative max-h-[80dvh] w-full object-contain"
+      />
+    </span>
+  );
+}
+```
+
+- [ ] **Step 4: Az egységes keret és a szélesség-szabály `post-blocks.tsx`-ben**
+
+Előbb olvasd újra a fájlt. A `Language`/`Block` importja után, az utolsó importsor mellé:
+
+```tsx
+import { PostImage } from "./post-image";
+```
+
+A `numberLocale` függvény után, az `InlineContent` elé:
+
+```tsx
+// The one place the post image frame (spec 1.4.12) is defined: paper background, ink border, inner
+// padding, a hard shadow with no blur. `dashed` is the "image unavailable" box; a loaded image keeps
+// a solid border. The caption, when there is one, lives inside this same frame — never a sibling of it.
+const imageFrameClass = "border-2 bg-paper p-2 shadow-[4px_4px_0_var(--ink)]";
+
+function ImageFrame({ dashed = false, caption, children }: { dashed?: boolean; caption?: string; children: ReactNode }) {
+  return (
+    <figure className={`${imageFrameClass} ${dashed ? "border-dashed border-ink/35" : "border-ink"}`}>
+      {children}
+      {caption && <figcaption className="mt-2 font-mono text-xs leading-5 text-ink/60">{caption}</figcaption>}
+    </figure>
+  );
+}
+
+// The block types that get the widened column's full width (spec 1.4.11); the block schema has no
+// table type yet, so this list is only what actually exists. Everything else keeps the 75ch prose cap.
+const FULL_WIDTH_BLOCK_TYPES = new Set<Block["type"]>(["image", "code", "video"]);
+```
+
+A teljes `ImageView` függvény erre cserélődik:
+
+```tsx
+function ImageView({ block, priority, language, baseUrl }: { block: ImageBlock; priority: boolean; language: Language; baseUrl: string }) {
+  const sources = mediaSources(block);
+  if (!sources) {
+    const href = safeHref(block.originalUrl, baseUrl);
+    return (
+      <ImageFrame dashed>
+        <p className="font-mono text-xs text-ink/60">
+          {labels[language].missing}:{" "}
+          {href ? (
+            <a href={href} target="_blank" rel="noreferrer" className="focus-ring text-signal underline">
+              {block.originalUrl}
+            </a>
+          ) : (
+            block.originalUrl
+          )}
+        </p>
+      </ImageFrame>
+    );
+  }
+  const placeholder = block.placeholder && isValidPlaceholder(block.placeholder) ? block.placeholder : undefined;
+  return (
+    <ImageFrame caption={block.caption}>
+      <PostImage
+        src={sources.src}
+        srcSet={sources.srcSet}
+        // Roughly the widened column's own content width (spec 1.4.11, max-w-5xl minus its padding);
+        // a request-size hint only, so a few px of slack here is harmless.
+        sizes="(min-width: 1024px) 944px, 100vw"
+        alt={block.alt}
+        width={block.width}
+        height={block.height}
+        priority={priority}
+        placeholder={placeholder}
+      />
+    </ImageFrame>
+  );
+}
+```
+
+A blokk-sor `div`-je (`PostBlocks` render-ciklusában) ez a sor:
+
+```tsx
+    out.push(
+      <div key={block.id} id={`b-${block.id}`} data-block-id={block.id} className={`scroll-mt-24 ${controls ? "relative pr-12 min-h-10" : ""}`}>
+```
+
+erre cserélődik:
+
+```tsx
+    out.push(
+      <div key={block.id} id={`b-${block.id}`} data-block-id={block.id} className={`scroll-mt-24 ${controls ? "relative pr-12 min-h-10" : ""} ${FULL_WIDTH_BLOCK_TYPES.has(block.type) ? "" : "max-w-[75ch]"}`}>
+```
+
+- [ ] **Step 5: A poszt-oldal kerete** (`app/(app)/library/[id]/post-article.tsx`)
+
+Előbb olvasd újra a fájlt (a 6. és a 7. feladat is módosíthatta a köztes sorokat). Ez a sor:
+
+```tsx
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-10 sm:py-16">
+```
+
+erre:
+
+```tsx
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-10 sm:py-16">
+```
+
+Az összefoglaló és a kulcspontok folyószöveg, ezért a spec szerint 75ch-nál nem szélesebb. Ez a blokk:
+
+```tsx
+        <p className="mt-8 text-lg leading-8">{post.summary[language]}</p>
+        {post.keyPoints[language].length > 0 && (
+          <div className="mt-8 border-l-4 border-signal pl-5">
+            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{t.keyPoints}</p>
+            <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7">
+              {post.keyPoints[language].map((point) => <li key={point}>{point}</li>)}
+            </ul>
+          </div>
+        )}
+```
+
+erre:
+
+```tsx
+        <p className="mt-8 max-w-[75ch] text-lg leading-8">{post.summary[language]}</p>
+        {post.keyPoints[language].length > 0 && (
+          <div className="mt-8 max-w-[75ch] border-l-4 border-signal pl-5">
+            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{t.keyPoints}</p>
+            <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7">
+              {post.keyPoints[language].map((point) => <li key={point}>{point}</li>)}
+            </ul>
+          </div>
+        )}
+```
+
+A `PostBlocks`-ot tartalmazó `<section className="mt-12">` változatlan marad, mert a szélesség blokkonként dől el (Step 4). Az oldalsáv összecsukásakor a tartalom külön kód nélkül kiszélesedik: a `<main>` már a 2. feladat `DesktopNav`-jának `<div className="min-w-0 flex-1">` oszlopában van, ez a szülő ad helyet, a `mx-auto max-w-5xl` pedig csak felfelé korlátoz.
+
+- [ ] **Step 6: Futtatás, át kell mennie**
+
+Futtatás: `node --experimental-strip-types --no-warnings --test app/components/post-blocks.test.ts "app/(app)/library/[[]id]/post-article.test.ts" && npx tsc --noEmit && npm run dup`
+Elvárt: minden teszt PASS, köztük a 7 új (a `post-blocks.test.ts`-ben 5, a `post-article.test.ts`-ben 2), a tsc hiba nélkül fut, 0 klón.
+
+- [ ] **Step 7: Teljes ellenőrzés**
+
+Futtatás: `npm test && npx tsc --noEmit && npm run lint && npm run build && npm run dup`
+Elvárt: minden zöld, 0 klón.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add app/components/post-image.tsx app/components/post-blocks.tsx app/components/post-blocks.test.ts "app/(app)/library/[id]/post-article.tsx" "app/(app)/library/[id]/post-article.test.ts"
+git commit -m "feat: widen the post column and frame images uniformly"
+```
+
+---
+
+### Task 11: Dokumentáció és végső ellenőrzés (Playwright az előnézeten)
 
 **Files:**
 - Modify: `CLAUDE.md`, `README.md`, `TODO.md`
@@ -4533,7 +4880,7 @@ app/              /login, auth routes, API routes, /media, error/not-found, mani
 app/dev/preview/  offline preview on fixtures (development only)
 app/components/   app-shell (+ mobile bottom bar), desktop-nav, nav-parts, shell-dialogs,
                   language-context, language-toggle, undo-toast, digest-dashboard, story-card,
-                  reader-panel, tag, page-header (PageHero, StatusCard), post-blocks,
+                  reader-panel, tag, page-header (PageHero, StatusCard), post-blocks, post-image,
                   use-reader-state, use-shortcuts, use-model-context-tools
 ```
 
@@ -4607,7 +4954,7 @@ A „Testing” szakaszba:
 - [ ] **Step 4: Végső ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
-Elvárt: minden zöld, 0 klón. A tesztszám a kiinduláshoz képest 39-cel nő: nav 4, nav-mode 2, public-paths 3, fixtures 4, undo-queue 3, reader-store 13, feed 4, keymap 6. Ha valamelyik fájlban eltér a szám, a tesztneveket vesd össze ezzel a tervvel.
+Elvárt: minden zöld, 0 klón. A tesztszám a kiinduláshoz képest 39-cel nő: nav 4, nav-mode 2, public-paths 3, fixtures 4, undo-queue 3, reader-store 13, feed 4, keymap 6. Ha valamelyik fájlban eltér a szám, a tesztneveket vesd össze ezzel a tervvel. A 10. feladat emellett 7 újabb tesztet ad: 5-öt a meglévő `post-blocks.test.ts`-hez, és 2-t az új `post-article.test.ts`-ben.
 
 - [ ] **Step 5: Playwright-ellenőrzőlista** (a kontroller futtatja a Playwright MCP-eszközeivel, `npm run dev` mellett)
 
@@ -4686,6 +5033,29 @@ Nézetek: `http://localhost:3000/dev/preview?view=` + `radar`, `radar-empty`, `l
       Elvárt fókuszban: `"1"`. Egy további `Tab` után (a fókusz odébb áll) újra `"0"`.
     - Nincs vízszintes görgetés rail módban sem (az 1. pont szkriptje).
     - `[` billentyűvel kattintás nélkül is ugyanez történik (lásd az 5. pont Oldalsáv-alpontját).
+
+12. **Az egységes képkeret** (`post` nézet; 360×740, és 1280×800 mindkét oldalsáv-módban — nyitva és a 11. pont szerint összecsukva).
+    - Minden `<figure>` a cikktörzsben paper hátterű és kemény árnyékú; a hiányzó képnél a szegély szaggatott, a betöltöttnél sima. Elvárt: minden sor `background: "rgb(251, 239, 202)"` (a `--paper` szín) és `shadow: true`.
+      ```js
+      () => [...document.querySelectorAll("article figure")].map((figure) => {
+        const style = getComputedStyle(figure);
+        return { background: style.backgroundColor, border: style.borderStyle, shadow: style.boxShadow !== "none" };
+      })
+      ```
+    - A képek `object-contain`-nel ülnek a keretben — így az átlátszó hátterű arXiv/GitHub-ábrák a keret paper hátterén jelennek meg, nem a cream oszlopon:
+      ```js
+      () => [...document.querySelectorAll("article figure img")].map((img) => getComputedStyle(img).objectFit)
+      ```
+      Elvárt: minden elem `"contain"`.
+    - Egy betöltött kép mögött nem marad elmosott előnézet, újratöltés után sem (a gyorsítótárból jövő kép a hidratálás előtt betölthet, ezt a `PostImage` ref-callbackje kezeli). Az oldal betöltése, majd egy újratöltés után:
+      ```js
+      () => [...document.querySelectorAll("article figure")].filter((figure) => {
+        const img = figure.querySelector("img");
+        return img?.complete && img.naturalWidth > 0 && figure.querySelector('span[aria-hidden="true"]');
+      }).length
+      ```
+      Elvárt: mindkétszer `0`.
+    - Nincs vízszintes görgetés egyik szélességen és oldalsáv-módban sem (az 1. pont szkriptje), és 1280 px-en az oldalsáv összecsukása után a cikkoszlop szélesebb lesz, miközben a bekezdések (`article p`) szélessége nem haladja meg a 75 karaktert (`getComputedStyle(p).maxWidth` a `75ch`-nak megfelelő, a bekezdés `font-size`-ától függő px-érték).
 
 Minden talált hibára előbb egy tiszta segédfüggvényes teszt a `lib/`-ben, ha a hiba logikai, aztán a javítás, és külön commit (`fix: …`).
 
