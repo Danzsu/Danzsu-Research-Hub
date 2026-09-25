@@ -5,7 +5,7 @@
 **Goal:** Minden bejelentkezett oldal közös keretet kap (asztalon oldalsáv, mobilon ötgombos alsó sáv). A Radar és a Library kevesebb kattintással és hüvelykujjal is kezelhető, a nyelvváltás a listaoldalakon frissítés nélkül működik, és az egész felület élő adat nélkül, egy fejlesztői előnézeten is ellenőrizhető.
 
 **Architecture:**
-- **Keret:** az `app/(app)/layout.tsx` minden bejelentkezett oldalt az `AppShell`-be csomagol. Ebben van a nyelvi kontextus, a `DesktopNav` (az A változat, egyetlen cserélhető fájl, ~56 px-es ikonsávvá csukható), a mobilos alsó sáv a „Több” panellel, a keresés helyfoglalója, a billentyűsúgó és a visszavonás-csík. Minden menüpont a `lib/nav.ts`-ből jön. Az oldalsáv állapotát (`full` | `rail`) a `nav` cookie őrzi meg, egy tiszta függvény (`lib/nav-mode.ts`) olvassa, a szerver ez alapján rendereli a keretet, villanás nélkül.
+- **Keret:** az `app/(app)/layout.tsx` minden bejelentkezett oldalt az `AppShell`-be csomagol. Ebben van a nyelvi kontextus, a `DesktopNav` (az A változat, egyetlen cserélhető fájl, ~56 px-es ikonsávvá csukható), a mobilos alsó sáv a „Több” panellel, a keresés helyfoglalója, a billentyűsúgó és a visszavonás-csík. Minden menüpont a `lib/nav.ts`-ből jön. Az oldalsáv állapotát (`full` | `rail`) a `nav` cookie őrzi meg, egy tiszta függvény (`lib/nav-mode.ts`) értelmezi, a `getNavMode()` (`lib/language.ts`, a `getLanguage()` mellett) olvassa a szerveren, és a szerver ez alapján rendereli a keretet, villanás nélkül.
 - **Olvasói állapot:** egy keretrendszer-független tár (`lib/reader-store.ts`) intézi az optimista írást. Egy kulcson a kérések sorban mennek ki, hibánál a felület a szerver által utoljára megerősített értékre áll vissza. A React-kötés (`use-reader-state.ts`) vékony.
 - **Tiszta logika a `lib/`-ben:** menü, billentyűk, rendezés, visszavonás-sor, útvonal-szabályok és mintaadatok. Mindet `node --test` teszteli, a TSX vékony marad.
 - **Előnézet:** az `app/dev/preview` a valódi nézet-komponenseket rendereli mintaadatokkal, hálózat és bejelentkezés nélkül, csak fejlesztői módban.
@@ -64,7 +64,7 @@
   - `03-api-reference/04-functions/use-pathname.md`.
   - `03-api-reference/03-file-conventions/proxy.md`: a kísérleti `unstable_doesProxyMatch` helyett tiszta segédfüggvényt tesztelünk (`lib/public-paths.ts`).
   - Az oldalak megtartják az `export const dynamic = "force-dynamic"` sort.
-- **Az M1 `lib/state.ts`-e:** ha a POST `/api/state` akcióit típusként exportálja, és az elfogadja a 6. feladat `StateWrite` négy alakját, akkor a `StateWrite` helyett azt importáld (`import type`).
+- **Az M1 `lib/state.ts`-e:** a `StateAction` a zod *kimeneti* típusa: az `add_todo` `itemId`-je ott kötelező `string | null`, ezért nem fogadja el a 6. feladat `{ action: "add_todo", text }` alakját. A `StateWrite` tehát marad. A 180 karakteres teendő-korlát egy helyen él: a 6. feladat exportálja a `lib/state.ts` `TODO_TEXT_MAX`-át, és a `lib/reader-store.ts` azt importálja.
 - **Commitok:** Conventional Commits, kisbetűs tárgy, attribúció nélkül.
 
 ## Review Focus
@@ -84,7 +84,8 @@
 | --- | --- |
 | `lib/nav.ts` (+ teszt) | a menüpontok egy listában, `activeNavId`, `switchesLanguageInPlace` |
 | `lib/nav-mode.ts` (+ teszt) | a `nav` cookie értéke: teljes oldalsáv vagy ikonsáv (`readNavMode`) |
-| `lib/public-paths.ts` (+ teszt) | melyik útvonal kerüli el a belépési átirányítást (a `/dev/` csak fejlesztői módban) |
+| `lib/language.ts` | a `getLanguage()` mellé a `getNavMode()`: a `nav` cookie a szerveren, a layoutnak és az előnézetnek |
+| `lib/public-paths.ts` (+ teszt, meglévő) | melyik útvonal kerüli el a belépési átirányítást; új: `isDevPreviewPath` (a `/dev/` csak fejlesztői módban) |
 | `lib/fixtures.ts` (+ teszt) | az előnézet mintaadatai |
 | `lib/undo-queue.ts` (+ teszt) | az egyszerre-egy visszavonás-sor |
 | `lib/reader-store.ts` (+ teszt) | olvasott, Később és teendők: optimista írás, sorrend, visszaállás, `post:<id>` kulcs |
@@ -93,7 +94,7 @@
 | `app/(app)/layout.tsx` | a bejelentkezett oldalak közös layoutja |
 | `app/(app)/**` | a mostani `app/page.tsx`, `app/archive`, `app/library`, `app/loading.tsx`, ugyanazokkal az URL-ekkel |
 | `app/(app)/archive/archive-view.tsx`, `app/(app)/library/library-view.tsx`, `app/(app)/library/[id]/post-article.tsx` | az oldalak törzse; az előnézet is ezeket rendereli |
-| `app/components/post-image.tsx` | a poszt-kép: a homályos helykitöltő eltűnik betöltés után, `object-contain`, legfeljebb `80dvh` |
+| `app/components/post-image.tsx` | a poszt-kép: a homályos helykitöltő eltűnik betöltés után, `object-contain`, legfeljebb `80dvh`, a kis képet nem nagyítja |
 | `app/(app)/library/refresh-while-processing.tsx`, `app/(app)/library/[id]/mark-post-read.tsx` | élő frissítés beküldés közben; a megnyitott poszt olvasott |
 | `app/dev/preview/page.tsx`, `post/page.tsx`, `preview-nav.tsx` | az offline előnézet: a listanézetek `?view=`-vel, a poszt-nézet külön útvonalon, mert az szerveren renderelt nyelvvel megy |
 | `app/components/app-shell.tsx` | a keret: nyelvi kontextus, alsó sáv, „Több” panel, párbeszédablakok, csík |
@@ -228,13 +229,14 @@ git commit -m "feat: add the shared navigation list"
   - `app/components/digest-dashboard.tsx`
   - `app/(app)/page.tsx`, `app/(app)/archive/page.tsx`, `app/(app)/archive/[week]/page.tsx`, `app/(app)/library/page.tsx`, `app/(app)/library/[id]/page.tsx`
   - `app/login/page.tsx`, `app/error.tsx`, `app/not-found.tsx`
-  - `lib/language.ts` (doc-komment)
+  - `lib/language.ts` (doc-komment, `getNavMode`)
   - `components/ui/sheet.tsx`, `components/ui/dialog.tsx` (bezáró gomb)
 
 **Interfaces:**
 - Consumes: `NAV_ITEMS`, `PRIMARY_NAV`, `SOON_NAV`, `activeNavId`, `NavId`, `NavItem` (1. feladat)
 - Produces:
   - `type NavMode = "full" | "rail"`, `readNavMode(value: string | undefined): NavMode` (`lib/nav-mode.ts`)
+  - `getNavMode(): Promise<NavMode>` (`lib/language.ts`, a `getLanguage()` mellett; a `nav` cookie-t a `readNavMode`-dal értelmezi)
   - `AppShell(props: { language: Language; email: string; initialNavMode: NavMode; children: ReactNode })`
   - `DesktopNav(props: DesktopNavProps)`, ahol `DesktopNavProps = { email: string; onSearch: () => void; mode: NavMode; onToggle: () => void; children: ReactNode }`. A 9. feladat hozzáad egy `onHelp: () => void` mezőt.
   - `navIcons: Record<NavId, LucideIcon>`, `NavEntry(props: { item: NavItem; active: boolean; onSearch: () => void; className: string; children: ReactNode })`, `SoonList(props: { className?: string })`, `NavTooltip(props: { label: string; children: ReactNode })`, `AccountActions(props: { email: string; iconOnly?: boolean })`
@@ -261,7 +263,7 @@ A `loading.tsx` azért költözik, hogy navigáláskor a keret látszódjon, és
 
 - [ ] **Step 2: A `nav` cookie olvasásának tesztje** (`lib/nav-mode.test.ts`)
 
-Az oldalsáv állapotát (2026-09-25-i döntés, spec 1.2) egy `nav` cookie őrzi (`full` | `rail`), ugyanúgy, mint a `lang` cookie-t a nyelv. Ezt a tiszta függvényt a 12. lépésben az `app/(app)/layout.tsx` hívja szerveren, a 4. feladat előnézeti oldalai pedig ugyanígy.
+Az oldalsáv állapotát (2026-09-25-i döntés, spec 1.2) egy `nav` cookie őrzi (`full` | `rail`), ugyanúgy, mint a `lang` cookie-t a nyelv. Ezt a tiszta függvényt a 12. lépésben a `getNavMode()` (`lib/language.ts`) hívja szerveren. A `getNavMode()`-ot az `app/(app)/layout.tsx` és a 4. feladat két előnézeti oldala használja.
 
 ```ts
 import assert from "node:assert/strict";
@@ -288,7 +290,7 @@ Elvárt: FAIL, `Cannot find module '…/lib/nav-mode.ts'`.
 
 ```ts
 // The desktop sidebar's two widths: a full sidebar or a ~56px icon rail (spec 1.2). Read from the
-// `nav` cookie by app/(app)/layout.tsx, so the server renders the right width with no flash.
+// `nav` cookie by getNavMode() in lib/language.ts, so the server renders the right width with no flash.
 
 export type NavMode = "full" | "rail";
 
@@ -338,7 +340,7 @@ export function useLanguage(): LanguageState {
 }
 ```
 
-A `lib/language.ts` doc-kommentje legyen ez: `/** The reader's language, written by persistLanguage in app/components/language-context.tsx. */`
+A `lib/language.ts` új tartalma (a `getLanguage` doc-kommentje és az új `getNavMode`) a 12. lépésben van.
 
 - [ ] **Step 7: A nyelvváltó a kontextusra, ikon-változattal a railhez** (`app/components/language-toggle.tsx`, a teljes fájl)
 
@@ -348,6 +350,7 @@ A `lib/language.ts` doc-kommentje legyen ez: `/** The reader's language, written
 import { useRouter } from "next/navigation";
 import { Languages } from "lucide-react";
 import { useLanguage } from "./language-context";
+import { NavTooltip } from "./nav-parts";
 
 // Each label names the switch in the language it switches to.
 const copy = { hu: { label: "Switch to English" }, en: { label: "Váltás magyarra" } };
@@ -356,14 +359,15 @@ const copy = { hu: { label: "Switch to English" }, en: { label: "Váltás magyar
 export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const { language, setLanguage } = useLanguage();
   const router = useRouter();
-  return (
+  const label = copy[language].label;
+  const toggle = (
     <button
       type="button"
       onClick={() => {
         setLanguage(language === "hu" ? "en" : "hu");
         router.refresh();
       }}
-      aria-label={copy[language].label}
+      aria-label={label}
       className={
         iconOnly
           ? "focus-ring grid size-10 place-items-center rounded-full border border-current/40 hover:border-signal hover:text-signal"
@@ -373,8 +377,12 @@ export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}
       {iconOnly ? <Languages className="size-4" /> : language.toUpperCase()}
     </button>
   );
+  // The rail shows only the icon, so its name comes up as a tooltip on hover and focus (spec 1.2).
+  return iconOnly ? <NavTooltip label={label}>{toggle}</NavTooltip> : toggle;
 }
 ```
+
+A `NavTooltip` a 8. lépésben készül (`nav-parts.tsx`); a `nav-parts.tsx` nem importálja a nyelvváltót, így nincs körkörös import.
 
 A `router.refresh()` itt még mindig lefut. A 3. feladat hagyja el ott, ahol a lista már mindkét nyelvet tartalmazza. Addig a szerveren renderelt szöveg így sem marad régi nyelven.
 
@@ -449,8 +457,9 @@ export function SoonList({ className = "" }: { className?: string }) {
 
 /**
  * Wraps an icon-only control with its name as a small popup, shown on hover and on keyboard focus
- * (house style: paper background, 2px ink border, hard shadow). Used by the rail (desktop-nav.tsx);
- * the accessible name itself comes from the child's own aria-label or sr-only text, not from this.
+ * (house style: paper background, 2px ink border, hard shadow). Used by every icon in the rail
+ * (desktop-nav.tsx): the menu entries, language, help, sign-out and expand. The accessible name
+ * itself comes from the child's own aria-label or sr-only text, not from this.
  */
 export function NavTooltip({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -474,9 +483,11 @@ export function AccountActions({ email, iconOnly = false }: { email: string; ico
   if (iconOnly) {
     return (
       <form action="/auth/signout" method="post" className="flex justify-center">
-        <button type="submit" aria-label={t.signOut} className="focus-ring grid size-10 place-items-center text-paper/70 hover:text-signal">
-          <LogOut className="size-4" />
-        </button>
+        <NavTooltip label={t.signOut}>
+          <button type="submit" aria-label={t.signOut} className="focus-ring grid size-10 place-items-center text-paper/70 hover:text-signal">
+            <LogOut className="size-4" />
+          </button>
+        </NavTooltip>
       </form>
     );
   }
@@ -537,12 +548,30 @@ export function DesktopNav({ email, onSearch, mode, onToggle, children }: Deskto
   const active = activeNavId(usePathname());
   const t = copy[language];
   const rail = mode === "rail";
+  const toggle = (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!rail}
+      aria-label={rail ? t.expand : t.collapse}
+      className="focus-ring flex min-h-10 w-full items-center justify-center gap-2 border-t border-paper/15 pt-3 font-mono text-[11px] text-paper/55 hover:text-signal"
+    >
+      {rail ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+      {!rail && t.collapse}
+    </button>
+  );
   return (
     <div className="md:flex">
+      {/* z-30: the rail's tooltips paint above the Radar's sticky header (z-20) and chip bar (z-10). */}
       <aside
-        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper md:flex ${rail ? "w-14" : "w-64"}`}
+        className={`sticky top-0 z-30 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper md:flex ${rail ? "w-14" : "w-64"}`}
       >
-        <Link href="/" className={`focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}>
+        {/* Named explicitly: in the rail only the icon is left. */}
+        <Link
+          href="/"
+          aria-label="NEON NEWS RADAR"
+          className={`focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}
+        >
           <span className="grid size-10 shrink-0 place-items-center rounded-full border border-signal bg-signal text-ink">
             <Radar className="size-5" />
           </span>
@@ -556,7 +585,8 @@ export function DesktopNav({ email, onSearch, mode, onToggle, children }: Deskto
             </span>
           )}
         </Link>
-        <nav aria-label={t.nav} className="flex-1 overflow-y-auto px-3 py-4">
+        {/* No overflow in the rail: a scroll container would clip the tooltips (the few items fit). */}
+        <nav aria-label={t.nav} className={rail ? "flex-1 px-1 py-4" : "flex-1 overflow-y-auto px-3 py-4"}>
           <ul className="space-y-1">
             {PRIMARY_NAV.map((item) => {
               const Icon = navIcons[item.id];
@@ -574,16 +604,7 @@ export function DesktopNav({ email, onSearch, mode, onToggle, children }: Deskto
         <div className={`space-y-3 border-t border-paper/15 ${rail ? "px-2 py-3" : "p-4"}`}>
           {rail ? <LanguageToggle iconOnly /> : <LanguageToggle />}
           {rail ? <AccountActions email={email} iconOnly /> : <AccountActions email={email} />}
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={!rail}
-            aria-label={rail ? t.expand : t.collapse}
-            className="focus-ring flex min-h-10 w-full items-center justify-center gap-2 border-t border-paper/15 pt-3 font-mono text-[11px] text-paper/55 hover:text-signal"
-          >
-            {rail ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
-            {!rail && t.collapse}
-          </button>
+          {rail ? <NavTooltip label={t.expand}>{toggle}</NavTooltip> : toggle}
         </div>
       </aside>
       <div className="min-w-0 flex-1">{children}</div>
@@ -592,7 +613,7 @@ export function DesktopNav({ email, onSearch, mode, onToggle, children }: Deskto
 }
 ```
 
-A tartalom oszlopa (`<div className="min-w-0 flex-1">`) magától kiszélesedik, amikor az `aside` 256-ról 56 px-re csukódik: nincs hozzá külön kód. A `NavTooltip` csak rail módban veszi körbe a bejegyzést; teljes módban a névnek nincs szüksége buborékra, mert ki van írva.
+A tartalom oszlopa (`<div className="min-w-0 flex-1">`) magától kiszélesedik, amikor az `aside` 256-ról 56 px-re csukódik: nincs hozzá külön kód. Rail módban a `NavTooltip` minden ikont körbevesz: a menüpontokat, a nyelvváltót és a kijelentkezést (a saját `iconOnly` águkban) és a kinyitó gombot, a 9. feladattól a súgó gombját is (spec 1.2, „minden ikon”). Teljes módban a névnek nincs szüksége buborékra, mert ki van írva. A rail `nav`-ján nincs `overflow`: egy görgethető konténer levágná a kilógó buborékokat, és a rail 4 menüpontja (a „hamarosan” lista ott nem látszik) amúgy is elfér. A `px-1` mellett a rail-bejegyzések ~47 px szélesek. Az `aside` `z-30`-a a Radar ragadós fejléce (`z-20`) és chip-sávja (`z-10`) fölé teszi a buborékokat, a Sheet (`z-50`) és az alsó sáv (`z-40`) alatt marad.
 
 - [ ] **Step 10: A keresés helye** (`app/components/shell-dialogs.tsx`)
 
@@ -667,7 +688,7 @@ const copy = {
   en: { nav: "Menu", more: "More", language: "Language" },
 };
 
-/** Mirrors persistLanguage (language-context.tsx): same cookie shape, read back by app/(app)/layout.tsx via readNavMode. */
+/** Mirrors persistLanguage (language-context.tsx): same cookie shape, read back on the server by getNavMode (lib/language.ts). */
 function persistNavMode(mode: NavMode) {
   document.cookie = `nav=${mode}; path=/; max-age=31536000; samesite=lax`;
 }
@@ -759,21 +780,40 @@ function MobileNav({ email, onSearch }: { email: string; onSearch: () => void })
 
 Mobilon nincs rail: a `MobileNav` a `LanguageToggle`-t és az `AccountActions`-t is a teljes (nem `iconOnly`) formájukban használja, mert a „Több” panelben elég a hely.
 
-- [ ] **Step 12: A layout, a `nav` cookie olvasásával** (`app/(app)/layout.tsx`)
+- [ ] **Step 12: A `nav` cookie a szerveren, és a layout** (`lib/language.ts`, `app/(app)/layout.tsx`)
+
+`lib/language.ts` (a teljes fájl; a `getLanguage` doc-kommentje az új `persistLanguage`-re mutat, a `getNavMode` új). A három szerveroldali hívó (a layout és a 4. feladat két előnézeti oldala) ezt hívja, így a süti olvasása egy helyen van:
+
+```ts
+import "server-only";
+import { cookies } from "next/headers";
+import type { Language } from "@/data/digest-types";
+import { readNavMode, type NavMode } from "@/lib/nav-mode";
+
+/** The reader's language, written by persistLanguage in app/components/language-context.tsx. */
+export async function getLanguage(): Promise<Language> {
+  return (await cookies()).get("lang")?.value === "en" ? "en" : "hu";
+}
+
+/** The desktop nav's width, written by persistNavMode in app/components/app-shell.tsx. */
+export async function getNavMode(): Promise<NavMode> {
+  return readNavMode((await cookies()).get("nav")?.value);
+}
+```
+
+`app/(app)/layout.tsx`:
 
 ```tsx
-import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShell } from "@/app/components/app-shell";
-import { getLanguage } from "@/lib/language";
-import { readNavMode } from "@/lib/nav-mode";
+import { getLanguage, getNavMode } from "@/lib/language";
 import { getViewer } from "@/lib/supabase/server";
 
 // Pages still check the session themselves, with their own ?next=: a layout cannot read the path.
 export default async function SignedInLayout({ children }: { children: ReactNode }) {
-  const [language, viewer, cookieStore] = await Promise.all([getLanguage(), getViewer(), cookies()]);
+  const [language, navMode, viewer] = await Promise.all([getLanguage(), getNavMode(), getViewer()]);
   return (
-    <AppShell language={language} email={viewer?.email ?? ""} initialNavMode={readNavMode(cookieStore.get("nav")?.value)}>
+    <AppShell language={language} email={viewer?.email ?? ""} initialNavMode={navMode}>
       {children}
     </AppShell>
   );
@@ -1237,7 +1277,7 @@ export function LocalizedText({ value }: { value: Localized }) {
 
 - [ ] **Step 5: A váltó csak ott frissít, ahol kell** (`app/components/language-toggle.tsx`)
 
-Az importok legyenek ezek: `import { usePathname, useRouter } from "next/navigation";` és `import { switchesLanguageInPlace } from "@/lib/nav";`. A `Languages` (lucide) és a `useLanguage` importja a 2. feladatból marad. A komponens (a 2. feladat `iconOnly`-ja megmarad, csak a frissítés lesz feltételes):
+Az importok legyenek ezek: `import { usePathname, useRouter } from "next/navigation";` és `import { switchesLanguageInPlace } from "@/lib/nav";`. A `Languages` (lucide), a `useLanguage` és a `NavTooltip` importja a 2. feladatból marad. A komponens (a 2. feladat `iconOnly`-ja és buboréka megmarad, csak a frissítés lesz feltételes):
 
 ```tsx
 /** Switches the whole shell at once; only a page whose text the server rendered in one language is refreshed. `iconOnly` is the rail's ~40px version (desktop-nav.tsx). */
@@ -1245,14 +1285,15 @@ export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}
   const { language, setLanguage } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
-  return (
+  const label = copy[language].label;
+  const toggle = (
     <button
       type="button"
       onClick={() => {
         setLanguage(language === "hu" ? "en" : "hu");
         if (!switchesLanguageInPlace(pathname)) router.refresh();
       }}
-      aria-label={copy[language].label}
+      aria-label={label}
       className={
         iconOnly
           ? "focus-ring grid size-10 place-items-center rounded-full border border-current/40 hover:border-signal hover:text-signal"
@@ -1262,6 +1303,8 @@ export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}
       {iconOnly ? <Languages className="size-4" /> : language.toUpperCase()}
     </button>
   );
+  // The rail shows only the icon, so its name comes up as a tooltip on hover and focus (spec 1.2).
+  return iconOnly ? <NavTooltip label={label}>{toggle}</NavTooltip> : toggle;
 }
 ```
 
@@ -1390,8 +1433,9 @@ import Link from "next/link";
 import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
 import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
-import type { Post, SubmittedSource } from "@/lib/content";
+import type { SubmittedSource } from "@/lib/content";
 import { hostOf } from "@/lib/pipeline/util";
+import type { Post } from "@/lib/post-view";
 import { SubmitForm } from "./submit-form";
 
 const kindIcons = { article: FileText, youtube: PlayCircle, arxiv: FlaskConical, github: GitFork, x: MessageSquareQuote, pdf: FileText } as const;
@@ -1399,8 +1443,8 @@ const kindIcons = { article: FileText, youtube: PlayCircle, arxiv: FlaskConical,
 // Server-rendered with both languages; LocalizedText picks one on the client, so the toggle needs no refresh here.
 const copy = {
   lead: {
-    hu: "Dobj be egy YouTube-videót vagy cikket: az AI összefoglalja, a cikk szövegét pedig elmenti ide, hogy a link halála után is megmaradjon.",
-    en: "Drop in a YouTube video or an article: the AI summarizes it and keeps a copy of the article text, so it outlives the original link.",
+    hu: "Dobj be egy cikket, YouTube-videót, arXiv-tanulmányt, PDF-et, GitHub-repót vagy X-posztot: az AI összefoglalja, a szövegét pedig elmenti ide, hogy a link halála után is megmaradjon.",
+    en: "Drop in an article, a YouTube video, an arXiv paper, a PDF, a GitHub repo or an X post: the AI summarizes it and keeps a copy of its text, so it outlives the original link.",
   },
   failed: { hu: "HIBA", en: "FAILED" },
   processing: { hu: "FELDOLGOZÁS…", en: "PROCESSING…" },
@@ -1474,7 +1518,7 @@ export function LibraryView({ posts, open }: { posts: Post[]; open: SubmittedSou
 }
 ```
 
-Ha az M1 15. feladata a `Post` / `SubmittedSource` típust máshová tette, onnan importáld (`grep -rn "export type Post "`).
+A `Post` típus az M1 óta a `lib/post-view.ts`-ben van (a `lib/content.ts` csak importálja, nem exportálja tovább); a `SubmittedSource` a `lib/content.ts`-ben maradt. A `copy.lead` a mostani `app/library/page.tsx` két mondata, betű szerint (az M1 minden forrástípust felsorolt benne).
 
 `app/(app)/library/page.tsx`:
 
@@ -1523,13 +1567,13 @@ git commit -m "feat: switch language without a refresh on list pages"
 ### Task 4: Offline előnézet: mintaadatok, proxy-kivétel, előnézeti oldal
 
 **Files:**
-- Create: `lib/public-paths.ts`, `lib/public-paths.test.ts`, `lib/fixtures.ts`, `lib/fixtures.test.ts`, `app/dev/preview/page.tsx`, `app/dev/preview/post/page.tsx`, `app/dev/preview/preview-nav.tsx`, `app/(app)/library/[id]/post-article.tsx`
-- Modify: `proxy.ts`, `app/(app)/library/[id]/page.tsx`
+- Create: `lib/fixtures.ts`, `lib/fixtures.test.ts`, `app/dev/preview/page.tsx`, `app/dev/preview/post/page.tsx`, `app/dev/preview/preview-nav.tsx`, `app/(app)/library/[id]/post-article.tsx`
+- Modify: `lib/public-paths.ts`, `lib/public-paths.test.ts` (mindkettő az M1 óta létezik), `proxy.ts`, `app/(app)/library/[id]/page.tsx`, `lib/test/fixtures.ts` (fejléc-komment)
 
 **Interfaces:**
-- Consumes: `AppShell`, `readNavMode` (`lib/nav-mode.ts`) (2. feladat); `ArchiveView`, `LibraryView` (3. feladat); `DigestDashboard`; `assignIds`, `blockSchema`, `parseBlocks`, `BlockDraft` (`lib/blocks.ts`); `publishedLabel` (`lib/pipeline/util.ts`)
+- Consumes: `AppShell`, `getNavMode` (`lib/language.ts`) (2. feladat); `ArchiveView`, `LibraryView` (3. feladat); `DigestDashboard`; `assignIds`, `blockSchema`, `parseBlocks`, `BlockDraft` (`lib/blocks.ts`); `publishedLabel` (`lib/pipeline/util.ts`); `testPost` (`lib/test/fixtures.ts`); `notices`, `PostNotices` (`app/(app)/library/[id]/post-notices.tsx`, M1); `isPublicPath` (`lib/public-paths.ts`, M1)
 - Produces:
-  - `isPublicPath(pathname: string): boolean`, `isDevPreviewPath(pathname: string, nodeEnv: string | undefined): boolean`
+  - `isDevPreviewPath(pathname: string, nodeEnv: string | undefined): boolean` (a meglévő `isPublicPath` mellé)
   - `lib/fixtures.ts`: `LONG_WORD`, `LONG_URL`, `previewEmail`, `digestItem(id: string, overrides?: Partial<DigestItem>): DigestItem`, `previewIssue`, `previewItems`, `previewGithub`, `previewArchive`, `previewSources`, `previewPosts`. A 6. feladat hozzáadja a `previewReader`-t, a 8. a `previewReadPostIds`-t.
   - `PostArticle(props: { post: Post; language: Language; query: PostQuery; canEdit: boolean })`
   - `PREVIEW_VIEWS`, `type PreviewView`, `PreviewNav(props: { current: PreviewView | "post" })`. A 6. feladat egy `failWrites: boolean` mezőt ad hozzá.
@@ -1537,13 +1581,9 @@ git commit -m "feat: switch language without a refresh on list pages"
 
 - [ ] **Step 1: A tesztek megírása**
 
-`lib/public-paths.test.ts`:
+`lib/public-paths.test.ts` (az M1 óta létezik): a meglévő `isPublicPath lets the login, auth, API and media routes answer for themselves` teszt változatlanul marad, a `/media/` továbbra is nyilvános előtag. Az import `import { isDevPreviewPath, isPublicPath } from "./public-paths.ts";` lesz, és a fájl végére két új teszt kerül:
 
 ```ts
-import assert from "node:assert/strict";
-import { test } from "node:test";
-import { isDevPreviewPath, isPublicPath } from "./public-paths.ts";
-
 test("the offline preview skips sign-in in development only", () => {
   assert.equal(isDevPreviewPath("/dev/preview", "development"), true);
   for (const nodeEnv of ["production", "test", undefined]) assert.equal(isDevPreviewPath("/dev/preview", nodeEnv), false);
@@ -1552,13 +1592,6 @@ test("the offline preview skips sign-in in development only", () => {
 test("only the /dev/ folder counts, not look-alike paths", () => {
   for (const path of ["/dev", "/devices", "/developer/x", "/library/dev/preview"]) {
     assert.equal(isDevPreviewPath(path, "development"), false, path);
-  }
-});
-
-test("public paths are sign-in, auth callbacks and the API", () => {
-  for (const path of ["/login", "/auth/callback", "/api/state"]) assert.equal(isPublicPath(path), true, path);
-  for (const path of ["/", "/library", "/archive/2026-W38", "/dev/preview", "/media/1/x.avif"]) {
-    assert.equal(isPublicPath(path), false, path);
   }
 });
 ```
@@ -1598,26 +1631,20 @@ test("the preview radar has exactly three must-read items and unique ids", () =>
 - [ ] **Step 2: Futtatás, el kell buknia**
 
 Futtatás: `node --experimental-strip-types --no-warnings --test lib/public-paths.test.ts lib/fixtures.test.ts`
-Elvárt: FAIL, a két modul nem létezik.
+Elvárt: FAIL. A `lib/public-paths.ts` még nem exportálja az `isDevPreviewPath`-ot (`SyntaxError: The requested module './public-paths.ts' does not provide an export named 'isDevPreviewPath'`), a `lib/fixtures.ts` pedig nem létezik.
 
-- [ ] **Step 3: `lib/public-paths.ts`, és a `proxy.ts` átállítása**
+- [ ] **Step 3: `lib/public-paths.ts` bővítése, és a `proxy.ts` átállítása**
+
+`lib/public-paths.ts`: a mostani tartalom (a komment, az előtaglista a `/media/`-val és az `isPublicPath`) változatlan marad, a fájl végére ez kerül:
 
 ```ts
-// Which paths proxy.ts lets through without a session. Pure, so the dev-only rule is tested.
-
-// API routes answer 401 themselves; redirecting a fetch to /login helps no one.
-const PUBLIC_PREFIXES = ["/login", "/auth/", "/api/"];
-
-export const isPublicPath = (pathname: string) => PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-
 /** The offline preview (app/dev/preview) skips sign-in in development only; in production the page itself is a 404. */
-export const isDevPreviewPath = (pathname: string, nodeEnv: string | undefined) =>
+export const isDevPreviewPath = (pathname: string, nodeEnv: string | undefined): boolean =>
   nodeEnv === "development" && pathname.startsWith("/dev/");
 ```
 
-`proxy.ts`:
-- a `PUBLIC_PREFIXES` konstans és a kommentje törlődik;
-- import: `import { isDevPreviewPath, isPublicPath } from "@/lib/public-paths";`;
+`proxy.ts` (az M1 már a `lib/public-paths.ts` `isPublicPath`-ját hívja, így csak ez a két változás marad):
+- import: `import { isPublicPath } from "@/lib/public-paths";` helyett `import { isDevPreviewPath, isPublicPath } from "@/lib/public-paths";`;
 - a függvény eleje ez lesz, a Supabase-kliens létrehozása elé:
 
 ```ts
@@ -1629,17 +1656,15 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 ```
 
-- a feltétel `!PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))` helyett `!isPublicPath(pathname)`;
-- a lenti, második `const { pathname, search } = request.nextUrl;` sor törlődik.
+- a lenti, második `const { pathname, search } = request.nextUrl;` sor (a `getClaims()` után) törlődik.
 
 - [ ] **Step 4: A poszt-oldal törzse külön komponensbe** (`app/(app)/library/[id]/post-article.tsx`)
 
-Előbb olvasd újra a `page.tsx`-et. A `const t = notices[language]` sortól a `</article>` záróig minden változatlanul ide költözik, a copy-szabály miatt három eltéréssel:
-1. a `notices` neve `copy` lesz, két új kulccsal: `keyPoints` és `kind`;
-2. `kindLabel[post.kind]` helyett `t.kind[post.kind]`;
-3. a `KULCSPONTOK` / `KEY POINTS` ternáris helyett `t.keyPoints`.
+Előbb olvasd újra a `page.tsx`-et. A lenti kód a `c8b6471` (M1 utáni) állapotból készült, a 2. feladat `PageHeader`-törlése után. A `const t = notices[language]` sortól a `</article>` záróig minden változatlanul ide költözik, egy szinttel kisebb behúzással (a `<main>` a `page.tsx`-ben marad), és a copy-szabály miatt két eltéréssel:
+1. `kindLabel[post.kind]` helyett `labels.kind[post.kind]`;
+2. a `KULCSPONTOK` / `KEY POINTS` ternáris helyett `labels.keyPoints`.
 
-Ha az M1 újabb sort tett a törzsbe, az is jöjjön át.
+A két új szöveg egy saját, kétnyelvű `copy` objektumba kerül (`keyPoints`, `kind`), a `kindLabel` konstans megszűnik. A `notices` és a `PostNotices` a `post-notices.tsx`-ben marad, ahogy az M1 hagyta. A figyelmeztető sávok, köztük a beküldőnek szóló `lastError`, és a `min` / `original` szöveg onnan jön, így a sávokból nem lesz második példány (az `npm run dup` ezt klónnak jelezné). A `canEdit` propként érkezik. A `videoStart` a törzzsel együtt költözik, és a `PostEditor` továbbra is megkapja a `query`-t és a `videoStart`-ot. A `Post` típus a `lib/post-view.ts`-ből jön, mert a `lib/content.ts` nem exportálja.
 
 ```tsx
 import { ExternalLink } from "lucide-react";
@@ -1647,32 +1672,20 @@ import { PostBlocks } from "@/app/components/post-blocks";
 import { Button } from "@/components/ui/button";
 import type { Language } from "@/data/digest-types";
 import { safeHref } from "@/lib/blocks";
-import type { Post } from "@/lib/content";
 import { hostOf } from "@/lib/pipeline/util";
-import { readMinutes, type PostQuery } from "@/lib/post-view";
+import { readMinutes, type Post, type PostQuery } from "@/lib/post-view";
 import { translatable } from "@/lib/translate";
 import { PostEditor } from "./post-editor";
+import { notices, PostNotices } from "./post-notices";
 import { PostToolbar } from "./post-toolbar";
 
+// Only the two strings the page used to hard-code; the rest of its text is `notices` (post-notices.tsx).
 const copy = {
   hu: {
-    noarchive: "Saját összefoglaló — az eredeti:",
-    failed: "A tartalmat nem sikerült átmenteni — az eredeti:",
-    // X oEmbed is embed-shaped, not article-shaped: it also cuts long single posts, not just threads.
-    truncated: "A poszt beágyazott formájában került be: szál, képek és a hosszú poszt vége nélkül.",
-    clipped: "A forrás túl hosszú volt, az eleje került be.",
-    original: "Eredeti forrás",
-    min: "perc",
     keyPoints: "KULCSPONTOK",
     kind: { article: "CIKK", youtube: "VIDEÓ", arxiv: "TANULMÁNY", github: "REPO", x: "POSZT", pdf: "PDF" },
   },
   en: {
-    noarchive: "Our own notes — the original:",
-    failed: "The content could not be mirrored — the original:",
-    truncated: "Captured in its embed form: no thread, images or the end of a long post.",
-    clipped: "The source was too long; the beginning was kept.",
-    original: "Original source",
-    min: "min",
     keyPoints: "KEY POINTS",
     kind: { article: "ARTICLE", youtube: "VIDEO", arxiv: "PAPER", github: "REPO", x: "POST", pdf: "PDF" },
   },
@@ -1680,11 +1693,13 @@ const copy = {
 
 /** The post page body. The offline preview (app/dev/preview) renders it with fixture posts. */
 export function PostArticle({ post, language, query, canEdit }: { post: Post; language: Language; query: PostQuery; canEdit: boolean }) {
-  const t = copy[language];
+  const t = notices[language];
+  const labels = copy[language];
   const showingTranslation = query.text === "hu" && Boolean(post.blocksHu);
   const blocks = showingTranslation ? post.blocksHu! : post.blocks;
   const minutes = readMinutes(post.blocks, post.kind);
   const start = Number.parseInt(query.t ?? "", 10);
+  const videoStart = Number.isFinite(start) && start > 0 ? start : undefined;
   // post.url is already validated at ingest (parseSubmittedUrl), but every href the page emits
   // goes through safeHref anyway — this is the same choke point PostBlocks uses.
   const originalHref = safeHref(post.url, post.url);
@@ -1694,25 +1709,14 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-10 sm:py-16">
         <header className="border-b-2 border-ink pb-6">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tracking-[0.15em] text-signal">
-            <span className="border border-signal px-2 py-0.5">{t.kind[post.kind]}</span>
+            <span className="border border-signal px-2 py-0.5">{labels.kind[post.kind]}</span>
             <span>{post.siteName ?? hostOf(post.url)}</span>
             {post.author && <span className="text-ink/60">{post.author}</span>}
             {post.publishedAt && <span className="text-ink/60">{post.publishedAt}</span>}
             {minutes !== null && <span className="text-ink/60">{minutes} {t.min}</span>}
           </p>
           <h1 className="mt-4 font-display text-[clamp(1.9rem,6vw,4.6rem)] leading-[0.95] tracking-[-0.05em] [overflow-wrap:anywhere]">{post.title[language]}</h1>
-          {(post.meta.noarchive || post.meta.extractionFailed) && (
-            <p className="mt-4 border-l-4 border-signal pl-4 text-sm">
-              {post.meta.noarchive ? t.noarchive : t.failed}{" "}
-              {originalHref ? (
-                <a href={originalHref} target="_blank" rel="noreferrer" className="focus-ring text-signal underline [overflow-wrap:anywhere]">{post.url}</a>
-              ) : (
-                <span className="[overflow-wrap:anywhere]">{post.url}</span>
-              )}
-            </p>
-          )}
-          {post.meta.truncated && <p className="mt-2 font-mono text-xs text-ink/60">{t.truncated}</p>}
-          {post.meta.clipped && <p className="mt-2 font-mono text-xs text-ink/60">{t.clipped}</p>}
+          <PostNotices post={post} language={language} originalHref={originalHref} canEdit={canEdit} />
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <PostToolbar
               postId={post.id}
@@ -1738,7 +1742,7 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
         <p className="mt-8 text-lg leading-8">{post.summary[language]}</p>
         {post.keyPoints[language].length > 0 && (
           <div className="mt-8 border-l-4 border-signal pl-5">
-            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{t.keyPoints}</p>
+            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{labels.keyPoints}</p>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7">
               {post.keyPoints[language].map((point) => <li key={point}>{point}</li>)}
             </ul>
@@ -1747,7 +1751,7 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
 
         {query.edit === "1" && canEdit ? (
           <section className="mt-12">
-            <PostEditor post={post} language={language} />
+            <PostEditor post={post} language={language} query={query} videoStart={videoStart} />
           </section>
         ) : (
           blocks.length > 0 && (
@@ -1758,7 +1762,7 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
                 baseUrl={post.url}
                 hidden={post.hiddenBlocks}
                 showHidden={query.hidden === "show"}
-                videoStart={Number.isFinite(start) && start > 0 ? start : undefined}
+                videoStart={videoStart}
                 linkQuery={query}
               />
             </section>
@@ -1774,7 +1778,7 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
 }
 ```
 
-`app/(app)/library/[id]/page.tsx` (a teljes fájl):
+`app/(app)/library/[id]/page.tsx` (a teljes fájl; a fej a mostani fájlé, változatlanul):
 
 ```tsx
 import { notFound, redirect } from "next/navigation";
@@ -1797,8 +1801,10 @@ export default async function PostPage({
   const { id } = await params;
   const reader = await getReader();
   if (!reader) redirect(`/login?next=/library/${id}`);
+  const query = await searchParams;
+  const language = await getLanguage();
   const postId = parseId(id);
-  const [post, query, language] = await Promise.all([postId ? getPost(reader.db, postId) : null, searchParams, getLanguage()]);
+  const post = postId ? await getPost(reader.db, postId) : null;
   if (!post) notFound();
 
   return (
@@ -1814,8 +1820,10 @@ export default async function PostPage({
 ```ts
 import { assignIds, type BlockDraft } from "./blocks.ts";
 import type { ArchiveIssue, CurrentIssue, DigestItem, GithubTopEntry } from "../data/digest-types.ts";
-import type { Post, SubmittedSource } from "./content.ts";
+import type { SubmittedSource } from "./content.ts";
 import { publishedLabel } from "./pipeline/util.ts";
+import type { Post } from "./post-view.ts";
+import { testPost } from "./test/fixtures.ts";
 
 // Sample data for the offline preview (app/dev/preview): every block type, all four post banners,
 // long titles and URLs, empty states. Nothing here reaches production: the preview is a 404 there.
@@ -1931,28 +1939,30 @@ const everyBlock: BlockDraft[] = [
   { type: "divider" },
 ];
 
+/** On top of testPost (lib/test/fixtures.ts), which fills every Post field: a new field is added there once. */
 function post(id: number, overrides: Partial<Post>): Post {
-  return {
+  const title = { hu: `Minta poszt ${id}`, en: `Sample post ${id}` };
+  const summary = { hu: "A poszt magyar összefoglalója.", en: "The post's English summary." };
+  return testPost({
     id,
     sourceId: id,
-    kind: "article",
     url: `https://example.test/posts/${id}`,
     author: "Minta Szerző",
     siteName: "example.test",
     publishedAt: "2026-09-20",
-    title: { hu: `Minta poszt ${id}`, en: `Sample post ${id}` },
-    summary: { hu: "A poszt magyar összefoglalója.", en: "The post's English summary." },
+    title,
+    summary,
+    generatedTitle: title,
+    generatedSummary: summary,
     keyPoints: { hu: ["Első kulcspont", "Második kulcspont"], en: ["First key point", "Second key point"] },
     tags: ["agents", "evals"],
     blocks: assignIds([{ type: "paragraph", content: [{ text: "Rövid törzsszöveg." }] }]),
-    blocksHu: null,
     meta: { mirrored: true },
-    hiddenBlocks: [],
     submittedBy: null,
     extractedAt: "2026-09-20T10:00:00Z",
     createdAt: "2026-09-20T10:00:00Z",
     ...overrides,
-  };
+  });
 }
 
 const fullBlocks = assignIds(everyBlock);
@@ -1966,7 +1976,13 @@ export const previewPosts: Post[] = [
 ];
 ```
 
-Ha a `Post` típusnak az M1 után új kötelező mezője van, a `post()` alapértékei közé kerül (a `tsc` jelzi). Értékelt tételek a B mérföldkővel kerülnek ide (spec 1.6). Az olvasott és halványított tételeket a 6. és a 8. feladat adja hozzá.
+A `post()` a `testPost`-ra épül (`kind: "article"`, `blocksHu: null`, `hiddenBlocks: []`, `lastError: null` onnan jön), így egy új kötelező `Post`-mező egy helyen, a `lib/test/fixtures.ts`-ben kerül be. A `testPost` tiszta modul (csak egy típusimportja van), az előnézet is betöltheti. A `lib/test/fixtures.ts` első sora ezért ez lesz:
+
+```ts
+// Test helper, and the base of the offline preview's posts (lib/fixtures.ts). Not *.test.ts, so `npm test`'s glob skips it as its own suite.
+```
+
+Értékelt tételek a B mérföldkővel kerülnek ide (spec 1.6). Az olvasott és halványított tételeket a 6. és a 8. feladat adja hozzá.
 
 - [ ] **Step 6: Futtatás, át kell mennie**
 
@@ -1987,7 +2003,8 @@ import Link from "next/link";
 export const PREVIEW_VIEWS = ["radar", "radar-empty", "library", "library-empty", "archive", "archive-empty"] as const;
 export type PreviewView = (typeof PREVIEW_VIEWS)[number];
 
-const linkClass = "focus-ring flex min-h-10 items-center aria-[current=page]:text-signal";
+// min-w-10: the 40px rule holds here too, and the Playwright checklist measures these links ("post" alone is ~29px wide).
+const linkClass = "focus-ring flex min-h-10 min-w-10 items-center justify-center aria-[current=page]:text-signal";
 
 export function PreviewNav({ current }: { current: PreviewView | "post" }) {
   return (
@@ -2008,15 +2025,13 @@ export function PreviewNav({ current }: { current: PreviewView | "post" }) {
 `app/dev/preview/page.tsx`:
 
 ```tsx
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { ArchiveView } from "@/app/(app)/archive/archive-view";
 import { LibraryView } from "@/app/(app)/library/library-view";
 import { AppShell } from "@/app/components/app-shell";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
 import { previewArchive, previewEmail, previewGithub, previewIssue, previewItems, previewPosts, previewSources } from "@/lib/fixtures";
-import { getLanguage } from "@/lib/language";
-import { readNavMode } from "@/lib/nav-mode";
+import { getLanguage, getNavMode } from "@/lib/language";
 import { PREVIEW_VIEWS, PreviewNav, type PreviewView } from "./preview-nav";
 
 // The real view components on fixtures: no Supabase keys, no network, no sign-in. Development only.
@@ -2024,11 +2039,11 @@ import { PREVIEW_VIEWS, PreviewNav, type PreviewView } from "./preview-nav";
 export default async function PreviewPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   // Before any await: production answers a real 404 and never renders the fixtures.
   if (process.env.NODE_ENV !== "development") notFound();
-  const [{ view: requested }, language, cookieStore] = await Promise.all([searchParams, getLanguage(), cookies()]);
+  const [{ view: requested }, language, navMode] = await Promise.all([searchParams, getLanguage(), getNavMode()]);
   const view: PreviewView = PREVIEW_VIEWS.find((candidate) => candidate === requested) ?? "radar";
 
   return (
-    <AppShell language={language} email={previewEmail} initialNavMode={readNavMode(cookieStore.get("nav")?.value)}>
+    <AppShell language={language} email={previewEmail} initialNavMode={navMode}>
       <PreviewNav current={view} />
       {view === "radar" && <DigestDashboard issue={previewIssue} items={previewItems} githubTop10={previewGithub} />}
       {view === "radar-empty" && <DigestDashboard issue={previewIssue} items={[]} githubTop10={[]} />}
@@ -2041,27 +2056,25 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
 }
 ```
 
-A `/dev/preview` így ugyanazt a `nav` sütit olvassa, mint az éles `app/(app)/layout.tsx`: az oldalsáv állapota Playwrighttal is ellenőrizhető újratöltés után (11. feladat).
+A `/dev/preview` így ugyanazzal a `getNavMode()`-dal olvassa a `nav` sütit, mint az éles `app/(app)/layout.tsx`: az oldalsáv állapota Playwrighttal is ellenőrizhető újratöltés után (11. feladat).
 
 `app/dev/preview/post/page.tsx`:
 
 ```tsx
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { PostArticle } from "@/app/(app)/library/[id]/post-article";
 import { AppShell } from "@/app/components/app-shell";
 import { previewEmail, previewPosts } from "@/lib/fixtures";
-import { getLanguage } from "@/lib/language";
-import { readNavMode } from "@/lib/nav-mode";
+import { getLanguage, getNavMode } from "@/lib/language";
 import { PreviewNav } from "../preview-nav";
 
 /** Every block type and all four banners, one fixture post after the other. */
 export default async function PreviewPostPage() {
   // Before any await: production answers a real 404 and never renders the fixtures.
   if (process.env.NODE_ENV !== "development") notFound();
-  const [language, cookieStore] = await Promise.all([getLanguage(), cookies()]);
+  const [language, navMode] = await Promise.all([getLanguage(), getNavMode()]);
   return (
-    <AppShell language={language} email={previewEmail} initialNavMode={readNavMode(cookieStore.get("nav")?.value)}>
+    <AppShell language={language} email={previewEmail} initialNavMode={navMode}>
       <PreviewNav current="post" />
       <main className="min-h-dvh bg-ink">
         {previewPosts.map((post) => (
@@ -2115,7 +2128,7 @@ A kontroller `npm run dev` mellett, Playwright MCP-eszközökkel (`browser_resiz
 - [ ] **Step 9: Commit**
 
 ```bash
-git add lib/public-paths.ts lib/public-paths.test.ts lib/fixtures.ts lib/fixtures.test.ts proxy.ts app/dev "app/(app)/library/[id]"
+git add lib/public-paths.ts lib/public-paths.test.ts lib/fixtures.ts lib/fixtures.test.ts lib/test/fixtures.ts proxy.ts app/dev "app/(app)/library/[id]"
 git commit -m "feat: add an offline preview page with fixtures"
 ```
 
@@ -2361,10 +2374,10 @@ git commit -m "feat: add a one-at-a-time undo toast"
 
 **Files:**
 - Create: `lib/reader-store.ts`, `lib/reader-store.test.ts`, `app/components/use-reader-state.ts`, `app/components/use-model-context-tools.ts`, `app/components/reader-panel.tsx`
-- Modify: `app/components/digest-dashboard.tsx`, `lib/fixtures.ts` (`previewReader`), `app/dev/preview/page.tsx`, `app/dev/preview/preview-nav.tsx`, `app/dev/preview/post/page.tsx`
+- Modify: `app/components/digest-dashboard.tsx`, `lib/state.ts` (`TODO_TEXT_MAX` exportja), `lib/fixtures.ts` (`previewReader`), `app/dev/preview/page.tsx`, `app/dev/preview/preview-nav.tsx`, `app/dev/preview/post/page.tsx`
 
 **Interfaces:**
-- Consumes: `toasts`, `isUndoToast` (5. feladat); `parseId` (`lib/pipeline/util.ts`); `useLanguage`
+- Consumes: `toasts`, `isUndoToast` (5. feladat); `parseId` (`lib/pipeline/util.ts`); `TODO_TEXT_MAX` (`lib/state.ts`, M1; ez a feladat exportálja); `useLanguage`
 - Produces (`lib/reader-store.ts`):
   - típusok: `ItemState = { read: boolean; saved: boolean }`, `Flag = keyof ItemState`, `Todo = { id: number; itemId: string | null; text: string; done: boolean }`, `ReaderData = { states: Record<string, ItemState>; todos: Todo[] }`, `ReaderSnapshot = ReaderData & { loadedStates: Record<string, ItemState>; syncing: boolean }`
   - `StateWrite` (a POST `/api/state` négy alakja), `SendState = (write: StateWrite) => Promise<{ id?: number }>`, `PendingRemoval = { undo(): void; commit(): void }`
@@ -2581,8 +2594,11 @@ Elvárt: FAIL, a modul nem létezik.
 
 - [ ] **Step 3: A tár** (`lib/reader-store.ts`)
 
+Előbb a `lib/state.ts`-ben a `const TODO_TEXT_MAX = 180;` sor elé kerül egy `export`: a 180-as korlát így egy helyen van, és a tár ugyanazt vágja, amit az API. A zod már most is a kliens-bundle-ben van (a `post-editor.tsx` a `lib/overrides.ts`-en át tölti), így az import nem hoz be új kódot.
+
 ```ts
 import { parseId } from "./pipeline/util.ts";
+import { TODO_TEXT_MAX } from "./state.ts";
 
 // The reader's own state (read / later flags, to-dos) with optimistic writes. Framework-free, so the
 // ordering and rollback rules run under node --test; app/components/use-reader-state.ts binds it to React.
@@ -2609,8 +2625,6 @@ export type PendingRemoval = { undo: () => void; commit: () => void };
 
 export const EMPTY_ITEM_STATE: ItemState = { read: false, saved: false };
 const FLAG_ACTIONS = { read: "set_read", saved: "set_saved" } as const;
-/** app/api/state/route.ts and the todos.text check both stop at 180 characters. */
-const MAX_TODO_TEXT = 180;
 
 /** Library posts keep their read flag in item_states too. Radar ids look like `local-2026-W38-…`, so `post:` never collides. */
 export const POST_STATE_PREFIX = "post:";
@@ -2750,9 +2764,9 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
     },
     setFlag,
     toggleFlag: (itemId: string, flag: Flag) => setFlag(itemId, flag, !(snapshot.states[itemId] ?? EMPTY_ITEM_STATE)[flag]),
-    /** False when nothing was added: blank text, or the item already has a to-do. */
+    /** False when nothing was added: blank text, or the item already has a to-do. Trimmed and capped like parseStateAction (lib/state.ts). */
     addTodo(rawText: string, itemId?: string): boolean {
-      const text = rawText.trim().slice(0, MAX_TODO_TEXT);
+      const text = rawText.trim().slice(0, TODO_TEXT_MAX);
       if (!text || (itemId !== undefined && snapshot.todos.some((item) => item.itemId === itemId))) return false;
       const tempId = nextTempId--;
       setTodos([{ id: tempId, itemId: itemId ?? null, text, done: false }, ...snapshot.todos]);
@@ -3154,7 +3168,7 @@ export const previewReader: ReaderData = {
 
 `app/dev/preview/page.tsx`:
 - a `searchParams` típusa `Promise<{ view?: string; fail?: string }>`;
-- a destrukturálás `const [{ view: requested, fail }, language] = …`, alatta `const failWrites = fail === "1";`;
+- a destrukturálás `const [{ view: requested, fail }, language, navMode] = await Promise.all([searchParams, getLanguage(), getNavMode()]);` (a 4. feladat `navMode`-ja megmarad, az `AppShell` `initialNavMode`-ja továbbra is ezt kapja), alatta `const failWrites = fail === "1";`;
 - a fixtures-importba kerül a `previewReader`;
 - `<PreviewNav current={view} failWrites={failWrites} />`;
 - a két dashboard-sor ez lesz:
@@ -3208,7 +3222,7 @@ A kontroller Playwrighttal nézi, 1280 px-en, a `/dev/preview?view=radar` oldalo
 - [ ] **Step 10: Commit**
 
 ```bash
-git add lib/reader-store.ts lib/reader-store.test.ts lib/fixtures.ts app/components app/dev
+git add lib/reader-store.ts lib/reader-store.test.ts lib/state.ts lib/fixtures.ts app/components app/dev
 git commit -m "refactor: move reader state into an optimistic store with rollback"
 ```
 
@@ -3314,7 +3328,7 @@ export function Tag({ tag }: { tag: string }) {
 ```
 
 A cserék, mindegyik `import { Tag } from "@/app/components/tag";` importtal (a `post-blocks.tsx`-ben `./tag`):
-- `app/components/post-blocks.tsx`: `{block.topics.slice(0, 8).map((topic) => <Tag key={topic} tag={topic} />)}`;
+- `app/components/post-blocks.tsx`: `{block.topics.slice(0, 8).map((topic) => <Tag key={topic} tag={topic} />)}`. A `BlockView` két helyi `Tag` konstansa ettől eltakarná az importált komponenst, ezért átnevezésre kerülnek, a használatukkal együtt: a `heading` ágban ``const Tag = `h${block.level}` as "h2" | "h3" | "h4";`` → `const HeadingTag = …`, és a `<Tag className=…>…</Tag>` elem → `<HeadingTag className=…>…</HeadingTag>`; a `list` ágban `const Tag = block.ordered ? "ol" : "ul";` → `const ListTag = …`, a nyitó és a záró elemmel együtt;
 - `app/(app)/library/library-view.tsx`: `{post.tags.map((tag) => <Tag key={tag} tag={tag} />)}`;
 - `app/(app)/library/[id]/post-article.tsx`: `{post.tags.map((tag) => <Tag key={tag} tag={tag} />)}`.
 
@@ -3481,7 +3495,7 @@ function CardFooter({ item, state, hasTodo, language, actions }: CardProps) {
 }
 ```
 
-A spec 1.4.3 sorrendje: `[Megnyitás] [👎 👍 ❤] [Később] [+ teendő]`. A kézi „Olvasott” kapcsoló (1.4.1) ebben nem szerepel, de az „minden gomb a kártya aljára” szabály ide hozza, ezért a sor végére kerül. A Top 3 forrás-linkje helyett a teljes lábléc szerepel, így az érintési felület is legalább 40 px (1.4.9).
+A spec 1.4.3 sorrendje: `[Megnyitás] [👎 👍 ❤] [Később] [+ teendő]`. A kézi „Olvasott” kapcsoló (1.4.1) ebben nem szerepel, de az „minden gomb a kártya aljára” szabály ide hozza, ezért a sor végére kerül. A kézi kapcsoló (a gomb és a 9. feladat `r` billentyűje) nem dob fel visszavonás-csíkot: ugyanaz a gomb a saját visszavonása. Csíkot csak a Megnyitás ad (spec 1.3, 1.4.1). A Top 3 forrás-linkje helyett a teljes lábléc szerepel, így az érintési felület is legalább 40 px (1.4.9).
 
 - [ ] **Step 7: A dashboard újraírása** (`app/components/digest-dashboard.tsx`, a teljes fájl)
 
@@ -3862,7 +3876,7 @@ git commit -m "feat: split story cards and put every action in the card footer"
 
 **Files:**
 - Create: `app/(app)/library/refresh-while-processing.tsx`, `app/(app)/library/[id]/mark-post-read.tsx`
-- Modify: `lib/content.ts` (`getReadPostIds`), `app/(app)/library/page.tsx`, `app/(app)/library/library-view.tsx`, `app/(app)/library/submit-form.tsx`, `app/(app)/library/[id]/page.tsx`, `lib/fixtures.ts` (`previewReadPostIds`), `app/dev/preview/page.tsx`
+- Modify: `lib/content.ts` (`getReadPostIds`), `lib/state.test.ts` (a `post:<id>` eset), `app/(app)/library/page.tsx`, `app/(app)/library/library-view.tsx`, `app/(app)/library/submit-form.tsx`, `app/(app)/library/[id]/page.tsx`, `lib/fixtures.ts` (`previewReadPostIds`), `app/dev/preview/page.tsx`
 
 **Interfaces:**
 - Consumes: `POST_STATE_PREFIX`, `postStateKey`, `readPostIds`, `postState` (6. feladat); `LibraryView`, `LocalizedText` (3. feladat)
@@ -3874,9 +3888,24 @@ git commit -m "feat: split story cards and put every action in the card footer"
 
 - [ ] **Step 1: Az API ellenőrzése, séma-változás nélkül**
 
-- A mostani `app/api/state/route.ts` a `set_read` ágban az `itemId`-t `String(body.itemId ?? "").slice(0, 120)` alakban veszi át. A tábla check-je `char_length(item_id) <= 120`, idegen kulcs nincs.
+- Az M1 óta a POST `/api/state` törzsét a `lib/state.ts` `parseStateAction`-je ellenőrzi. Az `itemId` bármilyen nem üres szöveg lehet, minta nélkül, 120 karakterre vágva. A tábla check-je `char_length(item_id) <= 120`, idegen kulcs nincs. A `post:<id>` tehát kódváltozás nélkül átmegy.
 - A `post:<id>` legfeljebb 24 karakter. Ezt a 6. feladat `post read state…` tesztje rögzíti.
-- Ha az M1 15. feladata után a `lib/state.ts` `parseStateAction` sémája az `itemId`-t mintához köti, akkor a `post:\d+` alakot is engedje. Ehhez kell egy eset a `lib/state.test.ts`-ben: `parseStateAction({ action: "set_read", itemId: "post:42", value: true })` elfogadja.
+- A spec 5. fejezete bekötési tesztet kér a posztok olvasottságára. Az írás útját ez az eset rögzíti, a `lib/state.test.ts` végén. Regressziós őr: már most átmegy, és akkor bukik el, ha a séma egyszer mintához kötné az `itemId`-t.
+
+```ts
+test("parseStateAction accepts a Library post's read flag, keyed post:<id>", () => {
+  assert.deepEqual(parseStateAction({ action: "set_read", itemId: "post:42", value: true }), {
+    action: "set_read",
+    itemId: "post:42",
+    value: true,
+  });
+});
+```
+
+- Az olvasás útja (`getReadPostIds`, lásd a 2. lépést) a csak szerveren futó `lib/content.ts`-ben van, amelyet teszt nem tölt be. A `fakeDb` az `item_states` `.like()`-ját sem ismeri. Ezt ezért csak a 11. feladat Playwright-ellenőrzése fedi le (9. pont: a `story-read` a 2-es poszton). A spectől ez tudatos eltérés: egy teljes `fakeDb`-s bekötési teszt aránytalan lenne ehhez az egy lekérdezéshez.
+
+Futtatás: `node --experimental-strip-types --no-warnings --test lib/state.test.ts`
+Elvárt: minden teszt PASS, köztük az új.
 
 - [ ] **Step 2: Az olvasott posztok lekérdezése** (`lib/content.ts`)
 
@@ -4049,7 +4078,7 @@ A kontroller Playwrighttal:
 - [ ] **Step 9: Commit**
 
 ```bash
-git add lib/content.ts lib/fixtures.ts "app/(app)/library" app/dev
+git add lib/content.ts lib/state.test.ts lib/fixtures.ts "app/(app)/library" app/dev
 git commit -m "feat: track read posts and refresh the library while links process"
 ```
 
@@ -4112,6 +4141,13 @@ test("browser combos stay the browser's; Ctrl or ⌘ + K is search, AltGr + K is
   assert.equal(shortcutFor(press("k", { ctrlKey: true, altKey: true }), page), null, "AltGr is Ctrl+Alt on Windows");
 });
 
+test("a symbol typed with AltGr or Alt still counts: [ is AltGr+F on the Hungarian layout", () => {
+  assert.equal(shortcutFor(press("[", { ctrlKey: true, altKey: true }), page), "toggleNav", "Windows AltGr");
+  assert.equal(shortcutFor(press("[", { altKey: true }), page), "toggleNav", "macOS Option");
+  assert.equal(shortcutFor(press("[", { metaKey: true }), page), null, "⌘[ stays the browser's Back");
+  assert.equal(shortcutFor(press("/", { ctrlKey: true }), page), null, "Ctrl without Alt is not AltGr");
+});
+
 test("isEditableTarget: form fields and contenteditable, not buttons or cards", () => {
   for (const tagName of ["INPUT", "TEXTAREA", "SELECT"]) assert.equal(isEditableTarget({ tagName }), true, tagName);
   assert.equal(isEditableTarget({ tagName: "DIV", isContentEditable: true }), true);
@@ -4172,9 +4208,13 @@ export function isEditableTarget(element: { tagName?: string; isContentEditable?
  * The action a key press asks for, or null. Nothing fires while typing, inside an open dialog, or
  * mid-composition. Letters take no modifier, so Ctrl+R (reload) and the like stay the browser's.
  * `/` and `?` ignore Shift, which the Hungarian layout needs to type them. Ctrl/⌘+K is search; AltGr (Ctrl+Alt) is not.
+ * A symbol also counts with Alt or AltGr, never with ⌘: on the Hungarian layout `[` is AltGr+F
+ * (Ctrl+Alt on Windows, Option on macOS).
  */
 export function shortcutFor(press: KeyPress, target: KeyTarget): ShortcutAction | null {
   if (press.isComposing || target.editable || target.inDialog) return null;
+  const letter = /^[a-z]$/i.test(press.key);
+  if (!letter && !press.metaKey && (press.altKey || !press.ctrlKey)) return BY_KEY.get(press.key) ?? null;
   if (press.ctrlKey || press.metaKey) return !press.altKey && press.key.toLowerCase() === "k" ? "search" : null;
   if (press.altKey) return null;
   return BY_KEY.get(press.key) ?? null;
@@ -4191,7 +4231,7 @@ export function nextCardIndex(current: number, count: number, step: 1 | -1): num
 - [ ] **Step 4: Futtatás, át kell mennie**
 
 Futtatás: `node --experimental-strip-types --no-warnings --test lib/keymap.test.ts`
-Elvárt: 6 teszt PASS.
+Elvárt: 7 teszt PASS.
 
 - [ ] **Step 5: A hook** (`app/components/use-shortcuts.ts`)
 
@@ -4378,7 +4418,7 @@ export function AppShell({
 }
 ```
 
-`app/components/desktop-nav.tsx`: a lábléc a 2. feladat óta már három sort tart (nyelv, fiók, összecsukó gomb), ezért itt a teljes fájl cserélődik — a `mode`/`onToggle`/rail-logika megmarad, csak az `onHelp` és a súgó-gomb (railben ikon, teljes módban ikon + „?”) kerül hozzá:
+`app/components/desktop-nav.tsx`: a lábléc a 2. feladat óta már három sort tart (nyelv, fiók, összecsukó gomb), ezért itt a teljes fájl cserélődik. A `mode`/`onToggle`/rail-logika, a logó `aria-label`-je, a rail `nav` `overflow` nélküli osztálya, az `aside` `z-30`-a és a rail buborékjai a 2. feladatból változatlanok. Csak az `onHelp` és a súgó-gomb kerül hozzá: railben ikon a saját `NavTooltip`-jével, teljes módban ikon + „?”.
 
 ```tsx
 "use client";
@@ -4422,12 +4462,30 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
   const active = activeNavId(usePathname());
   const t = copy[language];
   const rail = mode === "rail";
+  const toggle = (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!rail}
+      aria-label={rail ? t.expand : t.collapse}
+      className="focus-ring flex min-h-10 w-full items-center justify-center gap-2 border-t border-paper/15 pt-3 font-mono text-[11px] text-paper/55 hover:text-signal"
+    >
+      {rail ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+      {!rail && t.collapse}
+    </button>
+  );
   return (
     <div className="md:flex">
+      {/* z-30: the rail's tooltips paint above the Radar's sticky header (z-20) and chip bar (z-10). */}
       <aside
-        className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper md:flex ${rail ? "w-14" : "w-64"}`}
+        className={`sticky top-0 z-30 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper md:flex ${rail ? "w-14" : "w-64"}`}
       >
-        <Link href="/" className={`focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}>
+        {/* Named explicitly: in the rail only the icon is left. */}
+        <Link
+          href="/"
+          aria-label="NEON NEWS RADAR"
+          className={`focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}
+        >
           <span className="grid size-10 shrink-0 place-items-center rounded-full border border-signal bg-signal text-ink">
             <Radar className="size-5" />
           </span>
@@ -4441,7 +4499,8 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
             </span>
           )}
         </Link>
-        <nav aria-label={t.nav} className="flex-1 overflow-y-auto px-3 py-4">
+        {/* No overflow in the rail: a scroll container would clip the tooltips (the few items fit). */}
+        <nav aria-label={t.nav} className={rail ? "flex-1 px-1 py-4" : "flex-1 overflow-y-auto px-3 py-4"}>
           <ul className="space-y-1">
             {PRIMARY_NAV.map((item) => {
               const Icon = navIcons[item.id];
@@ -4461,14 +4520,16 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
           {rail ? (
             <div className="flex flex-col items-center gap-3">
               <LanguageToggle iconOnly />
-              <button
-                type="button"
-                onClick={onHelp}
-                aria-label={t.shortcuts}
-                className="focus-ring grid size-10 place-items-center text-paper/55 hover:text-signal"
-              >
-                <Keyboard className="size-4" />
-              </button>
+              <NavTooltip label={t.shortcuts}>
+                <button
+                  type="button"
+                  onClick={onHelp}
+                  aria-label={t.shortcuts}
+                  className="focus-ring grid size-10 place-items-center text-paper/55 hover:text-signal"
+                >
+                  <Keyboard className="size-4" />
+                </button>
+              </NavTooltip>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-2">
@@ -4484,16 +4545,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
             </div>
           )}
           {rail ? <AccountActions email={email} iconOnly /> : <AccountActions email={email} />}
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={!rail}
-            aria-label={rail ? t.expand : t.collapse}
-            className="focus-ring flex min-h-10 w-full items-center justify-center gap-2 border-t border-paper/15 pt-3 font-mono text-[11px] text-paper/55 hover:text-signal"
-          >
-            {rail ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
-            {!rail && t.collapse}
-          </button>
+          {rail ? <NavTooltip label={t.expand}>{toggle}</NavTooltip> : toggle}
         </div>
       </aside>
       <div className="min-w-0 flex-1">{children}</div>
@@ -4526,9 +4578,11 @@ git commit -m "feat: add keyboard shortcuts and a shortcut help dialog"
 - Consumes: `PostArticle` (a 4. feladat `app/(app)/library/[id]/post-article.tsx`-je), `mediaSources`, `isValidPlaceholder` (`lib/post-view.ts`), `safeHref`, `type Block`, `type ImageBlock` (`lib/blocks.ts`), `testPost` (`lib/test/fixtures.ts`), `render` (`lib/test/render.ts`)
 - Produces: `PostImage(props: { src: string; srcSet: string; sizes: string; alt: string; width?: number; height?: number; priority: boolean; placeholder?: string })` (`app/components/post-image.tsx`)
 
-A spec 1.4.11–12. pontja (`docs/superpowers/specs/2026-09-24-ux-signals-search-design.md`) két ergonómiai javítást kér a poszt-oldalon: szélesebb keret, olvasható sorhosszal, és egységes képkeret. Ez a feladat a 2. feladat utáni útvonalakon dolgozik: a poszt-oldal törzse a 4. feladat óta `app/(app)/library/[id]/post-article.tsx`-ben van (`PostArticle`), a blokkok renderelője változatlanul `app/components/post-blocks.tsx` (`PostBlocks`, benne az `ImageView`). **Olvasd újra mindkét fájlt**, mert a 4., a 6. és a 7. feladat is módosítja őket (a 7. a `repo` blokk `topics`-felsorolását cseréli `Tag`-re) — a lenti kódrészletek a pontosan idézett „előtte” szöveget keresik, a körülöttük lévő sorok a korábbi feladatoktól függően már mások lehetnek.
+A spec 1.4.11–12. pontja (`docs/superpowers/specs/2026-09-24-ux-signals-search-design.md`) két ergonómiai javítást kér a poszt-oldalon: szélesebb keret, olvasható sorhosszal, és egységes képkeret. Ez a feladat a 2. feladat utáni útvonalakon dolgozik: a poszt-oldal törzse a 4. feladat óta `app/(app)/library/[id]/post-article.tsx`-ben van (`PostArticle`), a blokkok renderelője változatlanul `app/components/post-blocks.tsx` (`PostBlocks`, benne az `ImageView`). **Olvasd újra mindkét fájlt**, mert a 4., a 6. és a 7. feladat is módosítja őket (a 7. a `repo` blokk `topics`-felsorolását cseréli `Tag`-re, és a `BlockView` helyi `Tag` konstansait `HeadingTag`-re és `ListTag`-re nevezi át) — a lenti kódrészletek a pontosan idézett „előtte” szöveget keresik, a körülöttük lévő sorok a korábbi feladatoktól függően már mások lehetnek.
 
 A blokkséma (`lib/blocks.ts`) ma nem ismer „táblázat” blokktípust, a spec „táblázatok” szava ellenére — ez a feladat ezért csak a ténylegesen létező típusokra vonatkozik: a kép, a kód és a videó blokk lesz teljes szélességű, a többi (bekezdés, lista, cím, idézet, fejezetlista, repó, elválasztó) a 75ch-s olvasási szélességben marad.
+
+A keret szélessége `max-w-6xl` (1152 px). A spec 1.4.11 „`max-w-5xl` körül”-t ír, a 6xl a pre-flight döntése. 1280 px-en az 5xl (1024 px) épp akkora, mint a teljes oldalsáv melletti oszlop (1280 − 256), így az oldalsáv összecsukása 0 px-t adna, pedig a spec szerint a tartalom a felszabaduló helyre is kiterjed. A 6xl mellett rail módban a cikkoszlop 1152 px, a folyószöveg pedig továbbra is 75ch.
 
 - [ ] **Step 1: A tesztek megírása**
 
@@ -4625,7 +4679,7 @@ const renderArticle = (post = testPost()) => render(createElement(PostArticle, {
 
 test("the post column is the widened frame, not the old narrow one", () => {
   const wrapper = renderArticle().querySelector("article > div")!;
-  assert.ok(wrapper.classList.contains("max-w-5xl"), wrapper.className);
+  assert.ok(wrapper.classList.contains("max-w-6xl"), wrapper.className);
   assert.equal(wrapper.classList.contains("max-w-3xl"), false);
 });
 
@@ -4642,8 +4696,8 @@ test("the summary and key points stay at the readable prose width", () => {
 - [ ] **Step 2: Futtatás, el kell buknia**
 
 Futtatás: `node --experimental-strip-types --no-warnings --test app/components/post-blocks.test.ts "app/(app)/library/[[]id]/post-article.test.ts"`
-Az `[id]` szögletes zárójelét `[[]id]`-ként kell írni, különben a `node --test` glob-karakterosztálynak veszi, 0 tesztet futtat, és 0-val lép ki (CLAUDE.md, Tests). A kimenet `# tests` sora nem lehet 0.
-Elvárt: FAIL — a mai `ImageView` a hiányzó képet sima `<p>`-ként adja vissza, `<figure>` nélkül, a betöltött képnél pedig a keret osztályai (`bg-paper`, `shadow-[4px_4px_0_var(--ink)]`) még az `img`-en sincsenek meg; a `post-article.test.ts` a modul hiánya miatt bukik.
+Az `[id]` szögletes zárójelét `[[]id]`-ként kell írni, különben a `node --test` glob-karakterosztálynak veszi, 0 tesztet futtat, és 0-val lép ki (CLAUDE.md, Tests). A kimenet `ℹ tests` sora (az alapértelmezett riporteré) nem lehet 0. A `(app)` zárójele a mintában szó szerint értendő, nem kell escape-elni.
+Elvárt: FAIL. A mai `ImageView` a hiányzó képet sima `<p>`-ként adja vissza, `<figure>` nélkül, és a betöltött kép keretén még nincsenek meg a keret osztályai (`bg-paper`, `shadow-[4px_4px_0_var(--ink)]`). A `post-article.test.ts` a 4. feladat óta létező modulon bukik: a keret ott még `max-w-3xl`, és az összefoglalón nincs `max-w-[75ch]`. Egy új teszt már most átmegy, ez rendben van: a `a loaded image's caption sits inside its frame, in mono` a mai `<figure>`-ben is teljesül, és regressziós őrként marad, hogy a képaláírás az új kereten belül maradjon.
 
 - [ ] **Step 3: A képkomponens** (`app/components/post-image.tsx`)
 
@@ -4705,7 +4759,8 @@ export function PostImage({
           if (img?.complete && img.naturalWidth > 0) setLoaded(true);
         }}
         onLoad={() => setLoaded(true)}
-        className="relative max-h-[80dvh] w-full object-contain"
+        // No w-full: images.ts never enlarges, so a small mirror keeps its size instead of being stretched blurry.
+        className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain"
       />
     </span>
   );
@@ -4724,13 +4779,13 @@ A `numberLocale` függvény után, az `InlineContent` elé:
 
 ```tsx
 // The one place the post image frame (spec 1.4.12) is defined: paper background, ink border, inner
-// padding, a hard shadow with no blur. `dashed` is the "image unavailable" box; a loaded image keeps
-// a solid border. The caption, when there is one, lives inside this same frame — never a sibling of it.
-const imageFrameClass = "border-2 bg-paper p-2 shadow-[4px_4px_0_var(--ink)]";
+// padding, a hard shadow with no blur. `dashed` is the "image unavailable" box: the same frame, only the
+// line is dashed. The caption, when there is one, lives inside this same frame — never a sibling of it.
+const imageFrameClass = "border-2 border-ink bg-paper p-2 shadow-[4px_4px_0_var(--ink)]";
 
 function ImageFrame({ dashed = false, caption, children }: { dashed?: boolean; caption?: string; children: ReactNode }) {
   return (
-    <figure className={`${imageFrameClass} ${dashed ? "border-dashed border-ink/35" : "border-ink"}`}>
+    <figure className={`${imageFrameClass} ${dashed ? "border-dashed" : ""}`}>
       {children}
       {caption && <figcaption className="mt-2 font-mono text-xs leading-5 text-ink/60">{caption}</figcaption>}
     </figure>
@@ -4770,9 +4825,9 @@ function ImageView({ block, priority, language, baseUrl }: { block: ImageBlock; 
       <PostImage
         src={sources.src}
         srcSet={sources.srcSet}
-        // Roughly the widened column's own content width (spec 1.4.11, max-w-5xl minus its padding);
-        // a request-size hint only, so a few px of slack here is harmless.
-        sizes="(min-width: 1024px) 944px, 100vw"
+        // Roughly the widened column's own content width (spec 1.4.11: max-w-6xl, 1152px, minus its 2 × 40px
+        // padding); a request-size hint only, so a few px of slack here is harmless.
+        sizes="(min-width: 1024px) 1072px, 100vw"
         alt={block.alt}
         width={block.width}
         height={block.height}
@@ -4809,7 +4864,7 @@ Előbb olvasd újra a fájlt (a 6. és a 7. feladat is módosíthatta a köztes 
 erre:
 
 ```tsx
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-10 sm:py-16">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-10 sm:py-16">
 ```
 
 Az összefoglaló és a kulcspontok folyószöveg, ezért a spec szerint 75ch-nál nem szélesebb. Ez a blokk:
@@ -4818,7 +4873,7 @@ Az összefoglaló és a kulcspontok folyószöveg, ezért a spec szerint 75ch-n�
         <p className="mt-8 text-lg leading-8">{post.summary[language]}</p>
         {post.keyPoints[language].length > 0 && (
           <div className="mt-8 border-l-4 border-signal pl-5">
-            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{t.keyPoints}</p>
+            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{labels.keyPoints}</p>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7">
               {post.keyPoints[language].map((point) => <li key={point}>{point}</li>)}
             </ul>
@@ -4832,7 +4887,7 @@ erre:
         <p className="mt-8 max-w-[75ch] text-lg leading-8">{post.summary[language]}</p>
         {post.keyPoints[language].length > 0 && (
           <div className="mt-8 max-w-[75ch] border-l-4 border-signal pl-5">
-            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{t.keyPoints}</p>
+            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{labels.keyPoints}</p>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7">
               {post.keyPoints[language].map((point) => <li key={point}>{point}</li>)}
             </ul>
@@ -4840,7 +4895,7 @@ erre:
         )}
 ```
 
-A `PostBlocks`-ot tartalmazó `<section className="mt-12">` változatlan marad, mert a szélesség blokkonként dől el (Step 4). Az oldalsáv összecsukásakor a tartalom külön kód nélkül kiszélesedik: a `<main>` már a 2. feladat `DesktopNav`-jának `<div className="min-w-0 flex-1">` oszlopában van, ez a szülő ad helyet, a `mx-auto max-w-5xl` pedig csak felfelé korlátoz.
+A `PostBlocks`-ot tartalmazó `<section className="mt-12">` változatlan marad, mert a szélesség blokkonként dől el (Step 4). Az oldalsáv összecsukásakor a tartalom külön kód nélkül kiszélesedik: a `<main>` már a 2. feladat `DesktopNav`-jának `<div className="min-w-0 flex-1">` oszlopában van, ez a szülő ad helyet, a `mx-auto max-w-6xl` pedig csak felfelé korlátoz. 1280 px-en teljes oldalsáv mellett a cikkoszlop ~1024 px (az oszlop szélessége), rail módban 1152 px (a 6xl korlát).
 
 - [ ] **Step 6: Futtatás, át kell mennie**
 
@@ -4884,6 +4939,17 @@ app/components/   app-shell (+ mobile bottom bar), desktop-nav, nav-parts, shell
                   use-reader-state, use-shortcuts, use-model-context-tools
 ```
 
+  Az `app/library/` sor helyére (az útvonal az `(app)` csoportba költözött, és új fájlok jöttek):
+
+```text
+app/(app)/library/  submit-form, library-view (the list body), refresh-while-processing;
+                  [id]/ post-article (the post body), post-toolbar (translate, edit link), post-editor
+                  (edit, hide, re-extract), post-notices (the notices under the title, the submitter's
+                  last extraction error), mark-post-read; post-article, post-toolbar, post-editor and
+                  post-notices each + test
+app/(app)/archive/  archive-view (the archive body)
+```
+
   A `lib/` sorai közé:
 
 ```text
@@ -4894,8 +4960,17 @@ lib/reader-store.ts  optimistic read/later/to-do state; post read state as post:
 lib/feed.ts       feed filter and unread-first order
 lib/undo-queue.ts the one-at-a-time undo toast
 lib/fixtures.ts   preview data
-lib/public-paths.ts  paths that skip the sign-in redirect
 ```
+
+  A meglévő sorok közül ezek változnak:
+  - `lib/public-paths.ts`: `isPublicPath, isDevPreviewPath — the paths proxy.ts lets through signed out (/dev/ in development only)`;
+  - `lib/language.ts`: `getLanguage(), getNavMode() — the lang (hu | en) and nav (full | rail) cookies`;
+  - `lib/test/`: a `fixtures (testPost)` helyett `fixtures (testPost, also the base of lib/fixtures.ts's preview posts)`;
+  - `hooks/use-mobile.ts`: a `used by the sidebar` helyett `useIsMobile: the Radar's to-do panel opens from the bottom below md (the sidebar that also used it is no longer rendered)`.
+- **Conventions**:
+  - a **No duplication** pont UI-felsorolásában a „`PageHeader` and `PageHero`” helyett „`PageHero` and `StatusCard`”; ugyanez a **Design language** „Shared controls” pontjában;
+  - a **HU/EN copy** pontban a nevek felsorolása: „Existing names: `copy` (most components, `digest-dashboard` included), `labels` (`post-blocks`), `notices` (`app/(app)/library/[id]/post-notices.tsx`, also read by `post-article.tsx`).” A „A few inline ternaries remain, … UX milestone A moves them.” mondat törlődik: az A mérföldkő kiváltotta őket (lásd a lenti „UI text (HU/EN)” szakaszt, amellyel ez a pont összevonható);
+  - a **Tests** pontban a `node --test "app/library/[id]/x.test.ts"` helyett `node --test "app/(app)/library/[id]/x.test.ts"`, és a példaparancs `"app/(app)/library/[[]id]/post-editor.test.ts"`. A régi útvonal a költözés után semmire nem illeszkedik, így 0 tesztet futtatna, 0-s kilépéssel. A `(app)` zárójele a mintában szó szerint értendő.
 
 - **Design language, Responsive rules**: a „Below `md` the dashboard's categories are a sticky chip bar and the sidebar is a Sheet; below `2xl` the progress/to-do panel opens as a right Sheet from the header.” mondat helyére:
   > The Radar categories are a sticky chip bar at every width. Below `md` the app shell shows a fixed five-slot bottom bar (it honours `env(safe-area-inset-bottom)`, and the content column has matching bottom padding); from `md` up the desktop nav takes its place. The progress/to-do panel is a bottom Sheet below `md`, a right Sheet from `md` to `2xl`, and a column from `2xl`; it is non-modal, so the undo toast stays usable while it is open.
@@ -4910,7 +4985,7 @@ Every signed-in page lives under `app/(app)/` and gets `app/(app)/layout.tsx` �
 
 - **One list:** `lib/nav.ts` holds the items (Radar, Library, Keresés, Archívum, and the dimmed "hamarosan" views) and `activeNavId()`. Both navigations render from it.
 - **Mobile, below `md`:** the bottom bar in `app-shell.tsx`, five slots; "Több" opens a bottom Sheet with the language toggle, sign-out and the coming views.
-- **Desktop:** `app/components/desktop-nav.tsx`, variant A (sidebar), collapsible to a ~56px icon rail via a toggle button at its foot (`aria-expanded`, localized "Collapse sidebar" / "Expand sidebar"). In rail mode every entry (including search, language and sign-out) shrinks to an icon with its accessible name kept (`aria-label` or sr-only text) and shown as a hover/focus tooltip (`NavTooltip` in `nav-parts.tsx`). The choice persists in the `nav` cookie (`full` | `rail`, same shape as `lang`); `readNavMode()` (`lib/nav-mode.ts`) parses it, and `app/(app)/layout.tsx` reads it server-side so the width is correct on first render. Variants B (top bar) and C (icon rail as the default) are a new `DesktopNav` with the same props that reuses `nav-parts.tsx`; no other file changes.
+- **Desktop:** `app/components/desktop-nav.tsx`, variant A (sidebar), collapsible to a ~56px icon rail via a toggle button at its foot (`aria-expanded`, localized "Collapse sidebar" / "Expand sidebar"). In rail mode every entry shrinks to an icon with its accessible name kept (`aria-label` or sr-only text; the logo link carries `aria-label="NEON NEWS RADAR"`), and every icon (the menu entries, language, help, sign-out and expand) shows its name as a hover/focus tooltip (`NavTooltip` in `nav-parts.tsx`). The rail's nav has no overflow, since a scroll container would clip the tooltips, and the aside sits at `z-30`, above the Radar's sticky header and chip bar. The choice persists in the `nav` cookie (`full` | `rail`, same shape as `lang`); `getNavMode()` (`lib/language.ts`) reads it server-side through `readNavMode()` (`lib/nav-mode.ts`), for `app/(app)/layout.tsx` and the preview, so the width is correct on first render. Variants B (top bar) and C (icon rail as the default) are a new `DesktopNav` with the same props that reuses `nav-parts.tsx`; no other file changes.
 - **Search** is a placeholder dialog until milestone C (`SearchSoon`); `⌘K` / `Ctrl K` and `/` already open it.
 - **Undo toast:** `toasts.show({ kind, undo?, commit? })` from `undo-toast.tsx`. One at a time, 5 s, `aria-live="polite"`; a new toast makes the previous action final, and `pagehide` does too. Read, delete and (milestone B) rating use it, and so does every failed write.
 - **Reader state:** `lib/reader-store.ts` (optimistic, writes per key in click order, rollback to the last value the server confirmed) behind `use-reader-state.ts`. Library posts use `item_states` too, keyed `post:<id>`.
@@ -4918,7 +4993,7 @@ Every signed-in page lives under `app/(app)/` and gets `app/(app)/layout.tsx` �
 
 ## Keyboard (desktop)
 
-`lib/keymap.ts` maps keys to actions: `j`/`k` next/previous card, `o` open (marks read), `r` read, `l` later, `⌘K`/`/` search, `[` collapse/expand the sidebar, `?` help. `use-shortcuts.ts` binds it. Nothing fires in an input, textarea, select or contenteditable, inside an open dialog, or with Ctrl/⌘/Alt held (except `⌘K`). Card scrolling honours `prefers-reduced-motion`. A new shortcut is one `SHORTCUTS` row plus a handler; the help dialog lists it by itself.
+`lib/keymap.ts` maps keys to actions: `j`/`k` next/previous card, `o` open (marks read), `r` read, `l` later, `⌘K`/`/` search, `[` collapse/expand the sidebar, `?` help. `use-shortcuts.ts` binds it. Nothing fires in an input, textarea, select or contenteditable, inside an open dialog, or mid-composition. Letters fire only with no Ctrl/⌘/Alt held (Ctrl/⌘+K is search); a symbol (`/`, `?`, `[`) also fires with Alt or AltGr, never with ⌘, because the Hungarian layout types `[` as AltGr+F. Card scrolling honours `prefers-reduced-motion`. A new shortcut is one `SHORTCUTS` row plus a handler; the help dialog lists it by itself.
 
 ## Offline preview
 
@@ -4940,7 +5015,16 @@ Az M1 15. feladata onboarding-README-t ír. A „Project tour” szakaszba (ha n
 
 > Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (collapsible to an icon rail), a five-slot bottom bar on phones. Desktop shortcuts: `j`/`k` move between cards, `o` opens (and marks read), `r` read, `l` later, `[` collapses the sidebar, `?` lists them.
 
-A „Testing” szakaszba:
+A „Project tour” táblázat sorai a költözés után:
+- az `app/` sor: ``| [`app/`](app/) | `/login`, the error and 404 pages, the manifest, and the route group below |``;
+- új sor utána: ``| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, plus their loading page |``;
+- az `app/components/` sor: ``| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast), the Radar dashboard and its cards, the title band, the language toggle, and `post-blocks`, the block renderer |``;
+- az `app/library/` sor: ``| [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |``;
+- új sor: ``| [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |``.
+
+A „Where to start reading” 6. pontjában a link célja a poszt törzse lesz: ``[`app/(app)/library/[id]/post-article.tsx`](<app/(app)/library/[id]/post-article.tsx>)``.
+
+A „Testing” szakaszban a komponens-teszt példájának importja `"../../../lib/test/render.ts"` helyett `"../../../../lib/test/render.ts"` (a `post-toolbar.test.ts` az `(app)` csoportba költözött). Az egy-fájlos példa két útvonala `"app/library/[id]/post-editor.test.ts"` és `"app/library/[[]id]/post-editor.test.ts"` helyett `"app/(app)/library/[id]/post-editor.test.ts"` és `"app/(app)/library/[[]id]/post-editor.test.ts"`: a régi útvonal a költözés után semmire nem illeszkedik, és 0 tesztet futtatna. Ugyanide kerül ez:
 
 > UI without live data: `npm run dev`, then open `/dev/preview` (development only). It renders every view on fixtures, including empty states and a `&fail=1` offline mode; Playwright checks run against it at 360, 768 and 1280 px.
 
@@ -4948,13 +5032,14 @@ A „Testing” szakaszba:
 
 - A „Kész” alá új pont: `- [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon összecsukható oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (\`/dev/preview\`).`
 - Az „UI/UX és keresés” pont első sora: `- [ ] **UI/UX és keresés:** az A mérföldkő kész (terv: [docs/superpowers/plans/2026-09-24-ux-a-app-shell.md](docs/superpowers/plans/2026-09-24-ux-a-app-shell.md)); hátra van a B (értékelés, GitHub-fül) és a C (keresés, lapozás).` Az alpontjai közül az egységes navigáció, a mobilos ergonómia és az offline előnézet kikerül, mert kész.
-- A „Neked: az asztali navigáció kiválasztása” pont alá: `  - Most az **A** van bent, 2026-09-25-től ~56 px-es ikonsávvá csukható (\`[\`, vagy a lábléc gombja). A csere egyetlen fájl: \`app/components/desktop-nav.tsx\`.`
-- A „Kényelmi funkciók” alatt: `- [x] **Todo cikkhez kötése.** A hírkártya „+ teendő” gombja (UI/UX A).`
+- Az „Új ötletek” alatti `- [x] **Asztali navigáció** (döntés: 2026-09-25)` pont alá (a korábbi „Neked: az asztali navigáció kiválasztása” pont már nincs meg): `  - Most az **A** van bent, 2026-09-25-től ~56 px-es ikonsávvá csukható (\`[\`, vagy a lábléc gombja). A csere egyetlen fájl: \`app/components/desktop-nav.tsx\`.`
+- A „Kényelmi funkciók” alatt a meglévő `- [ ] **Todo cikkhez kötése.** …` sor nem duplikálódik, hanem átvált erre: `- [x] **Todo cikkhez kötése.** A hírkártya „+ teendő” gombja (UI/UX A).`
+- A „Technikai adósság” alá új pont: `- [ ] **Egy getClaims() kérésenként.** A \`getReader\`-t React \`cache()\`-be csomagolni (\`lib/supabase/server.ts\`), hogy az \`(app)\` layout és az oldal egyetlen \`getClaims()\`-hívást osszon meg. A UI/UX A óta kérésenként kettő fut: a layout \`getViewer()\`-e és az oldal \`getReader()\`-e.`
 
 - [ ] **Step 4: Végső ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
-Elvárt: minden zöld, 0 klón. A tesztszám a kiinduláshoz képest 39-cel nő: nav 4, nav-mode 2, public-paths 3, fixtures 4, undo-queue 3, reader-store 13, feed 4, keymap 6. Ha valamelyik fájlban eltér a szám, a tesztneveket vesd össze ezzel a tervvel. A 10. feladat emellett 7 újabb tesztet ad: 5-öt a meglévő `post-blocks.test.ts`-hez, és 2-t az új `post-article.test.ts`-ben.
+Elvárt: minden zöld, 0 klón. A tesztszám a kiinduláshoz képest 40-nel nő: nav 4, nav-mode 2, public-paths 2 (a meglévő 1 mellé, így 3), fixtures 4, undo-queue 3, reader-store 13, feed 4, keymap 7, state 1 (a 8. feladat `post:<id>` esete). Ha valamelyik fájlban eltér a szám, a tesztneveket vesd össze ezzel a tervvel. A 10. feladat emellett 7 újabb tesztet ad: 5-öt a meglévő `post-blocks.test.ts`-hez, és 2-t az új `post-article.test.ts`-ben.
 
 - [ ] **Step 5: Playwright-ellenőrzőlista** (a kontroller futtatja a Playwright MCP-eszközeivel, `npm run dev` mellett)
 
@@ -5024,13 +5109,21 @@ Nézetek: `http://localhost:3000/dev/preview?view=` + `radar`, `radar-empty`, `l
         return { width: Math.round(aside.getBoundingClientRect().width), expanded: toggle.getAttribute("aria-expanded") };
       }
       ```
-    - Frissítés után (`browser_navigate` ugyanarra az URL-re) az `aside` már az első kiértékeléskor is 56 széles: a szerver a `nav` sütiből már a helyes móddal renderel (`app/(app)/layout.tsx`; a `/dev/preview` ugyanígy olvassa, lásd a 4. feladat 7. lépését), nincs olyan köztes állapot, amit a kliens utólag igazítana.
+    - Frissítés után (`browser_navigate` ugyanarra az URL-re) az `aside` már az első kiértékeléskor is 56 széles: a szerver a `nav` sütiből már a helyes móddal renderel (`getNavMode()`: az `app/(app)/layout.tsx` és a `/dev/preview` is ezt hívja, lásd a 4. feladat 7. lépését), nincs olyan köztes állapot, amit a kliens utólag igazítana.
     - A gomb újbóli kattintására az `aside` visszaáll `256`-ra, `aria-expanded="true"`.
-    - Rail módban egy `Tab`-bal fókuszált menüponthoz buborék tartozik:
+    - Rail módban egy `Tab`-bal fókuszált ikonhoz (menüpont, nyelv, súgó, kijelentkezés, kinyitás) látható buborék tartozik. Az átlátszatlanság mellett azt is nézi, hogy a buborék középpontjában valóban ő van legfelül: egy levágott vagy a Radar fejléce alá szoruló buborék `onTop: false`. A buborék `pointer-events-none`, amit az `elementFromPoint` átugrana, ezért a szkript a mérés idejére visszakapcsolja:
       ```js
-      () => { const tip = document.activeElement.closest("li")?.querySelector('[role="tooltip"]'); return tip ? getComputedStyle(tip).opacity : null; }
+      () => {
+        const tip = document.activeElement.closest(".group")?.querySelector('[role="tooltip"]');
+        if (!tip) return null;
+        const box = tip.getBoundingClientRect();
+        tip.style.pointerEvents = "auto";
+        const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        tip.style.pointerEvents = "";
+        return { opacity: getComputedStyle(tip).opacity, onTop: tip.contains(top) };
+      }
       ```
-      Elvárt fókuszban: `"1"`. Egy további `Tab` után (a fókusz odébb áll) újra `"0"`.
+      Elvárt fókuszban: `{ opacity: "1", onTop: true }`, a `radar` nézetben a Radar menüpontnál is (az a chip-sáv magasságában van). Egy további `Tab` után (a fókusz odébb áll) az előző buborék `opacity` értéke újra `"0"`.
     - Nincs vízszintes görgetés rail módban sem (az 1. pont szkriptje).
     - `[` billentyűvel kattintás nélkül is ugyanez történik (lásd az 5. pont Oldalsáv-alpontját).
 
@@ -5055,7 +5148,20 @@ Nézetek: `http://localhost:3000/dev/preview?view=` + `radar`, `radar-empty`, `l
       }).length
       ```
       Elvárt: mindkétszer `0`.
-    - Nincs vízszintes görgetés egyik szélességen és oldalsáv-módban sem (az 1. pont szkriptje), és 1280 px-en az oldalsáv összecsukása után a cikkoszlop szélesebb lesz, miközben a bekezdések (`article p`) szélessége nem haladja meg a 75 karaktert (`getComputedStyle(p).maxWidth` a `75ch`-nak megfelelő, a bekezdés `font-size`-ától függő px-érték).
+    - Nincs vízszintes görgetés egyik szélességen és oldalsáv-módban sem (az 1. pont szkriptje).
+    - 1280 px-en mindkét oldalsáv-módban mérd meg a cikkoszlopot (az első poszt, amelyben minden blokktípus van). Az oldalsáv összecsukása után a cikkoszlop szélesebb lesz, a folyószöveg viszont nem: az összefoglaló `p`-je és a bekezdés-blokkok sora `75ch`-nál nem szélesebb (a `max-w-[75ch]` a blokk során ül, nem a `p`-n):
+      ```js
+      () => {
+        const article = document.querySelector("article");
+        const row = [...article.querySelectorAll("[data-block-id]")].find((el) => el.querySelector(":scope > div > p"));
+        return {
+          column: Math.round(article.querySelector(":scope > div").getBoundingClientRect().width),
+          summary: getComputedStyle(article.querySelector("header + p")).maxWidth,
+          paragraphRow: row ? getComputedStyle(row).maxWidth : null,
+        };
+      }
+      ```
+      Elvárt: teljes oldalsávval `column` ≈ 1024 (1280 − 256, a görgetősáv szélességével kevesebb), rail módban `column` = 1152 (a `max-w-6xl` korlát). A `summary` és a `paragraphRow` egy-egy `75ch`-s px-érték (a saját betűméretükből), és mindkét módban változatlan.
 
 Minden talált hibára előbb egy tiszta segédfüggvényes teszt a `lib/`-ben, ha a hiba logikai, aztán a javítás, és külön commit (`fix: …`).
 
