@@ -9,6 +9,7 @@ import type {
 } from "@/data/digest-types";
 import { toPost, type Post } from "@/lib/post-view";
 import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel } from "@/lib/pipeline/util";
+import { POST_STATE_PREFIX, readPostIds } from "@/lib/reader-store";
 
 const budapest = new Intl.DateTimeFormat("hu-HU", {
   timeZone: "Europe/Budapest",
@@ -94,6 +95,12 @@ const POST_COLUMNS = `${LIST_COLUMNS}, blocks, blocks_hu, sources(submitted_by, 
 export async function getPosts(db: SupabaseClient): Promise<Post[]> {
   const { data } = await db.from("posts").select(LIST_COLUMNS).order("created_at", { ascending: false }).limit(100);
   return (data ?? []).map(toPost);
+}
+
+/** The reader's opened posts (item_states `post:<id>`, RLS: own rows only); the Library list dims them. */
+export async function getReadPostIds(db: SupabaseClient): Promise<Set<number>> {
+  const { data } = await db.from("item_states").select("item_id").like("item_id", `${POST_STATE_PREFIX}%`).eq("is_read", true);
+  return readPostIds((data ?? []).map((row) => row.item_id as string));
 }
 
 export async function getPost(db: SupabaseClient, id: number): Promise<Post | null> {

@@ -37,6 +37,14 @@ test("parseStateAction accepts set_todo and delete_todo with an integer id", () 
   assert.deepEqual(parseStateAction({ action: "delete_todo", id: 7 }), { action: "delete_todo", id: 7 });
 });
 
+test("parseStateAction accepts a Library post's read flag, keyed post:<id>", () => {
+  assert.deepEqual(parseStateAction({ action: "set_read", itemId: "post:42", value: true }), {
+    action: "set_read",
+    itemId: "post:42",
+    value: true,
+  });
+});
+
 test("parseStateAction answers each malformed body with the route's error code", () => {
   const cases: [unknown, string][] = [
     [{ action: "set_read" }, "missing_item"],

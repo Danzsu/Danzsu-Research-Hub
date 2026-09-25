@@ -4,6 +4,7 @@ import { getLanguage } from "@/lib/language";
 import { parseId } from "@/lib/pipeline/util";
 import type { PostQuery } from "@/lib/post-view";
 import { getReader } from "@/lib/supabase/server";
+import { MarkPostRead } from "./mark-post-read";
 import { PostArticle } from "./post-article";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function PostPage({
 
   return (
     <main className="min-h-dvh bg-ink text-paper">
+      <MarkPostRead postId={post.id} />
       <PostArticle post={post} language={language} query={query} canEdit={post.submittedBy === reader.viewer.id} />
     </main>
   );

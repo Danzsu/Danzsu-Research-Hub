@@ -6,6 +6,7 @@ import { Tag } from "@/app/components/tag";
 import type { SubmittedSource } from "@/lib/content";
 import { hostOf } from "@/lib/pipeline/util";
 import type { Post } from "@/lib/post-view";
+import { RefreshWhileProcessing } from "./refresh-while-processing";
 import { SubmitForm } from "./submit-form";
 
 const kindIcons = { article: FileText, youtube: PlayCircle, arxiv: FlaskConical, github: GitFork, x: MessageSquareQuote, pdf: FileText } as const;
@@ -18,14 +19,16 @@ const copy = {
   },
   failed: { hu: "HIBA", en: "FAILED" },
   processing: { hu: "FELDOLGOZÁS…", en: "PROCESSING…" },
-  empty: { hu: "Még üres a könyvtár.", en: "The library is empty." },
+  empty: { hu: "Még üres a könyvtár. Küldj be egy linket fent ↑", en: "The library is empty. Submit a link above ↑" },
+  toForm: { hu: "Az űrlaphoz", en: "To the form" },
   mirrored: { hu: "TÜKRÖZVE", en: "MIRRORED" },
 };
 
 /** The Library page body; the offline preview renders it with fixtures. */
-export function LibraryView({ posts, open }: { posts: Post[]; open: SubmittedSource[] }) {
+export function LibraryView({ posts, open, readIds }: { posts: Post[]; open: SubmittedSource[]; readIds: Set<number> }) {
   return (
     <main className="min-h-dvh bg-ink text-paper">
+      <RefreshWhileProcessing active={open.some((source) => source.status === "pending")} />
       <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm />} />
 
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-10">
@@ -45,7 +48,10 @@ export function LibraryView({ posts, open }: { posts: Post[]; open: SubmittedSou
 
         {!posts.length && (
           <p className="font-mono text-sm text-paper/55">
-            <LocalizedText value={copy.empty} />
+            <LocalizedText value={copy.empty} />{" "}
+            <a href="#submit" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
+              <LocalizedText value={copy.toForm} />
+            </a>
           </p>
         )}
         <div className="grid gap-5 lg:grid-cols-2">
@@ -55,7 +61,7 @@ export function LibraryView({ posts, open }: { posts: Post[]; open: SubmittedSou
               <Link
                 key={post.id}
                 href={`/library/${post.id}`}
-                className="focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6"
+                className={`focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6 ${readIds.has(post.id) ? "story-read" : ""}`}
               >
                 <div className="flex items-start justify-between">
                   <Icon className="size-7 text-signal group-hover:text-ink" />

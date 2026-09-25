@@ -169,3 +169,6 @@ export const previewReader: ReaderData = {
     { id: 3, itemId: null, text: "Kész teendő", done: true },
   ],
 };
+
+/** Post -2 was opened before: the Library list dims it. */
+export const previewReadPostIds = new Set([-2]);

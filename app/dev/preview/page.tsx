@@ -11,6 +11,7 @@ import {
   previewItems,
   previewPosts,
   previewReader,
+  previewReadPostIds,
   previewSources,
 } from "@/lib/fixtures";
 import { getLanguage, getNavMode } from "@/lib/language";
@@ -34,8 +35,8 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
       {view === "radar-empty" && (
         <DigestDashboard key={String(failWrites)} issue={previewIssue} items={[]} githubTop10={[]} preview={{ data: { states: {}, todos: [] }, failWrites }} />
       )}
-      {view === "library" && <LibraryView posts={previewPosts} open={previewSources} />}
-      {view === "library-empty" && <LibraryView posts={[]} open={[]} />}
+      {view === "library" && <LibraryView posts={previewPosts} open={previewSources} readIds={previewReadPostIds} />}
+      {view === "library-empty" && <LibraryView posts={[]} open={[]} readIds={new Set()} />}
       {view === "archive" && <ArchiveView issues={previewArchive} />}
       {view === "archive-empty" && <ArchiveView issues={[]} />}
     </AppShell>
