@@ -23,7 +23,7 @@
 - A koordinátor hibajelentése a `Progress`-ről (ugyanott).
 
 **Előfeltétel és sorrend:**
-- A UX-A bekerült a `main`-be (fast-forward, `main` = `ac8c36d`). Új ág: `git switch -c test-hardening main`. Ez a terv a taiyaki link-chat és az M2 előtt fut.
+- A UX-A bekerült a `main`-be (fast-forward). Rá került ennek a tervnek a commitja, így `main` = `721d1d0`. Az ág már létezik, és a `main`-nel egyezik: `test-hardening` = `721d1d0`. Váltás: `git switch test-hardening`, új ág nem kell. Ez a terv a taiyaki link-chat és az M2 előtt fut.
 - A terv minden kódját és elvárt kimenetét egy `git archive HEAD` másolaton ellenőriztem. A kiindulás az audit commitja volt (`45dcb3c`), amire rámásoltam a `main` öt azóta változott fájlját. Ezen a másolaton ellenőriztem:
   - a végállapot 474 tesztjét;
   - a `tsc`, a `lint`, a `build` és a `dup` zöld futását;
@@ -32,7 +32,7 @@
 
 ## Egyeztetés az audittal és a kóddal
 
-1. **Az audit `45dcb3c`-n készült, a `main` most `ac8c36d`.** Közben öt fájl változott:
+1. **Az audit `45dcb3c`-n készült, a `main` most `721d1d0`** (az `ac8c36d`, rajta ennek a tervnek a commitjával). Közben öt kódfájl változott:
    - `app/components/shell.test.ts` (új, 9 statikus smoke render);
    - `lib/test/next-stub.ts` (`usePathname`);
    - `page-header.tsx`, `submit-form.tsx`, `app/dev/preview/post/page.tsx` (hibajavítások).
@@ -57,7 +57,10 @@
 8. **linkedom és `assert`.** Egy linkedom-csomópont az `assert.equal(node, null)`-ban hibánál ~25 s-ig fut, aztán `RangeError: Array buffer allocation failed`-del áll le, mert a Node az egész dokumentumot próbálja kiírni. A V1 és az R1 próbánál futott bele ebbe a prototípus.
    - Az új tesztek ezért primitívet hasonlítanak (attribútum, `textContent`, darabszám).
    - A négy meglévő ilyen sor (`post-blocks.test.ts` 51., 57. és 94. sora, `post-editor.test.ts` 71. sora) darabszámra áll át (9. feladat).
-9. **A `post-article.test.ts` törlése és az M2.** Az M2 terv 7. és 10. feladata ezt a fájlt bővíti. A törlés után ott a fájl újra létrejön a fejlécével (az importok és a `renderArticle` segéd). Ez a TODO.md M2-sorába kerül (2. feladat).
+9. **A `post-article.test.ts` törlése, a `rpcError` típusa és az M2.**
+   - Az M2 terv 7. és 10. feladata a `post-article.test.ts`-t bővíti. A törlés után ott a fájl újra létrejön a fejlécével (az importok és a `renderArticle` segéd).
+   - Az 1. feladat a `FakeIngestTables.rpcError`-t `PostgrestErrorShape`-re szűkíti. Az M2 terv `rpcError: { code: "XX000", message: "boom" }` fixture-je (`docs/superpowers/plans/2026-09-25-reader-tools-m2.md:4043`) ezért TS2739-cel bukna a `tsc`-n. Az M2-ben ez `rpcError: pgError("XX000", "boom")` lesz.
+   - Mindkettő a TODO.md M2-sorába kerül (2. feladat).
 10. **A `Task` ↔ `model_settings_task_check` teszt** (az audit „next after these” listájának utolsó tétele) már az M2 terv 1. feladatában van (`TASKS`), ezért ez a terv csak a TODO-ban hivatkozik rá.
 
 ## Döntések
@@ -86,7 +89,7 @@
 - Mutációs próba: a továbbadás nélkül a teszt bukik.
 
 **A terv döntései:**
-- Ruling: a CI Node-ja pontosan `24.16.0` (2026-05-21, a nodejs.org `dist/index.json` szerint), nem a legújabb 24.21.0. A CLAUDE.md szerint a render harness csak a 24.16-on ellenőrzött. A 24.16 corepacket is hoz (0.35.0), ez kell a `corepack pnpm@11.25.0`-hoz. A verzió a `node-version` egyetlen sora, szándékosan emeljük.
+- Ruling: a CI Node-ja pontosan `24.16.0` (2026-05-21, a nodejs.org `dist/index.json` szerint), nem a legújabb 24.21.0. A CLAUDE.md szerint a render harness csak a 24.16-on ellenőrzött. A 24.16 corepacket is hoz (0.35.0), ez kell a `corepack pnpm@11.25.0`-hoz. A verzió a `node-version` egyetlen sora, szándékosan emeljük. A 24.17.0 és a 24.18.1 biztonsági kiadás, ezért a harness ellenőrzése után a CI a 24.18.1 vagy újabb kiadásra lép (TODO.md, Technikai adósság, 2. feladat). Addig a job titok nélkül fut.
 - Ruling: `runs-on: ubuntu-24.04`, nem `ubuntu-latest`, mert a supply-chain szabály mozgó címkét nem enged.
 - Ruling: nincs CI-cache. A `setup-node` pnpm-cache-e a PATH-on lévő `pnpm`-et keresné, a corepack-es hívás mellett ez nincs ott. Egy `actions/cache` egy újabb rögzítendő action lenne. A telepítés a lockfile-ból kb. fél perc.
 - Ruling: `on: push` és `pull_request`, ahogy a döntés kéri. Egy PR-ág pusha így kétszer fut. Ha zavar, egy `concurrency` blokk egy sor.
@@ -117,7 +120,7 @@ Mindkét tag „könnyű” tag: a `git ls-remote` kimenetében nincs `^{}` sor,
 
 ## Global Constraints
 
-- **Ág:** `git switch -c test-hardening main`. A push a tulajdonosé.
+- **Ág:** a `test-hardening` már létezik, és egyezik a `main`-nel (`721d1d0`). Váltás: `git switch test-hardening`. A push a tulajdonosé.
 - **Node és tesztek:**
   - Node `>=22.13.0`, a CI-ban pontosan `24.16.0`.
   - Futtatás: `node --experimental-strip-types --no-warnings --test`.
@@ -141,6 +144,7 @@ Mindkét tag „könnyű” tag: a `git ls-remote` kimenetében nincs `^{}` sor,
   - a literál id-k (`daily.test.ts`, `blocks.test.ts`);
   - a CAS-szűrők (`post-edit.test.ts`, `translate.test.ts`);
   - a fordítás 21 elutasító esete: a 8. feladatban táblázatba költözik, ugyanazzal a névvel és ugyanazzal az adattal;
+  - a `hiddenBlocksSchema` 400 id-s határa (a PATCH-határ): a 8. feladatban a `readHiddenBlocks caps…` tesztbe költözik;
   - `failureUpdate` és a tulajdonos-ellenőrzés.
 
   Fixture-t csak akkor szabad átírni, ha a teszt a szűrők figyelmen kívül hagyása miatt ment át, és a feladat ezt kimondja.
@@ -186,7 +190,7 @@ Mindkét tag „könnyű” tag: a `git ls-remote` kimenetében nincs `^{}` sor,
 | `lib/pipeline/fetch.test.ts`, `lib/pipeline/util.test.ts` | F1, F2, N10; U4–U7; a loopback/metadata teszt összevonása | 5 |
 | `lib/pipeline/images.test.ts`, `lib/pipeline/extract/index.test.ts` | G1 (lógó válasz), G1b, G2, G3, N13; H1–H3 | 6 |
 | `lib/pipeline/daily.test.ts`, `lib/pipeline/extract/index.test.ts` | W1; a duplikált YouTube-teszt törlése | 7 |
-| `lib/blocks.test.ts`, `lib/media.test.ts` (új), `lib/translate.test.ts`, `lib/overrides.test.ts` | B2; M1; az elutasító esetek táblázata; a duplikált teszt törlése | 8 |
+| `lib/blocks.test.ts`, `lib/media.test.ts` (új), `lib/translate.test.ts`, `lib/overrides.test.ts` | B2; M1; az elutasító esetek táblázata; a duplikált teszt törlése (a `hiddenBlocksSchema`-határ átköltözik, megmarad) | 8 |
 | `components/ui/progress.tsx`, `app/components/shell.test.ts` | a `value` továbbadása; N11 | 9 |
 | `app/components/post-blocks.test.ts`, `app/(app)/library/[id]/post-editor.test.ts`, `app/(app)/library/[id]/post-article.test.ts` (törlés), `lib/nav.test.ts`, `lib/reader-store.test.ts` | R1 és az elrendezés-teszt; a csomópont-assertek; N12; S1/S2 | 9 |
 | `CLAUDE.md`, `README.md`, `TODO.md` | a CI említése és a TODO-tételek; a réteg és a fake-ek leírása | 2, 10 |
@@ -584,7 +588,7 @@ Elvárt: a telepítés nem módosítja a lockfile-t (`git diff --stat -- pnpm-lo
 
 - [ ] **Step 6: Build titok nélkül, tiszta fán**
 
-A helyi build a `.env.local`-t is olvassa, ezért az nem bizonyítja, hogy a CI-nak nem kell titok. Egy leválasztott worktree-ben, env nélkül:
+A helyi build a `.env.local`-t is olvassa, ezért az nem bizonyítja, hogy a CI-nak nem kell titok. Egy leválasztott worktree-ben, env nélkül (Git Bash, a repó gyökeréből; az `env -u` és a `cd -` PowerShellben nem működik):
 
 ```bash
 git worktree add ../th-ci-check HEAD --detach
@@ -635,6 +639,7 @@ A `.github/workflows/ci.yml`-ben `actions/checkout@3d3c42e5aac5ba805825da76410c1
   - [ ] **Branch-védelem a `main`-en** (a CI első futása után). *Settings → Rules → Rulesets → New branch ruleset*, cél: a `main` (Default branch).
     - **Require status checks to pass**: `checks` (a CI egyetlen jobja; a lista az első futás után kínálja fel).
     - **Block force pushes** és **Restrict deletions**.
+    - **Require a pull request before merging**: ki. PR-kötelezettség nincs, a `main` továbbra is fast-forwarddal kap új commitot.
     - A `main`-re így csak olyan commit kerülhet, amelyen a CI már zöld. Előbb az ágat pushold, várd meg a zöld futást, utána jöhet a fast-forward `main` pusha.
   - [ ] **Dependabot-PR-ek:** hetente jöhet egy PR a két action frissítéséről, és csak legalább 7 napos kiadásról. Merge előtt a CI legyen zöld, és a kommentben szereplő tag legyen az új.
   ```
@@ -660,12 +665,17 @@ A `.github/workflows/ci.yml`-ben `actions/checkout@3d3c42e5aac5ba805825da76410c1
     - a `proxy.ts` (X4): ehhez a `@supabase/ssr` `createServerClient`-jének helyettese kell a route-rétegben;
     - az `app/auth/login` és az `app/auth/callback` tényleg a `safeNext`-en át irányít-e;
     - a `getReaderState` sor-leképezése (`lib/content.ts`).
+  - [ ] **A CI Node-ja legalább 24.18.1-re.** A `.github/workflows/ci.yml` ma a `24.16.0`-n fut, mert a render harness csak ezen ellenőrzött.
+    - A nodejs.org `dist/index.json` a 24.17.0-t (2026-06-17) és a 24.18.1-et (2026-07-28) biztonsági kiadásnak jelöli.
+    - A lépések: előbb a render harness (`lib/test/render.ts`, `lib/test/tsx-hooks.ts`) és a teljes `npm test` ellenőrzése az új verzión, aztán a `node-version` sor emelése egy legalább 7 napos kiadásra.
+    - Addig a kockázat kicsi: a job titok nélkül, csak `contents: read`-del fut.
   ```
 
-- A „Kutatási dashboard” alatt, az `M2 olvasóeszközök` sor alá, alpontként (négy szóköz behúzással):
+- A „Kutatási dashboard” alatt, az `M2 olvasóeszközök` sor alá, két alpontként (négy szóköz behúzással):
 
   ```markdown
       - A teszt-keményítés törölte a `post-article.test.ts`-t (osztálynév-tesztek voltak). Az M2 terv 7. és 10. feladata ezt a fájlt bővíti, ezért ott a fájl újra létrejön a fejlécével: a `testPost` és a `render` importja, és a `renderArticle` segéd.
+      - A teszt-keményítés óta a `fakeDb` `rpcError` mezője `PostgrestErrorShape` típusú, ezért az M2 `rpcError`-fixture-jei a `pgError(...)`-t használják. Az M2 terv `rpcError: { code: "XX000", message: "boom" }` sora (`reader-tools-m2.md:4043`) így `rpcError: pgError("XX000", "boom")` lesz, különben a `tsc` TS2739-cel bukik.
   ```
 
 - [ ] **Step 11: Teljes ellenőrzés és commit**
@@ -920,7 +930,7 @@ A `storage.from()` objektumában a `remove:` elé:
         objects.has(bareObjectName(path)) ? { data: new Blob([path]), error: null } : { data: null, error: { message: "Object not found" } },
 ```
 
-A `fakeDb` doc-kommentjében a „`upload` adds to it and `list` reflects it” rész helyett: „`upload` adds to it, `list` reflects it, and `download` answers an object it holds with the object's own path as its bytes”.
+A `fakeDb` doc-kommentjében a „`upload` adds to it and `list` reflects it” rész helyett (a fájlban a mondat az „and” után sort tör, a következő kommentsor a „`list` reflects it” szöveggel folytatódik, ezért szó szerinti kereséssel egy sorban nem található): „`upload` adds to it, `list` reflects it, and `download` answers an object it holds with the object's own path as its bytes”.
 
 - [ ] **Step 6: Futtatás, át kell mennie**
 
@@ -1176,9 +1186,10 @@ test("POST /reextract inside the cooldown answers 429 with the seconds left", as
 - [ ] **Step 2: Futtatás, a sources-teszt bukik**
 
 Futtatás: `node --experimental-strip-types --no-warnings --test app/api/sources/route.test.ts app/api/state/route.test.ts "app/api/posts/[[]id]/route.test.ts" "app/api/posts/[[]id]/translate/route.test.ts" "app/api/posts/[[]id]/reextract/route.test.ts"`
-Elvárt:
+Elvárt: `ℹ tests 12`, `ℹ fail 3`.
 - a `…409 already_submitted…` és a `…answers 202 with its id…` FAIL: `….insert is not a function`;
-- a sources 400-as és 401-es esete, valamint a state, a PATCH, a translate és a reextract tesztjei PASS. Ezek a mai, helyes kódot rögzítik; a piros lépésük az 5. lépés mutációja.
+- a sources 400-as esete (`…answers 400 invalid_url…`) FAIL: `undefined !== []`. A route helyesen 400-at ad, de a `db.sourceInserts` csak a 3. lépésben jön létre;
+- a sources 401-es esete, valamint a state, a PATCH, a translate és a reextract tesztjei PASS. Ezek a mai, helyes kódot rögzítik; a piros lépésük az 5. lépés mutációja.
 
 - [ ] **Step 3: A fake `insert`-je** (`lib/pipeline/fake-db.ts`)
 
@@ -1436,19 +1447,23 @@ test("encodeImage refuses an image over the 40-megapixel limit", async () => {
   await assert.rejects(() => encodeImage(huge), /pixel limit/);
 });
 
-// G3: a body over 5 MB is never read into memory, let alone handed to sharp, even when it is an image.
+// G3: an image declared over 5 MB is refused before a single byte is read, let alone handed to sharp.
 test("mirrorImages keeps a 5 MB + 1 byte image unmirrored, without reading it", async (t) => {
   const { db, uploads } = fakeStorageDb();
   t.mock.method(console, "warn", () => {});
-  const oversized = Buffer.concat([await png(200, 150), Buffer.alloc(5 * 1024 * 1024)]).subarray(0, 5 * 1024 * 1024 + 1);
-  mockFetch(t, async () => new Response(oversized, { headers: { "content-type": "image/png", "content-length": String(oversized.length) } }));
+  const { body, cancelled, reads } = endlessBody(1024 * 1024);
+  mockFetch(t, async () => new Response(body, { headers: { "content-type": "image/png", "content-length": String(5 * 1024 * 1024 + 1) } }));
   const out = await mirrorImages(db, 1, [image("i1", `${HOST}/big.png`)]);
   assert.equal((out[0] as ImageBlock).path, null);
   assert.equal(uploads.length, 0);
+  assert.equal(cancelled(), true);
+  assert.equal(reads(), 0); // the declared length alone decides; nothing is pulled from the body
 });
 ```
 
 A 8000 × 5001-es, egyszínű PNG kb. 127 KB, és kb. 90 ms alatt készül el. A sharp a fejlécből dob: `Input image exceeds pixel limit`.
+
+A G3-teszt törzse a meglévő `endlessBody` (1 MiB-os darabok), és a `content-length` fejléce 5 MB + 1 bájtot vall be. A `readLimited` a bevallott hossz alapján dönt, és egyetlen olvasás nélkül eldobja a törzset: `cancelled()` igaz, `reads()` 0. Így a teszt neve („without reading it”) igaz. Ha a plafon 5 MB-nál nagyobb, a törzs olvasása elindul, és a `reads()` állítás bukik.
 
 `lib/pipeline/extract/index.test.ts`, a `test("isHtml treats a missing content-type…", …)` elé:
 
@@ -1490,7 +1505,7 @@ Minden sorra: alkalmazd, futtasd a 2. lépés parancsát, lásd a FAIL-t, `git c
 | G1b | ugyanaz | `await safeFetch(image.originalUrl, { accept: "image/avif,image/webp,image/*;q=0.8", timeoutMs: FETCH_TIMEOUT_MS }),` → `await fetch(image.originalUrl, { headers: { accept: "image/avif,image/webp,image/*;q=0.8" }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),` | `mirrorImages never fetches an image on a private address…` |
 | N13 | ugyanaz | `timeoutMs: FETCH_TIMEOUT_MS })` → `})` | `mirrorImages aborts a download that hangs…` (`[20000]`) |
 | G2 | ugyanaz | mindkét `limitInputPixels: PIXEL_LIMIT` → `limitInputPixels: false` | `encodeImage refuses an image over the 40-megapixel limit` |
-| G3 | ugyanaz | `const MAX_BYTES = 5 * 1024 * 1024;` → `const MAX_BYTES = 500 * 1024 * 1024;` | `mirrorImages keeps a 5 MB + 1 byte image unmirrored…` |
+| G3 | ugyanaz | `const MAX_BYTES = 5 * 1024 * 1024;` → `const MAX_BYTES = 500 * 1024 * 1024;` | `mirrorImages keeps a 5 MB + 1 byte image unmirrored…` (`501 !== 0`: a mutáns 501 darab 1 MiB-os darabot olvas be, mielőtt az 500 MB-os plafon megállítja; ezredmásodpercek alatt bukik) |
 | H1 | `lib/pipeline/extract/article.ts` | `await safeFetch(url, { accept: "text/html,application/xhtml+xml,application/pdf;q=0.9" })` → `await fetch(url, { headers: { accept: "text/html,application/xhtml+xml,application/pdf;q=0.9" } })` | `extract() refuses a private URL before any fetch…` |
 | H2 | `lib/pipeline/extract/pdf.ts` | `await safeFetch(url, { accept: "application/pdf" })` → `await fetch(url, { headers: { accept: "application/pdf" } })` | ugyanaz |
 | H3 | `lib/pipeline/extract/index.ts` | `await safeFetch(url, { accept: "text/html" })` → `await fetch(url, { headers: { accept: "text/html" } })` | ugyanaz |
@@ -1587,7 +1602,7 @@ Ez erősebb a réginél: a lejárt határidő ennek része. A másik oldalt (`ST
 Futtatás: `node --experimental-strip-types --no-warnings --test lib/pipeline/daily.test.ts lib/pipeline/ingest.test.ts`
 Elvárt: FAIL, `The requested module './mock-fetch.ts' does not provide an export named 'geminiSchemaKeys'` (a `daily.test.ts` betöltése). Az `ingest.test.ts` 33 tesztje PASS.
 
-- [ ] **Step 3: `geminiSchemaKeys`** (`lib/pipeline/mock-fetch.ts`, a `geminiText` elé)
+- [ ] **Step 3: `geminiSchemaKeys`** (`lib/pipeline/mock-fetch.ts`, a `geminiText` doc-kommentje, vagyis az „A raw Gemini generateContent envelope…” kezdetű `/** … */` sor elé, hogy a komment a saját `const`-ja fölött maradjon)
 
 ```ts
 /** The top-level fields of the JSON Schema a captured Gemini request asks for: which task is calling
@@ -1726,7 +1741,7 @@ git commit -m "test: pin the retry reserve and the shortlist, and route model fa
 
 **Files:**
 - Create: `lib/media.test.ts`
-- Modify: `lib/blocks.test.ts` (B2), `lib/translate.test.ts` (21 teszt egy táblázatba), `lib/overrides.test.ts` (egy duplikált teszt törlése)
+- Modify: `lib/blocks.test.ts` (B2), `lib/translate.test.ts` (21 teszt egy táblázatba), `lib/overrides.test.ts` (egy duplikált teszt törlése, a két `hiddenBlocksSchema` sora a `readHiddenBlocks caps…` tesztbe költözik)
 
 **Interfaces:**
 - Consumes: `assignIds` (`lib/blocks.ts`), `isMediaKey`, `variantPath` (`lib/media.ts`), `applyTranslation`, `translatable`, `type TranslationItem` (`lib/translate.ts`)
@@ -1803,7 +1818,9 @@ Ez a 21 teszt törlődik, a közvetlenül fölöttük álló, csak rájuk vonatk
 - `applyTranslation rejects a chapters answer whose array is shorter than the original`
 - `applyTranslation rejects a whitespace-only chapter title`
 
-A négy elfogadó teszt marad: `…applies a translated caption only when…`, `…accepts a missing alt when…`, `…ignores the model's alt entirely…`, `…translates chapter titles…`. A `// Two mirror-image rules: …` három soros komment a `…accepts a missing alt…` fölött ma mindkét tesztre vonatkozik. Erre a két sorra cserélődik:
+A négy elfogadó teszt marad: `…applies a translated caption only when…`, `…accepts a missing alt when…`, `…ignores the model's alt entirely…`, `…translates chapter titles…`.
+
+A `// Two mirror-image rules: …` három soros komment ma a törlendő `…rejects a missing caption when the original block had one` teszt fölött áll. Két tesztre vonatkozik: erre és az utána álló `…accepts a missing alt…`-ra. A törlendő teszttel együtt erre a két sorra cserélődik, így közvetlenül a `…accepts a missing alt…` fölé kerül:
 
 ```ts
 // alt must not be required when the original alt was already empty: otherwise an image with alt: ""
@@ -1866,7 +1883,23 @@ Elvárt: `ℹ tests 42`, `ℹ pass 42`, és újra `21` elutasító eset.
 
 - [ ] **Step 3: A duplikált overrides-teszt** (`lib/overrides.test.ts`, az audit átírási listája)
 
-Törlődik a `test("overridesSchema and hiddenBlocksSchema are the single source of truth readOverrides/readHiddenBlocks build on", …)`: ugyanazokat a határokat a fölötte álló `readOverrides …` és az alatta álló `readHiddenBlocks caps at the shared block limit` teszt már rögzíti. Az import: `import { hiddenBlocksSchema, overridesSchema, readHiddenBlocks, readOverrides } from "./overrides.ts";` → `import { readHiddenBlocks, readOverrides } from "./overrides.ts";`. A `MAX_BLOCKS` import marad, mert a `readHiddenBlocks caps…` használja.
+Törlődik a `test("overridesSchema and hiddenBlocksSchema are the single source of truth readOverrides/readHiddenBlocks build on", …)`, de csak az `overridesSchema` öt sora vész el vele. Azokat a határokat a fölötte álló `readOverrides …` tesztek már rögzítik.
+
+A két `hiddenBlocksSchema` sor nem duplikátum. A `readHiddenBlocks` csak vág (`.slice(0, MAX_BLOCKS)`), a PATCH-határ viszont a `hiddenBlocksSchema.max(MAX_BLOCKS)` (`patchSchema`, `lib/post-edit.ts`). Ezt a két sort ma semmi más nem rögzíti: nélkülük a `.max` elhagyása a teljes csomagon átmegy. Ezért a két sor átköltözik az alatta álló `readHiddenBlocks caps at the shared block limit` tesztbe, amely így ez lesz:
+
+```ts
+test("readHiddenBlocks caps at the shared block limit", () => {
+  const many = Array.from({ length: MAX_BLOCKS + 50 }, (_, i) => `b${i}`);
+  const result = readHiddenBlocks(many);
+  assert.equal(result.length, MAX_BLOCKS);
+  assert.deepEqual(result, many.slice(0, MAX_BLOCKS));
+  // The PATCH body is validated by hiddenBlocksSchema (patchSchema in lib/post-edit.ts): past the limit it's refused, not cut.
+  assert.equal(hiddenBlocksSchema.safeParse(Array.from({ length: MAX_BLOCKS }, (_, i) => `b${i}`)).success, true);
+  assert.equal(hiddenBlocksSchema.safeParse(Array.from({ length: MAX_BLOCKS + 1 }, (_, i) => `b${i}`)).success, false);
+});
+```
+
+Az import: `import { hiddenBlocksSchema, overridesSchema, readHiddenBlocks, readOverrides } from "./overrides.ts";` → `import { hiddenBlocksSchema, readHiddenBlocks, readOverrides } from "./overrides.ts";`. A `MAX_BLOCKS` import marad.
 
 Futtatás: `node --experimental-strip-types --no-warnings --test lib/overrides.test.ts`
 Elvárt: `ℹ tests 8`, `ℹ pass 8`.
@@ -1887,6 +1920,9 @@ Minden sorra: alkalmazd, futtasd a megadott fájlt, lásd a FAIL-t, `git checkou
 | M1 | `lib/media.ts` | `/^\d+\/[0-9a-f]{16}-\d+\.(avif\|webp)$/` → `/\d+\/[0-9a-f]{16}-\d+\.(avif\|webp)$/` | `… --test lib/media.test.ts` | `isMediaKey accepts exactly…` |
 | T1 | `lib/translate.ts` | az `item.items.length === block.items.length &&` sor törlése | `… --test lib/translate.test.ts` | `applyTranslation rejects a list whose items array is shorter…` |
 | T4 | ugyanaz | `original.length * 3 + 200` → `original.length * 30 + 200` | ugyanaz | `applyTranslation rejects an answer ~10x the original length…` |
+| HB (pre-flight I1) | `lib/overrides.ts` | `export const hiddenBlocksSchema = z.array(z.string()).max(MAX_BLOCKS);` → `export const hiddenBlocksSchema = z.array(z.string());` | `… --test lib/overrides.test.ts` | `readHiddenBlocks caps at the shared block limit` |
+
+A HB próba csak ennek a feladatnak a próbája, a 10. feladat újrafuttatásában nem szerepel.
 
 - [ ] **Step 6: Commit**
 
@@ -1905,7 +1941,7 @@ git commit -m "test: pin block ids and media keys, and table-drive the translati
 - Delete: `app/(app)/library/[id]/post-article.test.ts`
 
 **Interfaces:**
-- Consumes: `render` (`lib/test/render.ts`), `mockFetch` (`lib/pipeline/mock-fetch.ts`), `postState`, `loadState` (`lib/reader-store.ts`), `NAV_ITEMS`, `PRIMARY_NAV`, `SOON_NAV` (`lib/nav.ts`)
+- Consumes: `render` (`lib/test/render.ts`), `mockFetch` (`lib/pipeline/mock-fetch.ts`), `postState`, `loadState` (`lib/reader-store.ts`), `NAV_ITEMS` (`lib/nav.ts`)
 - Produces: `Progress` (`components/ui/progress.tsx`): a `value` a Radix Root-ra is eljut. A `max` a `...props`-szal eddig is átment.
 
 - [ ] **Step 1: A `Progress` tesztje** (`app/components/shell.test.ts`)
@@ -1972,9 +2008,14 @@ A függvény a `value`-t kiveszi a propok közül, ezért a `{...props}` nem ír
 Futtatás: `node --experimental-strip-types --no-warnings --test app/components/shell.test.ts`
 Elvárt: `ℹ tests 10`, `ℹ pass 10`.
 
-- [ ] **Step 4: Mutációs próba (N11), aztán commit**
+- [ ] **Step 4: Mutációs próba (N11), teljes ellenőrzés, aztán commit**
 
 Töröld ideiglenesen a `value={value}` sort. Futtatás: ugyanaz. Elvárt: a két teszt újra FAIL. Tedd vissza a sort, és futtasd újra: PASS.
+
+A commit előtt az öt ellenőrzés (CLAUDE.md: „Before a commit, all five checks pass”):
+
+Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
+Elvárt: minden zöld, `ℹ tests 479` (a 8. feladat 478-a és az új `Progress`-teszt), `Found 0 clones.`
 
 ```bash
 git add components/ui/progress.tsx app/components/shell.test.ts
@@ -2053,9 +2094,10 @@ test("every nav item has a unique id and href and a label in both languages, and
     assert.ok(item.label.hu.trim() && item.label.en.trim(), item.id);
     if (item.soon) assert.equal(item.href, null, item.id);
   }
-  assert.deepEqual([...PRIMARY_NAV, ...SOON_NAV].map((item) => item.id).sort(), [...ids].sort());
 });
 ```
+
+A `PRIMARY_NAV` és a `SOON_NAV` a `NAV_ITEMS` két, egymást kiegészítő szűrője (`lib/nav.ts`), ezért a kettőt összevető állítás mindig igaz lenne, a teszt nem is tartalmazza. Így a két név kikerül az importból, különben a lint nem használt importot jelez: `import { activeNavId, NAV_ITEMS, PRIMARY_NAV, SOON_NAV, switchesLanguageInPlace } from "./nav.ts";` → `import { activeNavId, NAV_ITEMS, switchesLanguageInPlace } from "./nav.ts";`.
 
 Az `activeNavId` és a `switchesLanguageInPlace` teszt marad.
 
@@ -2162,7 +2204,7 @@ A három fájlt a 2. feladat is szerkesztette. **Olvasd újra őket.** Ahol egy 
 - **Relative imports in `lib/`**, a „The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which tests never load.” mondat helyett:
   > The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`. No test loads `lib/supabase/server.ts` or `lib/language.ts` (route tests get `lib/test/route-hooks.ts` in the first one's place); `lib/content.ts` is loaded by the state route's test, with `server-only` mapped to an empty module.
 - **Layout**:
-  - az `app/(app)/library/` sorban: „post-article, post-toolbar, post-editor and post-notices each + test” → „post-toolbar, post-editor and post-notices each + test”;
+  - az `app/(app)/library/` sorban: „post-article, post-toolbar, post-editor and post-notices each + test” → „post-toolbar, post-editor and post-notices each + test” (a CLAUDE.md-ben a felsorolás az „and” után sort tör, a „post-notices each + test” a következő, behúzott sorban áll);
   - az `app/api/` sor végére: „; each route has a `route.test.ts`”;
   - az `app/media/[...path]/` sor végére: „(+ test)”;
   - a `lib/test/` sorban: „render harness for component tests (render, tsx-hooks, next-stub)” → „render harness for component tests (render, tsx-hooks, next-stub) and the route-handler stubs (route-hooks)”.
@@ -2418,7 +2460,7 @@ Elvárt: a `CI` workflow `checks` jobja zöld (Review Focus 4.). Ha piros, a hib
 | Átírás: `post-blocks.test.ts` | 9 |
 | Átírás: `post-article.test.ts` törlése | 9 |
 | Átírás: `nav.test.ts` invariánsai | 9 |
-| Átírás: `overrides.test.ts:47–56` | 8 |
+| Átírás: `overrides.test.ts:47–56` (az `overridesSchema` sorai törlődnek, a két `hiddenBlocksSchema` sor a `readHiddenBlocks caps…` tesztbe költözik; HB próba) | 8 |
 | Átírás: `translate.test.ts` táblázat | 8 |
 | Átírás: `fetch.test.ts:28–38` összevonás | 5 |
 | Átírás: `images.test.ts:235–253` lógó válasz | 6 |
@@ -2432,7 +2474,7 @@ Elvárt: a `CI` workflow `checks` jobja zöld (Review Focus 4.). Ha piros, a hib
 **2. Placeholder-keresés.** Nincs „TBD”, „később”, „hasonlóan a …-hoz”, és nincs kód nélküli kódlépés. Ahol egy lépés meglévő fájlt módosít, idézi a pontos „előtte” és „utána” szöveget, vagy név szerint sorolja a törlendő teszteket. Minden elvárt kimenet (tesztszám, hibaüzenet, JSON-sor) a prototípus futásából származik.
 
 **3. Nevek és típusok a feladatok között:**
-- `pgError`, `PostgrestErrorShape`, `FakeIngestTables.sources` (1.) → a 3. és 4. feladat tesztjei és a `route-hooks.ts` nem ismételik őket, importálják.
+- `pgError`, `PostgrestErrorShape`, `FakeIngestTables.sources` (1.) → a 3. és 4. feladat tesztjei és a `route-hooks.ts` nem ismételik őket, importálják. A később futó M2 terv `rpcError`-fixture-je is `pgError(...)`-ra vált (Egyeztetés 9., TODO.md).
 - `sourceInsertError`, `sourceInserts` (4.) → csak a sources route-teszt használja.
 - `routeStub` (`reader`, `admin`, `adminCalls`, `scheduled`), `resetRoute()`, `signedIn(db, id = "owner")` (3.) → a 4. feladat öt tesztje ugyanezekkel a nevekkel.
 - `STUBS` (3.) váltja a `STUBBED`-et és a `stub`-ot; a `resolve` törzsében a helyi `stub` változó a térkép értéke.
