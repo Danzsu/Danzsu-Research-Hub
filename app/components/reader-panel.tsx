@@ -111,7 +111,10 @@ export function ReaderPanel({ language, progress, readCount, total, syncing, tod
                 variant="ghost"
                 size="icon-lg"
                 disabled={item.id < 0}
-                onClick={() => onDelete(item.id)}
+                onClick={(event) => {
+                  // A double click's second click lands on the next row's button, which slides up under the pointer.
+                  if (event.detail <= 1) onDelete(item.id);
+                }}
                 aria-label={t.delete}
                 className="size-10 hover:bg-signal/20 sm:size-8"
               >
