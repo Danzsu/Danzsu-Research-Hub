@@ -14,8 +14,8 @@ import { AccountActions, NavEntry, navIcons, SoonList } from "./nav-parts";
 import { SearchSoon } from "./shell-dialogs";
 
 const copy = {
-  hu: { nav: "Menü", more: "Több", language: "Nyelv" },
-  en: { nav: "Menu", more: "More", language: "Language" },
+  hu: { nav: "Menü", more: "Több", language: "Nyelv", close: "Bezárás" },
+  en: { nav: "Menu", more: "More", language: "Language", close: "Close" },
 };
 
 /** Mirrors persistLanguage (language-context.tsx): same cookie shape, read back on the server by getNavMode (lib/language.ts). */
@@ -85,6 +85,7 @@ function MobileNav({ email, onSearch }: { email: string; onSearch: () => void })
         </SheetTrigger>
         <SheetContent
           side="bottom"
+          closeLabel={t.close}
           className="max-h-[85dvh] gap-5 overflow-y-auto border-t-2 border-ink bg-cream p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] text-ink"
         >
           <SheetHeader className="p-0 pr-12">
