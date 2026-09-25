@@ -18,7 +18,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON N
 
 ## How it works
 
-Two server-side writers put content in. The pipeline work runs with the Supabase secret key; only the submission's `sources` row is inserted as the signed-in reader. Nothing runs on a personal machine.
+Two server-side writers put content in. Both do their pipeline work with the Supabase secret key; of their writes, only the submission's `sources` row is inserted as the signed-in reader. (The submitter's edits on the post page also write as the reader, through `update_post_overrides`.) Nothing runs on a personal machine.
 
 ```mermaid
 flowchart TD
@@ -76,7 +76,7 @@ Every source ends up as the same block model ([`lib/blocks.ts`](lib/blocks.ts)):
 ### Prerequisites
 
 - **Node 24 LTS** (recommended). `engines` in `package.json` allows `>=22.13.0`, but the component-test harness is verified only on Node 24; Node 22 is unverified.
-- **corepack.** Node 24 bundles it; newer Node releases no longer do, so install it with `npm i -g corepack`.
+- **corepack.** Node 24 bundles it; newer Node releases no longer do, so install the version Node 24.16 ships with: `npm i -g corepack@0.35.0`.
 - `curl` for the first cron run, `openssl` to generate `CRON_SECRET`, and optionally the [Vercel CLI](https://vercel.com/docs/cli) for `vercel env pull`.
 - A Supabase project: the shared one (ask its owner for an invite and the keys) or your own.
 - A Gemini API key from [Google AI Studio](https://aistudio.google.com). Optional: a [Groq](https://console.groq.com) key and a GitHub fine-grained token with no scopes.
@@ -103,11 +103,11 @@ Copy [.env.example](.env.example) to `.env.local` and fill it in. Every variable
 | `CRON_SECRET` | yes | A long random string (`openssl rand -hex 32`); the cron route's bearer token |
 | `GITHUB_TOKEN` | no | Raises the GitHub API rate limit for the daily repo search and the GitHub extractor |
 
-Once the Vercel project exists, `vercel env pull --environment=production .env.local` fills the file from it. A plain `vercel env pull` reads the Development environment, which stays empty unless Development was ticked when the variables were added (see [Deploy](#deploy)).
+Once the Vercel project exists, `vercel env pull --environment=production .env.local` fills the file from it. A plain `vercel env pull` reads the Development environment, which stays empty unless Development was ticked when the variables were added (see [Deploy](#deploy)). Pulling production puts the production **secret key** on your machine, and that key bypasses RLS on every table and in Storage: keep `.env.local` private, and prefer your own project for experiments. Variables marked **Sensitive** in Vercel come back empty from `env pull`, so enter those by hand.
 
 ### Supabase
 
-**On the shared project**, everything is already set up and migrated. Don't change its settings, and don't apply migrations to catch up. Ask the owner to invite you (*Authentication → Users → Invite user*).
+**On the shared project**, everything is already set up and migrated up to `post_blocks`. Don't change its settings, and don't apply migrations to catch up. Ask the owner to invite you (*Authentication → Users → Invite user*).
 
 To sign in locally against it: request a link on `http://localhost:3000/login`. The email links to the production domain, because the templates build the link from the Site URL. Replace the link's origin with `http://localhost:3000`, keep the path and query, and open it. The token-hash callback ([`app/auth/callback/route.ts`](app/auth/callback/route.ts)) verifies on any origin. A link works only once, so don't open the production one first.
 
@@ -117,7 +117,7 @@ To sign in locally against it: request a link on `http://localhost:3000/login`. 
 - *Authentication → URL Configuration:* set the Site URL to `http://localhost:3000` (it's your project), and add `http://localhost:3000/**` to the Redirect URLs.
 - *Authentication → Email Templates:* point Magic Link at `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`, and Invite user at the same link with `type=invite`.
 - *Authentication → SMTP Settings:* the built-in mailer delivers only to members of the project's Supabase team and only a few emails an hour, so set up a custom SMTP server before inviting anyone else.
-- Apply all four migrations (next section), then check the *Table Editor*: every table has RLS enabled.
+- Apply the migrations in the table below, then check the *Table Editor*: every table has RLS enabled.
 - *Authentication → Users → Invite user:* invite yourself.
 
 ### Migrations
@@ -155,11 +155,13 @@ npm run ingest -- https://example.com/some-article
 
 ## Deploy
 
+The shared project is already deployed. These steps are for a deployment of your own, backed by your own Supabase project. Don't follow them with the shared project's keys: a second deployment would run a second daily cron, and with it `retryPendingSources`, against production.
+
 1. **Vercel:** *Add New → Project*, import the repository. Next.js and pnpm are detected automatically.
-2. **Environment variables:** everything from the [Environment](#environment) table, for Production and Preview. Tick Development too if you want a plain `vercel env pull` to work; otherwise pull with `--environment=production`. Environment changes take effect on the next deploy.
+2. **Environment variables:** everything from the [Environment](#environment) table, with your own project's values, for Production and Preview. Tick Development too if you want a plain `vercel env pull` to work; otherwise pull with `--environment=production`. Environment changes take effect on the next deploy.
 3. **Cron:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 5 * * *` (05:00 UTC). With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, translation and re-extraction routes may run for up to 300 s.
 4. **Install command:** check that Vercel installs from `pnpm-lock.yaml` in frozen mode with pnpm 11, so the 7-day age gate applies. This is an open item in [TODO.md](TODO.md).
-5. **Supabase:** the shared project's Site URL is the production domain, and its Redirect URLs include that domain and `http://localhost:3000/**`. The Site URL changes only when the production domain does (for example after renaming the Vercel project); never point it at localhost or a preview URL, because every member's magic link follows it. After a domain change, send new invites.
+5. **Supabase:** set your project's Site URL to the deployment's domain, add that domain to the Redirect URLs, and send new invites. On the shared project, the Site URL is the production domain and changes only when that domain does (for example after renaming the Vercel project). Only the owner changes it, and never to localhost or a preview URL, because every member's magic link follows it.
 6. **First run:** the same `curl` against `https://<domain>/api/cron/daily`. The next morning, check *Vercel → Logs* and *Cron Jobs*.
 
 Schema changes go in before the code that needs them, and a migration may only add while older code is still deployed. A column is dropped only after no deployed code reads it, as `drop_post_body` does.

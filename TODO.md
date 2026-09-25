@@ -31,7 +31,7 @@
 ### 2. API kulcsok
 - [ ] **Gemini**: [aistudio.google.com](https://aistudio.google.com) → *Get API key*. Az ingyenes keretnél a Google felhasználhatja a beküldött adatot. Nyilvános hírekhez ez rendben van, de ha zavar, kapcsold be a fizetős csomagot.
 - [ ] **Groq** (opcionális): [console.groq.com](https://console.groq.com) → API Keys
-- [ ] **GitHub token** (opcionális): *Settings → Developer settings → Fine-grained token*, jogosultság nélkül. Csak a keresési limitet emeli.
+- [ ] **GitHub token** (opcionális): *Settings → Developer settings → Fine-grained token*, jogosultság nélkül. A GitHub API limitjét emeli a napi repókeresésnél és a GitHub-kinyerőnél.
 - [ ] **CRON_SECRET**: egy hosszú, véletlen szöveg, pl. `openssl rand -hex 32`
 
 ### 3. Helyi próba

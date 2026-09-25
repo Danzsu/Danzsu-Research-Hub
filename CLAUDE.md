@@ -10,7 +10,7 @@ It was reconstructed from a flat archive (see [docs/ARCHIVE-MAP.md](docs/ARCHIVE
 
 ## How content gets in
 
-Nothing runs on a personal machine. Two writers, both server-side; the pipeline work runs with the Supabase **secret key**, and only the submission's `sources` row is inserted as the reader:
+Nothing runs on a personal machine. Two writers, both server-side; their pipeline work runs with the Supabase **secret key**, and of their writes only the submission's `sources` row is inserted as the reader (the submitter's post edits are the other reader write, see Database):
 
 1. **Daily pipeline** — Vercel Cron (`vercel.json`, `0 5 * * *`, 05:00 UTC) → `app/api/cron/daily` → `runDaily` in `lib/pipeline/daily.ts`:
    - upserts the current ISO-week `issues` row;
@@ -138,7 +138,7 @@ npm run ingest -- <url>   # node --env-file=.env.local … scripts/ingest-url.mt
 
 Before a commit, all five checks pass: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`.
 
-`corepack enable` fails with EPERM under nvm-for-windows, so pnpm is invoked through corepack directly. `engines` requires Node `>=22.13.0`; use Node 24 LTS, the only version the render harness is verified on. Newer Node releases no longer bundle corepack (`npm i -g corepack`).
+`corepack enable` fails with EPERM under nvm-for-windows, so pnpm is invoked through corepack directly. `engines` requires Node `>=22.13.0`; use Node 24 LTS, the only version the render harness is verified on. Newer Node releases no longer bundle corepack; install the version Node 24.16 ships with (`npm i -g corepack@0.35.0`).
 
 ## Layout
 
