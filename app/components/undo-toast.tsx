@@ -38,14 +38,14 @@ export function UndoToast() {
   const { language } = useLanguage();
   const toast = useSyncExternalStore(toasts.subscribe, toasts.getSnapshot, noToast);
   // Paused while the pointer or focus is on it, so the Undo button can be reached in time.
-  const [pausedId, setPausedId] = useState<number | null>(null);
+  const [paused, setPaused] = useState(false);
   const toastId = toast?.id;
 
   useEffect(() => {
-    if (toastId === undefined || pausedId === toastId) return;
+    if (toastId === undefined || paused) return;
     const timer = setTimeout(() => toasts.dismiss(toastId), VISIBLE_MS);
     return () => clearTimeout(timer);
-  }, [toastId, pausedId]);
+  }, [toastId, paused]);
 
   useEffect(() => {
     // A delete that waits for its toast to run out must still happen if the tab closes first.
@@ -63,10 +63,15 @@ export function UndoToast() {
       {toast && (
         <div
           data-undo-toast
-          onPointerEnter={() => setPausedId(toast.id)}
-          onPointerLeave={() => setPausedId(null)}
-          onFocus={() => setPausedId(toast.id)}
-          onBlur={() => setPausedId(null)}
+          onPointerEnter={() => setPaused(true)}
+          onPointerLeave={() => setPaused(false)}
+          onFocus={() => setPaused(true)}
+          onBlur={(event) => {
+            // Only unpause if focus moved outside the toast's container
+            if (!(event.currentTarget instanceof Element) || !event.currentTarget.contains(event.relatedTarget as Node)) {
+              setPaused(false);
+            }
+          }}
           className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs ${
             toast.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"
           }`}
