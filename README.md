@@ -61,7 +61,7 @@ flowchart TD
 3. **Image mirroring** ([`images.ts`](lib/pipeline/images.ts)). Up to 30 images are downloaded and re-encoded to AVIF, or animated WebP, at 640 and 1280 px. They go into a private Storage bucket and are served by the `/media` route to signed-in readers only.
 4. **Summary or notes.** A model writes the bilingual title, summary, key points and tags. A page that asks not to be archived (`noarchive`) gets no mirrored text at all, only notes in the model's own words.
 
-Every source ends up as the same block model ([`lib/blocks.ts`](lib/blocks.ts)): headings, paragraphs, lists, quotes, code, images, videos, chapters, repo cards and dividers. The page renders only these blocks, never raw HTML. Block ids come from their content, so a hidden block stays hidden after re-extraction as long as its content is unchanged.
+Every source ends up as the same block model ([`lib/blocks.ts`](lib/blocks.ts)): headings, paragraphs, lists, quotes, code, images, videos, chapters, repo cards and dividers. The page renders only these blocks, never raw HTML. Block ids come from their content, so a hidden block stays hidden after re-extraction as long as its content is unchanged. A re-extraction that fails leaves the post as it was, and the post page shows the error to the submitter until a later run succeeds.
 
 **Translation** ([`lib/translate.ts`](lib/translate.ts)) runs on demand from the post page. Only the text of the blocks goes to the model, in chunks; links, images and structure are copied from the original. A translation that finishes after the post was re-extracted is refused, and the reader is asked to retry.
 
@@ -172,14 +172,14 @@ Schema changes go in before the code that needs them, and a migration may only a
 | --- | --- |
 | [`app/`](app/) | Pages: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]` and `/login`, plus loading, error and 404 pages |
 | [`app/components/`](app/components/) | The Radar dashboard, the page header, the language toggle, and `post-blocks`, the block renderer |
-| [`app/library/`](app/library/) | The submit form, and the post page with its toolbar (translate, edit link) and editor (edit, hide, re-extract) |
+| [`app/library/`](app/library/) | The submit form, and the post page with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
 | [`app/api/`](app/api/) | JSON routes: reader state, link submission, post edit, translate, re-extract, and the daily cron |
 | [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link login, callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login` |
 | [`app/media/`](app/media/) | Serves mirrored images to signed-in readers |
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the feed list, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
 | [`lib/`](lib/) | The block model, the post view, post edits, translation, the model client, content queries, the language cookie, Supabase clients |
-| [`lib/test/`](lib/test/) | The offline render harness for component tests |
+| [`lib/test/`](lib/test/) | The offline render harness for component tests, and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [CLAUDE.md](CLAUDE.md#design-language--do-not-erode-it)) |
 | [`supabase/migrations/`](supabase/migrations/) | Schema, RLS, database functions, model seeds |

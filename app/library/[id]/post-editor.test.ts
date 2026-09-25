@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { assignIds } from "../../../lib/blocks.ts";
-import type { Post } from "../../../lib/post-view.ts";
+import { testPost } from "../../../lib/test/fixtures.ts";
 import { render } from "../../../lib/test/render.ts";
 
 const { PostEditor } = await import("./post-editor.tsx");
@@ -13,30 +13,7 @@ const blocks = assignIds([
   { type: "paragraph", content: [{ text: "Body" }] },
 ]);
 const [video] = blocks;
-const title = { hu: "Cím", en: "Title" };
-const summary = { hu: "Összefoglaló", en: "Summary" };
-const post: Post = {
-  id: 7,
-  sourceId: 3,
-  kind: "youtube",
-  url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  author: null,
-  siteName: "YouTube",
-  publishedAt: null,
-  title,
-  summary,
-  generatedTitle: title,
-  generatedSummary: summary,
-  keyPoints: { hu: [], en: [] },
-  tags: [],
-  blocks,
-  blocksHu: null,
-  meta: {},
-  hiddenBlocks: [video.id],
-  submittedBy: "owner",
-  extractedAt: null,
-  createdAt: "2026-09-22T10:00:00Z",
-};
+const post = testPost({ kind: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", siteName: "YouTube", blocks, hiddenBlocks: [video.id] });
 
 // What page.tsx passes in its edit branch: the page's own query, which always has edit=1 there.
 const renderEditor = () => render(createElement(PostEditor, { post, language: "en", query: { edit: "1" } }));

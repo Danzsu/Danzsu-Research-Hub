@@ -12,31 +12,12 @@ import { readMinutes, type PostQuery } from "@/lib/post-view";
 import { getReader } from "@/lib/supabase/server";
 import { translatable } from "@/lib/translate";
 import { PostEditor } from "./post-editor";
+import { notices, PostNotices } from "./post-notices";
 import { PostToolbar } from "./post-toolbar";
 
 export const dynamic = "force-dynamic";
 
 const kindLabel = { article: "ARTICLE", youtube: "VIDEO", arxiv: "PAPER", github: "REPO", x: "POST", pdf: "PDF" } as const;
-
-const notices = {
-  hu: {
-    noarchive: "Saját összefoglaló — az eredeti:",
-    failed: "A tartalmat nem sikerült átmenteni — az eredeti:",
-    // X oEmbed is embed-shaped, not article-shaped: it also cuts long single posts, not just threads.
-    truncated: "A poszt beágyazott formájában került be: szál, képek és a hosszú poszt vége nélkül.",
-    clipped: "A forrás túl hosszú volt, az eleje került be.",
-    original: "Eredeti forrás",
-    min: "perc",
-  },
-  en: {
-    noarchive: "Our own notes — the original:",
-    failed: "The content could not be mirrored — the original:",
-    truncated: "Captured in its embed form: no thread, images or the end of a long post.",
-    clipped: "The source was too long; the beginning was kept.",
-    original: "Original source",
-    min: "min",
-  },
-};
 
 export default async function PostPage({
   params,
@@ -82,18 +63,7 @@ export default async function PostPage({
               {minutes !== null && <span className="text-ink/60">{minutes} {t.min}</span>}
             </p>
             <h1 className="mt-4 font-display text-[clamp(1.9rem,6vw,4.6rem)] leading-[0.95] tracking-[-0.05em] [overflow-wrap:anywhere]">{post.title[language]}</h1>
-            {(post.meta.noarchive || post.meta.extractionFailed) && (
-              <p className="mt-4 border-l-4 border-signal pl-4 text-sm">
-                {post.meta.noarchive ? t.noarchive : t.failed}{" "}
-                {originalHref ? (
-                  <a href={originalHref} target="_blank" rel="noreferrer" className="focus-ring text-signal underline [overflow-wrap:anywhere]">{post.url}</a>
-                ) : (
-                  <span className="[overflow-wrap:anywhere]">{post.url}</span>
-                )}
-              </p>
-            )}
-            {post.meta.truncated && <p className="mt-2 font-mono text-xs text-ink/60">{t.truncated}</p>}
-            {post.meta.clipped && <p className="mt-2 font-mono text-xs text-ink/60">{t.clipped}</p>}
+            <PostNotices post={post} language={language} originalHref={originalHref} canEdit={canEdit} />
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <PostToolbar
                 postId={post.id}

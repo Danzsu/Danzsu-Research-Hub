@@ -90,7 +90,7 @@ export async function getArchive(db: SupabaseClient, language: Language): Promis
 }
 
 const LIST_COLUMNS = "id, source_id, kind, url, author, source_site, published_at, title, summary, key_points, tags, meta, overrides, hidden_blocks, extracted_at, created_at";
-const POST_COLUMNS = `${LIST_COLUMNS}, blocks, blocks_hu, sources(submitted_by)`;
+const POST_COLUMNS = `${LIST_COLUMNS}, blocks, blocks_hu, sources(submitted_by, error)`;
 
 export async function getPosts(db: SupabaseClient): Promise<Post[]> {
   const { data } = await db.from("posts").select(LIST_COLUMNS).order("created_at", { ascending: false }).limit(100);

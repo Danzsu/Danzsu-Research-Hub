@@ -36,14 +36,16 @@ export type Post = {
   meta: PostMeta;
   hiddenBlocks: string[];
   submittedBy: string | null;
+  /** The source's last extraction error: a re-extraction failed and the post kept its content. A good run clears it. */
+  lastError: string | null;
   extractedAt: string | null;
   createdAt: string;
 };
 
-/** A `posts` row (optionally with its `sources(submitted_by)` embed) as the page's Post. */
+/** A `posts` row (optionally with its `sources(submitted_by, error)` embed) as the page's Post. */
 export function toPost(row: Record<string, unknown>): Post {
   const overrides = readOverrides(row.overrides);
-  const source = row.sources as { submitted_by: string } | null | undefined;
+  const source = row.sources as { submitted_by: string; error?: string | null } | null | undefined;
   return {
     id: row.id as number,
     sourceId: row.source_id as number,
@@ -64,6 +66,7 @@ export function toPost(row: Record<string, unknown>): Post {
     meta: (row.meta ?? {}) as PostMeta,
     hiddenBlocks: readHiddenBlocks(row.hidden_blocks),
     submittedBy: source?.submitted_by ?? null,
+    lastError: source?.error ?? null,
     extractedAt: row.extracted_at as string | null,
     createdAt: row.created_at as string,
   };

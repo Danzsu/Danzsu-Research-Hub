@@ -217,3 +217,9 @@ test("toPost reads the submitter from the sources embed and defaults the optiona
   assert.equal(full.submittedBy, "user-1");
   assert.deepEqual(full.hiddenBlocks, ["b1"]);
 });
+
+test("toPost carries the source's last extraction error, and null when there is none", () => {
+  assert.equal(toPost(postRow({ sources: { submitted_by: "user-1", error: "fetch 404" } })).lastError, "fetch 404");
+  assert.equal(toPost(postRow({ sources: { submitted_by: "user-1", error: null } })).lastError, null);
+  assert.equal(toPost(postRow()).lastError, null); // the list query has no embed
+});

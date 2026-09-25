@@ -32,7 +32,7 @@ Nothing runs on a personal machine. Two writers, both server-side; their pipelin
    5. `summarize` (`ingest_article`) writes the bilingual title, summary, key points and tags, unless the extractor already did (YouTube).
    6. Upserts `posts` on `source_id` with `blocks_hu: null` and `extracted_at: now`, deletes Storage objects the new blocks no longer reference (`removeUnusedMedia`), and marks the source `done`.
 
-   On failure, `failureUpdate` writes only `error` when a post already exists (it stays published), otherwise `status: "failed"`. The pipeline never writes `overrides` or `hidden_blocks`.
+   On failure, `failureUpdate` writes only `error` when a post already exists (it stays published, and the post page shows that error to the submitter; the next good run clears it), otherwise `status: "failed"`. The pipeline never writes `overrides` or `hidden_blocks`.
 
 The extractors, one per `SourceKind` (`lib/pipeline/util.ts`):
 
@@ -148,7 +148,8 @@ app/                     pages (/, /archive, /archive/[week], /library, /library
 app/components/          digest-dashboard (the Radar), page-header (PageHeader, PageHero), language-toggle,
                          post-blocks (the block renderer, + test)
 app/library/             submit-form; [id]/ post-toolbar (translate, edit link), post-editor (edit, hide,
-                         re-extract), both + tests
+                         re-extract), post-notices (the notices under the title, the submitter's last
+                         extraction error), each + tests
 app/api/                 state, sources, posts/[id] (PATCH), posts/[id]/translate, posts/[id]/reextract, cron/daily
 app/auth/                login, callback, signout
 app/media/[...path]/     session-checked mirrored-image serving
@@ -159,7 +160,7 @@ lib/pipeline/extract/    index (extract, the fallback sets, metadataOnly), types
                          article, youtube, arxiv, github, x, pdf
 lib/pipeline/fake-db.ts  test helper: offline Supabase stand-in (fakeDb)
 lib/pipeline/mock-fetch.ts  test helper: fetch, DNS, env and response-body fakes
-lib/test/                render harness for component tests (render, tsx-hooks, next-stub)
+lib/test/                render harness for component tests (render, tsx-hooks, next-stub), fixtures (testPost)
 lib/blocks.ts            the block schema (`zod/v4`), parseBlocks, assignIds, limitBlocks, safeHref
 lib/post-view.ts         Post, toPost (a posts row → the page's Post), media/video helpers, withQuery
 lib/post-edit.ts         editPayload, savePostEdits, requestReextract
@@ -187,7 +188,7 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 
 - **No duplication.** Search (`grep -rn`) before writing a helper or a class list, and reuse the shared homes: `lib/media.ts` (image paths), `lib/api.ts` (`jsonError`), `lib/supabase/server.ts` (`getReader` / `getViewer`), `lib/pipeline/util.ts` (`hostOf`, `parseId`, `detectSource`, `errorMessage`, `publishedDate`…), `lib/pipeline/fetch.ts` (`safeFetch`, `apiFetch`, `ensureOk`, `readText`), `lib/blocks.ts` (`localizedSchema`, `parseBlocks`), `readPageMeta` in `extract/article.ts`, and in the UI the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHeader` and `PageHero`. `npm run dup` is the gate: at most 1% duplication, and no new clone.
 - **Relative imports in `lib/`.** Every file under `lib/` uses relative `.ts` imports (no `@/`), so `node --test` loads it without a bundler, and the client editor can import `lib/post-edit.ts` without server-only code. The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which tests never load.
-- **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library. Existing names: `copy` (`submit-form`, `post-toolbar`, `post-editor`), `labels` (`post-blocks`), `notices` (`library/[id]/page.tsx`), `ui` (`digest-dashboard`). A few inline ternaries remain, for example in `app/library/page.tsx` and `app/archive/page.tsx`; UX milestone A moves them. Code identifiers, comments and model prompts are English.
+- **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library. Existing names: `copy` (`submit-form`, `post-toolbar`, `post-editor`), `labels` (`post-blocks`), `notices` (`library/[id]/post-notices.tsx`, also read by the post page), `ui` (`digest-dashboard`). A few inline ternaries remain, for example in `app/library/page.tsx` and `app/archive/page.tsx`; UX milestone A moves them. Code identifiers, comments and model prompts are English.
 - **Tests.** `node --test` with type stripping, no framework. Helpers:
   - `lib/pipeline/fake-db.ts`: `fakeDb(route?, tables?)`, an offline Supabase client: `model_settings` answers with `route` and records each task asked for (`.tasks`); `sources`, `posts`, storage and RPCs answer from `tables`; every write is recorded (`sourceUpdates`, `postUpserts`, `postUpdates`, `postUpdateFilters`, `rpcCalls`, `upserts`, `writes`, …).
   - `lib/pipeline/mock-fetch.ts`: `mockFetch(t, handler)`, `withGeminiKey(t)` and `withEnv(t, name, value)`, which restore themselves with `t.after`; `mockDns(t)`; `endlessBody()` with `reads()` / `cancelled()` to prove a body was released unread; `TEST_IP` / `TEST_HOST`, a public IP literal `safeFetch` resolves offline; `geminiResponse`, `geminiText`, `geminiPrompt`.
@@ -224,7 +225,7 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 
 `githubTop10` is an array of **positional 3-tuples** `[repo, focus, url]`, not objects. Exactly 3 items per issue have `must_read` — enforced by `refresh_must_read`; the `nth-child(2)/(3)` stagger in `globals.css` only reads as deliberate at exactly three.
 
-**Library posts use a separate block model, not `DigestItem`.** `lib/blocks.ts`'s `blockSchema` — a `zod/v4` discriminated union (`heading`, `paragraph`, `list`, `quote`, `code`, `image`, `video`, `chapters`, `repo`, `divider`) — is the one shape every source is converted into and the one shape `app/components/post-blocks.tsx` renders from. Inline text is a list of spans with optional `href`, `bold`, `italic` and `code`. Extractors build `BlockDraft`s and call `assignIds`, which derives each id from the block's type and normalized content (content-addressed, not positional), so it stays stable across re-extraction — `hidden_blocks`, and later annotations, refer to a block by this id. `posts.blocks` holds the original-language blocks, `posts.blocks_hu` the on-demand Hungarian translation; both are read through `parseBlocks`, which drops any individual block that fails validation rather than failing the whole page (an empty or unparseable `blocks_hu` means "not translated"). `overrides` and `hidden_blocks` are read through `readOverrides` / `readHiddenBlocks`, which validate each field on its own. `posts.meta` carries the page's notices: `mirrored`, `noarchive`, `extractionFailed`, `truncated` and `clipped`. `lib/post-view.ts`'s `toPost` turns a row into the page's `Post`, where a submitter's override wins over the model's title and summary.
+**Library posts use a separate block model, not `DigestItem`.** `lib/blocks.ts`'s `blockSchema` — a `zod/v4` discriminated union (`heading`, `paragraph`, `list`, `quote`, `code`, `image`, `video`, `chapters`, `repo`, `divider`) — is the one shape every source is converted into and the one shape `app/components/post-blocks.tsx` renders from. Inline text is a list of spans with optional `href`, `bold`, `italic` and `code`. Extractors build `BlockDraft`s and call `assignIds`, which derives each id from the block's type and normalized content (content-addressed, not positional), so it stays stable across re-extraction — `hidden_blocks`, and later annotations, refer to a block by this id. `posts.blocks` holds the original-language blocks, `posts.blocks_hu` the on-demand Hungarian translation; both are read through `parseBlocks`, which drops any individual block that fails validation rather than failing the whole page (an empty or unparseable `blocks_hu` means "not translated"). `overrides` and `hidden_blocks` are read through `readOverrides` / `readHiddenBlocks`, which validate each field on its own. `posts.meta` carries the page's notices: `mirrored`, `noarchive`, `extractionFailed`, `truncated` and `clipped`. `lib/post-view.ts`'s `toPost` turns a row into the page's `Post`, where a submitter's override wins over the model's title and summary, and `lastError` is the `sources.error` of the single-post embed.
 
 ## Content and copyright
 
