@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type { Language } from "@/data/digest-types";
+import type { Language, Localized } from "@/data/digest-types";
 
 /** Stores the choice for the server (`getLanguage()` in lib/language.ts) and relabels <html lang> for the page already shown. */
 function persistLanguage(language: Language) {
@@ -27,4 +27,13 @@ export function useLanguage(): LanguageState {
   const state = useContext(LanguageContext);
   if (!state) throw new Error("useLanguage must be used inside LanguageProvider (app/components/app-shell.tsx)");
   return state;
+}
+
+/**
+ * One `{ hu, en }` text in the reader's language. Server components hand both languages to it, so
+ * the language toggle switches the page without a round trip.
+ */
+export function LocalizedText({ value }: { value: Localized }) {
+  const { language } = useLanguage();
+  return value[language];
 }

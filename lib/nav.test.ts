@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activeNavId, NAV_ITEMS, PRIMARY_NAV, SOON_NAV } from "./nav.ts";
+import { activeNavId, NAV_ITEMS, PRIMARY_NAV, SOON_NAV, switchesLanguageInPlace } from "./nav.ts";
 
 test("the bar's four primary slots in order, then the soon items", () => {
   assert.deepEqual(PRIMARY_NAV.map((item) => item.id), ["radar", "library", "search", "archive"]);
@@ -22,4 +22,13 @@ test("activeNavId goes by path prefix at segment boundaries", () => {
   assert.equal(activeNavId("/libraryx"), null);
   assert.equal(activeNavId("/login"), null);
   assert.equal(activeNavId("/dev/preview"), null);
+});
+
+test("the toggle switches in place only where both languages are on the page", () => {
+  for (const path of ["/", "/library", "/library/", "/archive", "/archive/2026-W38", "/dev/preview"]) {
+    assert.equal(switchesLanguageInPlace(path), true, path);
+  }
+  for (const path of ["/library/42", "/archive/2026-W38/x", "/dev/preview/post", "/login"]) {
+    assert.equal(switchesLanguageInPlace(path), false, path);
+  }
 });

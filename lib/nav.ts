@@ -33,3 +33,12 @@ export function activeNavId(pathname: string): NavId | null {
   );
   return match?.id ?? null;
 }
+
+/**
+ * Pages that hold every text in both languages (client components, or LocalizedText): the toggle
+ * switches them without a server round trip. Any other page is refreshed, so nothing stays in the old language.
+ * /dev/preview renders the same list views on fixtures (development only); its post view, /dev/preview/post, is refreshed.
+ */
+const IN_PLACE_LANGUAGE = [/^\/$/, /^\/library\/?$/, /^\/archive(\/[^/]+)?\/?$/, /^\/dev\/preview\/?$/];
+
+export const switchesLanguageInPlace = (pathname: string) => IN_PLACE_LANGUAGE.some((pattern) => pattern.test(pathname));

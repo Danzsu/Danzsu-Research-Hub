@@ -81,7 +81,7 @@ export type ArchiveIssue = {
   period: string;
   /** Big display label, max ~4 chars — it renders at `font-display text-5xl`. */
   week: string;
-  top: string;
+  top: Localized;
   itemCount: number;
   readMinutes: number;
 };

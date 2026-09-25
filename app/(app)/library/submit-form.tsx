@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { useLanguage } from "@/app/components/language-context";
 import { Button } from "@/components/ui/button";
-import type { Language } from "@/data/digest-types";
 
 const copy = {
   hu: {
@@ -29,7 +29,8 @@ const copy = {
 
 type Status = "ok" | "invalid_url" | "already_submitted" | "error";
 
-export function SubmitForm({ language }: { language: Language }) {
+export function SubmitForm() {
+  const { language } = useLanguage();
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");

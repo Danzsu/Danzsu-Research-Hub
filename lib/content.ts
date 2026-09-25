@@ -5,7 +5,6 @@ import type {
   CurrentIssue,
   DigestItem,
   GithubTopEntry,
-  Language,
   Localized,
 } from "@/data/digest-types";
 import { toPost, type Post } from "@/lib/post-view";
@@ -71,7 +70,7 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
   };
 }
 
-export async function getArchive(db: SupabaseClient, language: Language): Promise<ArchiveIssue[]> {
+export async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
   const current = isoWeek(new Date()).id;
   const { data } = await db
     .from("archive_issues")
@@ -83,7 +82,7 @@ export async function getArchive(db: SupabaseClient, language: Language): Promis
     id: row.id,
     period: row.period,
     week: row.id.slice(5), // '2026-W38' → 'W38'
-    top: (row.top_title as Localized | null)?.[language] ?? "—",
+    top: (row.top_title as Localized | null) ?? { hu: "—", en: "—" },
     itemCount: row.item_count,
     readMinutes: row.read_minutes,
   }));

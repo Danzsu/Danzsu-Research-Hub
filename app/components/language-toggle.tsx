@@ -1,24 +1,26 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Languages } from "lucide-react";
+import { switchesLanguageInPlace } from "@/lib/nav";
 import { useLanguage } from "./language-context";
 import { NavTooltip } from "./nav-parts";
 
 // Each label names the switch in the language it switches to.
 const copy = { hu: { label: "Switch to English" }, en: { label: "Váltás magyarra" } };
 
-/** Switches the whole shell at once; the server-rendered page follows with one refresh. `iconOnly` is the rail's ~40px version (desktop-nav.tsx). */
+/** Switches the whole shell at once; only a page whose text the server rendered in one language is refreshed. `iconOnly` is the rail's ~40px version (desktop-nav.tsx). */
 export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const { language, setLanguage } = useLanguage();
   const router = useRouter();
+  const pathname = usePathname();
   const label = copy[language].label;
   const toggle = (
     <button
       type="button"
       onClick={() => {
         setLanguage(language === "hu" ? "en" : "hu");
-        router.refresh();
+        if (!switchesLanguageInPlace(pathname)) router.refresh();
       }}
       aria-label={label}
       className={
