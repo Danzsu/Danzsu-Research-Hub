@@ -1,11 +1,11 @@
 import { XMLParser } from "fast-xml-parser";
-import { assignIds, plainText, withoutIds, type Block, type BlockDraft } from "../../blocks.ts";
+import { assignIds, plainText, withoutIds, type BlockDraft } from "../../blocks.ts";
 import { apiFetch, cancelBody, ensureOk, readText, safeFetch } from "../fetch.ts";
 import { collapse } from "../html-to-blocks.ts";
 import { arxivId, errorMessage, list, xmlText } from "../util.ts";
 import { articleFromHtml } from "./article.ts";
 import { extractPdf } from "./pdf.ts";
-import type { Extractor } from "./types.ts";
+import type { Extracted, Extractor } from "./types.ts";
 
 export type ArxivMeta = { title: string; summary: string; published: string | null; authors: string[] };
 
@@ -60,7 +60,8 @@ export const extractArxiv: Extractor = async (db, url, note) => {
       // browser would — forcing a trailing slash here breaks that and 404s every figure.
       const base = response.url || `https://arxiv.org/html/${id}`;
       const article = articleFromHtml(html, base);
-      return { ...article, title: info.title || article.title, author: byline(info.authors), siteName: "arXiv", publishedAt: info.published, meta };
+      // The page's own meta (its robots `noarchive`) survives; arXiv's ids are added to it.
+      return { ...article, title: info.title || article.title, author: byline(info.authors), siteName: "arXiv", publishedAt: info.published, meta: { ...article.meta, ...meta } };
     }
   } catch (error) {
     console.warn(`arxiv html ${id}: ${errorMessage(error)}`);
@@ -71,20 +72,21 @@ export const extractArxiv: Extractor = async (db, url, note) => {
     { type: "heading", level: 2, text: "Abstract" },
     { type: "paragraph", content: [{ text: info.summary }] },
   ];
-  let body: Block[] = [];
+  let pdf: Pick<Extracted, "blocks" | "meta"> = { blocks: [], meta: {} };
   try {
-    body = (await extractPdf(db, `https://arxiv.org/pdf/${id}`, note)).blocks;
+    pdf = await extractPdf(db, `https://arxiv.org/pdf/${id}`, note);
   } catch (error) {
     console.warn(`arxiv pdf ${id}: ${errorMessage(error)}`);
   }
-  const blocks = assignIds([...abstract, ...withoutIds(body)]);
+  const blocks = assignIds([...abstract, ...withoutIds(pdf.blocks)]);
   return {
     blocks,
     title: info.title,
     author: byline(info.authors),
     siteName: "arXiv",
     publishedAt: info.published,
-    meta,
-    text: [info.summary, plainText(body)].filter(Boolean).join("\n\n"),
+    // The PDF's X-Robots-Tag `noarchive` survives the same way.
+    meta: { ...pdf.meta, ...meta },
+    text: [info.summary, plainText(pdf.blocks)].filter(Boolean).join("\n\n"),
   };
 };

@@ -40,7 +40,7 @@ The extractors, one per `SourceKind` (`lib/pipeline/util.ts`):
 | --- | --- | --- |
 | `article` | `extract/article.ts` | `safeFetch` (8 MB), a PDF content type goes to the PDF path; `readPageMeta` → `cleanDocument` → Readability → `htmlToBlocks`; throws under 200 characters of text |
 | `youtube` | `extract/youtube.ts` | oEmbed (400/404 → `FetchError`), then one `ingest_video` call for the summary and chapters; the video is embedded, not mirrored; a Gemini failure leaves a video-only post (`meta.extractionFailed`) |
-| `arxiv` | `extract/arxiv.ts` | export.arxiv.org metadata, then `arxiv.org/html/<id>` parsed like an article; without HTML, the abstract plus a PDF transcription |
+| `arxiv` | `extract/arxiv.ts` | export.arxiv.org metadata, then `arxiv.org/html/<id>` parsed like an article; without HTML, the abstract plus a PDF transcription; either path keeps its page's or PDF's `noarchive` |
 | `github` | `extract/github.ts` | REST repo info and the README as HTML (404 = no README, anything else throws); a `repo` block, then README blocks with repo-relative image URLs rewritten to raw.githubusercontent.com |
 | `x` | `extract/x.ts` | publish.twitter.com oEmbed: one post's text, no thread or images (`meta.truncated`); every failure is a `FetchError` |
 | `pdf` | `extract/pdf.ts` | `safeFetch` (20 MB) → `ingest_pdf` transcription into at most 400 blocks; the prompt stops at roughly 12,000 words |

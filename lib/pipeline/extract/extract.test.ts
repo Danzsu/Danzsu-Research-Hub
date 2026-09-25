@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseHTML } from "linkedom";
 import type { Block, BlockDraft } from "../../blocks.ts";
 import { FetchError } from "../fetch.ts";
 import { htmlToDrafts } from "../html-to-blocks.ts";
-import { mockDns, mockFetch, TEST_IP } from "../mock-fetch.ts";
+import { fakeDb } from "../fake-db.ts";
+import { geminiResponse, mockDns, mockFetch, TEST_IP, withGeminiKey } from "../mock-fetch.ts";
 import { articleFromHtml, extractArticle, readPageMeta, trimByline } from "./article.ts";
 import { extractArxiv, isArxivHtml, parseArxivAtom } from "./arxiv.ts";
 import { extractGithub, resolveGithubImage } from "./github.ts";
@@ -60,6 +61,8 @@ test("articleFromHtml reads robots directives from every robots/googlebot meta, 
   assert.equal(googlebot.meta.noarchive, true);
   const shoutyCase = articleFromHtml(page(`<meta name="ROBOTS" content="NOARCHIVE">`, article), "https://blog.test/p");
   assert.equal(shoutyCase.meta.noarchive, true);
+  const padded = articleFromHtml(page(`<meta name=" robots " content="noarchive">`, article), "https://blog.test/p");
+  assert.equal(padded.meta.noarchive, true);
   const header = articleFromHtml(page("", article), "https://blog.test/p", "noarchive");
   assert.equal(header.meta.noarchive, true);
   assert.equal(articleFromHtml(page("", article), "https://blog.test/p").meta.noarchive, undefined);
@@ -259,13 +262,19 @@ ${Array.from({ length: 12 }, (_, i) => `<p class="ltx_p">Paragraph ${i} on facto
 <figure class="ltx_figure"><img src="2401.00001v1/return_difference.png" alt="Return difference" width="640" height="480"><figcaption class="ltx_caption">Figure 1: Return difference.</figcaption></figure>
 </article></div></body></html>`;
 
-test("extractArxiv resolves an HTML paper's figure against the real (unslashed) page URL", async (t) => {
+/** Serves the arXiv API with `singleAuthorFeed`, each other URL from the first `routes` key it contains, the rest 404. */
+function mockArxiv(t: TestContext, routes: Record<string, () => Response | Promise<Response>> = {}) {
   mockDns(t);
   mockFetch(t, async (url) => {
     if (url.includes("export.arxiv.org")) return new Response(singleAuthorFeed, { status: 200 });
-    if (url.includes("/html/")) return new Response(arxivHtmlFixture, { status: 200, headers: { "content-type": "text/html" } });
-    return new Response("", { status: 404 });
+    const route = Object.keys(routes).find((part) => url.includes(part));
+    return route ? routes[route]() : new Response("", { status: 404 });
   });
+}
+const arxivHtml = (html: string) => () => new Response(html, { status: 200, headers: { "content-type": "text/html" } });
+
+test("extractArxiv resolves an HTML paper's figure against the real (unslashed) page URL", async (t) => {
+  mockArxiv(t, { "/html/": arxivHtml(arxivHtmlFixture) });
   const result = await extractArxiv(db, "https://arxiv.org/abs/2401.00001", "");
   // Forcing a trailing slash on the base would instead give
   // ".../html/2401.00001/2401.00001v1/return_difference.png", which 404s.
@@ -273,17 +282,32 @@ test("extractArxiv resolves an HTML paper's figure against the real (unslashed) 
 });
 
 test("extractArxiv falls back to the abstract when neither an HTML nor a PDF version can be read", async (t) => {
-  mockDns(t);
-  mockFetch(t, async (url) => {
-    if (url.includes("export.arxiv.org")) return new Response(singleAuthorFeed, { status: 200 });
-    return new Response("", { status: 404 }); // no HTML version, no PDF either
-  });
+  mockArxiv(t); // no HTML version, no PDF either
   const result = await extractArxiv(db, "https://arxiv.org/abs/math/0211159", "");
   assert.deepEqual(
     result.blocks.map((b) => b.type),
     ["heading", "paragraph"],
   );
   assert.ok(result.text.includes("monotonic expression for the Ricci flow"));
+});
+
+test("extractArxiv keeps an HTML paper's robots noarchive next to its arXiv meta", async (t) => {
+  mockArxiv(t, { "/html/": arxivHtml(arxivHtmlFixture.replace("<head>", `<head><meta name="robots" content="noarchive">`)) });
+  const result = await extractArxiv(db, "https://arxiv.org/abs/2401.00001", "");
+  assert.equal(result.meta.noarchive, true);
+  assert.equal(result.meta.arxivId, "2401.00001");
+});
+
+test("extractArxiv keeps the PDF's X-Robots-Tag noarchive when there is no HTML version", async (t) => {
+  withGeminiKey(t);
+  mockArxiv(t, {
+    "/pdf/": () => new Response("%PDF-1.4", { headers: { "content-type": "application/pdf", "x-robots-tag": "noarchive" } }),
+    "googleapis.com": () => geminiResponse({ title: "T", blocks: [{ type: "paragraph", text: "Body" }] }),
+  });
+  const result = await extractArxiv(fakeDb(), "https://arxiv.org/abs/math/0211159", "");
+  assert.equal(result.meta.noarchive, true);
+  assert.equal(result.meta.arxivId, "math/0211159");
+  assert.deepEqual(result.blocks.map((b) => b.type), ["heading", "paragraph", "paragraph"]);
 });
 
 // Trimmed from a live fetch of api.github.com/repos/facebookresearch/detectron2 (Accept:

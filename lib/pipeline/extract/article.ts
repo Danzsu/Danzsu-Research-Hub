@@ -21,10 +21,10 @@ export type PageMeta = {
   robots: string[];
 };
 
-/** Every `meta[name=robots|googlebot]` content value, name matched case-insensitively. */
+/** Every `meta[name=robots|googlebot]` content value, name matched case-insensitively and trimmed. */
 function robotsMetaValues(document: Document): string[] {
   return [...document.querySelectorAll("meta[name]")]
-    .filter((meta) => ROBOTS_META_NAMES.has((meta.getAttribute("name") ?? "").toLowerCase()))
+    .filter((meta) => ROBOTS_META_NAMES.has((meta.getAttribute("name") ?? "").trim().toLowerCase()))
     .map((meta) => meta.getAttribute("content") ?? "");
 }
 
