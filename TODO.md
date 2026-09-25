@@ -80,6 +80,7 @@
 - [x] **Archívum részletoldal:** `/archive/2026-W38`, ugyanazzal az olvasó felülettel
 - [x] **Nyelvválasztás megjegyzése:** `lang` cookie, minden oldal ezt használja
 - [x] **Márkanév:** NEON NEWS RADAR
+- [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon összecsukható oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (`/dev/preview`).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
@@ -104,12 +105,10 @@
 ### Új ötletek (2026-09-24), a tervezés sorrendjében
 - [x] **Asztali navigáció** (döntés: 2026-09-25): az **A** (oldalsáv) az alap, és egy gombbal vagy a `[` billentyűvel keskeny ikonsávvá csukható, mint a C változat. A választást egy cookie jegyzi meg.
   - A spec: [docs/superpowers/specs/2026-09-24-ux-signals-search-design.md](docs/superpowers/specs/2026-09-24-ux-signals-search-design.md)
-- [ ] **UI/UX és keresés** (spec kész, terv következik):
-  - egységes navigáció: asztalon oldalsáv vagy felső sáv, mobilon alsó sáv
-  - mobilos ergonómia
+  - Most az **A** van bent, 2026-09-25-től ~56 px-es ikonsávvá csukható (`[`, vagy a lábléc gombja). A csere egyetlen fájl: `app/components/desktop-nav.tsx`.
+- [ ] **UI/UX és keresés:** az A mérföldkő kész (terv: [docs/superpowers/plans/2026-09-24-ux-a-app-shell.md](docs/superpowers/plans/2026-09-24-ux-a-app-shell.md)); hátra van a B (értékelés, GitHub-fül) és a C (keresés, lapozás).
   - okos keresés a címekben: elgépelés-tűrő, jelentés szerint is talál, szűrők
   - lapozás
-  - offline előnézeti oldal mintaadatokkal, Playwright-tesztekkel
 - [ ] **Olvasási jelzések:**
   - kedvenc (szív), plusz like / dislike a Radar-híreknél és a Library-posztoknál
   - a „nem hasznos” tétel az archívumban marad, csak halványítva jelenik meg, és kiszűrhető
@@ -157,6 +156,12 @@
   - Alternatíva: GitHub App, amelynek a tokenje nem jár le.
 - [ ] **Library keresés.** Postgres full-text search egy `search_posts` RPC-vel, a Library fejlécében egy keresőmezővel.
 - [ ] **Tag-szűrő.** A hírkártyák `#tag`-jei legyenek kattinthatók, és szűrjék a feedet.
+- [ ] **Élő próbák a UI/UX A deploy után** (a kontroller futtatja, ha a felhasználó engedélyez egy bejelentkezett munkamenetet):
+  - a képhelykitöltő eltűnik egy valódi tükrözött képen, újratöltés után is;
+  - egy poszt megnyitása olvasottnak jelöli az `item_states`-ben (`post:<id>`), és a Library-kártya elhalványul;
+  - a Library frissül, amíg egy valódi beküldés feldolgozás alatt van, és utána leáll;
+  - Tabbal elérhető az olvasópanel `2xl` alatt;
+  - a `z` visszavon egy valódi Megnyitást.
 
 ### Tartalom minősége
 - [ ] **Valódi GitHub trending.** Most csak a héten *létrehozott* repókat rangsorolja csillag szerint. A régebbi, de most gyorsan növő repókhoz napi csillagszám-mentés és a különbség számítása kell.
@@ -166,7 +171,7 @@
 - [ ] **Forráslink-figyelés.** Nincs ellenőrzés arra, hogy az eredeti link él-e még.
 
 ### Kényelmi funkciók
-- [ ] **Todo cikkhez kötése.** Az adatbázis tudja (`todos.item_id`), de a hírkártyán nincs „tedd a listára” gomb.
+- [x] **Todo cikkhez kötése.** A hírkártya „+ teendő” gombja (UI/UX A).
 - [ ] **Library lapozás.** Most a legutóbbi 100 poszt látszik, régebbiekhez „Továbbiak” gomb kell.
 - [ ] **Napi összefoglaló emailben** a meghívottaknak.
 - [ ] **Beküldés kívülről.** Egy gépi tokennel a Claude Cowork, egy iOS Shortcut vagy egy böngészőbővítmény is küldhetne linket az `/api/sources`-ra.
@@ -177,3 +182,4 @@
 - [ ] **Generált Supabase-típusok** (`supabase gen types`). Most a kliens típus nélkül dolgozik.
 - [x] **Pipeline-teszt** mockolt LLM-válaszokkal. Az ingest, a napi futás, a fordítás és az `llm.ts` útválasztása offline tesztekkel fedett, mockolt modellválaszokkal (`fakeDb`, `mockFetch`).
 - [ ] **DNS rebinding** elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.
+- [ ] **Egy getClaims() kérésenként.** A `getReader`-t React `cache()`-be csomagolni (`lib/supabase/server.ts`), hogy az `(app)` layout és az oldal egyetlen `getClaims()`-hívást osszon meg. A UI/UX A óta kérésenként kettő fut: a layout `getViewer()`-e és az oldal `getReader()`-e.

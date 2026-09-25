@@ -168,14 +168,18 @@ Schema changes go in before the code that needs them, and a migration may only a
 
 ## Project tour
 
+Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (collapsible to an icon rail), a five-slot bottom bar on phones. Desktop shortcuts: `j`/`k` move between cards, `o` opens (and marks read), `r` read, `l` later, `[` collapses the sidebar, `?` lists them.
+
 | Path | What is there |
 | --- | --- |
-| [`app/`](app/) | Pages: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]` and `/login`, plus loading, error and 404 pages |
-| [`app/components/`](app/components/) | The Radar dashboard, the page header, the language toggle, and `post-blocks`, the block renderer |
-| [`app/library/`](app/library/) | The submit form, and the post page with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
+| [`app/`](app/) | `/login`, the error and 404 pages, the manifest, and the route group below |
+| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, plus their loading page |
+| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast), the Radar dashboard and its cards, the title band, the language toggle, and `post-blocks`, the block renderer |
+| [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
 | [`app/api/`](app/api/) | JSON routes: reader state, link submission, post edit, translate, re-extract, and the daily cron |
 | [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link login, callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login` |
 | [`app/media/`](app/media/) | Serves mirrored images to signed-in readers |
+| [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the feed list, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
 | [`lib/`](lib/) | The block model, the post view, post edits, translation, the model client, content queries, the language cookie, Supabase clients |
@@ -193,7 +197,7 @@ Schema changes go in before the code that needs them, and a migration may only a
 3. [`app/api/cron/daily/route.ts`](app/api/cron/daily/route.ts) → [`lib/pipeline/daily.ts`](lib/pipeline/daily.ts) → [`collect.ts`](lib/pipeline/collect.ts): the Radar writer.
 4. [`app/api/sources/route.ts`](app/api/sources/route.ts) → [`lib/pipeline/ingest.ts`](lib/pipeline/ingest.ts) → [`extract/index.ts`](lib/pipeline/extract/index.ts) → [`extract/article.ts`](lib/pipeline/extract/article.ts) → [`html-to-blocks.ts`](lib/pipeline/html-to-blocks.ts): the Library writer.
 5. [`lib/llm.ts`](lib/llm.ts): how a task finds its model.
-6. [`app/library/[id]/page.tsx`](<app/library/[id]/page.tsx>) → [`lib/post-view.ts`](lib/post-view.ts) → [`app/components/post-blocks.tsx`](app/components/post-blocks.tsx): how a post is read and rendered.
+6. [`app/(app)/library/[id]/post-article.tsx`](<app/(app)/library/[id]/post-article.tsx>) → [`lib/post-view.ts`](lib/post-view.ts) → [`app/components/post-blocks.tsx`](app/components/post-blocks.tsx): how a post is read and rendered.
 7. [`proxy.ts`](proxy.ts) and [`lib/supabase/server.ts`](lib/supabase/server.ts): sessions and the two Supabase clients.
 
 ## Recipes
@@ -246,18 +250,20 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 
   ```ts
   import { createElement } from "react";
-  import { render } from "../../../lib/test/render.ts"; // first: it registers the .tsx loader
+  import { render } from "../../../../lib/test/render.ts"; // first: it registers the .tsx loader
   const { PostToolbar } = await import("./post-toolbar.tsx");
 
   const doc = render(createElement(PostToolbar, { postId: 7, language: "en" /* … */ }));
   ```
 
   A static render runs hooks once and no effects, so it cannot see clicks or state changes. It is verified on Node 24; Node 22 is unverified.
-- **One test file** runs with the same flags as `npm test`. A path with `[id]` in it is read as a glob character class, so `"app/library/[id]/post-editor.test.ts"` runs 0 tests and still exits 0. Escape the bracket:
+- **One test file** runs with the same flags as `npm test`. A path with `[id]` in it is read as a glob character class, so `"app/(app)/library/[id]/post-editor.test.ts"` runs 0 tests and still exits 0. Escape the bracket:
 
   ```bash
-  node --experimental-strip-types --no-warnings --test "app/library/[[]id]/post-editor.test.ts"
+  node --experimental-strip-types --no-warnings --test "app/(app)/library/[[]id]/post-editor.test.ts"
   ```
+
+UI without live data: `npm run dev`, then open `/dev/preview` (development only). It renders every view on fixtures, including empty states and a `&fail=1` offline mode; Playwright checks run against it at 360, 768 and 1280 px.
 
 **What the tests don't cover:** the interactive UI, real RLS policies, live model calls and live websites. Those are checked by hand in a browser (Playwright) against a deployment: sign in, the Radar's read, saved and to-do state, an archived week, one link per source kind, the post page (blocks, images, video and chapters), translation, editing, hiding, re-extraction and its 10-minute cooldown, a `noarchive` page, and no horizontal scroll at 360 and 1280 px.
 

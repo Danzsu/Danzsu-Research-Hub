@@ -65,11 +65,35 @@ The seeds are in `supabase/migrations/20260923010000_model_settings.sql` and `20
 
 Supabase Auth, magic link. **Sign-ups are disabled in the Supabase dashboard** — that is the invite allowlist; members are added with *Authentication → Invite user*. `app/auth/login` calls `signInWithOtp({ shouldCreateUser: false })` and always answers the same, so it cannot enumerate members.
 
-`proxy.ts` refreshes the session on every request and redirects signed-out requests to `/login?next=…`, except under `/login`, `/auth/`, `/api/` and `/media/` (`isPublicPath` in `lib/public-paths.ts`; the `/api/*` and `/media` routes return 401 themselves). Pages and API routes that act as the reader call `getReader()` from `lib/supabase/server.ts`, which returns the RLS-scoped client and the viewer together, or null; `getViewer()` is the identity-only form (the `/media` route). The five identity pages (`/`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) declare `export const dynamic = "force-dynamic"`.
+`proxy.ts` refreshes the session on every request and redirects signed-out requests to `/login?next=…`, except under `/login`, `/auth/`, `/api/` and `/media/` (`isPublicPath` in `lib/public-paths.ts`; the `/api/*` and `/media` routes return 401 themselves). `/dev/*` passes without a session in development only (`lib/public-paths.ts`). Pages and API routes that act as the reader call `getReader()` from `lib/supabase/server.ts`, which returns the RLS-scoped client and the viewer together, or null; `getViewer()` is the identity-only form (the `/media` route and `app/(app)/layout.tsx`). The five identity pages (`/`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) declare `export const dynamic = "force-dynamic"`.
 
 Email templates (Supabase → Authentication → Email Templates) should link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email` (Magic Link) and `…&type=invite` (Invite user). `app/auth/callback` handles both that and the default `?code=` form; the token-hash form also works when the link is opened on another device. The post-login target always goes through `safeNext`.
 
 The shared project's Site URL is the production domain. Never change it: every member's magic link follows it. To sign in locally against the shared project, replace the emailed link's origin with `http://localhost:3000`; the token-hash callback verifies on any origin.
+
+## App shell and navigation
+
+Every signed-in page lives under `app/(app)/` and gets `app/(app)/layout.tsx` → `AppShell`. `/login`, `/auth/*`, `/api/*`, `/media` and `/dev/*` stay outside. Pages still check the session themselves: a layout cannot read the path for `?next=`.
+
+- **One list:** `lib/nav.ts` holds the items (Radar, Library, Keresés, Archívum, and the dimmed "hamarosan" views) and `activeNavId()`. Both navigations render from it.
+- **Mobile, below `md`:** the bottom bar in `app-shell.tsx`, five slots; "Több" opens a bottom Sheet with the language toggle, sign-out and the coming views.
+- **Desktop:** `app/components/desktop-nav.tsx`, variant A (sidebar), collapsible to a ~56px icon rail via a toggle button at its foot (`aria-expanded`, localized "Collapse sidebar" / "Expand sidebar"). In rail mode every entry shrinks to an icon with its accessible name kept (`aria-label` or sr-only text; the logo link carries `aria-label="NEON NEWS RADAR"`), and every icon (the menu entries, language, help, sign-out and expand) shows its name as a hover/focus tooltip (`NavTooltip` in `nav-parts.tsx`). The rail's nav has no overflow, since a scroll container would clip the tooltips, and the aside sits at `z-30`, above the Radar's sticky header and chip bar. The choice persists in the `nav` cookie (`full` | `rail`, same shape as `lang`); `getNavMode()` (`lib/language.ts`) reads it server-side through `readNavMode()` (`lib/nav-mode.ts`), for `app/(app)/layout.tsx` and the preview, so the width is correct on first render. Variants B (top bar) and C (icon rail as the default) are a new `DesktopNav` with the same props that reuses `nav-parts.tsx`; no other file changes.
+- **Search** is a placeholder dialog until milestone C (`SearchSoon`); `⌘K` / `Ctrl K` and `/` already open it.
+- **Undo toast:** `toasts.show({ kind, undo?, commit? })` from `undo-toast.tsx`. One at a time, 5 s, `aria-live="polite"`; a new toast makes the previous action final, and `pagehide` does too. Read, delete and (milestone B) rating use it, and so does every failed write.
+- **Reader state:** `lib/reader-store.ts` (optimistic, writes per key in click order, rollback to the last value the server confirmed) behind `use-reader-state.ts`. Library posts use `item_states` too, keyed `post:<id>` (`postStateKey`); opening a post marks it read (`mark-post-read.tsx`) and dims its Library card.
+- **WebMCP:** `use-model-context-tools.ts` registers two `document.modelContext` tools for in-browser agents; a no-op elsewhere.
+
+## Keyboard (desktop)
+
+`lib/keymap.ts`'s `SHORTCUTS` maps keys to actions: `j`/`k` next/previous card, `o` open (marks read), `r` toggle read, `l` toggle later, `z` undo, `⌘K`/`Ctrl K`/`/` search, `[` collapse/expand the sidebar, `?` help. `use-shortcuts.ts` binds it. Nothing fires in an input, textarea, select or contenteditable, inside an open dialog, or mid-composition. Letters fire only with no Ctrl/⌘/Alt held (Ctrl/⌘+K is search); a non-letter key (`/`, `?`, `[`) also fires with Alt or AltGr (Ctrl+Alt), never with ⌘, because the Hungarian layout types `[` as AltGr+F. Card scrolling honours `prefers-reduced-motion`. A new shortcut is one `SHORTCUTS` row plus a handler; the help dialog lists it by itself.
+
+## Offline preview
+
+`npm run dev`, then `/dev/preview?view=radar|radar-empty|library|library-empty|archive|archive-empty` (plus `&fail=1` to make every write fail as if offline) and `/dev/preview/post` (every block type and banner; it is a separate path because it renders in the server's language, so the toggle refreshes it). It renders the real view components on `lib/fixtures.ts`, with no Supabase keys, no network and no sign-in. `proxy.ts` lets `/dev/` through only when `NODE_ENV` is `development`, and both pages call `notFound()` otherwise. `lib/fixtures.ts`'s preview post ids are negative on purpose: `parseId` rejects them, so no click in the preview (translate, a `/library` link) can reach a real post, which matters because local dev points at the production project. UI changes are checked there with Playwright at 360, 768 and 1280 px. Add a fixture with every new block type, banner or empty state; `lib/fixtures.test.ts` fails for a missing block type.
+
+## UI text (HU/EN)
+
+One colocated `copy` object per component; no inline `language === "hu" ? … : …`, no English-only labels. Client components read `copy[language]` with `useLanguage()`. Server components on pages that switch language in place (Radar, Library list, Archive: `switchesLanguageInPlace()` in `lib/nav.ts`) keep `{ hu, en }` per key and render `<LocalizedText value={…} />`; the toggle refreshes any other page.
 
 ## Database
 
@@ -143,41 +167,58 @@ Before a commit, all five checks pass: `npx tsc --noEmit && npm run lint && npm 
 ## Layout
 
 ```text
-app/                     pages (/, /archive, /archive/[week], /library, /library/[id], /login),
-                         loading/error/not-found, manifest, layout (robots: noindex)
-app/components/          digest-dashboard (the Radar), page-header (PageHeader, PageHero), language-toggle,
-                         post-blocks (the block renderer, + test)
-app/library/             submit-form; [id]/ post-toolbar (translate, edit link), post-editor (edit, hide,
-                         re-extract), post-notices (the notices under the title, the submitter's last
-                         extraction error), each + tests
-app/api/                 state, sources, posts/[id] (PATCH), posts/[id]/translate, posts/[id]/reextract, cron/daily
-app/auth/                login, callback, signout
-app/media/[...path]/     session-checked mirrored-image serving
-lib/pipeline/            daily, collect, feeds, ingest, fetch (safeFetch, apiFetch, ensureOk, readLimited),
-                         html-to-blocks, html-noise (noise layers 1–2), html-images (srcset, icon filter),
-                         cleanup (layer 3), images (mirrorImages), summary (summarize, writeNotes), util
-lib/pipeline/extract/    index (extract, the fallback sets, metadataOnly), types, one file per kind:
-                         article, youtube, arxiv, github, x, pdf
+app/(app)/        the signed-in pages (/, /archive, /archive/[week], /library, /library/[id]) under
+                  one layout, the app shell; the group name is not part of the URL
+app/              /login, auth routes, API routes, /media, error/not-found, manifest
+app/dev/preview/  offline preview on fixtures (development only)
+app/components/   app-shell (+ mobile bottom bar), desktop-nav, nav-parts, shell-dialogs,
+                  language-context, language-toggle, undo-toast, digest-dashboard, story-card,
+                  reader-panel, tag, page-header (PageHero, StatusCard), post-blocks, post-image,
+                  use-reader-state, use-shortcuts, use-model-context-tools
+app/(app)/library/  submit-form, library-view (the list body), refresh-while-processing;
+                  [id]/ post-article (the post body), post-toolbar (translate, edit link), post-editor
+                  (edit, hide, re-extract), post-notices (the notices under the title, the submitter's
+                  last extraction error), mark-post-read; post-article, post-toolbar, post-editor and
+                  post-notices each + test
+app/(app)/archive/  archive-view (the archive body)
+app/api/          state, sources, posts/[id] (PATCH), posts/[id]/translate, posts/[id]/reextract, cron/daily
+app/auth/         login, callback, signout
+app/media/[...path]/  session-checked mirrored-image serving
+lib/pipeline/     daily, collect, feeds, ingest, fetch (safeFetch, apiFetch, ensureOk, readLimited),
+                  html-to-blocks, html-noise (noise layers 1–2), html-images (srcset, icon filter),
+                  cleanup (layer 3), images (mirrorImages), summary (summarize, writeNotes), util
+lib/pipeline/extract/  index (extract, the fallback sets, metadataOnly), types, one file per kind:
+                  article, youtube, arxiv, github, x, pdf
 lib/pipeline/fake-db.ts  test helper: offline Supabase stand-in (fakeDb)
 lib/pipeline/mock-fetch.ts  test helper: fetch, DNS, env and response-body fakes
-lib/test/                render harness for component tests (render, tsx-hooks, next-stub), fixtures (testPost)
-lib/blocks.ts            the block schema (`zod/v4`), parseBlocks, assignIds, limitBlocks, safeHref
-lib/post-view.ts         Post, toPost (a posts row → the page's Post), media/video helpers, withQuery
-lib/post-edit.ts         editPayload, savePostEdits, requestReextract
-lib/overrides.ts         overrides / hidden_blocks schemas and tolerant readers
-lib/translate.ts         translatePost — on-demand Hungarian translation
-lib/media.ts             the media bucket name, key format and /media URLs
-lib/public-paths.ts      isPublicPath — the paths proxy.ts lets through signed out
-lib/state.ts             parseStateAction — the /api/state body
-lib/llm.ts               Gemini + Groq behind generate()
-lib/api.ts               jsonError, postRoute and POST_ERRORS for the posts/[id] routes
-lib/content.ts           DB rows → the Radar and Library content types
-lib/language.ts          getLanguage() — the `lang` cookie (hu | en)
-lib/supabase/server.ts   createClient, createAdminClient, getReader, getViewer, safeNext (re-exported from util)
-lib/utils.ts             cn() for class names
-data/digest-types.ts     the Radar content contract and tag vocabulary
-components/ui/           vendored shadcn components; only a few are reachable from the app, the rest are kept for the UI/UX milestones
-hooks/use-mobile.ts      used by the sidebar
+lib/test/         render harness for component tests (render, tsx-hooks, next-stub), fixtures
+                  (testPost, also the base of lib/fixtures.ts's preview posts)
+lib/blocks.ts     the block schema (`zod/v4`), parseBlocks, assignIds, limitBlocks, safeHref
+lib/post-view.ts  Post, toPost (a posts row → the page's Post), media/video helpers, withQuery
+lib/post-edit.ts  editPayload, savePostEdits, requestReextract
+lib/overrides.ts  overrides / hidden_blocks schemas and tolerant readers
+lib/translate.ts  translatePost — on-demand Hungarian translation
+lib/media.ts      the media bucket name, key format and /media URLs
+lib/public-paths.ts  isPublicPath, isDevPreviewPath — the paths proxy.ts lets through signed out
+                  (/dev/ in development only)
+lib/state.ts      parseStateAction — the /api/state body
+lib/nav.ts        the menu items, the active item, which pages switch language in place
+lib/nav-mode.ts   the `nav` cookie's value: full sidebar or icon rail
+lib/keymap.ts     keyboard shortcuts → actions
+lib/reader-store.ts  optimistic read/later/to-do state; post read state as post:<id>
+lib/feed.ts       feed filter and unread-first order
+lib/undo-queue.ts the one-at-a-time undo toast
+lib/fixtures.ts   preview data
+lib/llm.ts        Gemini + Groq behind generate()
+lib/api.ts        jsonError, postRoute and POST_ERRORS for the posts/[id] routes
+lib/content.ts    DB rows → the Radar and Library content types
+lib/language.ts   getLanguage(), getNavMode() — the lang (hu | en) and nav (full | rail) cookies
+lib/supabase/server.ts  createClient, createAdminClient, getReader, getViewer, safeNext (re-exported from util)
+lib/utils.ts      cn() for class names
+data/digest-types.ts  the Radar content contract and tag vocabulary
+components/ui/    vendored shadcn components; only a few are reachable from the app, the rest are kept for the UI/UX milestones
+hooks/use-mobile.ts  useIsMobile: the Radar's to-do panel opens from the bottom below md (the sidebar
+                  that also used it is no longer rendered)
 scripts/ingest-url.mts   `npm run ingest`
 supabase/migrations/     schema, RLS, RPCs, model_settings seeds, the media bucket
 vendor/                  shadcn Tailwind 4 utility pack, imported by app/globals.css
@@ -187,14 +228,14 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 
 ## Conventions
 
-- **No duplication.** Search (`grep -rn`) before writing a helper or a class list, and reuse the shared homes: `lib/media.ts` (image paths), `lib/api.ts` (`jsonError`, `postRoute`), `lib/supabase/server.ts` (`getReader` / `getViewer`), `lib/pipeline/util.ts` (`hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…), `lib/pipeline/fetch.ts` (`safeFetch`, `apiFetch`, `ensureOk`, `readText`), `lib/blocks.ts` (`localizedSchema`, `parseBlocks`), `readPageMeta` in `extract/article.ts`, and in the UI the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHeader` and `PageHero`. `npm run dup` is the gate: at most 1% duplication, and no new clone.
+- **No duplication.** Search (`grep -rn`) before writing a helper or a class list, and reuse the shared homes: `lib/media.ts` (image paths), `lib/api.ts` (`jsonError`, `postRoute`), `lib/supabase/server.ts` (`getReader` / `getViewer`), `lib/pipeline/util.ts` (`hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…), `lib/pipeline/fetch.ts` (`safeFetch`, `apiFetch`, `ensureOk`, `readText`), `lib/blocks.ts` (`localizedSchema`, `parseBlocks`), `readPageMeta` in `extract/article.ts`, and in the UI the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHero`, `StatusCard` and `Tag`. `npm run dup` is the gate: at most 1% duplication, and no new clone.
 - **Relative imports in `lib/`.** Every file under `lib/` uses relative `.ts` imports (no `@/`), so `node --test` loads it without a bundler, and the client editor can import `lib/post-edit.ts` without server-only code. The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which tests never load.
-- **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library. Existing names: `copy` (`submit-form`, `post-toolbar`, `post-editor`), `labels` (`post-blocks`), `notices` (`library/[id]/post-notices.tsx`, also read by the post page), `ui` (`digest-dashboard`). A few inline ternaries remain, for example in `app/library/page.tsx` and `app/archive/page.tsx`; UX milestone A moves them. Code identifiers, comments and model prompts are English.
+- **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library. Existing names: `copy` (most components, `digest-dashboard` included), `labels` (`post-blocks`), `notices` (`app/(app)/library/[id]/post-notices.tsx`, also read by `post-article.tsx`). Code identifiers, comments and model prompts are English.
 - **Tests.** `node --test` with type stripping, no framework. Helpers:
   - `lib/pipeline/fake-db.ts`: `fakeDb(route?, tables?)`, an offline Supabase client: `model_settings` answers with `route` and records each task asked for (`.tasks`); `sources`, `posts`, storage and RPCs answer from `tables`; every write is recorded (`sourceUpdates`, `postUpserts`, `postUpdates`, `postUpdateFilters`, `rpcCalls`, `upserts`, `writes`, …).
   - `lib/pipeline/mock-fetch.ts`: `mockFetch(t, handler)`, `withGeminiKey(t)` and `withEnv(t, name, value)`, which restore themselves with `t.after`; `mockDns(t)`; `endlessBody()` with `reads()` / `cancelled()` to prove a body was released unread; `TEST_IP` / `TEST_HOST`, a public IP literal `safeFetch` resolves offline; `geminiResponse`, `geminiText`, `geminiPrompt`.
-  - `lib/test/render.ts`: importing it registers `tsx-hooks.ts` with `module.register`; the hooks resolve `@/`, compile `.tsx` with the project's TypeScript (`transpileModule`), and swap `next/link` and `next/navigation` for `next-stub.ts`. `render(element)` runs `renderToStaticMarkup` and returns a linkedom `Document`. Import `render.ts` first, then the component with `await import("./x.tsx")`. Limits: a static render runs hooks once with no effects, so clicks and state changes are invisible (check those in the browser); verified on Node 24.16 only, Node 22.13 is unverified.
-  - `node --test "app/library/[id]/x.test.ts"` runs 0 tests and exits 0, because `[id]` is read as a glob character class. Use `npm test`, or run one file with the bracket escaped: `node --experimental-strip-types --no-warnings --test "app/library/[[]id]/post-editor.test.ts"`.
+  - `lib/test/render.ts`: importing it registers `tsx-hooks.ts` with `module.register`; the hooks resolve `@/` and extensionless relative imports (`./x` → `.ts`/`.tsx`/`index`) from a `.ts`/`.tsx` parent, compile `.tsx` with the project's TypeScript (`transpileModule`), and swap `next/link` and `next/navigation` for `next-stub.ts`. `render(element)` runs `renderToStaticMarkup` and returns a linkedom `Document`. Import `render.ts` first, then the component with `await import("./x.tsx")`. Limits: a static render runs hooks once with no effects, so clicks and state changes are invisible (check those in the browser); verified on Node 24.16 only, Node 22.13 is unverified.
+  - `node --test "app/(app)/library/[id]/x.test.ts"` runs 0 tests and exits 0, because `[id]` is read as a glob character class. Use `npm test`, or run one file with the bracket escaped: `node --experimental-strip-types --no-warnings --test "app/(app)/library/[[]id]/post-editor.test.ts"`.
 - **Supply chain.** Every dependency is pinned to an exact version; `pnpm-lock.yaml` is committed and installed with `--frozen-lockfile` (pnpm also defaults to a frozen lockfile under CI). `pnpm-workspace.yaml` sets `minimumReleaseAge: 10080` (7 days) with `minimumReleaseAgeIgnoreMissingTime: false`, and `strictDepBuilds` with only `sharp` and `unrs-resolver` allowed to build — never lower or bypass these. Whether Vercel honours the lockfile depends on its Install Command setting (an open TODO item). `jscpd` is a devDependency, so `npm run dup` uses the local binary. `.gitattributes` marks the lockfile `-diff`: review lockfile changes with `git diff --text`. No update bot is configured; one would need a 7-day cooldown (`cooldown: { default-days: 7 }` in `dependabot.yml`).
 - **Commits.** Conventional Commits with lowercase, imperative subjects, committed with an explicit pathspec.
 
@@ -206,15 +247,16 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 - **System fonts only, no webfonts.** `.font-display` = Arial Black/Impact 900, `.font-mono` = Courier New.
 - **Shadows are hard offsets with zero blur** (`5px 5px 0 var(--ink)` → hover `8px 8px 0 var(--signal)`). Transitions are **160ms ease**.
 - **Single fixed theme.** No `.dark` block, no `prefers-color-scheme`, no `next-themes`. The contrast is spatial: `html` is ink, `body` is paper, the sidebar and hero are ink-on-paper, the content column is cream.
-- **Responsive rules.** Everything must fit 360px with no horizontal scroll. Display headings use `clamp(2.6rem, 11vw, …)` or smaller minimums. Below `md` the dashboard's categories are a sticky chip bar and the sidebar is a Sheet; below `2xl` the progress/to-do panel opens as a right Sheet from the header. Widths inside the main column use container queries (`@container`, `cqi`, `@3xl:`), not `vw`: the sidebar and panel make that column far narrower than the viewport. Touch targets are at least 40px (`min-h-10`, `size-10 sm:size-8`). Custom `:hover` effects in `globals.css` sit inside `@media (hover: hover)`; Tailwind's `hover:` already does that. Use `dvh`, not `vh`.
-- **Shared controls:** the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHeader` and `PageHero`. Use them instead of repeating class lists.
+- **Responsive rules.** Everything must fit 360px with no horizontal scroll. Display headings use `clamp(2.6rem, 11vw, …)` or smaller minimums. The Radar categories are a sticky chip bar at every width. Below `md` the app shell shows a fixed five-slot bottom bar (it honours `env(safe-area-inset-bottom)`, and the content column has matching bottom padding); from `md` up the desktop nav takes its place. The progress/to-do panel is a bottom Sheet below `md`, a right Sheet from `md` to `2xl`, and a column from `2xl`; it is non-modal, so the undo toast stays usable while it is open. Widths inside the main column use container queries (`@container`, `cqi`, `@3xl:`), not `vw`: the desktop nav and the panel make that column far narrower than the viewport. Touch targets are at least 40px (`min-h-10`, `size-10 sm:size-8`). Custom `:hover` effects in `globals.css` sit inside `@media (hover: hover)`; Tailwind's `hover:` already does that. Use `dvh`, not `vh`.
+- **Shared controls:** the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHero`, `StatusCard` and `Tag`. Use them instead of repeating class lists.
 
 > ⚠️ **Never run `npx shadcn add` in this repo.** `add sidebar` appends `--sidebar-*` variables and a `.dark` block to `app/globals.css` — after the existing `@theme inline`, so it wins the cascade and the sidebar renders stock grey. It would also overwrite `components/ui/button.tsx`, which carries an extended size set (`xs`, `icon-xs`, `icon-sm`, `icon-lg`) and the house variants `ink` / `signal` / `brutal` the app depends on, and install individual `@radix-ui/react-*` packages although this project deliberately uses the unified `radix-ui`. Fetch read-only with `npx shadcn@4.17.0 view <name>` and hand-place instead.
 
 ## Hand-authored components
 
 - **`components/ui/progress.tsx`, `separator.tsx`, `skeleton.tsx`, `textarea.tsx`** — written in this project's house style (function components, `data-slot`, unified `radix-ui`). The registry still serves forwardRef-era source, so pasting it would have broken the convention *and* omitted `data-slot="progress-indicator"`, which the dashboard targets to paint the bar signal-orange.
-- **`components/ui/sidebar.tsx`** — fetched read-only from the registry and hand-patched (import paths, `Slot.Root`, Tailwind 4 `w-(--sidebar-width)` instead of the v3 square-bracket variable form, which compiles to invalid CSS). See the header comment in the file.
+- **`components/ui/sheet.tsx`, `dialog.tsx`**: the close button is patched to a 40px house-style square (`size-10`, ink border, paper → signal on hover); the stock one is a ~16px target.
+- **`components/ui/sidebar.tsx`** — fetched read-only from the registry and hand-patched (import paths, `Slot.Root`, Tailwind 4 `w-(--sidebar-width)` instead of the v3 square-bracket variable form, which compiles to invalid CSS). See the header comment in the file. The app no longer renders it (the app shell has its own nav); it stays until the unused-component cleanup.
 
 `skeleton.tsx` deliberately uses `bg-primary/10` rather than upstream's `bg-accent`, because `--accent` is the signal orange here and a stock skeleton would pulse bright orange.
 
