@@ -27,6 +27,8 @@
     - Leaked Password Protection: jelszó nincs, csak magic link van.
 - [ ] Halasztott élő próbák (ezeket én futtatom): `npm run ingest -- <url>` mind a hat forrástípusra, a képek a `/media` route-on, fordítás, szerkesztés és újrakinyerés. Egy X-poszt is legyen benne: az X, a YouTube és az arXiv fix hostjai új User-Agentet kapnak (`apiFetch`), ezt élesben még nem próbáltuk.
 - [ ] **Csak az M1 deployja után:** futtasd le a `supabase/migrations/20260925000000_drop_post_body.sql`-t (a régi `posts.body` oszlop törlése)
+  - Előtte: `select count(*) from posts where body is not null;` Ennyi posztnak van még régi, átmentett szövege, ami a droppal elvész (a blokkok nem ebből épülnek). Ha nem 0, döntsd el, kell-e őket előbb újrakinyerni.
+  - ⚠️ A drop után egy Vercel *Instant Rollback* egy M1 előtti deploymentre elrontja a Library-t: a régi kód a `posts.body`-t olvassa.
 
 ### 2. API kulcsok
 - [ ] **Gemini**: [aistudio.google.com](https://aistudio.google.com) → *Get API key*. Az ingyenes keretnél a Google felhasználhatja a beküldött adatot. Nyilvános hírekhez ez rendben van, de ha zavar, kapcsold be a fizetős csomagot.
