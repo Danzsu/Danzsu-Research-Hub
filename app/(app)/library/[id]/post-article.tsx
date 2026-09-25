@@ -38,7 +38,7 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
 
   return (
     <article className="bg-cream text-ink">
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-10 sm:py-16">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-10 sm:py-16">
         <header className="border-b-2 border-ink pb-6">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tracking-[0.15em] text-signal">
             <span className="border border-signal px-2 py-0.5">{labels.kind[post.kind]}</span>
@@ -71,9 +71,9 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
           )}
         </header>
 
-        <p className="mt-8 text-lg leading-8">{post.summary[language]}</p>
+        <p className="mt-8 max-w-[75ch] text-lg leading-8">{post.summary[language]}</p>
         {post.keyPoints[language].length > 0 && (
-          <div className="mt-8 border-l-4 border-signal pl-5">
+          <div className="mt-8 max-w-[75ch] border-l-4 border-signal pl-5">
             <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{labels.keyPoints}</p>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7">
               {post.keyPoints[language].map((point) => <li key={point}>{point}</li>)}

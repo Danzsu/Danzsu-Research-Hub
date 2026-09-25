@@ -3,6 +3,7 @@ import type { Language } from "@/data/digest-types";
 import { safeHref, type Block, type ImageBlock, type Inline } from "@/lib/blocks";
 import { isBlockVisible, isValidPlaceholder, mediaSources, primaryVideoId, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
 import { formatTimestamp } from "@/lib/pipeline/util";
+import { PostImage } from "./post-image";
 import { Tag } from "./tag";
 
 // Plain component (no hooks, no server-only imports) so the editor can reuse it client-side.
@@ -13,6 +14,24 @@ const labels = {
 };
 
 const numberLocale = (language: Language) => (language === "hu" ? "hu-HU" : "en-US");
+
+// The one place the post image frame (spec 1.4.12) is defined: paper background, ink border, inner
+// padding, a hard shadow with no blur. `dashed` is the "image unavailable" box: the same frame, only the
+// line is dashed. The caption, when there is one, lives inside this same frame — never a sibling of it.
+const imageFrameClass = "border-2 border-ink bg-paper p-2 shadow-[4px_4px_0_var(--ink)]";
+
+function ImageFrame({ dashed = false, caption, children }: { dashed?: boolean; caption?: string; children: ReactNode }) {
+  return (
+    <figure className={`${imageFrameClass} ${dashed ? "border-dashed" : ""}`}>
+      {children}
+      {caption && <figcaption className="mt-2 font-mono text-xs leading-5 text-ink/60">{caption}</figcaption>}
+    </figure>
+  );
+}
+
+// The block types that get the widened column's full width (spec 1.4.11); the block schema has no
+// table type yet, so this list is only what actually exists. Everything else keeps the 75ch prose cap.
+const FULL_WIDTH_BLOCK_TYPES = new Set<Block["type"]>(["image", "code", "video"]);
 
 function InlineContent({ spans, baseUrl }: { spans: Inline[]; baseUrl: string }) {
   return spans.map((span, index) => {
@@ -37,37 +56,36 @@ function ImageView({ block, priority, language, baseUrl }: { block: ImageBlock; 
   if (!sources) {
     const href = safeHref(block.originalUrl, baseUrl);
     return (
-      <p className="border-2 border-dashed border-ink/35 p-4 font-mono text-xs text-ink/60">
-        {labels[language].missing}:{" "}
-        {href ? (
-          <a href={href} target="_blank" rel="noreferrer" className="focus-ring text-signal underline">
-            {block.originalUrl}
-          </a>
-        ) : (
-          block.originalUrl
-        )}
-      </p>
+      <ImageFrame dashed>
+        <p className="font-mono text-xs text-ink/60">
+          {labels[language].missing}:{" "}
+          {href ? (
+            <a href={href} target="_blank" rel="noreferrer" className="focus-ring text-signal underline">
+              {block.originalUrl}
+            </a>
+          ) : (
+            block.originalUrl
+          )}
+        </p>
+      </ImageFrame>
     );
   }
   const placeholder = block.placeholder && isValidPlaceholder(block.placeholder) ? block.placeholder : undefined;
   return (
-    <figure>
-      {/* eslint-disable-next-line @next/next/no-img-element -- variants are pre-encoded; next/image would re-optimize them */}
-      <img
+    <ImageFrame caption={block.caption}>
+      <PostImage
         src={sources.src}
         srcSet={sources.srcSet}
-        sizes="(min-width: 768px) 680px, 100vw"
+        // Roughly the widened column's own content width (spec 1.4.11: max-w-6xl, 1152px, minus its 2 × 40px
+        // padding); a request-size hint only, so a few px of slack here is harmless.
+        sizes="(min-width: 1024px) 1072px, 100vw"
         alt={block.alt}
         width={block.width}
         height={block.height}
-        loading={priority ? "eager" : "lazy"}
-        fetchPriority={priority ? "high" : "auto"}
-        decoding="async"
-        className="h-auto max-w-full border-2 border-ink bg-cream bg-cover"
-        style={placeholder ? { backgroundImage: `url("${placeholder}")` } : undefined}
+        priority={priority}
+        placeholder={placeholder}
       />
-      {block.caption && <figcaption className="mt-2 font-mono text-xs leading-5 text-ink/60">{block.caption}</figcaption>}
-    </figure>
+    </ImageFrame>
   );
 }
 
@@ -235,7 +253,7 @@ export function PostBlocks({
     if (block.type === "image") firstImage = false;
     const primaryVideo = block.type === "video" && block.id === primaryId;
     out.push(
-      <div key={block.id} id={`b-${block.id}`} data-block-id={block.id} className={`scroll-mt-24 ${controls ? "relative pr-12 min-h-10" : ""}`}>
+      <div key={block.id} id={`b-${block.id}`} data-block-id={block.id} className={`scroll-mt-24 ${controls ? "relative pr-12 min-h-10" : ""} ${FULL_WIDTH_BLOCK_TYPES.has(block.type) ? "" : "max-w-[75ch]"}`}>
         {controls?.(block)}
         <div className={isHidden ? "opacity-40" : undefined}>
           <BlockView block={block} priority={priority} primaryVideo={primaryVideo} videoStart={videoStart} language={language} baseUrl={baseUrl} linkQuery={linkQuery} />

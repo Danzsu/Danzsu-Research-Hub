@@ -15,8 +15,21 @@ const blocks = assignIds([
   { type: "video", provider: "vimeo", videoId: "76979871" },
   { type: "repo", fullName: "owner/repo", url: "javascript:alert(2)", stars: 1, topics: [] },
   { type: "image", originalUrl: "javascript:alert(3)", alt: "", path: null },
+  { type: "code", language: "ts", code: "const answer = 42;" },
+  {
+    type: "image",
+    originalUrl: "https://blog.test/figure.png",
+    alt: "A chart",
+    caption: "Figure 1",
+    path: "1/0123456789abcdef",
+    format: "avif",
+    widths: [640, 1280],
+    width: 1280,
+    height: 720,
+    placeholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  },
 ]);
-const [invalidVideo, youtube, , paragraph, vimeo, repo, missingImage] = blocks;
+const [invalidVideo, youtube, , paragraph, vimeo, repo, missingImage, codeBlock, mirroredImage] = blocks;
 
 type Props = Parameters<typeof PostBlocks>[0];
 const renderBlocks = (props: Partial<Props> = {}) => render(createElement(PostBlocks, { blocks, language: "en", baseUrl, ...props }));
@@ -79,4 +92,50 @@ test("PostBlocks in controls mode gives every block a 40px-tall row and dims onl
   assert.equal(hiddenRow.children[0].tagName, "BUTTON");
   assert.ok(hiddenRow.children[1].classList.contains("opacity-40"));
   assert.equal(wrapper(doc, vimeo)!.querySelector(".opacity-40"), null);
+});
+
+test("both the missing-image box and a loaded image share the same frame", () => {
+  const doc = renderBlocks();
+  const missingFrame = wrapper(doc, missingImage)!.querySelector("figure")!;
+  const loadedFrame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
+  for (const frame of [missingFrame, loadedFrame]) {
+    assert.ok(frame.classList.contains("bg-paper"), frame.className);
+    assert.ok(frame.classList.contains("shadow-[4px_4px_0_var(--ink)]"), frame.className);
+  }
+  assert.ok(missingFrame.classList.contains("border-dashed"), "the missing box's border is dashed");
+  assert.equal(loadedFrame.classList.contains("border-dashed"), false, "a loaded image keeps a solid border");
+});
+
+test("a loaded image's caption sits inside its frame, in mono", () => {
+  const doc = renderBlocks();
+  const frame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
+  const caption = frame.querySelector("figcaption")!;
+  assert.equal(caption.textContent, "Figure 1");
+  assert.ok(caption.classList.contains("font-mono"));
+});
+
+test("the image itself is contained, capped at 80dvh tall, and stacked above the placeholder", () => {
+  const doc = renderBlocks();
+  const img = wrapper(doc, mirroredImage)!.querySelector("img")!;
+  assert.ok(img.classList.contains("relative"), img.className);
+  assert.ok(img.classList.contains("object-contain"), img.className);
+  assert.ok(img.classList.contains("max-h-[80dvh]"), img.className);
+});
+
+test("a loaded image's placeholder sits behind it, ready to be hidden once the browser fires onload", () => {
+  const doc = renderBlocks();
+  const frame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
+  const placeholderLayer = frame.querySelector('span[aria-hidden="true"]')!;
+  assert.match(placeholderLayer.getAttribute("style") ?? "", /background-image/);
+  // The server-rendered markup is always the pre-load state (render.ts runs no effects or refs); the
+  // browser removes this layer once the image has loaded (onLoad, or `complete` at hydration) —
+  // Task 11's Playwright checklist item 12 checks that in a real browser.
+});
+
+test("images, code and video break out of the prose width; paragraphs keep it", () => {
+  const doc = renderBlocks();
+  for (const wide of [mirroredImage, codeBlock, youtube]) {
+    assert.equal(wrapper(doc, wide)!.classList.contains("max-w-[75ch]"), false, wide.id);
+  }
+  assert.ok(wrapper(doc, paragraph)!.classList.contains("max-w-[75ch]"));
 });
