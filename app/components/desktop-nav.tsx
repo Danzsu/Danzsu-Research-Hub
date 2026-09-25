@@ -54,9 +54,9 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
   return (
     <div className="md:flex">
       {/* z-30: the rail's tooltips paint above the Radar's sticky header (z-20) and chip bar (z-10). */}
-      {/* On short md+ viewports (landscape phones) the rail's bottom controls would sit below the fold; below 30rem tall, the whole column scrolls instead. */}
+      {/* On short md+ viewports (landscape phones) the rail's bottom controls would sit below the fold; below 32rem tall (the rail is ~490px), the whole column scrolls instead, and the hidden tooltips must not widen it. */}
       <aside
-        className={`sticky top-0 z-30 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper [@media(max-height:30rem)]:overflow-y-auto md:flex ${rail ? "w-14" : "w-64"}`}
+        className={`sticky top-0 z-30 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper [@media(max-height:32rem)]:overflow-y-auto [@media(max-height:32rem)]:overflow-x-hidden md:flex ${rail ? "w-14" : "w-64"}`}
       >
         {/* Named explicitly: in the rail only the icon is left. */}
         <Link
