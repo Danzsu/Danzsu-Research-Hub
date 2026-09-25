@@ -30,10 +30,10 @@ export function PostImage({
   priority: boolean;
   placeholder?: string;
 }) {
-  const [loaded, setLoaded] = useState(false);
+  const [settled, setSettled] = useState(false);
   return (
     <span className="relative block">
-      {placeholder && !loaded && (
+      {placeholder && !settled && (
         <span
           aria-hidden="true"
           className="absolute inset-0 bg-cover bg-center"
@@ -52,9 +52,10 @@ export function PostImage({
         fetchPriority={priority ? "high" : "auto"}
         decoding="async"
         ref={(img) => {
-          if (img?.complete && img.naturalWidth > 0) setLoaded(true);
+          if (img?.complete && img.naturalWidth > 0) setSettled(true);
         }}
-        onLoad={() => setLoaded(true)}
+        onLoad={() => setSettled(true)}
+        onError={() => setSettled(true)}
         // No w-full: images.ts never enlarges, so a small mirror keeps its size instead of being stretched blurry.
         className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain"
       />
