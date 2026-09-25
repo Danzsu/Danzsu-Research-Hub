@@ -157,7 +157,10 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it,
  * `list` reflects it, and `download` answers an object it holds with the object's own path as its
  * bytes, so a test can mirror an image and then see it (or its absence) in a later list.
- * Every write is recorded on `.sourceUpdates`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
+ * Every write is recorded on `.sourceUpdates`/`.sourceInserts`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
+ * Unlike `posts`' `upsert` above, a `sources` `insert` isn't written through: a later `sources`
+ * `select()` in the same test still only sees `tables.source`/`tables.sources`, never the row
+ * `insert()` just recorded.
  */
 export function fakeDb(
   route: { provider: string; model: string; fallback_provider?: string; fallback_model?: string } = { provider: "gemini", model: "m" },

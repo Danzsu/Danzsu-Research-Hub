@@ -35,12 +35,27 @@ test("POST /api/sources answers 409 already_submitted when the link is already i
 
 // N4: the 202 is a promise that the link gets processed after the response.
 test("POST /api/sources stores the link as the reader, answers 202 with its id, and schedules its processing", async () => {
-  const db = reader();
+  const db = reader({ sources: [{ id: 1 }, { id: 2 }] });
   const response = await submit({ url: " https://www.youtube.com/watch?v=dQw4w9WgXcQ#t=1 ", note: `  ${"n".repeat(600)}` });
-  assert.deepEqual([response.status, await response.json()], [202, { ok: true, id: 1 }]);
+  assert.deepEqual([response.status, await response.json()], [202, { ok: true, id: 3 }]);
   assert.deepEqual(db.sourceInserts, [{ url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", kind: "youtube", note: "n".repeat(500) }]);
   assert.equal(routeStub.scheduled.length, 1);
   assert.equal(routeStub.adminCalls, 0, "the admin client is opened only when the scheduled run starts");
+
+  // The scheduled task really processes the new source (id 3), not just any resolved promise.
+  const admin = fakeDb();
+  routeStub.admin = admin;
+  await assert.rejects(async () => routeStub.scheduled[0](), { code: "PGRST116" }); // the fake holds no sources row
+  assert.deepEqual(admin.eqCalls.filter((call) => call.table === "sources"), [{ table: "sources", column: "id", value: 3 }]);
+});
+
+// N3 continued: only the 23505 (duplicate url) code is the reader's news; any other insert
+// error is a plain 500, not silently reported as "already submitted".
+test("POST /api/sources answers 500 insert_failed for an insert error that isn't a duplicate", async () => {
+  reader({ sourceInsertError: pgError("08006", "connection failure") });
+  const response = await submit({ url: "https://blog.test/post" });
+  assert.deepEqual([response.status, await response.json()], [500, { error: "insert_failed" }]);
+  assert.deepEqual(routeStub.scheduled, []);
 });
 
 test("POST /api/sources answers 401 when signed out", async () => {

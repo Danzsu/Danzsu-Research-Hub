@@ -37,11 +37,12 @@ test("POST /reextract answers 202 to the submitter and schedules a run of the po
 
 // N7: the client shows "try again in N minutes" from retryAfter.
 test("POST /reextract inside the cooldown answers 429 with the seconds left", async () => {
-  postBy("owner", new Date(Date.now() - 5 * 60_000).toISOString());
+  const admin = postBy("owner", new Date(Date.now() - 5 * 60_000).toISOString());
   const response = await reextract();
   const body = (await response.json()) as { error: string; retryAfter: number };
   assert.equal(response.status, 429);
   assert.equal(body.error, "cooldown");
   assert.ok(body.retryAfter > 295 && body.retryAfter <= 300, String(body.retryAfter));
   assert.deepEqual(routeStub.scheduled, []);
+  assert.deepEqual(admin.postUpdates, []); // still inside the cooldown: the claim was never attempted
 });
