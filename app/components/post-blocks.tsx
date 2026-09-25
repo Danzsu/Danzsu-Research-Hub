@@ -3,6 +3,7 @@ import type { Language } from "@/data/digest-types";
 import { safeHref, type Block, type ImageBlock, type Inline } from "@/lib/blocks";
 import { isBlockVisible, isValidPlaceholder, mediaSources, primaryVideoId, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
 import { formatTimestamp } from "@/lib/pipeline/util";
+import { Tag } from "./tag";
 
 // Plain component (no hooks, no server-only imports) so the editor can reuse it client-side.
 
@@ -90,17 +91,17 @@ function BlockView({
   switch (block.type) {
     case "heading": {
       const size = { 2: "text-2xl sm:text-3xl", 3: "text-xl sm:text-2xl", 4: "text-lg sm:text-xl" }[block.level];
-      const Tag = `h${block.level}` as "h2" | "h3" | "h4";
-      return <Tag className={`mt-10 font-display ${size} leading-[1.05] tracking-tight`}>{block.text}</Tag>;
+      const HeadingTag = `h${block.level}` as "h2" | "h3" | "h4";
+      return <HeadingTag className={`mt-10 font-display ${size} leading-[1.05] tracking-tight`}>{block.text}</HeadingTag>;
     }
     case "paragraph":
       return <p><InlineContent spans={block.content} baseUrl={baseUrl} /></p>;
     case "list": {
-      const Tag = block.ordered ? "ol" : "ul";
+      const ListTag = block.ordered ? "ol" : "ul";
       return (
-        <Tag className={`${block.ordered ? "list-decimal" : "list-disc"} space-y-2 pl-6`}>
+        <ListTag className={`${block.ordered ? "list-decimal" : "list-disc"} space-y-2 pl-6`}>
           {block.items.map((item, index) => <li key={index}><InlineContent spans={item} baseUrl={baseUrl} /></li>)}
-        </Tag>
+        </ListTag>
       );
     }
     case "quote":
@@ -162,7 +163,7 @@ function BlockView({
           </p>
           {block.topics.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
-              {block.topics.slice(0, 8).map((topic) => <span key={topic} className="border border-ink/30 px-2 py-1 font-mono text-[10px]">#{topic}</span>)}
+              {block.topics.slice(0, 8).map((topic) => <Tag key={topic} tag={topic} />)}
             </div>
           )}
         </>

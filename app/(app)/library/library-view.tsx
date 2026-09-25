@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
 import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
+import { Tag } from "@/app/components/tag";
 import type { SubmittedSource } from "@/lib/content";
 import { hostOf } from "@/lib/pipeline/util";
 import type { Post } from "@/lib/post-view";
@@ -69,7 +70,7 @@ export function LibraryView({ posts, open }: { posts: Post[]; open: SubmittedSou
                 </p>
                 <div className="mt-6 flex flex-wrap gap-2 border-t border-current/20 pt-4">
                   {post.tags.map((tag) => (
-                    <span key={tag} className="border border-current/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>
+                    <Tag key={tag} tag={tag} />
                   ))}
                   {post.meta.mirrored && (
                     <span className="ml-auto flex items-center gap-1 font-mono text-[10px] opacity-60">

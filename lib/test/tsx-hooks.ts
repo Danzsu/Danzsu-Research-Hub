@@ -1,6 +1,7 @@
 // Node module hooks registered by render.ts (they run on Node's loader thread). They do the three
-// things a bundler would: resolve `@/` like tsconfig's paths, compile .tsx with the project's own
-// TypeScript, and swap the Next.js modules that need a running app for next-stub.ts.
+// things a bundler would: resolve `@/` and extensionless relative imports like tsconfig's paths,
+// compile .tsx with the project's own TypeScript, and swap the Next.js modules that need a running
+// app for next-stub.ts.
 
 import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -15,16 +16,24 @@ const stub = new URL("./next-stub.ts", import.meta.url).href;
 
 const isFile = (url: string) => statSync(fileURLToPath(url), { throwIfNoEntry: false })?.isFile() ?? false;
 
-/** `@/lib/blocks` → the file it names, trying the extensions an extensionless import can mean. */
-function aliasedFile(specifier: string): string | undefined {
-  const base = new URL(specifier.slice(2), root).href;
-  return ["", ".ts", ".tsx", "/index.ts", "/index.tsx"].map((suffix) => base + suffix).find(isFile);
-}
+/** A base URL → the file it names, trying the extensions an extensionless import can mean. */
+const withExtension = (base: string) => ["", ".ts", ".tsx", "/index.ts", "/index.tsx"].map((suffix) => base + suffix).find(isFile);
+
+/** `@/lib/blocks` → the file it names. */
+const aliasedFile = (specifier: string) => withExtension(new URL(specifier.slice(2), root).href);
+
+/** `./tag` or `../foo`, no extension → the file it names, resolved against the importing module. */
+const relativeFile = (specifier: string, parentURL: string) => withExtension(new URL(specifier, parentURL).href);
 
 export async function resolve(specifier: string, context: unknown, nextResolve: (specifier: string, context: unknown) => Promise<Resolved>): Promise<Resolved> {
   if (STUBBED.has(specifier)) return { url: stub, shortCircuit: true };
-  const aliased = specifier.startsWith("@/") ? aliasedFile(specifier) : undefined;
-  return aliased ? { url: aliased, shortCircuit: true } : nextResolve(specifier, context);
+  const parentURL = (context as { parentURL?: string }).parentURL;
+  const resolved = specifier.startsWith("@/")
+    ? aliasedFile(specifier)
+    : /^\.\.?\//.test(specifier) && !/\.[^./]+$/.test(specifier) && parentURL
+      ? relativeFile(specifier, parentURL)
+      : undefined;
+  return resolved ? { url: resolved, shortCircuit: true } : nextResolve(specifier, context);
 }
 
 export async function load(url: string, context: unknown, nextLoad: (url: string, context: unknown) => Promise<Loaded>): Promise<Loaded> {

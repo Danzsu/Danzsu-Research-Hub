@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { PostBlocks } from "@/app/components/post-blocks";
+import { Tag } from "@/app/components/tag";
 import { Button } from "@/components/ui/button";
 import type { Language } from "@/data/digest-types";
 import { safeHref } from "@/lib/blocks";
@@ -65,7 +66,7 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
           </div>
           {post.tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
-              {post.tags.map((tag) => <span key={tag} className="border border-ink/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>)}
+              {post.tags.map((tag) => <Tag key={tag} tag={tag} />)}
             </div>
           )}
         </header>
