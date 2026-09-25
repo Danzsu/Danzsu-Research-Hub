@@ -26,7 +26,10 @@ export async function createClient() {
   });
 }
 
-/** Bypasses RLS. Only for the pipeline (cron, ingest) — never pass its results to a reader unfiltered. */
+/**
+ * Bypasses RLS. For the pipeline (cron, ingest) and, each after its own auth check, the translate,
+ * reextract and /media routes — never pass its results to a reader unfiltered.
+ */
 export function createAdminClient() {
   return createSupabaseClient(env("SUPABASE_URL"), env("SUPABASE_SECRET_KEY"), {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -37,7 +40,7 @@ export { safeNext } from "@/lib/pipeline/util";
 
 export type Viewer = { id: string; email: string };
 
-/** The signed-in reader's client, or null: the one auth check every API route starts with. */
+/** The signed-in reader's client and identity, or null: the auth check of every page and reader API route (the cron route checks CRON_SECRET instead). */
 export async function getReader(): Promise<{ db: Awaited<ReturnType<typeof createClient>>; viewer: Viewer } | null> {
   const db = await createClient();
   const { data } = await db.auth.getClaims();

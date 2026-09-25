@@ -30,8 +30,8 @@ export default async function LibraryPage() {
         title="LIBRARY"
         lead={
           lang === "hu"
-            ? "Dobj be egy YouTube-videót vagy cikket: az AI összefoglalja, a cikk szövegét pedig elmenti ide, hogy a link halála után is megmaradjon."
-            : "Drop in a YouTube video or an article: the AI summarizes it and keeps a copy of the article text, so it outlives the original link."
+            ? "Dobj be egy cikket, YouTube-videót, arXiv-tanulmányt, PDF-et, GitHub-repót vagy X-posztot: az AI összefoglalja, a szövegét pedig elmenti ide, hogy a link halála után is megmaradjon."
+            : "Drop in an article, a YouTube video, an arXiv paper, a PDF, a GitHub repo or an X post: the AI summarizes it and keeps a copy of its text, so it outlives the original link."
         }
         aside={<SubmitForm language={lang} />}
       />
