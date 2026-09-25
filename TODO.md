@@ -28,6 +28,13 @@
   - A Security Advisor két figyelmeztetése szándékos, nem kell javítani:
     - `update_post_overrides` SECURITY DEFINER: a függvény maga ellenőrzi, hogy a hívó a beküldő-e, és csak a saját két oszlopát írja.
     - Leaked Password Protection: jelszó nincs, csak magic link van.
+- [ ] **A két megszűnt Groq-modell cseréje** (2026-09-25-i döntés). A `llama-3.3-70b-versatile` megszűnt, ezért most minden napi futás és beküldés-tisztítás a Gemini-tartalékra esik vissza. *SQL Editor*:
+  ```sql
+  update public.model_settings set model = 'openai/gpt-oss-120b' where task = 'daily_shortlist';
+  update public.model_settings set model = 'openai/gpt-oss-20b'  where task = 'ingest_cleanup';
+  select task, provider, model, fallback_model from public.model_settings order by task;
+  ```
+  Elvárt: a `daily_shortlist` sorában `groq | openai/gpt-oss-120b`, az `ingest_cleanup` sorában `groq | openai/gpt-oss-20b`, a tartalékok változatlanok.
 - [ ] Halasztott élő próbák (ezeket én futtatom): `npm run ingest -- <url>` mind a hat forrástípusra, a képek a `/media` route-on, fordítás, szerkesztés és újrakinyerés. Egy X-poszt is legyen benne: az X, a YouTube és az arXiv fix hostjai új User-Agentet kapnak (`apiFetch`), ezt élesben még nem próbáltuk.
 - [ ] **Csak az M1 deployja után:** futtasd le a `supabase/migrations/20260925000000_drop_post_body.sql`-t (a régi `posts.body` oszlop törlése)
   - Előtte: `select count(*) from posts where body is not null;` Ennyi posztnak van még régi, átmentett szövege, ami a droppal elvész (a blokkok nem ebből épülnek). Ha nem 0, döntsd el, kell-e őket előbb újrakinyerni.
@@ -136,8 +143,11 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **Taiyaki link-chat** (döntve 2026-09-25, az UX-A után, az M2 előtt). Egy taiyaki-ikonos buborék: asztalon a jobb alsó sarokban lebeg, mobilon az alsó sáv kiemelt középső gombja, az Archívum pedig átkerül a „Több” panelbe. Megnyitva mini chat nyílik: egy link és egy opcionális megjegyzés, a válasz élő állapottal. A specifikáció: `docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md`.
+- [ ] **`/glossary` a főmenübe** (döntve 2026-09-25, az M2 után): egy nem elsődleges tétel a `lib/nav.ts`-ben, a tesztjei bővítésével.
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
+  - A saját beküldés „Újra” gombja a taiyaki link-chattel érkezik. A „Törlés” és az admin-rész marad itt.
 - [ ] **Lassú archívum** (a felhasználó jelezte 2026-09-25-én): a „Heti archívum” sokáig tölt. Kijelentkezve a szerver gyors (0,13–0,7 mp), ezért az ok a bejelentkezett úton vagy a route hideg indulásában lehet. A kivizsgáláshoz bejelentkezett mérés kell: engedély egy egyszeri teszt-munkamenetre, vagy a megfigyelésed (minden kattintásnál lassú-e, hány másodperc, mi látszik közben).
 - [ ] **Hibajelzés.** Ha a napi futás elbukik (Gemini-limit, lejárt kulcs), senki nem kap értesítést. Telegram-bot vagy email kellene. Addig a hiba a Vercel cron-logjában látszik.
 - [ ] **GitHub-token lejárat-figyelmeztető** (a GitHub-archívumhoz és a `GITHUB_TOKEN`-hez).

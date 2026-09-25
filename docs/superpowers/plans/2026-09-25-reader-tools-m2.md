@@ -4928,6 +4928,8 @@ A push a felhasználó feladata: `! git push origin reader-tools-m2`. A merge el
 
 ## Nyitott kérdések a felhasználónak
 
+**Eldöntve (2026-09-25):** a felhasználó mind a hat kérdésben az ajánlott választ fogadta el. A két Groq-sort ő cseréli az SQL Editorban (TODO.md, A/1). A `/glossary` menüpont külön kis PR lesz (TODO.md, B). Az alábbi szöveg a döntés indoklásaként marad.
+
 1. **A két megszűnt Groq-sor** (`daily_shortlist`, `ingest_cleanup`: `llama-3.3-70b-versatile`). Cseréljük-e most `openai/gpt-oss-120b`-re, illetve `openai/gpt-oss-20b`-re? **Ajánlás:** igen, még az M2 előtt, két sor átírásával a Table Editorban. Mindkettő átment a JSON-módú próbán, és adatról van szó, nem sémáról, ezért az M2 migrációja szándékosan nem nyúl hozzájuk.
 2. **Kerüljön-e a `/glossary` a fő navigációba** (oldalsáv és a mobil „Több” panel)? **Ajánlás:** igen, egy kis követő PR-ben: a `lib/nav.ts` egy új, nem elsődleges tétele, a UX-A teszteinek bővítésével. Addig a Library oldalról és minden fogalomkártyáról link vezet ide.
 3. **Törölje-e az újrakinyerés a Key insights-ot és a posztnál a fogalmakat?** **Ajánlás:** nem (ez a mostani döntés). A blokk-id-k tartalomból jönnek, így az insightok linkjei többnyire megmaradnak, és egy elavult insight egy SQL-sorral nullázható.
