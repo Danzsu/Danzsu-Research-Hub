@@ -157,11 +157,34 @@ export function filenameOf(url: string): string | undefined {
 /** Route and page ids: positive integers only. */
 export const parseId = (raw: string): number | null => (/^[1-9]\d{0,15}$/.test(raw) ? Number(raw) : null);
 
-/** Loopback, private, link-local, CGNAT, multicast/reserved, and their IPv4-mapped IPv6 forms. */
+/** The eight 16-bit groups of an IPv6 address, or null. The URL parser canonicalizes it first: hex only, at most one `::`. */
+function ipv6Groups(address: string): number[] | null {
+  let host: string;
+  try {
+    host = new URL(`http://[${address}]/`).hostname.slice(1, -1);
+  } catch {
+    return null;
+  }
+  const [head, tail] = host.split("::").map((part) => (part ? part.split(":") : []));
+  const groups = tail ? [...head, ...Array<string>(8 - head.length - tail.length).fill("0"), ...tail] : head;
+  return groups.map((group) => Number.parseInt(group, 16));
+}
+
+// The /96 prefixes whose last 32 bits are an IPv4 address: IPv4-compatible (::/96, which also holds
+// :: and ::1), IPv4-mapped (::ffff:0:0/96) and NAT64 (64:ff9b::/96).
+const IPV4_SUFFIX_PREFIXES = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0xffff], [0x64, 0xff9b, 0, 0, 0, 0]];
+
+/** The IPv4 address an IPv6 one carries, as a dotted quad: in its last 32 bits, or 6to4's (2002::/16) next 32. */
+function embeddedIpv4(groups: number[]): string | null {
+  const quad = (high: number, low: number) => `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
+  if (groups[0] === 0x2002) return quad(groups[1], groups[2]);
+  const suffixed = IPV4_SUFFIX_PREFIXES.some((prefix) => prefix.every((group, i) => groups[i] === group));
+  return suffixed ? quad(groups[6], groups[7]) : null;
+}
+
+/** Loopback, private, link-local, CGNAT, multicast/reserved, and an IPv6 address carrying any of those IPv4 ones. */
 export function isPrivateAddress(ip: string): boolean {
   const address = ip.toLowerCase().replace(/^\[|\]$/g, "");
-  const mapped = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (mapped) return isPrivateAddress(mapped[1]);
 
   const v4 = address.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (v4) {
@@ -174,12 +197,13 @@ export function isPrivateAddress(ip: string): boolean {
       (a === 100 && b >= 64 && b <= 127)
     );
   }
+  const groups = ipv6Groups(address);
+  const embedded = groups && embeddedIpv4(groups);
+  if (embedded) return isPrivateAddress(embedded);
   return (
-    address === "::" || address === "::1" ||
-    /^f[cd]/.test(address) ||     // fc00::/7 unique local
-    /^fe[89ab]/.test(address) ||  // fe80::/10 link-local
-    /^ff/.test(address) ||        // multicast
-    address.startsWith("::ffff:") // mapped in hex form
+    /^f[cd]/.test(address) ||    // fc00::/7 unique local
+    /^fe[89ab]/.test(address) || // fe80::/10 link-local
+    /^ff/.test(address)          // multicast
   );
 }
 

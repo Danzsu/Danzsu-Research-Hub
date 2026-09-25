@@ -102,6 +102,19 @@ test("isPrivateAddress covers v4, v6 and mapped forms", () => {
   }
 });
 
+test("isPrivateAddress applies the IPv4 rules to IPv4 carried in NAT64, IPv4-compatible, mapped and 6to4 addresses", () => {
+  const cases = {
+    nat64: { private: ["64:ff9b::7f00:1", "64:ff9b::10.0.0.1", "[64:ff9b::a9fe:a9fe]"], public: ["64:ff9b::808:808", "64:ff9b::8.8.8.8"] },
+    compatible: { private: ["::7f00:1", "::127.0.0.1", "::c0a8:1"], public: ["::808:808"] },
+    mapped: { private: ["::ffff:a00:1", "0:0:0:0:0:ffff:7f00:1"], public: ["::ffff:808:808", "::ffff:8.8.8.8"] },
+    sixToFour: { private: ["2002:7f00:1::", "2002:a00:1::1", "2002:c0a8:101:1::1"], public: ["2002:808:808::1"] },
+  };
+  for (const [kind, { private: privateIps, public: publicIps }] of Object.entries(cases)) {
+    for (const ip of privateIps) assert.equal(isPrivateAddress(ip), true, `${kind} ${ip}`);
+    for (const ip of publicIps) assert.equal(isPrivateAddress(ip), false, `${kind} ${ip}`);
+  }
+});
+
 test("detectSource and its URL helpers", () => {
   const kind = (u: string) => detectSource(new URL(u));
   assert.equal(kind("https://youtu.be/dQw4w9WgXcQ?si=abc"), "youtube");
