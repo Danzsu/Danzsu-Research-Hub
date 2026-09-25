@@ -24,12 +24,22 @@ const copy = {
   mirrored: { hu: "TÜKRÖZVE", en: "MIRRORED" },
 };
 
-/** The Library page body; the offline preview renders it with fixtures. */
-export function LibraryView({ posts, open, readIds }: { posts: Post[]; open: SubmittedSource[]; readIds: Set<number> }) {
+/** The Library page body; the offline preview renders it with fixtures and `preview`, so the form sends nothing. */
+export function LibraryView({
+  posts,
+  open,
+  readIds,
+  preview,
+}: {
+  posts: Post[];
+  open: SubmittedSource[];
+  readIds: Set<number>;
+  preview?: { failWrites: boolean };
+}) {
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <RefreshWhileProcessing active={open.some((source) => source.status === "pending")} />
-      <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm />} />
+      <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm preview={preview} />} />
 
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-10">
         {open.length > 0 && (

@@ -33,8 +33,25 @@ const copy = {
 } as const;
 
 type Status = "ok" | "invalid_url" | "already_submitted" | "error";
+type SubmitResult = { ok: boolean; error?: string };
 
-export function SubmitForm() {
+async function postSource(url: string, note: string): Promise<SubmitResult> {
+  const response = await fetch("/api/sources", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url, note }),
+  });
+  const data = (await response.json().catch(() => ({}))) as { error?: string };
+  return { ok: response.ok, error: data.error };
+}
+
+/** The offline preview sends nothing: local dev points at the production project. `failWrites` rejects like an offline fetch. */
+async function previewSubmit(failWrites: boolean): Promise<SubmitResult> {
+  if (failWrites) throw new TypeError("Failed to fetch");
+  return { ok: true };
+}
+
+export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
   const { language } = useLanguage();
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -47,15 +64,10 @@ export function SubmitForm() {
     event.preventDefault();
     setBusy(true);
     try {
-      const response = await fetch("/api/sources", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url, note }),
-      });
-      const data = (await response.json().catch(() => ({}))) as { error?: string };
-      const known = data.error === "invalid_url" || data.error === "already_submitted" ? data.error : "error";
-      setStatus(response.ok ? "ok" : known);
-      if (response.ok) {
+      const result = preview ? await previewSubmit(preview.failWrites) : await postSource(url, note);
+      const known = result.error === "invalid_url" || result.error === "already_submitted" ? result.error : "error";
+      setStatus(result.ok ? "ok" : known);
+      if (result.ok) {
         setUrl("");
         setNote("");
         router.refresh();

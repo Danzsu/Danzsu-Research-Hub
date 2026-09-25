@@ -35,8 +35,8 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
       {view === "radar-empty" && (
         <DigestDashboard key={String(failWrites)} issue={previewIssue} items={[]} githubTop10={[]} preview={{ data: { states: {}, todos: [] }, failWrites }} />
       )}
-      {view === "library" && <LibraryView posts={previewPosts} open={previewSources} readIds={previewReadPostIds} />}
-      {view === "library-empty" && <LibraryView posts={[]} open={[]} readIds={new Set()} />}
+      {view === "library" && <LibraryView posts={previewPosts} open={previewSources} readIds={previewReadPostIds} preview={{ failWrites }} />}
+      {view === "library-empty" && <LibraryView posts={[]} open={[]} readIds={new Set()} preview={{ failWrites }} />}
       {view === "archive" && <ArchiveView issues={previewArchive} />}
       {view === "archive-empty" && <ArchiveView issues={[]} />}
     </AppShell>
