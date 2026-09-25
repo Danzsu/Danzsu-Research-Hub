@@ -11,8 +11,9 @@ import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
 import { AccountActions, NavEntry, navIcons, SoonList } from "./nav-parts";
-import { SearchSoon } from "./shell-dialogs";
-import { UndoToast } from "./undo-toast";
+import { SearchSoon, ShortcutHelp } from "./shell-dialogs";
+import { toasts, UndoToast } from "./undo-toast";
+import { useShortcuts } from "./use-shortcuts";
 
 const copy = {
   hu: { nav: "Menü", more: "Több", language: "Nyelv", close: "Bezárás" },
@@ -37,21 +38,35 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [navMode, setNavMode] = useState<NavMode>(initialNavMode);
   const openSearch = () => setSearchOpen(true);
+  const openHelp = () => setHelpOpen(true);
   const toggleNav = () => {
     const next: NavMode = navMode === "rail" ? "full" : "rail";
     persistNavMode(next);
     setNavMode(next);
   };
+  // ⌘K and / are reserved for the search palette (milestone C); until then they open its placeholder.
+  useShortcuts({
+    search: openSearch,
+    help: openHelp,
+    toggleNav,
+    // z: last in tab order and gone in 5s, so a keyboard user can't reliably Tab to the toast's Undo button.
+    undo: () => {
+      const toast = toasts.getSnapshot();
+      if (toast?.undo) toasts.undo(toast.id);
+    },
+  });
   return (
     <LanguageProvider initial={language}>
-      <DesktopNav email={email} onSearch={openSearch} mode={navMode} onToggle={toggleNav}>
+      <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
         {/* Room for the fixed bottom bar, so it never covers the end of the page. */}
         <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
       </DesktopNav>
       <MobileNav email={email} onSearch={openSearch} />
       <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+      <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
       <UndoToast />
     </LanguageProvider>
   );

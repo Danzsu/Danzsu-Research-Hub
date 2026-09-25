@@ -1,6 +1,7 @@
 import { Bookmark, BookmarkCheck, Check, Clock3, ExternalLink, ListChecks, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DigestItem, Language } from "@/data/digest-types";
+import { nextCardIndex } from "@/lib/keymap";
 import type { Flag, ItemState } from "@/lib/reader-store";
 import { Tag } from "./tag";
 
@@ -38,12 +39,18 @@ export type CardProps = { item: DigestItem; state: ItemState; hasTodo: boolean; 
 
 const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
 
+/** Makes a card a j/k stop: focusable from script (not by Tab) and findable by id. */
+const cardFocus = (itemId: string) => ({ tabIndex: -1, "data-card-id": itemId });
+
 /** A feed card: meta (a 96px gutter from lg up), the text, then every action in one row at the bottom. */
 export function StoryCard(props: CardProps) {
   const { item, state, language } = props;
   const t = copy[language];
   return (
-    <article className={`story-card border-2 border-ink bg-paper p-5 sm:p-6 ${state.read ? "story-read" : ""}`}>
+    <article
+      {...cardFocus(item.id)}
+      className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${state.read ? "story-read" : ""}`}
+    >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
         {/* A row of meta on narrow screens, the 96px gutter from lg up. */}
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[10px] leading-5 text-ink/55 lg:block">
@@ -68,7 +75,10 @@ export function StoryCard(props: CardProps) {
 export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
   const { item, state } = props;
   return (
-    <article className={`must-card border-2 border-ink bg-paper p-5 ${state.read ? "story-read" : ""}`}>
+    <article
+      {...cardFocus(item.id)}
+      className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${state.read ? "story-read" : ""}`}
+    >
       <div className="mb-6 flex items-start justify-between">
         <span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
         <span className="border border-ink px-2 py-1 font-mono text-[10px]">{item.score}/100</span>
@@ -112,6 +122,7 @@ function CardFooter({ item, state, hasTodo, language, actions }: CardProps) {
           href={item.url}
           target="_blank"
           rel="noreferrer"
+          data-card-open
           onClick={() => actions.onOpen(item)}
           onAuxClick={(event) => {
             if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
@@ -153,4 +164,27 @@ function CardFooter({ item, state, hasTodo, language, actions }: CardProps) {
       </Button>
     </div>
   );
+}
+
+const CARD = "[data-card-id]";
+
+/** The id of the card that has focus, or holds the focused button. */
+export function focusedCardId(): string | null {
+  return document.activeElement?.closest<HTMLElement>(CARD)?.dataset.cardId ?? null;
+}
+
+/** j/k: focus the next or previous card and scroll it to the middle, instantly under prefers-reduced-motion. */
+export function moveCardFocus(step: 1 | -1) {
+  const cards = [...document.querySelectorAll<HTMLElement>(CARD)];
+  const index = nextCardIndex(cards.findIndex((card) => card.contains(document.activeElement)), cards.length, step);
+  if (index === null) return;
+  const card = cards[index];
+  card.focus({ preventScroll: true });
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  card.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
+}
+
+/** o: follows the focused card's Open link, which also marks it read. */
+export function openFocusedCard() {
+  document.activeElement?.closest(CARD)?.querySelector<HTMLAnchorElement>("[data-card-open]")?.click();
 }

@@ -18,13 +18,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import type { CurrentIssue, DigestItem, GithubTopEntry } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { feedItems, type Filter } from "@/lib/feed";
-import { EMPTY_ITEM_STATE } from "@/lib/reader-store";
+import { EMPTY_ITEM_STATE, type Flag } from "@/lib/reader-store";
 import { useLanguage } from "./language-context";
 import { ReaderPanel } from "./reader-panel";
-import { MustReadCard, StoryCard, type CardActions } from "./story-card";
+import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
 import { isUndoToast, toasts } from "./undo-toast";
 import { useModelContextTools } from "./use-model-context-tools";
 import { useReaderState, type ReaderPreview } from "./use-reader-state";
+import { useShortcuts } from "./use-shortcuts";
 
 const copy = {
   hu: {
@@ -140,6 +141,19 @@ export function DigestDashboard({
     const removal = store.removeTodo(id);
     if (removal) toasts.show({ kind: "todoDeleted", ...removal });
   }
+
+  function toggleFocused(flag: Flag) {
+    const itemId = focusedCardId();
+    if (itemId) store.toggleFlag(itemId, flag);
+  }
+
+  useShortcuts({
+    next: () => moveCardFocus(1),
+    previous: () => moveCardFocus(-1),
+    open: openFocusedCard,
+    read: () => toggleFocused("read"),
+    later: () => toggleFocused("saved"),
+  });
 
   const cardProps = (item: DigestItem) => ({
     item,
