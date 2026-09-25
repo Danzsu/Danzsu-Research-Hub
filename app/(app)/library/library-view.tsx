@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
 import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
@@ -6,6 +5,7 @@ import { Tag } from "@/app/components/tag";
 import type { SubmittedSource } from "@/lib/content";
 import { hostOf } from "@/lib/pipeline/util";
 import type { Post } from "@/lib/post-view";
+import { PostCardLink } from "./opened-posts";
 import { RefreshWhileProcessing } from "./refresh-while-processing";
 import { SubmitForm } from "./submit-form";
 
@@ -68,10 +68,11 @@ export function LibraryView({
           {posts.map((post) => {
             const Icon = kindIcons[post.kind];
             return (
-              <Link
+              <PostCardLink
                 key={post.id}
-                href={`/library/${post.id}`}
-                className={`focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6 ${readIds.has(post.id) ? "story-read" : ""}`}
+                postId={post.id}
+                read={readIds.has(post.id)}
+                className="focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6"
               >
                 <div className="flex items-start justify-between">
                   <Icon className="size-7 text-signal group-hover:text-ink" />
@@ -94,7 +95,7 @@ export function LibraryView({
                     </span>
                   )}
                 </div>
-              </Link>
+              </PostCardLink>
             );
           })}
         </div>

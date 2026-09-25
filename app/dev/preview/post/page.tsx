@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { MarkPostRead } from "@/app/(app)/library/[id]/mark-post-read";
 import { PostArticle } from "@/app/(app)/library/[id]/post-article";
 import { AppShell } from "@/app/components/app-shell";
 import { previewEmail, previewPosts } from "@/lib/fixtures";
@@ -16,6 +17,10 @@ export default async function PreviewPostPage() {
       <main className="min-h-dvh bg-ink">
         {previewPosts.map((post) => (
           <PostArticle key={post.id} post={post} language={language} query={{}} canEdit={false} />
+        ))}
+        {/* Like the real post page, so Back to the preview's Library shows the cards dimmed; nothing is sent. */}
+        {previewPosts.map((post) => (
+          <MarkPostRead key={post.id} postId={post.id} preview />
         ))}
       </main>
     </AppShell>
