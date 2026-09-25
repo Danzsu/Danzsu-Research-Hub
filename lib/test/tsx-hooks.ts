@@ -1,7 +1,7 @@
-// Node module hooks registered by render.ts (they run on Node's loader thread). They do the three
-// things a bundler would: resolve `@/` and extensionless relative imports like tsconfig's paths,
-// compile .tsx with the project's own TypeScript, and swap the Next.js modules that need a running
-// app for next-stub.ts.
+// Node module hooks registered by render.ts and route-hooks.ts (they run on Node's loader thread).
+// They do the three things a bundler would: resolve `@/` and extensionless relative imports like
+// tsconfig's paths, compile .tsx with the project's own TypeScript, and swap the modules that need a
+// running Next.js app for next-stub.ts (components) or route-hooks.ts (route handlers).
 
 import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -11,8 +11,15 @@ type Resolved = { url: string; shortCircuit?: boolean };
 type Loaded = { format?: string | null; source?: unknown; shortCircuit?: boolean };
 
 const root = new URL("../../", import.meta.url);
-const STUBBED = new Set(["next/link", "next/navigation"]);
-const stub = new URL("./next-stub.ts", import.meta.url).href;
+const here = (file: string) => new URL(file, import.meta.url).href;
+/** Modules that need a running Next.js app, and what stands in for them. */
+const STUBS = new Map([
+  ["next/link", here("./next-stub.ts")],
+  ["next/navigation", here("./next-stub.ts")],
+  ["next/server", here("./route-hooks.ts")],
+  ["@/lib/supabase/server", here("./route-hooks.ts")],
+  ["server-only", "data:text/javascript,"],
+]);
 
 const isFile = (url: string) => statSync(fileURLToPath(url), { throwIfNoEntry: false })?.isFile() ?? false;
 
@@ -26,7 +33,8 @@ const aliasedFile = (specifier: string) => withExtension(new URL(specifier.slice
 const relativeFile = (specifier: string, parentURL: string) => withExtension(new URL(specifier, parentURL).href);
 
 export async function resolve(specifier: string, context: unknown, nextResolve: (specifier: string, context: unknown) => Promise<Resolved>): Promise<Resolved> {
-  if (STUBBED.has(specifier)) return { url: stub, shortCircuit: true };
+  const stub = STUBS.get(specifier);
+  if (stub) return { url: stub, shortCircuit: true };
   const parentURL = (context as { parentURL?: string }).parentURL;
   const resolved = specifier.startsWith("@/")
     ? aliasedFile(specifier)

@@ -150,8 +150,9 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * only `.is(...)` matches null); a `sources` `single()` that matches no row, or several, answers
  * PostgREST's PGRST116 error.
  * Any other table only upserts (recorded on `.upserts`) and answers `select().gte()` from `tables.rows`.
- * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it and
- * `list` reflects it, so a test can mirror an image and then see it (or its absence) in a later list.
+ * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it,
+ * `list` reflects it, and `download` answers an object it holds with the object's own path as its
+ * bytes, so a test can mirror an image and then see it (or its absence) in a later list.
  * Every write is recorded on `.sourceUpdates`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
  */
 export function fakeDb(
@@ -297,6 +298,8 @@ export function fakeDb(
         objects.add(bareObjectName(path));
         return { data: { path }, error: null };
       },
+      download: async (path: string) =>
+        objects.has(bareObjectName(path)) ? { data: new Blob([path]), error: null } : { data: null, error: { message: "Object not found" } },
       remove: async (paths: string[]) => {
         writes.push("storage.remove");
         if (tables.storageError) throw new Error("storage down");
