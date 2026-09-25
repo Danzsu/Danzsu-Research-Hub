@@ -12,7 +12,16 @@ const cronRequest = (authorization?: string) =>
 // X1: with CRON_SECRET unset, no header can be right, so the route never runs (model spend, DoS).
 test("the cron answers 401 without a CRON_SECRET or with a wrong bearer, and never opens the admin client", async (t) => {
   resetRoute();
-  for (const [secret, header] of [[undefined, undefined], [undefined, "Bearer undefined"], [undefined, "Bearer "], ["s3cret", "Bearer wrong"], ["s3cret", "s3cret"]]) {
+  for (const [secret, header] of [
+    [undefined, undefined],
+    [undefined, "Bearer undefined"],
+    [undefined, "Bearer "],
+    ["", undefined],
+    ["", "Bearer "],
+    ["s3cret", undefined],
+    ["s3cret", "Bearer wrong"],
+    ["s3cret", "s3cret"],
+  ]) {
     withEnv(t, "CRON_SECRET", secret);
     const response = await GET(cronRequest(header));
     assert.deepEqual([response.status, await response.json()], [401, { error: "unauthorized" }], `${secret} / ${header}`);

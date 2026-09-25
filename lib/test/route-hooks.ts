@@ -34,7 +34,10 @@ export const signedIn = (db: SupabaseClient, id = "owner"): Reader => ({ db, vie
 
 export const getReader = async () => routeStub.reader;
 export const getViewer = async () => routeStub.reader?.viewer ?? null;
-export const createClient = async () => routeStub.reader?.db;
+export async function createClient(): Promise<SupabaseClient> {
+  if (!routeStub.reader) throw new Error("routeStub.reader is not set");
+  return routeStub.reader.db;
+}
 
 export function createAdminClient(): SupabaseClient {
   routeStub.adminCalls++;
