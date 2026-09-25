@@ -610,8 +610,8 @@ test("retryPendingSources(): forwards its deadline into processSource, so a tigh
 
 test("retryPendingSources(): with plenty of time left, every pending source is processed", async (t) => {
   withGeminiKey(t);
-  const source = newSource(1);
-  const db = fakeDb(undefined, { source, post: null, pending: [{ id: 1 }, { id: 2 }, { id: 3 }] });
+  const sources = [newSource(1), newSource(2), newSource(3)];
+  const db = fakeDb(undefined, { sources, post: null, pending: sources });
   mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
   const processed = await retryPendingSources(db, Date.now() + 10 * 60_000);
   assert.equal(processed, 3);
@@ -623,4 +623,23 @@ test("retryPendingSources() stops starting new sources once the deadline is too 
   const processed = await retryPendingSources(db, Date.now() - 1);
   assert.equal(processed, 0);
   assert.deepEqual(db.sourceUpdates, []); // no source was ever started
+});
+
+// I8, I9: a finished source, or one that failed MAX_ATTEMPTS (3) times, is never retried: a poison
+// link would otherwise cost a model run every day.
+test("retryPendingSources() retries only unfinished sources under the 3-attempt cap", async (t) => {
+  const fetched: string[] = [];
+  mockFetch(t, async (url) => {
+    fetched.push(url);
+    return new Response("", { status: 404 });
+  });
+  const sources = [
+    { ...newSource(1, "article", "done"), status: "done", attempts: 1 },
+    { ...newSource(2, "article", "spent"), status: "failed", attempts: 3 },
+    { ...newSource(3, "article", "new"), status: "pending", attempts: 0 },
+    { ...newSource(4, "article", "again"), status: "failed", attempts: 2 },
+  ];
+  const db = fakeDb(undefined, { sources, post: null, pending: sources });
+  assert.equal(await retryPendingSources(db), 2);
+  assert.deepEqual(fetched, [`${TEST_HOST}/new`, `${TEST_HOST}/again`]);
 });

@@ -4,9 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Rows the `sources`/`posts` tables of a {@link fakeDb} answer with, offline. */
 export type FakeIngestTables = {
-  /** The row `sources`' `select().eq().single()` resolves to; omit to make it "not found". */
+  /** The row `sources`' `select().eq(column, value).single()` finds when it matches; omit to make it "not found". */
   source?: Record<string, unknown>;
-  /** The row `posts`' `select().eq().maybeSingle()` resolves to; omit/null for "no existing post". */
+  /** Several rows for that lookup, instead of `source`, for a test that processes more than one source. */
+  sources?: Record<string, unknown>[];
+  /** The row `posts`' `select().eq(column, value).maybeSingle()` resolves to when it matches; omit/null for "no existing post". */
   post?: Record<string, unknown> | null;
   /** Forces a `posts` lookup's `maybeSingle()` to resolve with this error instead of `post`. Applies
    *  to every lookup unless `postErrorOnCall` narrows it to just one of them. */
@@ -20,13 +22,13 @@ export type FakeIngestTables = {
   postUpdateError?: unknown;
   /** Bare object names (no `<sourceId>/` prefix) the media bucket already holds for this source. */
   media?: string[];
-  /** Rows `retryPendingSources`' pending-sources listing resolves to. */
+  /** Rows `retryPendingSources`' pending-sources listing filters (`eq`/`neq`/`lt`), then limits. */
   pending?: Record<string, unknown>[];
   /** Every `storage.from().list/upload/remove` call rejects, for testing failure-path cleanup. */
   storageError?: boolean;
-  /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g. `{
-   *  code: "42501" }` for the `update_post_overrides` "not the submitter" case. */
-  rpcError?: { code?: string; message?: string };
+  /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g.
+   *  `pgError("42501", …)` for the `update_post_overrides` "not the submitter" case. */
+  rpcError?: PostgrestErrorShape;
   /** Rows any other table's `select().gte()` resolves to, by table name (runDaily's recent-items lookup). */
   rows?: Record<string, Record<string, unknown>[]>;
 };
@@ -66,21 +68,46 @@ export type FakeIngestDb = SupabaseClient & {
   writes: ("sources.update" | "posts.upsert" | "posts.update" | "storage.list" | "storage.upload" | "storage.remove" | "fetch")[];
 };
 
-type PendingChain = {
-  neq: (column: string, value: unknown) => PendingChain;
-  lt: (column: string, value: unknown) => PendingChain;
-  order: (column: string) => PendingChain;
-  limit: (n: number) => Promise<{ data: Record<string, unknown>[]; error: null }>;
-};
+/** The error body PostgREST answers with; supabase-js resolves `error` to it. */
+export type PostgrestErrorShape = { code: string; message: string; details: string | null; hint: string | null };
 
-function pendingChain(rows: Record<string, unknown>[]): PendingChain {
-  const chain: PendingChain = {
-    neq: () => chain,
-    lt: () => chain,
-    order: () => chain,
-    limit: async (n) => ({ data: rows.slice(0, n), error: null }),
+export const pgError = (code: string, message: string, details: string | null = null): PostgrestErrorShape => ({ code, message, details, hint: null });
+
+type Filter = { column: string; op: "eq" | "neq" | "lt"; value: unknown };
+
+/** Whether `row` passes `filter` as PostgREST compares it. A column the fixture never set passes every
+ *  filter, so a sparse fixture (`{ id: 1 }`) still stands in for whichever row a test needs. */
+function passes(row: Record<string, unknown>, { column, op, value }: Filter): boolean {
+  if (!(column in row)) return true;
+  if (op === "eq") return row[column] === value;
+  if (op === "neq") return row[column] !== value;
+  return (row[column] as number) < (value as number);
+}
+
+/** `sources`' select chain, filters applied: the pending listing (`limit`) over `listed`, the
+ *  one-row lookup (`single`) over `lookedUp`, which answers PGRST116 unless exactly one row matches. */
+function sourcesQuery(listed: Record<string, unknown>[], lookedUp: Record<string, unknown>[], onEq: (column: string, value: unknown) => void) {
+  const filters: Filter[] = [];
+  const matching = (rows: Record<string, unknown>[]) => rows.filter((row) => filters.every((filter) => passes(row, filter)));
+  const filter = (op: Filter["op"]) => (column: string, value: unknown) => {
+    if (op === "eq") onEq(column, value);
+    filters.push({ column, op, value });
+    return query;
   };
-  return chain;
+  const query = {
+    eq: filter("eq"),
+    neq: filter("neq"),
+    lt: filter("lt"),
+    order: () => query,
+    limit: async (n: number) => ({ data: matching(listed).slice(0, n), error: null }),
+    single: async () => {
+      const rows = matching(lookedUp);
+      return rows.length === 1
+        ? { data: rows[0], error: null }
+        : { data: null, error: pgError("PGRST116", "JSON object requested, multiple (or no) rows returned", `The result contains ${rows.length} rows`) };
+    },
+  };
+  return query;
 }
 
 /** A storage path's bare object name: whatever follows the first `/` (the `<sourceId>/` prefix real
@@ -112,6 +139,9 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * every value queried via `.eq("task", value)`, so a test can assert which task (`ingest_video`,
  * `ingest_cleanup`, …) a call actually asked for, and how many times.
  * `sources`/`posts`/storage: fixed by `tables` (all optional — omit what a test never queries).
+ * Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows, and a column the fixture never
+ * set passes every filter; a `sources` `single()` that matches no row, or several, answers PostgREST's
+ * PGRST116 error.
  * Any other table only upserts (recorded on `.upserts`) and answers `select().gte()` from `tables.rows`.
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it and
  * `list` reflects it, so a test can mirror an image and then see it (or its absence) in a later list.
@@ -148,17 +178,9 @@ export function fakeDb(
       };
     }
     if (table === "sources") {
+      const lookedUp = tables.sources ?? (tables.source ? [tables.source] : []);
       return {
-        select: () => ({
-          eq: (column: string, value: unknown) => {
-            eqCalls.push({ table: "sources", column, value });
-            return {
-              single: async () =>
-                tables.source ? { data: tables.source, error: null } : { data: null, error: new Error("source not found") },
-            };
-          },
-          ...pendingChain(tables.pending ?? []),
-        }),
+        select: () => sourcesQuery(tables.pending ?? [], lookedUp, (column, value) => eqCalls.push({ table: "sources", column, value })),
         update: (values: Record<string, unknown>) => ({
           eq: async (column: string, value: unknown) => {
             eqCalls.push({ table: "sources", column, value });
@@ -179,9 +201,9 @@ export function fakeDb(
             return {
               maybeSingle: async () => {
                 const errored = tables.postErrorOnCall !== undefined ? callNumber === tables.postErrorOnCall : Boolean(tables.postError);
-                return errored
-                  ? { data: null, error: tables.postError ?? new Error("posts lookup failed") }
-                  : { data: project(tables.post ?? null, columns), error: null };
+                if (errored) return { data: null, error: tables.postError ?? pgError("08006", "posts lookup failed") };
+                const row = tables.post ?? null;
+                return { data: row && passes(row, { column, op: "eq", value }) ? project(row, columns) : null, error: null };
               },
             };
           },

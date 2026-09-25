@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft } from "./blocks.ts";
 import { TITLE_MAX } from "./overrides.ts";
-import { fakeDb } from "./pipeline/fake-db.ts";
+import { fakeDb, pgError } from "./pipeline/fake-db.ts";
 import { editPayload, requestReextract, savePostEdits } from "./post-edit.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
@@ -66,13 +66,13 @@ test("savePostEdits: invalid input is rejected before any RPC call", async () =>
 });
 
 test("savePostEdits: a 42501 RPC error maps to forbidden", async () => {
-  const db = fakeDb(undefined, { post: { id: 1, blocks: [] }, rpcError: { code: "42501" } });
+  const db = fakeDb(undefined, { post: { id: 1, blocks: [] }, rpcError: pgError("42501", "only the submitter can edit this post") });
   const result = await savePostEdits(db, 1, { hidden: [] });
   assert.equal(result, "forbidden");
 });
 
 test("savePostEdits: a non-42501 RPC error maps to failed, not forbidden", async () => {
-  const db = fakeDb(undefined, { post: { id: 1, blocks: [] }, rpcError: { code: "23505" } });
+  const db = fakeDb(undefined, { post: { id: 1, blocks: [] }, rpcError: pgError("23505", "duplicate key value violates unique constraint") });
   const result = await savePostEdits(db, 1, { hidden: [] });
   assert.equal(result, "failed");
 });
@@ -96,6 +96,19 @@ test("savePostEdits: a title over the shared TITLE_MAX cap is invalid", async ()
   const result = await savePostEdits(db, 1, { title: { hu: "x".repeat(TITLE_MAX + 1), en: "y" }, hidden: [] });
   assert.equal(result, "invalid");
   assert.equal(db.rpcCalls.length, 0);
+});
+
+// E3, E7: both read the post by its own id. Only a fixture whose id and source_id differ can tell:
+// with the two equal, a read keyed on the wrong column finds the same row.
+test("savePostEdits and requestReextract read the post by its id, never by its source_id", async () => {
+  const blocks = assignIds([p("a")]);
+  const post = { id: 7, source_id: 3, blocks, extracted_at: null, sources: { submitted_by: "owner" } };
+  const saved = fakeDb(undefined, { post });
+  assert.equal(await savePostEdits(saved, 7, { hidden: [blocks[0].id] }), "ok");
+  assert.deepEqual(saved.rpcCalls[0].args.p_hidden, [blocks[0].id]);
+  assert.equal(await savePostEdits(fakeDb(undefined, { post }), 3, { hidden: [] }), "not_found");
+  assert.deepEqual(await requestReextract(fakeDb(undefined, { post }), "owner", 7, new Date()), { status: "accepted", sourceId: 3 });
+  assert.deepEqual(await requestReextract(fakeDb(undefined, { post }), "owner", 3, new Date()), { status: "not_found" });
 });
 
 test("requestReextract: a non-submitter is forbidden", async () => {
