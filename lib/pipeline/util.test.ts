@@ -34,7 +34,11 @@ test("safeNext keeps same-site paths", () => {
 });
 
 test("safeNext rejects anything that resolves off-site", () => {
-  for (const hostile of ["//evil.com", "/\\evil.com", "/\t/evil.com", "/\n/evil.com", "/\r\n/evil.com", "https://evil.com", "javascript:alert(1)", "evil.com", ""]) {
+  for (const hostile of [
+    "//evil.com", "/\\evil.com", "/\t/evil.com", "/\n/evil.com", "/\r\n/evil.com",
+    "/..//evil.com", "/.//evil.com", "/%2e%2e//evil.com", "/a/..//evil.com",
+    "https://evil.com", "javascript:alert(1)", "evil.com", "",
+  ]) {
     assert.equal(safeNext(hostile), "/", JSON.stringify(hostile));
   }
   assert.equal(safeNext(null), "/");

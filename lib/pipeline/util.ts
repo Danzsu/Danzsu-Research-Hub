@@ -212,17 +212,20 @@ export function parseSubmittedUrl(raw: string): URL | null {
   return url;
 }
 
-const SAME_SITE = "http://same.site";
+const SAME_SITE = "https://same.site";
 
 /**
  * Only same-site paths survive; anything else falls back to `/`. Checked on the parsed URL, not the
- * string: the URL parser drops tab/newline and reads `\` as `/`, so `/\t/evil.com` becomes `//evil.com`.
+ * string: the URL parser drops tab/newline, reads `\` as `/` and resolves dot-segments, so both
+ * `/\t/evil.com` and `/..//evil.com` can turn into `//evil.com`. The returned path must itself
+ * resolve on this site, because the caller resolves it again.
  */
 export function safeNext(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/")) return "/";
   try {
     const url = new URL(value, SAME_SITE);
-    return url.origin === SAME_SITE ? `${url.pathname}${url.search}${url.hash}` : "/";
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    return url.origin === SAME_SITE && new URL(path, SAME_SITE).origin === SAME_SITE ? path : "/";
   } catch {
     return "/";
   }
