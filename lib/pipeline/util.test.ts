@@ -20,6 +20,7 @@ import {
   publishedDate,
   publishedLabel,
   safeNext,
+  settledValues,
   slugify,
   videoFromUrl,
   xmlText,
@@ -168,6 +169,13 @@ test("hasNoarchive matches case-insensitively across several robots-directive st
   assert.equal(hasNoarchive("NOARCHIVE"), true);
   assert.equal(hasNoarchive(null, undefined, "noarchive"), true); // a header alongside absent metas
   assert.equal(hasNoarchive(), false);
+});
+
+test("settledValues keeps the fulfilled values in order and logs each rejection with its label", async (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  const results = await Promise.allSettled([Promise.resolve(1), Promise.reject(new Error("down")), Promise.resolve(3)]);
+  assert.deepEqual(settledValues(results, (i) => `feed ${i}`), [1, 3]);
+  assert.deepEqual(warn.mock.calls.map((call) => call.arguments), [["feed 1: down"]]);
 });
 
 test("mapLimited runs at most `limit` items concurrently and keeps result order", async () => {

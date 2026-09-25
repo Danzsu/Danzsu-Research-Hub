@@ -2,7 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
 import { apiFetch, ensureOk, githubHeaders } from "./fetch.ts";
 import { feeds, githubTopics, hnQueries } from "./feeds.ts";
-import { errorMessage, list, publishedDate, xmlText } from "./util.ts";
+import { list, publishedDate, settledValues, xmlText } from "./util.ts";
 
 export type Candidate = {
   url: string;
@@ -54,11 +54,7 @@ async function fromFeeds(since: Date): Promise<Candidate[]> {
   const results = await Promise.allSettled(
     feeds.map(async (feed) => parseFeed(await (await get(feed.url)).text(), feed, since).slice(0, feed.limit ?? 25)),
   );
-  return results.flatMap((result, i) => {
-    if (result.status === "fulfilled") return result.value;
-    console.warn(`feed failed: ${feeds[i].name}: ${errorMessage(result.reason)}`);
-    return [];
-  });
+  return settledValues(results, (i) => `feed failed: ${feeds[i].name}`).flat();
 }
 
 async function fromHackerNews(since: Date): Promise<Candidate[]> {
@@ -79,7 +75,7 @@ async function fromHackerNews(since: Date): Promise<Candidate[]> {
       }));
     }),
   );
-  return results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+  return settledValues(results, (i) => `hacker news query failed: ${hnQueries[i]}`).flat();
 }
 
 export async function collectRepos(now: Date): Promise<Repo[]> {
@@ -97,9 +93,8 @@ export async function collectRepos(now: Date): Promise<Repo[]> {
   );
 
   const byName = new Map<string, Repo>();
-  for (const result of results) {
-    if (result.status !== "fulfilled") continue;
-    for (const item of result.value) {
+  for (const items of settledValues(results, (i) => `github topic failed: ${githubTopics[i]}`)) {
+    for (const item of items) {
       byName.set(item.full_name, {
         repo: item.full_name,
         focus: (item.description ?? "").slice(0, 90),

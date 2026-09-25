@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dedupeCandidates, parseFeed, type Candidate } from "./collect.ts";
+import { collectRepos, dedupeCandidates, parseFeed, type Candidate } from "./collect.ts";
+import { githubTopics } from "./feeds.ts";
+import { mockFetch } from "./mock-fetch.ts";
 
 const since = new Date("2026-09-21T00:00:00Z");
 const feed = { name: "Test Feed", hint: "research" as const };
@@ -90,4 +92,12 @@ test("dedupeCandidates keeps the first of each URL, ignoring a fragment and a tr
 test("dedupeCandidates drops untitled candidates without letting them claim the URL", () => {
   const kept = dedupeCandidates([candidate("https://blog.test/a", ""), candidate("https://blog.test/a", "titled")]);
   assert.deepEqual(kept.map((c) => c.title), ["titled"]);
+});
+
+test("collectRepos logs each failing topic search (an expired GitHub token) instead of swallowing it", async (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  mockFetch(t, async () => new Response("Bad credentials", { status: 401 }));
+  assert.deepEqual(await collectRepos(new Date("2026-09-23T05:00:00Z")), []);
+  assert.equal(warn.mock.callCount(), githubTopics.length);
+  assert.match(String(warn.mock.calls[0].arguments[0]), /^github topic failed: llm: https:\/\/api\.github\.com\/\S+ 401$/);
 });

@@ -276,6 +276,15 @@ export function xmlText(value: unknown): string {
 
 export const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
+/** The fulfilled values, in order; each rejection is logged as `<label(index)>: <reason>` and skipped. */
+export function settledValues<T>(results: PromiseSettledResult<T>[], label: (index: number) => string): T[] {
+  return results.flatMap((result, index) => {
+    if (result.status === "fulfilled") return [result.value];
+    console.warn(`${label(index)}: ${errorMessage(result.reason)}`);
+    return [];
+  });
+}
+
 /** True if any of the given robots-directive strings turns off archiving, case-insensitively. */
 export function hasNoarchive(...values: (string | null | undefined)[]): boolean {
   return values.some((value) => value && /noarchive/i.test(value));
