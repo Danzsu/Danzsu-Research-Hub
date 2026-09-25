@@ -2,7 +2,7 @@ import { parseId } from "./pipeline/util.ts";
 
 // `Response.json`, not NextResponse: a route handler may return either, and this way `node --test` can load the file.
 export const jsonError = (status: number, error: string, extra: Record<string, unknown> = {}) =>
-  Response.json({ error, ...extra }, { status });
+  Response.json({ ...extra, error }, { status });
 
 export type ErrorAnswer = { status: number; error: string };
 

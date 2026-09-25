@@ -8,6 +8,10 @@ test("jsonError answers JSON with the status, the error and any extra fields", a
   assert.deepEqual(await response.json(), { error: "cooldown", retryAfter: 60 });
 });
 
+test("jsonError never lets an extra field override the error code", async () => {
+  assert.deepEqual(await jsonError(400, "invalid", { error: "spoofed", field: "title" }).json(), { error: "invalid", field: "title" });
+});
+
 const request = new Request("http://localhost/api/posts/7", { method: "POST" });
 const context = (id: string) => ({ params: Promise.resolve({ id }) });
 
