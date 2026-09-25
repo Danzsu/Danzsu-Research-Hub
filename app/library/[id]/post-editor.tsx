@@ -117,55 +117,64 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 border-2 border-ink bg-paper p-5 sm:grid-cols-2">
-        {(["hu", "en"] as const).map((lang) => (
-          <div key={lang} className="space-y-3">
-            <FieldRow
-              htmlFor={titleId(lang)}
-              label={`${t.title} (${lang.toUpperCase()})`}
-              resetLabel={t.resetTitle(lang.toUpperCase())}
-              resetText={t.original}
-              onReset={() => setTitle({ ...title, [lang]: post.generatedTitle[lang] })}
-            >
-              <Input
-                id={titleId(lang)}
-                value={title[lang]}
-                onChange={(e) => setTitle({ ...title, [lang]: e.target.value })}
-                className="min-h-10 border-2 border-ink bg-paper"
-                required
-                maxLength={TITLE_MAX}
-                lang={lang}
-              />
-            </FieldRow>
-            <FieldRow
-              htmlFor={summaryId(lang)}
-              label={`${t.summary} (${lang.toUpperCase()})`}
-              resetLabel={t.resetSummary(lang.toUpperCase())}
-              resetText={t.original}
-              onReset={() => setSummary({ ...summary, [lang]: post.generatedSummary[lang] })}
-            >
-              <Textarea
-                id={summaryId(lang)}
-                value={summary[lang]}
-                onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })}
-                rows={5}
-                className="border-2 border-ink bg-paper"
-                required
-                maxLength={SUMMARY_MAX}
-                lang={lang}
-              />
-            </FieldRow>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ink" className="min-h-10" onClick={() => void save()} disabled={busy}>{busy ? t.saving : t.save}</Button>
-        <Button asChild variant="brutal" className="min-h-10"><Link href={`/library/${post.id}`}>{t.cancel}</Link></Button>
-        <Button variant="brutal" className="min-h-10" onClick={() => void reextract()} disabled={reextracting}><RefreshCw /> {t.reextract}</Button>
-        {/* Always mounted: a live region must already be in the accessibility tree before its text
-            changes, or screen readers may not announce the change at all. */}
-        <p role="status" className={`font-mono text-xs ${status?.failed ? "text-signal" : "text-ink/70"}`}>{status?.text ?? ""}</p>
-      </div>
+      {/* A real form, so Enter in a title field saves and the browser enforces required / maxLength. */}
+      <form
+        className="space-y-8"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+      >
+        <div className="grid gap-4 border-2 border-ink bg-paper p-5 sm:grid-cols-2">
+          {(["hu", "en"] as const).map((lang) => (
+            <div key={lang} className="space-y-3">
+              <FieldRow
+                htmlFor={titleId(lang)}
+                label={`${t.title} (${lang.toUpperCase()})`}
+                resetLabel={t.resetTitle(lang.toUpperCase())}
+                resetText={t.original}
+                onReset={() => setTitle({ ...title, [lang]: post.generatedTitle[lang] })}
+              >
+                <Input
+                  id={titleId(lang)}
+                  value={title[lang]}
+                  onChange={(e) => setTitle({ ...title, [lang]: e.target.value })}
+                  className="min-h-10 border-2 border-ink bg-paper"
+                  required
+                  maxLength={TITLE_MAX}
+                  lang={lang}
+                />
+              </FieldRow>
+              <FieldRow
+                htmlFor={summaryId(lang)}
+                label={`${t.summary} (${lang.toUpperCase()})`}
+                resetLabel={t.resetSummary(lang.toUpperCase())}
+                resetText={t.original}
+                onReset={() => setSummary({ ...summary, [lang]: post.generatedSummary[lang] })}
+              >
+                <Textarea
+                  id={summaryId(lang)}
+                  value={summary[lang]}
+                  onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })}
+                  rows={5}
+                  className="border-2 border-ink bg-paper"
+                  required
+                  maxLength={SUMMARY_MAX}
+                  lang={lang}
+                />
+              </FieldRow>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" variant="ink" className="min-h-10" disabled={busy}>{busy ? t.saving : t.save}</Button>
+          <Button asChild variant="brutal" className="min-h-10"><Link href={`/library/${post.id}`}>{t.cancel}</Link></Button>
+          <Button type="button" variant="brutal" className="min-h-10" onClick={() => void reextract()} disabled={reextracting}><RefreshCw /> {t.reextract}</Button>
+          {/* Always mounted: a live region must already be in the accessibility tree before its text
+              changes, or screen readers may not announce the change at all. */}
+          <p role="status" className={`font-mono text-xs ${status?.failed ? "text-signal" : "text-ink/70"}`}>{status?.text ?? ""}</p>
+        </div>
+      </form>
       <PostBlocks
         blocks={post.blocks}
         language={language}

@@ -57,3 +57,16 @@ test("PostEditor mounts its live region empty, before any status text exists", (
   assert.ok(status);
   assert.equal(status.textContent, "");
 });
+
+test("PostEditor puts its fields in a form whose one submit button is Save, so Enter and required/maxLength work", () => {
+  const form = renderEditor().querySelector("form");
+  assert.ok(form);
+  const fields = [...form.querySelectorAll("input, textarea")];
+  assert.equal(fields.length, 4);
+  assert.ok(fields.every((field) => field.hasAttribute("required")));
+  const buttons = [...form.querySelectorAll("button")];
+  assert.deepEqual(buttons.filter((button) => button.getAttribute("type") === "submit").map((button) => button.textContent), ["Save"]);
+  // A button with no type would submit the form too: re-extract and the resets must say "button".
+  assert.deepEqual(buttons.filter((button) => button.getAttribute("type") !== "submit").map((button) => button.getAttribute("type")), Array(5).fill("button"));
+  assert.equal(form.querySelector("button[aria-pressed]"), null); // the hide toggles sit outside the form
+});
