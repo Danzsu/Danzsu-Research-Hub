@@ -20,7 +20,7 @@ Ez a spec a kinézethez nem nyúl. A `CLAUDE.md` „Design language” szakasza 
 | Kérdés | Döntés |
 | --- | --- |
 | Eszköz | Telefon és asztal nagyjából fele-fele. Mobilon alsó sáv. |
-| Asztali navigáció | **Nyitott.** A, B vagy C a `navigation.html` szerint. Az A mérföldkő elején döntünk, addig az A (oldalsáv) az alapértelmezés. |
+| Asztali navigáció | **A (oldalsáv)** az alap. Egy gombbal keskeny ikonsávvá csukható, mint a C változat (döntés: 2026-09-25). |
 | Keresés tárgya | Radar-hírek és Library-posztok, **csak címek**. A teljes szövegben nem keresünk, mert túl sok lenne a találat. |
 | „Okos” keresés | A cím elgépelés-tűrő egyezése (pg_trgm) és jelentés szerinti keresés a cím és az összefoglaló embeddingjével (pgvector) |
 | Szűrők | Címke, típus, dátum, értékelés |
@@ -71,7 +71,12 @@ Az aktív menüpontot az útvonal előtagja dönti el. Az `/archive/2026-W38` p�
   - A „Több” egy alulról nyíló panel, benne: nyelvváltás, kijelentkezés és a jövőbeli nézetek.
   - A sáv figyelembe veszi az `env(safe-area-inset-bottom)` értéket.
   - A tartalom alján annyi hely marad, hogy a sáv ne takarjon ki semmit.
-- **Asztal (`md` fölött):** a választott változat (A, B vagy C). Mindháromban ugyanazok a menüpontok, és a keresés ⌘K-val nyílik.
+- **Asztal (`md` fölött):** oldalsáv (A változat). Benne a logó, a keresés (⌘K), a menüpontok, és alul a nyelvváltó és a kijelentkezés.
+  - **Összecsukás ikonsávvá.** A sáv alján egy gomb (`aria-expanded`, felirata „Oldalsáv összecsukása” / „Collapse sidebar”) kb. 56 px-es ikonsávvá csukja, mint a C változat. Ilyenkor csak az ikonok látszanak. Minden ikon hozzáférhető neve a menüpont neve, és a név rámutatásra és billentyűs fókuszra buborékban megjelenik. A tartalom oszlopa kiszélesedik.
+  - **Alapállapot:** kinyitva.
+  - **Megjegyzés:** a választást egy `nav` cookie (`full` | `rail`) őrzi meg, így a szerver már a helyes szélességgel rendereli az oldalt, villanás nélkül. A cookie értékét egy tiszta függvény olvassa, teszttel.
+  - **Billentyűparancs:** a `[` váltja a két állapotot. Gépelés közben nem működik (lásd 1.5).
+  - **Mobilon** nincs oldalsáv, csak az alsó sáv.
 - **A Radar kategóriái** minden szélességen chip-sávban jelennek meg. Az oldalsáv kategórialistája megszűnik.
 - **Fejlécek:** a `PageHeader` (vissza-link és logó) helyét a keret veszi át. A `PageHero` (cím-sáv) marad.
 
@@ -115,6 +120,7 @@ Neve: `app/components/undo-toast.tsx`. Egy alul megjelenő sáv: „Olvasottnak 
 | `r` | Olvasott ki/be |
 | `l` | Későbbre |
 | `⌘K` vagy `/` | Keresés (C mérföldkő) |
+| `[` | Az oldalsáv összecsukása vagy kinyitása |
 | `?` | A billentyűparancsok listája |
 
 - A parancsok nem futnak, ha a fókusz beviteli mezőn, szövegdobozon vagy `contenteditable` elemen van.
@@ -298,6 +304,6 @@ A meglévő `/api/state` route egy új műveletet kap: `set_rating`, paramétere
   - 360 px és az alsó sáv takarása;
   - keresés embedding nélkül.
 
-## 6. Nyitott döntés
+## 6. Eldöntve
 
-- **Asztali navigáció:** A (oldalsáv), B (felső sáv) vagy C (ikonsáv), a `.superpowers/brainstorm/…/navigation.html` alapján. Az A mérföldkő elején döntünk. Ha addig nincs döntés, az A az alapértelmezés.
+- **Asztali navigáció (2026-09-25):** az A (oldalsáv) marad az alap, és a C ikonsávjává csukható. A részletek az 1.2 pontban.
