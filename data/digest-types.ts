@@ -43,8 +43,9 @@ export type DigestItem = {
    * and saved state — there is no migration that can recover the association.
    * Ids are append-only: add new ones, never rewrite existing ones.
    *
-   * Format: `<category>-<isoweek>-<slug>`, max 120 characters (the API route
-   * truncates beyond that).
+   * Format: `<category>-<yyyy>w<ww>-<slug>-<urlhash>`, from `itemId()` in
+   * lib/pipeline/util.ts. Max 120 characters: `itemId()` cuts it there, and
+   * `/api/state` truncates an incoming id to the same length.
    */
   id: string;
   category: DigestCategory;
