@@ -1,8 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-// API routes answer 401 themselves; redirecting a fetch to /login helps no one.
-const PUBLIC_PREFIXES = ["/login", "/auth/", "/api/"];
+import { isPublicPath } from "@/lib/public-paths";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -23,7 +21,7 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const { pathname, search } = request.nextUrl;
 
-  if (!data?.claims && !PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (!data?.claims && !isPublicPath(pathname)) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = `?next=${encodeURIComponent(pathname + search)}`;
