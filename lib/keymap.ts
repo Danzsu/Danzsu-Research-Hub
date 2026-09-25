@@ -21,7 +21,7 @@ const BY_KEY = new Map(
   SHORTCUTS.flatMap(({ keys, action }) => keys.filter((key) => key.length === 1).map((key) => [key, action] as const)),
 );
 
-export type KeyPress = { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; isComposing?: boolean };
+export type KeyPress = { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; isComposing?: boolean; repeat?: boolean };
 export type KeyTarget = { editable: boolean; inDialog: boolean };
 
 /** True for anything that takes typing: input, textarea, select, or a contenteditable element (and its children). */
@@ -31,14 +31,25 @@ export function isEditableTarget(element: { tagName?: string; isContentEditable?
 }
 
 /**
- * The action a key press asks for, or null. Nothing fires while typing, inside an open dialog, or
- * mid-composition. Letters take no modifier, so Ctrl+R (reload) and the like stay the browser's.
+ * The action a key press asks for, or null. Nothing fires while typing or mid-composition, and only `z`
+ * fires inside an open dialog: the reader panel is a non-modal one, and its undo toast stays usable.
+ * A held key repeats only j/k; holding r would otherwise toggle read about 30 times a second.
+ */
+export function shortcutFor(press: KeyPress, target: KeyTarget): ShortcutAction | null {
+  if (press.isComposing || target.editable) return null;
+  const action = keyAction(press);
+  if (press.repeat && action !== "next" && action !== "previous") return null;
+  if (target.inDialog && action !== "undo") return null;
+  return action;
+}
+
+/**
+ * Letters take no modifier, so Ctrl+R (reload) and the like stay the browser's.
  * `/` and `?` ignore Shift, which the Hungarian layout needs to type them. Ctrl/⌘+K is search; AltGr (Ctrl+Alt) is not.
  * A symbol also counts with Alt or AltGr, never with ⌘: on the Hungarian layout `[` is AltGr+F
  * (Ctrl+Alt on Windows, Option on macOS).
  */
-export function shortcutFor(press: KeyPress, target: KeyTarget): ShortcutAction | null {
-  if (press.isComposing || target.editable || target.inDialog) return null;
+function keyAction(press: KeyPress): ShortcutAction | null {
   const letter = /^[a-z]$/i.test(press.key);
   if (!letter && !press.metaKey && (press.altKey || !press.ctrlKey)) return BY_KEY.get(press.key) ?? null;
   if (press.ctrlKey || press.metaKey) return !press.altKey && press.key.toLowerCase() === "k" ? "search" : null;

@@ -46,6 +46,18 @@ test("z undoes the visible toast, and is blocked while typing like every other s
   assert.equal(shortcutFor(press("z"), { editable: true, inDialog: false }), null);
 });
 
+test("z still undoes inside the non-modal reader panel, but not while typing in its to-do input", () => {
+  assert.equal(shortcutFor(press("z"), { editable: false, inDialog: true }), "undo");
+  assert.equal(shortcutFor(press("z"), { editable: true, inDialog: true }), null);
+  assert.equal(shortcutFor(press("r"), { editable: false, inDialog: true }), null, "every other shortcut stays off in a dialog");
+});
+
+test("a held key repeats only j and k: holding r must not toggle read on every repeat", () => {
+  assert.equal(shortcutFor(press("j", { repeat: true }), page), "next");
+  assert.equal(shortcutFor(press("k", { repeat: true }), page), "previous");
+  for (const key of ["r", "l", "[", "o", "z", "?", "/"]) assert.equal(shortcutFor(press(key, { repeat: true }), page), null, key);
+});
+
 test("isEditableTarget: form fields and contenteditable, not buttons or cards", () => {
   for (const tagName of ["INPUT", "TEXTAREA", "SELECT"]) assert.equal(isEditableTarget({ tagName }), true, tagName);
   assert.equal(isEditableTarget({ tagName: "DIV", isContentEditable: true }), true);
