@@ -138,6 +138,7 @@
 ### Következő lépések
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
+- [ ] **Lassú archívum** (a felhasználó jelezte 2026-09-25-én): a „Heti archívum” sokáig tölt. Kijelentkezve a szerver gyors (0,13–0,7 mp), ezért az ok a bejelentkezett úton vagy a route hideg indulásában lehet. A kivizsgáláshoz bejelentkezett mérés kell: engedély egy egyszeri teszt-munkamenetre, vagy a megfigyelésed (minden kattintásnál lassú-e, hány másodperc, mi látszik közben).
 - [ ] **Hibajelzés.** Ha a napi futás elbukik (Gemini-limit, lejárt kulcs), senki nem kap értesítést. Telegram-bot vagy email kellene. Addig a hiba a Vercel cron-logjában látszik.
 - [ ] **GitHub-token lejárat-figyelmeztető** (a GitHub-archívumhoz és a `GITHUB_TOKEN`-hez).
   - A GitHub a fine-grained token minden API-válaszában visszaküldi a lejárati dátumot (`GitHub-Authentication-Token-Expiration` fejléc).

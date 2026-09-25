@@ -110,6 +110,18 @@ Neve: `app/components/undo-toast.tsx`. Egy alul megjelenő sáv: „Olvasottnak 
 8. **Nyelvváltás oldalfrissítés nélkül** ott, ahol mindkét nyelv már be van töltve: Radar, Library-lista, Archívum.
 9. **Érintési felületek.** A Top 3 forrás-linkje és a teendő-törlés is legalább 40 px (`size-10 sm:size-8`).
 10. **Üres állapotok.** Mindegyik megmondja, mi a teendő. Például: „Még üres, küldj be egy linket fent ↑”.
+11. **Szélesebb cikkoszlop a poszt-oldalon** (a felhasználó kérése, 2026-09-25).
+    - A mostani `max-w-3xl` (~80 karakter) helyett a keret legyen szélesebb: `max-w-5xl` körül.
+    - A folyószöveg sorhossza maradjon olvasható: `max-w-[75ch]` a bekezdéseken és a listákon.
+    - A képek, a kódblokkok, a táblázatok és a videó kihasználhatják a teljes szélességet.
+    - Az oldalsáv összecsukásakor a tartalom a felszabaduló helyre is kiterjed.
+12. **Egységes képkeret** (a felhasználó kérése, 2026-09-25). Minden tükrözött kép egyforma keretben jelenik meg:
+    - paper háttér, 2 px-es ink keret, belső margó, kemény árnyék (`4px 4px 0 var(--ink)`);
+    - a kép `object-contain`, így az átlátszó hátterű ábrák (arXiv, GitHub) is a paper háttéren jelennek meg, nem a cream oszlopon;
+    - a nagyon magas képek legfeljebb `80dvh` magasak;
+    - a képaláírás a kereten belül, alul, mono betűvel szerepel;
+    - a homályos `placeholder` csak betöltés közben látszik, utána eltűnik, így nem ütközik át az átlátszó képeken;
+    - a „kép nem érhető el” doboz ugyanezt a keretet kapja, szaggatott vonallal.
 
 ### 1.5 Billentyűparancsok (asztal)
 
