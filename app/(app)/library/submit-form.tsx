@@ -82,7 +82,9 @@ export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
   return (
     <form id="submit" onSubmit={submit} className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
       <p className="font-mono text-xs tracking-[0.14em] text-signal">BEKÜLDÉS / SUBMIT</p>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+      {/* @lg (not sm:), keyed to the hero's @container: in the narrow full-sidebar column this must
+          wrap on the column's own width, not the viewport (page-header.tsx). */}
+      <div className="mt-3 flex flex-col gap-2 @lg:flex-row">
         <Input
           type="url"
           required
@@ -92,7 +94,7 @@ export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
           aria-label={t.url}
           className="min-h-10 flex-1 border-2 border-ink bg-cream focus-visible:border-signal"
         />
-        <Button type="submit" variant="signal" className="min-h-10" disabled={busy}>
+        <Button type="submit" variant="signal" className="min-h-10 shrink @lg:shrink-0" disabled={busy}>
           <Plus /> {busy ? "…" : t.submit}
         </Button>
       </div>

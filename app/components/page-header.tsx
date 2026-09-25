@@ -6,11 +6,13 @@ import { Radar } from "lucide-react";
 /** The cream title band of the secondary pages: eyebrow, `TITLE//`, lead text, optional side panel. */
 export function PageHero({ eyebrow, title, lead, aside }: { eyebrow: string; title: string; lead: ReactNode; aside?: ReactNode }) {
   return (
-    <section className="border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
-      <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 lg:grid-cols-[1fr_minmax(0,460px)] lg:items-end" : ""}`}>
-        <div>
+    // @container: the sidebar (256px full, 56px rail) makes this section's own width, not the
+    // viewport, the thing the two-column switch below has to key off (spec: Design language → Responsive rules).
+    <section className="@container border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
+      <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
+        <div className="min-w-0">
           <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
-          <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em]">
+          <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em] [overflow-wrap:anywhere]">
             {title}
             <span className="text-signal">{"//"}</span>
           </h1>
