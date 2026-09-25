@@ -11,7 +11,10 @@
 - [ ] *Authentication → URL Configuration*:
   - Site URL: `https://neon-news-radar.vercel.app`
   - Redirect URLs: add hozzá a `https://neon-news-radar.vercel.app/**` címet (a `http://localhost:3000/**` maradhat a helyi próbához)
-- [ ] *Authentication → Email Templates*:
+- [ ] **Saját SMTP nélkül a sablonok nem szerkeszthetők** (2026-09-25). Addig két szabály érvényes:
+  - Magadat a *Users → Add user → Create new user* (Auto Confirm) menüben vedd fel, ne meghívóval. Az alap „Invite” sablon linkje nem léptet be.
+  - A belépő linket ugyanabban a böngészőben nyisd meg, ahol kérted. Az alap Magic Link a `?code=` (PKCE) utat használja.
+- [ ] *Authentication → Email Templates* (csak saját SMTP után):
   - Magic Link: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`
   - Invite user: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite`
   - A sablonok szövegében a név legyen **NEON NEWS RADAR** (a kód már így hívja az oldalt)
