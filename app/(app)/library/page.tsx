@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
-import { LanguageToggle } from "@/app/components/language-toggle";
-import { PageHeader, PageHero } from "@/app/components/page-header";
+import { PageHero } from "@/app/components/page-header";
 import { getOpenSources, getPosts } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
 import { hostOf } from "@/lib/pipeline/util";
@@ -21,10 +20,6 @@ export default async function LibraryPage() {
 
   return (
     <main className="min-h-dvh bg-ink text-paper">
-      <PageHeader backHref="/" backLabel="LIVE RADAR">
-        <LanguageToggle language={lang} />
-      </PageHeader>
-
       <PageHero
         eyebrow="MIRRORED SOURCES / KÖNYVTÁR"
         title="LIBRARY"

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
-import { assignIds } from "../../../lib/blocks.ts";
-import { testPost } from "../../../lib/test/fixtures.ts";
-import { render } from "../../../lib/test/render.ts";
+import { assignIds } from "../../../../lib/blocks.ts";
+import { testPost } from "../../../../lib/test/fixtures.ts";
+import { render } from "../../../../lib/test/render.ts";
 
 const { PostEditor } = await import("./post-editor.tsx");
 

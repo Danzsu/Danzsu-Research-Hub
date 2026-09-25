@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
-import { render } from "../../../lib/test/render.ts";
+import { render } from "../../../../lib/test/render.ts";
 
 const { PostToolbar } = await import("./post-toolbar.tsx");
 

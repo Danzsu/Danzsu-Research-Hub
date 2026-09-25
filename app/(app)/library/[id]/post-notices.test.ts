@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
-import { testPost } from "../../../lib/test/fixtures.ts";
-import { render } from "../../../lib/test/render.ts";
+import { testPost } from "../../../../lib/test/fixtures.ts";
+import { render } from "../../../../lib/test/render.ts";
 
 const { PostNotices } = await import("./post-notices.tsx");
 

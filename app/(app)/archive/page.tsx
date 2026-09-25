@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Archive, CalendarDays, Clock3 } from "lucide-react";
-import { LanguageToggle } from "@/app/components/language-toggle";
-import { PageHeader, PageHero } from "@/app/components/page-header";
+import { PageHero } from "@/app/components/page-header";
 import { getArchive } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
 import { getReader } from "@/lib/supabase/server";
@@ -17,9 +16,6 @@ export default async function ArchivePage() {
 
   return (
     <main className="min-h-dvh bg-ink text-paper">
-      <PageHeader backHref="/" backLabel="LIVE RADAR">
-        <LanguageToggle language={language} />
-      </PageHeader>
       <PageHero
         eyebrow="WEEKLY FREEZE / HETI ZÁRÁS"
         title="ARCHIVE"

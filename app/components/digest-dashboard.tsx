@@ -1,10 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Archive,
-  BookOpen,
   Bookmark,
   BookmarkCheck,
   Building2,
@@ -14,42 +11,19 @@ import {
   ExternalLink,
   FlaskConical,
   GitFork,
-  Languages,
   ListTodo,
   Newspaper,
   Plus,
   Radar,
   Trash2,
-  UserRound,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import type {
-  CurrentIssue,
-  DigestCategory,
-  DigestItem,
-  GithubTopEntry,
-  Language,
-} from "@/data/digest-types";
-import { persistLanguage } from "./language-toggle";
+import type { CurrentIssue, DigestCategory, DigestItem, GithubTopEntry } from "@/data/digest-types";
+import { useLanguage } from "./language-context";
 
 type ItemState = { read: boolean; saved: boolean };
 const EMPTY_ITEM_STATE: ItemState = { read: false, saved: false };
@@ -70,8 +44,6 @@ const ui = {
     companies: "AI cégek",
     github: "GitHub Top 10",
     saved: "Mentve későbbre",
-    archiveNav: "Heti archívum",
-    library: "Könyvtár",
     mustRead: "TOP 3 · KÖTELEZŐ",
     feed: "A HÉT ÉLŐ ADATFOLYAMA",
     why: "MIÉRT FONTOS",
@@ -84,7 +56,6 @@ const ui = {
     add: "Hozzáadás",
     empty: "Ebben a nézetben még nincs elem.",
     sample: "Ez a heti kiadás még üres — a napi automatikus futás tölti fel.",
-    signOut: "Kijelentkezés",
     tracked: "FIGYELT REPO",
   },
   en: {
@@ -100,8 +71,6 @@ const ui = {
     companies: "AI companies",
     github: "GitHub Top 10",
     saved: "Saved for later",
-    archiveNav: "Weekly archive",
-    library: "Library",
     mustRead: "TOP 3 · MUST READ",
     feed: "THE WEEK'S LIVE SIGNAL",
     why: "WHY IT MATTERS",
@@ -114,7 +83,6 @@ const ui = {
     add: "Add",
     empty: "Nothing in this view yet.",
     sample: "This week's issue is still empty — the daily automated run fills it.",
-    signOut: "Sign out",
     tracked: "TRACKED REPO",
   },
 } as const;
@@ -143,22 +111,18 @@ async function mutate(payload: Record<string, unknown>) {
 }
 
 export function DigestDashboard({
-  email,
   issue: currentIssue,
   items: digestItems,
   githubTop10,
-  initialLanguage,
   archived = false,
 }: {
-  email: string;
   issue: CurrentIssue;
   items: DigestItem[];
   githubTop10: GithubTopEntry[];
-  initialLanguage: Language;
   /** A closed week opened from /archive: same reading UI, no "live" framing. */
   archived?: boolean;
 }) {
-  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const { language } = useLanguage();
   const [filter, setFilter] = useState<Filter>("all");
   const [states, setStates] = useState<Record<string, ItemState>>({});
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -244,12 +208,6 @@ export function DigestDashboard({
   const readCount = digestItems.filter((item) => states[item.id]?.read).length;
   const progress = digestItems.length ? Math.round((readCount / digestItems.length) * 100) : 0;
   const openTodos = todos.filter((todo) => !todo.done).length;
-
-  function toggleLanguage() {
-    const next = language === "hu" ? "en" : "hu";
-    setLanguage(next);
-    persistLanguage(next);
-  }
 
   async function setItemState(itemId: string, key: "read" | "saved", value: boolean) {
     setStates((current) => ({
@@ -344,143 +302,59 @@ export function DigestDashboard({
   );
 
   return (
-    <SidebarProvider className="min-h-dvh bg-ink text-paper">
-      <Sidebar className="border-r-0 bg-ink text-paper" collapsible="offcanvas">
-        <SidebarHeader className="border-b border-paper/15 p-5">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-full border border-signal bg-signal text-ink">
-              <Radar className="size-5" />
-            </span>
-            <div>
-              <p className="font-display text-2xl leading-none tracking-tight">NEON</p>
-              <p className="font-display text-2xl leading-none tracking-tight">NEWS</p>
-              <p className="font-display text-2xl leading-none text-signal">RADAR</p>
-            </div>
+    <div className="min-w-0 bg-cream text-ink">
+      <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          {!archived && <span className="live-pulse shrink-0" />}
+          <div className="min-w-0">
+            <p className="truncate font-mono text-[10px] tracking-[0.2em] text-signal">{archived ? t.archived : t.live}</p>
+            <p className="font-display text-lg leading-none">{currentIssue.label}</p>
           </div>
-        </SidebarHeader>
-        <SidebarContent className="px-3 py-4">
-          <SidebarGroup>
-            <SidebarGroupLabel className="font-mono text-[11px] tracking-[0.18em] text-paper/45">
-              SIGNAL / JEL
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {filters.map(({ id, icon: Icon, key }) => (
-                  <SidebarMenuItem key={id}>
-                    <SidebarMenuButton
-                      isActive={filter === id}
-                      onClick={() => setFilter(id)}
-                      className="h-10 rounded-none border-l-2 border-transparent font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper data-[active=true]:border-signal data-[active=true]:bg-signal/10 data-[active=true]:text-signal"
-                    >
-                      <Icon />
-                      <span>{t[key]}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    className="h-10 rounded-none border-l-2 border-transparent font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper"
-                  >
-                    <Link href="/archive">
-                      <Archive />
-                      <span>{t.archiveNav}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    className="h-10 rounded-none border-l-2 border-transparent font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper"
-                  >
-                    <Link href="/library">
-                      <BookOpen />
-                      <span>{t.library}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter className="border-t border-paper/15 p-4">
-          <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-full bg-paper text-ink">
-              <UserRound className="size-4" />
-            </span>
-            <p className="min-w-0 flex-1 truncate font-mono text-[11px] text-paper/70">{email}</p>
-          </div>
-          <form action="/auth/signout" method="post">
-            <button type="submit" className="mt-3 block font-mono text-[11px] text-paper/45 hover:text-signal">
-              {t.signOut} →
-            </button>
-          </form>
-        </SidebarFooter>
-      </Sidebar>
-
-      <SidebarInset className="min-w-0 bg-cream text-ink">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <SidebarTrigger className="size-9 rounded-none border border-ink bg-transparent md:hidden" />
-            {!archived && <span className="live-pulse shrink-0" />}
-            <div className="min-w-0">
-              <p className="truncate font-mono text-[10px] tracking-[0.2em] text-signal">{archived ? t.archived : t.live}</p>
-              <p className="font-display text-lg leading-none">{currentIssue.label}</p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label={t.panel}
-                  className="h-9 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper 2xl:hidden"
-                >
-                  <ListTodo /> {progress}%{openTodos > 0 && <span className="text-signal">· {openTodos}</span>}
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side="right"
-                // Focusing the to-do input on open would pop the phone keyboard over the panel.
-                onOpenAutoFocus={(event) => event.preventDefault()}
-                className="w-[88vw] max-w-sm overflow-y-auto border-l-2 border-ink bg-cream p-5 pt-12 text-ink"
-              >
-                <SheetHeader className="sr-only">
-                  <SheetTitle>{t.panel}</SheetTitle>
-                </SheetHeader>
-                {readerPanel}
-              </SheetContent>
-            </Sheet>
+        </div>
+        <Sheet>
+          <SheetTrigger asChild>
             <Button
               variant="outline"
               size="sm"
-              onClick={toggleLanguage}
-              className="h-9 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper"
+              aria-label={t.panel}
+              className="h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:h-9 2xl:hidden"
             >
-              <Languages className="hidden sm:block" /> {language.toUpperCase()}
+              <ListTodo /> {progress}%{openTodos > 0 && <span className="text-signal">· {openTodos}</span>}
             </Button>
-          </div>
-        </header>
+          </SheetTrigger>
+          <SheetContent
+            side="right"
+            // Focusing the to-do input on open would pop the phone keyboard over the panel.
+            onOpenAutoFocus={(event) => event.preventDefault()}
+            className="w-[88vw] max-w-sm overflow-y-auto border-l-2 border-ink bg-cream p-5 pt-12 text-ink"
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>{t.panel}</SheetTitle>
+            </SheetHeader>
+            {readerPanel}
+          </SheetContent>
+        </Sheet>
+      </header>
 
-        <nav
-          aria-label={t.categories}
-          className="sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none md:hidden"
-        >
-          {filters.map(({ id, icon: Icon, key }) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={filter === id}
-              onClick={() => setFilter(id)}
-              className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
-            >
-              <Icon className="size-3.5" /> {t[key]}
-            </button>
-          ))}
-        </nav>
-
-        <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_330px]">
+      <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_330px]">
+        {/* The chip bar belongs to this column, so the 2xl panel beside it is not covered. */}
+        <div className="min-w-0">
+          <nav
+            aria-label={t.categories}
+            className="sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
+          >
+            {filters.map(({ id, icon: Icon, key }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={filter === id}
+                onClick={() => setFilter(id)}
+                className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
+              >
+                <Icon className="size-3.5" /> {t[key]}
+              </button>
+            ))}
+          </nav>
           <main className="min-w-0 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
             <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-7 text-paper sm:px-8 sm:py-9">
               <div className="signal-grid" aria-hidden="true" />
@@ -624,13 +498,13 @@ export function DigestDashboard({
               </>
             )}
           </main>
-
-          <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 2xl:sticky 2xl:top-16 2xl:block 2xl:h-[calc(100dvh-4rem)] 2xl:overflow-y-auto">
-            {readerPanel}
-          </aside>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+
+        <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 2xl:sticky 2xl:top-16 2xl:block 2xl:h-[calc(100dvh-4rem)] 2xl:overflow-y-auto">
+          {readerPanel}
+        </aside>
+      </div>
+    </div>
   );
 }
 

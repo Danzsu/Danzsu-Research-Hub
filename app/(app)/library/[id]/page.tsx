@@ -1,7 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
-import { LanguageToggle } from "@/app/components/language-toggle";
-import { PageHeader } from "@/app/components/page-header";
 import { PostBlocks } from "@/app/components/post-blocks";
 import { Button } from "@/components/ui/button";
 import { safeHref } from "@/lib/blocks";
@@ -48,10 +46,6 @@ export default async function PostPage({
 
   return (
     <main className="min-h-dvh bg-ink text-paper">
-      <PageHeader backHref="/library" backLabel="LIBRARY">
-        <LanguageToggle language={language} />
-      </PageHeader>
-
       <article className="bg-cream text-ink">
         <div className="mx-auto max-w-3xl px-4 py-10 sm:px-10 sm:py-16">
           <header className="border-b-2 border-ink pb-6">

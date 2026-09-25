@@ -1,29 +1,35 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { Language } from "@/data/digest-types";
+import { Languages } from "lucide-react";
+import { useLanguage } from "./language-context";
+import { NavTooltip } from "./nav-parts";
 
-/** Read back on the server by `getLanguage()` in lib/language.ts. */
-export function persistLanguage(language: Language) {
-  document.cookie = `lang=${language}; path=/; max-age=31536000; samesite=lax`;
-}
+// Each label names the switch in the language it switches to.
+const copy = { hu: { label: "Switch to English" }, en: { label: "Váltás magyarra" } };
 
-/** For server-rendered pages: stores the choice, then re-renders the page in it. */
-export function LanguageToggle({ language }: { language: Language }) {
+/** Switches the whole shell at once; the server-rendered page follows with one refresh. `iconOnly` is the rail's ~40px version (desktop-nav.tsx). */
+export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}) {
+  const { language, setLanguage } = useLanguage();
   const router = useRouter();
-  const next = language === "hu" ? "en" : "hu";
-
-  return (
+  const label = copy[language].label;
+  const toggle = (
     <button
       type="button"
       onClick={() => {
-        persistLanguage(next);
+        setLanguage(language === "hu" ? "en" : "hu");
         router.refresh();
       }}
-      aria-label={next === "en" ? "Switch to English" : "Váltás magyarra"}
-      className="focus-ring min-h-9 rounded-full border border-paper/40 px-3 font-mono text-xs hover:border-signal hover:text-signal"
+      aria-label={label}
+      className={
+        iconOnly
+          ? "focus-ring grid size-10 place-items-center rounded-full border border-current/40 hover:border-signal hover:text-signal"
+          : "focus-ring min-h-10 rounded-full border border-current/40 px-4 font-mono text-xs hover:border-signal hover:text-signal"
+      }
     >
-      {language.toUpperCase()}
+      {iconOnly ? <Languages className="size-4" /> : language.toUpperCase()}
     </button>
   );
+  // The rail shows only the icon, so its name comes up as a tooltip on hover and focus (spec 1.2).
+  return iconOnly ? <NavTooltip label={label}>{toggle}</NavTooltip> : toggle;
 }
