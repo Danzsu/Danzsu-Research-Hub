@@ -15,15 +15,10 @@
   - Magic Link: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`
   - Invite user: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite`
   - A sablonok szövegében a név legyen **NEON NEWS RADAR** (a kód már így hívja az oldalt)
-- [ ] Ajánlott: *Authentication → SMTP Settings*, saját SMTP (pl. Resend, ingyenes kerettel). A beépített levélküldés óránként csak néhány emailt enged, ez meghívásnál gyorsan elfogy.
+- [ ] Ajánlott: *Authentication → SMTP Settings*, saját SMTP (pl. Resend, ingyenes kerettel). A beépített levélküldés csak a Supabase-projekt csapatának tagjaihoz kézbesít, és óránként csak néhány emailt enged, ez meghívásnál gyorsan elfogy.
 - [ ] *Project Settings → API Keys*: a `Publishable` és a `Secret` kulcs kimásolása
-- [ ] A séma feltöltése:
-  ```bash
-  npx supabase login
-  npx supabase link --project-ref <project-ref>
-  npx supabase db push
-  ```
-  CLI nélkül: *SQL Editor*, és egymás után, fájlnév szerinti sorrendben a `supabase/migrations/` fájljai (`…_init.sql`, `…_model_settings.sql`, `…_post_blocks.sql`). A `…_drop_post_body.sql` csak az M1 deployja után jön, lásd lent.
+- [ ] A séma feltöltése: *SQL Editor*, a fájlokat egyenként, a [README migrációs táblázatának](README.md#migrations) sorrendjében, mindig csak az előző sikere után. A `…_drop_post_body.sql` csak az M1 deployja után jön, lásd lent.
+  - ⚠️ **Ne futtasd a `supabase db push`-t:** idő előtt lefuttatná a drop migrációt, pedig az éles oldal még olvassa a `posts.body`-t. Ez a figyelmeztetés addig marad, amíg a lenti „Csak az M1 deployja után” pont kész nincs.
 - [ ] Ellenőrzés a *Table Editor*-ban: 8 tábla (a `model_settings`-szel együtt) és egy `archive_issues` view, mindegyik táblán „RLS enabled”
 - [ ] *Authentication → Users → Invite user*: meghívod magad
 - [x] **Egységes poszt-sablon (M1) migrációja** (`20260924000000_post_blocks.sql`): lefutott és ellenőrizve, 2026-09-24. Megvannak az új `posts`-oszlopok, a privát `media` bucket, a 7 `model_settings` sor, és az `update_post_overrides` jogosultság-ellenőrzése is működik.
@@ -42,7 +37,7 @@
 ### 3. Helyi próba
 - [ ] `cp .env.example .env.local`, majd a kulcsok beírása
 - [ ] `corepack pnpm@11.25.0 install --frozen-lockfile`, majd `npm run dev`
-- [ ] Belépés a `http://localhost:3000/login` oldalon a meghívott címeddel
+- [ ] Belépés a `http://localhost:3000/login` oldalon a meghívott címeddel. Az emailben kapott link a Site URL-re (az éles címre) mutat: a link elejét cseréld `http://localhost:3000`-ra, a Site URL-t ne írd át.
 - [ ] Az első kiadás elindítása:
   ```bash
   curl -H "Authorization: Bearer <CRON_SECRET>" http://localhost:3000/api/cron/daily
@@ -52,7 +47,7 @@
 
 ### 4. Vercel
 - [ ] [vercel.com](https://vercel.com) → *Add New → Project* → a GitHub repó importálása. A Next.js-t és a pnpm-et magától felismeri.
-- [ ] *Settings → Environment Variables*: minden változó a `.env.example`-ből (Production és Preview)
+- [ ] *Settings → Environment Variables*: minden változó a `.env.example`-ből (Production és Preview; a Development is, ha a sima `vercel env pull`-nak is működnie kell, különben `vercel env pull --environment=production .env.local`)
 - [x] Deploy
 - [ ] A projekt átnevezése `neon-news-radar`-ra (*Settings → General*), és a cím átírása `neon-news-radar.vercel.app`-ra (*Settings → Domains*)
 - [ ] **Lockfile-védelem ellenőrzése:** *Settings → Build and Deployment → Install Command*. A kívánt állapot: a Vercel a `pnpm-lock.yaml` szerint, frozen módban telepít, és pnpm 11-et használ, hogy a `pnpm-workspace.yaml` 7 napos korhatára (`minimumReleaseAge`) érvényesüljön. Ha a mező üres, a pnpm CI-ban alapból frozen módban fut. Szólj, mit látsz ott, és ha kell, beállítom a `vercel.json`-ban.
@@ -152,7 +147,7 @@
 - [ ] **Valódi GitHub trending.** Most csak a héten *létrehozott* repókat rangsorolja csillag szerint. A régebbi, de most gyorsan növő repókhoz napi csillagszám-mentés és a különbség számítása kell.
 - [ ] **Beküldött posztok a Radarban.** A Library-posztok nem jelennek meg a heti feedben.
 - [ ] **Paywall-felismerés.** Most csak a `noarchive` jelzést figyeli. A fizetős cikkekből csak a nyilvános eleje kerül be.
-- [x] **Képek tükrözése** a Supabase Storage-ba. Most a cikkekből csak a szöveg mentődik.
+- [x] **Képek tükrözése** a Supabase Storage-ba. Az M1 óta a posztok képei a privát `media` bucketba kerülnek, AVIF-ként (animált képnél WebP-ként), és a `/media` route szolgálja ki őket.
 - [ ] **Forráslink-figyelés.** Nincs ellenőrzés arra, hogy az eredeti link él-e még.
 
 ### Kényelmi funkciók
@@ -163,7 +158,7 @@
 - [ ] **Chat felület** a Library fölött („mit írtak erről?”). Ez a legnagyobb munka.
 
 ### Technikai adósság
-- [x] **Függőségek pontos verzióra.** A `package.json`-ban `^` tartományok vannak; a lockfile rögzíti őket, de a policy pontos verziót kér.
+- [x] **Függőségek pontos verzióra.** A `package.json` minden függősége pontos verzió, a lockfile-lal összhangban, és a `jscpd` is pontos devDependency.
 - [ ] **Generált Supabase-típusok** (`supabase gen types`). Most a kliens típus nélkül dolgozik.
-- [x] **Pipeline-teszt** mockolt LLM-válaszokkal. Most csak a tiszta segédfüggvényeknek van tesztje.
+- [x] **Pipeline-teszt** mockolt LLM-válaszokkal. Az ingest, a napi futás, a fordítás és az `llm.ts` útválasztása offline tesztekkel fedett, mockolt modellválaszokkal (`fakeDb`, `mockFetch`).
 - [ ] **DNS rebinding** elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.
