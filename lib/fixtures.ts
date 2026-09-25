@@ -9,7 +9,7 @@ import { testPost } from "./test/fixtures.ts";
 // long titles and URLs, empty states. Nothing here reaches production: the preview is a 404 there.
 
 /** No break opportunity: the 360px layout has to wrap it, not scroll sideways. */
-export const LONG_WORD = "Transzformer-architektúra-optimalizálási-lehetőségvizsgálati-jegyzőkönyv";
+export const LONG_WORD = "Transzformerarchitektúraoptimalizálásilehetőségvizsgálatijegyzőkönyv";
 export const LONG_URL =
   "https://example.test/research/2026/09/a-very-long-path-segment-without-any-natural-break-points-at-all?utm_source=preview&utm_medium=fixture&ref=long-url-check";
 export const previewEmail = "preview@example.test";
@@ -147,10 +147,11 @@ function post(id: number, overrides: Partial<Post>): Post {
 
 const fullBlocks = assignIds(everyBlock);
 
+// Negative ids: parseId rejects them, so a click in the preview (Translate, a /library link) can never reach a real post.
 export const previewPosts: Post[] = [
-  post(1, { title: { hu: LONG_WORD, en: LONG_WORD }, url: LONG_URL, blocks: fullBlocks, hiddenBlocks: [fullBlocks[2].id] }),
-  post(2, { meta: { noarchive: true } }),
-  post(3, { meta: { extractionFailed: true }, blocks: [] }),
-  post(4, { kind: "x", meta: { truncated: true } }),
-  post(5, { kind: "youtube", meta: { mirrored: true, clipped: true } }),
+  post(-1, { title: { hu: LONG_WORD, en: LONG_WORD }, url: LONG_URL, blocks: fullBlocks, hiddenBlocks: [fullBlocks[2].id] }),
+  post(-2, { meta: { noarchive: true } }),
+  post(-3, { meta: { extractionFailed: true }, blocks: [] }),
+  post(-4, { kind: "x", meta: { truncated: true } }),
+  post(-5, { kind: "youtube", meta: { mirrored: true, clipped: true } }),
 ];

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { blockSchema, parseBlocks } from "./blocks.ts";
 import { previewItems, previewPosts } from "./fixtures.ts";
+import { parseId } from "./pipeline/util.ts";
 
 test("the preview posts cover every block type", () => {
   const shown = new Set(previewPosts.flatMap((post) => post.blocks.map((block) => block.type)));
@@ -24,4 +25,11 @@ test("the preview posts show all four banners", () => {
 test("the preview radar has exactly three must-read items and unique ids", () => {
   assert.equal(previewItems.filter((item) => item.mustRead).length, 3);
   assert.equal(new Set(previewItems.map((item) => item.id)).size, previewItems.length);
+});
+
+test("the preview post ids are negative, so the posts/[id] routes 404 before touching a real post", () => {
+  for (const post of previewPosts) {
+    assert.ok(post.id < 0, `post ${post.id}`);
+    assert.equal(parseId(String(post.id)), null, `post ${post.id}`);
+  }
 });
