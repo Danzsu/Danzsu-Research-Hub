@@ -4,7 +4,7 @@ import sharp from "sharp";
 import type { Block, ImageBlock } from "../blocks.ts";
 import { MEDIA_BUCKET, MEDIA_TYPES, variantPath, type MediaFormat } from "../media.ts";
 import { ensureOk, readLimited, safeFetch } from "./fetch.ts";
-import { errorMessage, mapLimited } from "./util.ts";
+import { errorMessage, mapLimited, settledValues } from "./util.ts";
 
 const MAX_IMAGES = 30;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -32,7 +32,8 @@ export const imageKey = (sourceId: number, data: Buffer) =>
   `${sourceId}/${createHash("sha1").update(data).digest("hex").slice(0, 16)}`;
 
 /**
- * AVIF at two widths (animated → animated WebP); null for images too small to be content.
+ * AVIF at two widths (animated → animated WebP); null for images too small to be content. Throws when
+ * no variant encodes, so the caller keeps the block unmirrored instead of dropping it like an icon.
  * SVGs are never stored or served as markup (a stored-XSS vector): they're rasterized
  * like any other image, decoded at a density high enough that the 1280px variant isn't an upscale.
  * EXIF orientation is applied before measuring, so a sideways photo reports its displayed size.
@@ -63,8 +64,8 @@ export async function encodeImage(input: Buffer): Promise<Encoded | null> {
     }),
   );
   // A variant that still overshoots the encoder's limits is dropped, not fatal — the smaller ones survive.
-  const variants = settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
-  if (variants.length === 0) return null;
+  const variants = settledValues(settled, (i) => `image variant ${targets[i]}px`);
+  if (variants.length === 0) throw new Error("no image variant could be encoded");
 
   const tiny = await open().resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
   const format: MediaFormat = animated ? "webp" : "avif";
@@ -76,9 +77,9 @@ const isMirrored = (block: Block): block is ImageBlock => block.type === "image"
 /**
  * Downloads, encodes and uploads image blocks. Images already mirrored in
  * `previous` are reused by URL, without fetching; too-small images and those
- * past the 30 limit are dropped; a failed download — or one that never got a
- * chance to start before `options.budgetMs` (default 90s) ran out — keeps the
- * block with `path: null`. Content type is not trusted: sharp sniffs the bytes.
+ * past the 30 limit are dropped; a failed download or encode — or a download that
+ * never got a chance to start before `options.budgetMs` (default 90s) ran out —
+ * keeps the block with `path: null`. Content type is not trusted: sharp sniffs the bytes.
  */
 export async function mirrorImages(
   db: SupabaseClient,

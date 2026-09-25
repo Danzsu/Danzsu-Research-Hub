@@ -165,6 +165,19 @@ test("mirrorImages keeps the block with path: null when the download fails, and 
   assert.equal(reads(), 0); // the error page is never downloaded, let alone handed to sharp
 });
 
+test("mirrorImages keeps an image whose every variant fails to encode, unmirrored, instead of dropping it", async (t) => {
+  const { db, uploads } = fakeStorageDb();
+  t.mock.method(console, "warn", () => {});
+  // The header (and so the size) reads fine; the pixel data is cut off, so every resize fails.
+  const truncated = (await png(200, 150)).subarray(0, 100);
+  await assert.rejects(() => encodeImage(truncated), /no image variant could be encoded/);
+  mockFetch(t, async () => new Response(truncated, { headers: { "content-type": "image/png" } }));
+  const out = await mirrorImages(db, 1, [image("i1", `${HOST}/broken.png`)]);
+  assert.equal(out.length, 1);
+  assert.equal((out[0] as ImageBlock).path, null);
+  assert.equal(uploads.length, 0);
+});
+
 test("mirrorImages ignores a wrong content-type and lets sharp sniff the bytes", async (t) => {
   const { db, uploads } = fakeStorageDb();
   mockFetch(t, async () => new Response(await png(200, 150), { headers: { "content-type": "binary/octet-stream" } }));
