@@ -63,6 +63,14 @@ test("generate() sends video and PDF input to Gemini only, as file_data and inli
   assert.deepEqual(run.calls, ["gemini", "gemini"]);
 });
 
+test("generate() names a route it skipped for media input when nothing succeeds", async (t) => {
+  providers(t, { groq: "k" }, { groq: () => groqAnswer({ answer: "unused" }), gemini: () => geminiResponse({ answer: "unused" }) });
+  await assert.rejects(
+    () => generate(groqThenGemini(), "ingest_pdf", schema, "p", { pdfBase64: "JVBERi0=" }),
+    { message: "ingest_pdf failed — groq/g: skipped, only Gemini reads video and PDF input; gemini: GEMINI_API_KEY not set" },
+  );
+});
+
 test("generate() names the task and every route's failure when nothing succeeds", async (t) => {
   providers(t, { groq: "k" }, { groq: () => new Response("rate limited", { status: 429 }), gemini: () => geminiResponse({ answer: "unused" }) });
   await assert.rejects(

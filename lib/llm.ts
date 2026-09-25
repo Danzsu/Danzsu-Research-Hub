@@ -114,8 +114,10 @@ export async function generate<T extends z.ZodType>(
       errors.push(`${route.provider}: ${KEYS[route.provider]} not set`);
       continue;
     }
-    // Only Gemini reads video and PDF input.
-    if ((options.youtubeUrl || options.pdfBase64) && route.provider !== "gemini") continue;
+    if ((options.youtubeUrl || options.pdfBase64) && route.provider !== "gemini") {
+      errors.push(`${route.provider}/${route.model}: skipped, only Gemini reads video and PDF input`);
+      continue;
+    }
     try {
       return route.provider === "gemini"
         ? await gemini(route.model, schema, prompt, options)
