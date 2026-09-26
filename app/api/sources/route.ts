@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
+import { existingPostId } from "@/lib/my-sources";
 import { processSource } from "@/lib/pipeline/ingest";
 import { detectSource, parseSubmittedUrl } from "@/lib/pipeline/util";
 import { createAdminClient, getReader } from "@/lib/supabase/server";
@@ -23,10 +24,8 @@ export async function POST(request: Request) {
     .single();
   if (error?.code === "23505") {
     // Already in: point the submitter at its post, once there is one (the chat's "MEGNYITÁS →").
-    const { data: existing, error: lookupError } = await reader.db.from("sources").select("posts(id)").eq("url", url.toString()).maybeSingle();
-    if (lookupError) console.warn("duplicate source's post lookup failed", lookupError);
-    const postId = (existing?.posts as unknown as { id: number } | null | undefined)?.id;
-    return jsonError(409, "already_submitted", postId ? { postId } : {});
+    const postId = await existingPostId(reader.db, url.toString());
+    return jsonError(409, "already_submitted", postId === undefined ? {} : { postId });
   }
   if (error || !data) {
     console.error("source insert failed", error);

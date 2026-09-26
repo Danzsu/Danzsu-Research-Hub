@@ -33,10 +33,12 @@ test("GET /api/sources/mine answers the caller's own sources only", async () => 
 });
 
 // Kills a failed query answered as 200 with an empty thread.
-test("GET /api/sources/mine answers 500 db_error when the query fails", async () => {
+test("GET /api/sources/mine answers 500 db_error when the query fails", async (t) => {
+  const error = t.mock.method(console, "error", () => {});
   readerWith({ sourceSelectError: pgError("08006", "connection failure") });
   const response = await GET();
   assert.deepEqual([response.status, await response.json()], [500, { error: "db_error" }]);
+  assert.equal(error.mock.calls.length, 1);
 });
 
 test("GET /api/sources/mine answers 401 when signed out", async () => {

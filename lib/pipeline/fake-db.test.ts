@@ -54,6 +54,26 @@ test("a sources update changes only the rows its filters match, writes through, 
   assert.deepEqual(db.sourceUpdates, [{ status: "pending" }, { status: "pending" }]);
 });
 
+// Fix round 1: the fake's `sources` select used to ignore its own column list — a query string
+// (here, or in lib/my-sources.ts) could drop a column and every test would still pass. Now every
+// answer is projected, one level into a `table(...)` embed too. Kills: the projection dropped
+// entirely (both `url` and `overrides` would leak through), and the embed's own inner columns
+// ignored (the naive `columns.split(",")` this replaced tore `posts(id, title)` apart on its own
+// inner comma, which `posts(id, title, overrides)` — lib/my-sources.ts's real select — has one of).
+test("a sources select projects both the top-level row and one level into a table(...) embed", async () => {
+  const db = fakeDb(undefined, {
+    sources: [
+      {
+        id: 1,
+        url: "https://blog.test/1",
+        posts: { id: 9, title: { hu: "Cím", en: "Title" }, overrides: { title: { hu: "S", en: "O" } } },
+      },
+    ],
+  });
+  const { data } = await db.from("sources").select("id, posts(id, title)").eq("id", 1).maybeSingle();
+  assert.deepEqual(data, { id: 1, posts: { id: 9, title: { hu: "Cím", en: "Title" } } });
+});
+
 // Kills: sourceSelectError ignored by one of the three terminal calls.
 test("sourceSelectError answers the listing, single() and maybeSingle() alike", async () => {
   const error = pgError("08006", "connection failure");

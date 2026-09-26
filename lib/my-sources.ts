@@ -22,6 +22,14 @@ export type MySource = {
   post: { id: number; title: Localized } | null;
 };
 
+/** A source's embedded `posts(...)` join, cast from PostgREST's untyped shape — shared by every
+ *  caller that reads one, since `posts.source_id` is unique and `select` always embeds it as one
+ *  object, or null. `title`/`overrides` are only ever present when the caller's own select asked
+ *  for them (`existingPostId` doesn't); reading either off a value that lacks them answers
+ *  `undefined`, same as a column the fixture never set. */
+type EmbeddedPost = { id: number; title?: unknown; overrides?: unknown };
+const embeddedPost = (value: unknown): EmbeddedPost | null => (value as EmbeddedPost | null | undefined) ?? null;
+
 /**
  * The viewer's latest MINE_LIMIT submissions, newest first, each with its post. The `submitted_by`
  * filter is ours, not RLS's: every reader may select every source. Null when the query fails.
@@ -38,8 +46,7 @@ export async function listMySources(db: SupabaseClient, viewerId: string): Promi
     return null;
   }
   return (data ?? []).map((row) => {
-    // posts.source_id is unique, so PostgREST embeds the post as one object, or null.
-    const post = row.posts as unknown as { id: number; title: unknown; overrides: unknown } | null;
+    const post = embeddedPost(row.posts);
     return {
       id: row.id,
       url: row.url,
@@ -51,4 +58,20 @@ export async function listMySources(db: SupabaseClient, viewerId: string): Promi
       post: post ? { id: post.id, title: shownTitle(post) } : null,
     };
   });
+}
+
+/**
+ * The post already made from `url`, once a duplicate submission's insert fails on `sources.url`'s
+ * unique constraint (`POST /api/sources`) — so the reader's "already in" answer can point at it
+ * (the link chat's "MEGNYITÁS →"). `undefined` both when there's no post yet and when the lookup
+ * itself fails; a lookup failure is logged, never thrown, so the 409 the caller already decided on
+ * still goes out, just without a postId.
+ */
+export async function existingPostId(db: SupabaseClient, url: string): Promise<number | undefined> {
+  const { data, error } = await db.from("sources").select("posts(id)").eq("url", url).maybeSingle();
+  if (error) {
+    console.warn("duplicate source's post lookup failed", error);
+    return undefined;
+  }
+  return embeddedPost(data?.posts)?.id;
 }

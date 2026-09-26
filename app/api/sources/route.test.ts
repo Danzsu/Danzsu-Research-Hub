@@ -48,6 +48,19 @@ test("POST /api/sources answers 409 with the post's id when the link is already 
   assert.deepEqual(routeStub.scheduled, []);
 });
 
+// Kills the lookup failure being thrown instead of answered, or its console.warn dropped: the
+// reader still gets the same 409 they'd get without a post to point at, just without a postId.
+test("POST /api/sources answers 409 without a postId when the post lookup itself fails", async (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  reader({
+    sourceInsertError: pgError("23505", 'duplicate key value violates unique constraint "sources_url_key"'),
+    sourceSelectError: pgError("08006", "connection failure"),
+  });
+  const response = await submit({ url: "https://blog.test/post" });
+  assert.deepEqual([response.status, await response.json()], [409, { error: "already_submitted" }]);
+  assert.equal(warn.mock.calls.length, 1);
+});
+
 // N4: the 202 is a promise that the link gets processed after the response.
 test("POST /api/sources stores the link as the reader, answers 202 with its id, and schedules its processing", async () => {
   const db = reader({ sources: [{ id: 1 }, { id: 2 }] });

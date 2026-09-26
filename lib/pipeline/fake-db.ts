@@ -102,12 +102,14 @@ const notOneRow = (count: number) => pgError("PGRST116", "JSON object requested,
 
 /** `sources`' select chain, filters applied: the listing (`order`, then `limit`) over `listed`, the
  *  one-row lookups over `lookedUp` — `single` answers PGRST116 unless exactly one row matches,
- *  `maybeSingle` answers null for none and PGRST116 for several. `error` answers all three. */
+ *  `maybeSingle` answers null for none and PGRST116 for several. `error` answers all three. Every
+ *  answer is projected down to `columns` (see `project`), the same as the real `select=` string. */
 function sourcesQuery(
   listed: Record<string, unknown>[],
   lookedUp: Record<string, unknown>[],
   onEq: (column: string, value: unknown) => void,
   error: PostgrestErrorShape | undefined,
+  columns: string,
 ) {
   const filters: Filter[] = [];
   let sortBy: { column: string; ascending: boolean } | undefined;
@@ -135,16 +137,17 @@ function sourcesQuery(
       sortBy = { column, ascending };
       return query;
     },
-    limit: async (n: number) => (error ? { data: null, error } : { data: sorted(matching(listed)).slice(0, n), error: null }),
+    limit: async (n: number) =>
+      error ? { data: null, error } : { data: sorted(matching(listed)).slice(0, n).map((row) => project(row, columns)), error: null },
     single: async () => {
       if (error) return { data: null, error };
       const rows = matching(lookedUp);
-      return rows.length === 1 ? { data: rows[0], error: null } : { data: null, error: notOneRow(rows.length) };
+      return rows.length === 1 ? { data: project(rows[0], columns), error: null } : { data: null, error: notOneRow(rows.length) };
     },
     maybeSingle: async () => {
       if (error) return { data: null, error };
       const rows = matching(lookedUp);
-      return rows.length > 1 ? { data: null, error: notOneRow(rows.length) } : { data: rows[0] ?? null, error: null };
+      return rows.length > 1 ? { data: null, error: notOneRow(rows.length) } : { data: project(rows[0] ?? null, columns), error: null };
     },
   };
   return query;
@@ -174,20 +177,46 @@ function updateChain(filter: (column: string, value: unknown, op: "eq" | "is") =
  *  Supabase storage strips when listing a folder), or the whole path if there's no prefix to strip. */
 const bareObjectName = (path: string) => (path.includes("/") ? path.slice(path.indexOf("/") + 1) : path);
 
+/** Splits a `select=` column list on its top-level commas only — a `table(a, b, c)` embed's own
+ *  commas don't count, so its whole `table(...)` segment reaches `project` intact for the embed
+ *  regex below to parse, instead of being torn apart into "table(a" / " b" / " c)". */
+function splitColumns(columns: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of columns) {
+    if (char === "(") depth++;
+    else if (char === ")") depth--;
+    if (char === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  parts.push(current);
+  return parts.map((part) => part.trim()).filter(Boolean);
+}
+
 /** Projects `row` down to `columns` (comma-separated, `"*"` for everything) the way PostgREST's
  *  `select=` does — a column the fixture never set comes back `undefined`, not silently present
- *  because some other part of the row happened to have it. A `table(column)` embed (e.g.
- *  `sources(submitted_by)`) isn't projected per-column — the fake just needs the fixture's own
- *  embedded object present under its table key, so it reads `row.sources` whole. */
+ *  because some other part of the row happened to have it. A `table(inner)` embed (e.g.
+ *  `posts(id, title, overrides)`) is projected one level into the embedded value too, whether the
+ *  fixture holds it as one object or (real PostgREST embeds an array when the relationship isn't
+ *  known to be unique) an array of them; `table(*)` keeps the embed whole, and a null/undefined
+ *  embed is left as is rather than projected into. */
 function project(row: Record<string, unknown> | null, columns: string): Record<string, unknown> | null {
   if (!row) return null;
   if (columns.trim() === "*") return row;
-  const keys = columns.split(",").map((column) => column.trim()).filter(Boolean);
   return Object.fromEntries(
-    keys.map((key) => {
-      const embed = /^(\w+)\(.*\)$/.exec(key);
-      const name = embed ? embed[1] : key;
-      return [name, row[name]];
+    splitColumns(columns).map((key) => {
+      const embed = /^(\w+)\((.*)\)$/.exec(key);
+      if (!embed) return [key, row[key]];
+      const [, name, innerColumns] = embed;
+      const value = row[name];
+      if (innerColumns.trim() === "*" || value == null) return [name, value];
+      const projectOne = (item: unknown) => project(item as Record<string, unknown>, innerColumns);
+      return [name, Array.isArray(value) ? value.map(projectOne) : projectOne(value)];
     }),
   );
 }
@@ -203,8 +232,11 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * set passes every filter; a null filter value, or a null row value, never passes (SQL's own rule —
  * only `.is(...)` matches null); a `sources` `single()` that matches no row, or several, answers
  * PostgREST's PGRST116 error, and `maybeSingle()` does for several. A `sources` listing applies
- * `order(column, { ascending })` before `limit(n)`. A `sources` update applies its `.eq` filters
- * and writes through, so a later select sees it.
+ * `order(column, { ascending })` before `limit(n)`. Every `sources` answer — the listing, `single()`
+ * and `maybeSingle()` alike — is projected down to the `.select(...)` column list, one level into
+ * any `table(inner)` embed (`project`), so a select that drops a column, or narrows an embed, is
+ * caught the same way a real PostgREST query would catch it. A `sources` update applies its `.eq`
+ * filters and writes through, so a later select sees it.
  * Any other table only upserts (recorded on `.upserts`) and answers `select().gte()` from `tables.rows`.
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it,
  * `list` reflects it, and `download` answers an object it holds with the object's own path as its
@@ -251,7 +283,7 @@ export function fakeDb(
       const lookedUp = tables.sources ?? (tables.source ? [tables.source] : []);
       const recordEq = (column: string, value: unknown) => eqCalls.push({ table: "sources", column, value });
       return {
-        select: () => sourcesQuery(tables.pending ?? lookedUp, lookedUp, recordEq, tables.sourceSelectError),
+        select: (columns = "*") => sourcesQuery(tables.pending ?? lookedUp, lookedUp, recordEq, tables.sourceSelectError, columns),
         insert: (values: Record<string, unknown>) => ({
           select: () => ({
             single: async () => {
