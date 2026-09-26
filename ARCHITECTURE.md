@@ -68,10 +68,10 @@ Breaking one of these is a bug even when every test passes.
 - **A Radar item's id never changes.** `item.id` is half the composite primary key of `item_states`, so renaming one silently orphans every reader's read and saved state. `itemId()` in `lib/pipeline/util.ts` derives it once, as `<category>-<yyyy>w<ww>-<slug>-<urlhash>`, from the category, the ISO week, the English title and the source URL. Inserts use `ignoreDuplicates` on `url`, so an existing row is never rewritten. `lib/pipeline/daily.test.ts` pins two literal ids.
 - **An issue has three must-reads.** After every daily run, `refresh_must_read` marks the three highest scores of the issue (ties go to the earlier row). An issue with fewer than three items has fewer. The Top 3 grid is built for exactly three.
 - **Block ids are content-addressed.** `assignIds` (`lib/blocks.ts`) derives each id from the block's type and normalized content, never from its position. That's why `hidden_blocks`, and later annotations, still point at the same block after a re-extraction.
-- **No raw HTML reaches a page** (CLAUDE.md → Security).
-- **No secret reaches the browser** (CLAUDE.md → Security).
-- **The admin client runs only in the pipeline, or after a route has made its own check** (CLAUDE.md → Database).
-- **Every user-supplied or page-derived URL is fetched through `safeFetch`** (CLAUDE.md → Security).
+- **No raw HTML reaches a page** (SECURITY.md → XSS).
+- **No secret reaches the browser** (SECURITY.md → Secrets).
+- **The admin client runs only in the pipeline, or after a route has made its own check** (SECURITY.md → Reader vs admin client).
+- **Every user-supplied or page-derived URL is fetched through `safeFetch`** (SECURITY.md → SSRF).
 - **The offline preview never reaches real data.** Local dev points at the production project, so preview writes send nothing:
   - reader state goes through `memorySend`;
   - the Library form goes through an in-memory stub (`preview` on `LibraryView`);
@@ -79,13 +79,13 @@ Breaking one of these is a bug even when every test passes.
   - under `fail=1`, every write fails.
 
   The preview post ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Translate or a Library card link can't reach a real post. The preview isn't a sandbox, though: the app shell's own links and Sign out are the real ones, so with a local session they leave the preview for real pages, real data and a real sign-out.
-- **`robots: noindex` and the invite gate are load-bearing, not cosmetic.** The Library mirrors other people's articles, and those two are what keep that defensible (README.md → Content and copyright). A `noarchive` page is never mirrored (CLAUDE.md → How content gets in, step 3).
+- **`robots: noindex` and the invite gate are load-bearing, not cosmetic.** The Library mirrors other people's articles, and those two are what keep that defensible (README.md → Content and copyright). SECURITY.md covers how the gate is enforced. A `noarchive` page is never mirrored (CLAUDE.md → How content gets in, step 3).
 
 ## Boundaries
 
 - **`lib/` and `app/`.** `lib/` never imports from `app/`, and it loads without Next.js, except for the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`. `app/` is routes and components. It keeps its logic thin, so that the logic sits in a `lib/` function that a unit test can reach.
 - **Server and client components.** Pages, the post article and the Library and Archive lists are server components. `"use client"` marks the interactive leaves, such as the shell, the Radar dashboard, the language toggle, the submit form, the editor and the toolbar. A presentational component that both sides render stays hook-free (`post-blocks.tsx`, `page-header.tsx`), and its one stateful piece is split out (`post-image.tsx`).
-- **Reader and admin client.** `lib/supabase/server.ts` creates both. Which code may use the admin client is in CLAUDE.md → Database. The browser never talks to Supabase: data reaches it through server components and the API routes.
+- **Reader and admin client.** `lib/supabase/server.ts` creates both, and SECURITY.md → Reader vs admin client says which code may use which.
 - **Pipeline and routes.** A route authenticates, parses, calls `lib/` and maps the result to JSON. Ingest (`processSource`, from the sources and reextract routes) runs in `after()`, once the response has been sent. The cron and translate routes do their work inside the request, because the result is their answer.
 
 ## Cross-cutting concerns
@@ -100,4 +100,4 @@ Breaking one of these is a bug even when every test passes.
   - A failed ingest ends up on its `sources` row (`error`, or `status: "failed"`). The Library list shows it, and so does the post page, to the submitter.
   - A failed reader write rolls back and shows the undo toast's failure message.
 - **Testing layers** are unit tests on `lib/`, static component renders, route handlers under stubs, and the offline preview (TESTING.md).
-- **CI and supply chain.** TESTING.md → Test layers covers the workflow, and CLAUDE.md → Conventions → Supply chain covers the dependency rules.
+- **CI and supply chain.** TESTING.md → Test layers covers the workflow, and SECURITY.md → Supply chain covers the dependency rules and the workflow's permissions.

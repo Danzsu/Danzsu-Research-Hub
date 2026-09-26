@@ -25,7 +25,7 @@ There is no test framework. Tests use `node:test` and `node:assert/strict`, and 
    - `corepack pnpm@11.25.0 install --frozen-lockfile`, with no package-manager cache;
    - a superseded run on the same ref is cancelled (`concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`).
 
-   `next build` needs no environment variables, so the workflow holds no secrets and only `contents: read`. Branch protection on `main`, which requires the `checks` job, is the owner's setting (TODO.md).
+   The workflow's permissions and pinning are in SECURITY.md → Supply chain. Branch protection on `main`, which requires the `checks` job, is the owner's setting (TODO.md).
 
 ## How to run
 
