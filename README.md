@@ -263,6 +263,7 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 - **Routes:** [`lib/test/route-hooks.ts`](lib/test/route-hooks.ts) stands in for `@/lib/supabase/server` and `next/server`, so a route handler runs under `node --test` with no Next.js server. A route test looks like this:
 
   ```ts
+  import { fakeDb } from "../../../lib/pipeline/fake-db.ts";
   import { resetRoute, routeStub, signedIn } from "../../../lib/test/route-hooks.ts"; // first: it registers the loader
   const { POST } = await import("./route.ts");
 
@@ -271,7 +272,7 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
   const response = await POST(new Request("http://localhost/api/state", { method: "POST", body: "{}" }));
   ```
 
-- **One test file** runs with the same flags as `npm test`. A path with `[id]` in it is read as a glob character class, so `"app/(app)/library/[id]/post-editor.test.ts"` runs 0 tests and still exits 0. Escape the bracket:
+- **One test file** runs with the same flags as `npm test`. `node --test` reads every `[` in a path as the start of a glob character class, so every bracketed segment needs escaping (`[` → `[[]`), not only `[id]`: `"app/(app)/library/[id]/post-editor.test.ts"` and `"app/media/[...path]/route.test.ts"` both run 0 tests and still exit 0. Escape the bracket:
 
   ```bash
   node --experimental-strip-types --no-warnings --test "app/(app)/library/[[]id]/post-editor.test.ts"
