@@ -220,9 +220,12 @@ export function parseSubmittedUrl(raw: string): URL | null {
     return null;
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  const host = url.hostname.toLowerCase();
+  // Strip a trailing dot (a syntactically valid root-label separator) before the name checks below —
+  // otherwise "localhost.", "printer.local." and "metadata.google.internal." each slip past unmatched.
+  const host = url.hostname.toLowerCase().replace(/\.+$/, "");
   if (
     host === "localhost" ||
+    host.endsWith(".localhost") || // RFC 6761: .localhost is reserved, same as .local and .internal
     host.endsWith(".local") ||
     host.endsWith(".internal") ||
     !host.includes(".") ||
