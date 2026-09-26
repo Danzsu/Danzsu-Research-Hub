@@ -145,6 +145,7 @@
     - IBM Research és Microsoft Research blog, valamint az IBM Technology cikkei és videói
     - Google DeepMind: már bent van, csak a súlyozását kell a kiemelt források közé emelni
     - Anthropic: news és engineering posztok. Hivatalos RSS-t nem ismerek, ezért ezt a megvalósítás elején ellenőrizni kell. Ha nincs, oldal-letöltéssel kerülhet be.
+    - **ByteByteGo** (a felhasználó ötlete, 2026-09-26): rendszertervezés és AI-infrastruktúra. RSS: `https://blog.bytebytego.com/feed`, 2026-09-26-án élőben ellenőrizve: 200, 20 tétel, a felükben a teljes szöveg (`content:encoded`). A poszt-oldalak szerverről letölthetők, `noarchive` nincs rajtuk. A „No thanks” feliratkozó ablak csak a böngészőben jelenik meg, a pipeline nem látja, így a Könyvtárba beküldött link is működik. Két dologra kell figyelni: a fizetős posztokból csak egy részlet érhető el (Substack), és vannak tisztán promóciós posztok (pl. „LAST CALL FOR ENROLLMENT”), ezeket a pontozásnak kell kiszűrnie. Javaslat: `feeds.ts`-be `limit: 5`-tel.
   - Szűrés, hogy ne legyen túl sok (döntés, 2026-09-24):
     - naponta legfeljebb kb. 8 kiemelt tétel, csak 60 pont felett;
     - a 40–59 pontosak egy összecsukott „Többi” szakaszba kerülnek, és a keresésben is megtalálhatók;
