@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,11 +12,16 @@ import { TaiyakiIcon } from "./taiyaki-icon";
 const copy = {
   hu: {
     greeting: "Dobj be egy linket! Ha akarod, írd mellé, mire figyeljek.",
+    // sr-only speaker prefixes (I2): a screen reader announces who is "talking" in each bubble.
+    me: "Te:",
+    taiyaki: "Taiyaki:",
     received: "Megkaptam,",
     processing: "FELDOLGOZÁS…",
+    loading: "BETÖLTÉS…",
     done: "KÉSZ · MEGNYITÁS →",
     failed: "Nem sikerült feldolgozni.",
     retry: "ÚJRA",
+    retrying: "ÚJRA…",
     open: "MEGNYITÁS →",
     no_link: "Egyelőre csak linket tudok fogadni.",
     more_links: "Egyszerre egy linket tudok fogadni, az elsőt küldtem be.",
@@ -28,11 +34,15 @@ const copy = {
   },
   en: {
     greeting: "Drop in a link! If you like, add what I should look out for.",
+    me: "You:",
+    taiyaki: "Taiyaki:",
     received: "Got it:",
     processing: "PROCESSING…",
+    loading: "LOADING…",
     done: "DONE · OPEN →",
     failed: "I couldn't process it.",
     retry: "RETRY",
+    retrying: "RETRY…",
     open: "OPEN →",
     no_link: "For now I can only take links.",
     more_links: "I take one link at a time, so I sent in the first one.",
@@ -49,23 +59,29 @@ const bubble = "max-w-[85%] border-2 border-ink px-3 py-2 text-sm leading-6 [ove
 // Small signal text on paper is under 3:1 (DESIGN.md → Colors), so the thread's small labels and
 // links are ink, and the signal goes into their underline.
 const signalUnderline = "text-ink underline decoration-signal decoration-2 underline-offset-4";
-const action = `focus-ring inline-flex min-h-10 items-center font-mono text-[11px] tracking-[0.14em] ${signalUnderline} hover:decoration-ink`;
+const microLabel = "font-mono text-[11px] tracking-[0.14em]";
+const action = `focus-ring inline-flex min-h-10 items-center ${microLabel} ${signalUnderline} hover:decoration-ink`;
 
-function Taiyaki({ children }: { children: ReactNode }) {
+function Taiyaki({ language, children }: { language: Language; children: ReactNode }) {
   return (
     <div className="flex items-start gap-2">
       <TaiyakiIcon className="mt-1 size-7 shrink-0" />
-      <div className={`${bubble} bg-paper shadow-[3px_3px_0_var(--ink)]`}>{children}</div>
+      <div className={`${bubble} bg-paper shadow-[3px_3px_0_var(--ink)]`}>
+        <span className="sr-only">{copy[language].taiyaki}</span>
+        {children}
+      </div>
     </div>
   );
 }
 
-function Mine({ entry }: { entry: ChatEntry }) {
+function Mine({ entry, language }: { entry: ChatEntry; language: Language }) {
   return (
     <div className={`${bubble} ml-auto w-fit bg-ink text-paper shadow-[3px_3px_0_var(--signal)]`}>
+      <span className="sr-only">{copy[language].me}</span>
       {entry.href ? (
         <a href={entry.href} target="_blank" rel="noreferrer" className="focus-ring underline">
           {entry.url}
+          <ExternalLink aria-hidden="true" className="ml-1 inline size-4 align-text-bottom" />
         </a>
       ) : (
         entry.url
@@ -93,9 +109,9 @@ function Reply({ entry, retrying, language, onRetry, onOpenPost }: ThreadActions
         <p>
           {t.received} <em>{SOURCE_KIND_LABELS[reply.kind][language]}</em>.
         </p>
-        <p className="mt-1 flex items-center gap-2 font-mono text-[11px] tracking-[0.14em]">
+        <p className={`mt-1 flex items-center gap-2 ${microLabel}`}>
           <span className="live-pulse shrink-0" />
-          <span className={signalUnderline}>{t.processing}</span>
+          <span className="text-ink/70">{t.processing}</span>
         </p>
       </>
     );
@@ -114,8 +130,13 @@ function Reply({ entry, retrying, language, onRetry, onOpenPost }: ThreadActions
     <>
       <p>{t.failed}</p>
       {reply.error && <p className="mt-1 font-mono text-[11px] leading-4 text-ink/70">{reply.error}</p>}
-      <Button variant="signal" className="mt-2 min-h-10" disabled={retrying} onClick={() => onRetry(entry.id)}>
-        {t.retry}
+      <Button
+        variant="signal"
+        className="mt-2 min-h-10 aria-disabled:pointer-events-none aria-disabled:opacity-50"
+        aria-disabled={retrying}
+        onClick={() => onRetry(entry.id)}
+      >
+        {retrying ? t.retrying : t.retry}
       </Button>
     </>
   );
@@ -150,18 +171,34 @@ function NoticeText({ notice, language, loginHref, onOpenPost }: ThreadActions &
 
 /** The thread: the greeting, the reader's own submissions (oldest first) with the taiyaki's replies, then the local replies. */
 export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "retrying"> }) {
-  const t = copy[actions.language];
+  const { language } = actions;
+  const t = copy[language];
+  // Nothing has answered yet, and no local reply or the unreachable line already covers it: one
+  // "loading" taiyaki, not the whole region flickering line by line as the first answer lands.
+  const stillLoading = snapshot.sources === null && !snapshot.unreachable && snapshot.notices.length === 0;
   return (
-    <ol aria-live="polite" className="space-y-4">
+    // Keyed on the loaded state (I2): the first real list mounts as a fresh live region instead of
+    // being announced entry by entry against the empty one it replaces.
+    <ol key={snapshot.sources === null ? "loading" : "loaded"} aria-live="polite" className="space-y-4">
       <li>
-        <Taiyaki>
+        <Taiyaki language={language}>
           <p>{t.greeting}</p>
         </Taiyaki>
       </li>
+      {stillLoading && (
+        <li>
+          <Taiyaki language={language}>
+            <p className={`flex items-center gap-2 ${microLabel}`}>
+              <span className="live-pulse shrink-0" />
+              <span className="text-ink/70">{t.loading}</span>
+            </p>
+          </Taiyaki>
+        </li>
+      )}
       {toThread(snapshot.sources ?? []).map((entry) => (
         <li key={entry.id} className="space-y-2">
-          <Mine entry={entry} />
-          <Taiyaki>
+          <Mine entry={entry} language={language} />
+          <Taiyaki language={language}>
             <Reply entry={entry} retrying={snapshot.retrying.includes(entry.id)} {...actions} />
           </Taiyaki>
         </li>
@@ -169,14 +206,14 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
       {snapshot.notices.map((notice, index) => (
         // Append-only while the panel is open, so the position is a stable key.
         <li key={index}>
-          <Taiyaki>
+          <Taiyaki language={language}>
             <NoticeText notice={notice} {...actions} />
           </Taiyaki>
         </li>
       ))}
       {snapshot.unreachable && (
         <li>
-          <Taiyaki>
+          <Taiyaki language={language}>
             <p>{t.unreachable}</p>
           </Taiyaki>
         </li>

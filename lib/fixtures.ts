@@ -188,6 +188,6 @@ export const previewMySources: MySource[] = [
     error: null,
     note: `Hosszú megjegyzés: ${LONG_WORD}`,
     createdAt: "2026-09-23T08:00:00Z",
-    post: { id: -1, title: { hu: LONG_WORD, en: LONG_WORD } },
+    post: { id: -1, title: { hu: `${LONG_WORD} – kész`, en: `${LONG_WORD} – done` } },
   },
 ];
