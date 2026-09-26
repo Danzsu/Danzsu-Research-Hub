@@ -116,6 +116,22 @@ test("isPrivateAddress applies the IPv4 rules to IPv4 carried in NAT64, IPv4-com
   }
 });
 
+// U4–U7: each private range and internal-name rule, pinned on both sides of its edge.
+test("isPrivateAddress and parseSubmittedUrl hold at every range boundary", () => {
+  for (const ip of ["172.16.0.1", "172.31.255.255", "100.64.0.0", "100.127.255.255", "224.0.0.1", "fe90::1", "feb0::1", "febf::1", "fc00::1"]) {
+    assert.equal(isPrivateAddress(ip), true, ip);
+  }
+  for (const ip of ["172.15.255.255", "172.32.0.0", "100.63.255.255", "100.128.0.0", "223.255.255.255"]) {
+    assert.equal(isPrivateAddress(ip), false, ip);
+  }
+  for (const bad of ["http://printer.local/", "http://NAS.LOCAL/", "http://metadata.google.internal/", "http://172.16.0.1/", "http://172.31.0.1/"]) {
+    assert.equal(parseSubmittedUrl(bad), null, bad);
+  }
+  for (const good of ["https://local.example.com/", "https://internal.example.com/", "http://172.15.0.1/", "http://172.32.0.1/"]) {
+    assert.ok(parseSubmittedUrl(good), good);
+  }
+});
+
 test("detectSource and its URL helpers", () => {
   const kind = (u: string) => detectSource(new URL(u));
   assert.equal(kind("https://youtu.be/dQw4w9WgXcQ?si=abc"), "youtube");

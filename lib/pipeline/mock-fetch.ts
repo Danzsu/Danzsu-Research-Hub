@@ -24,13 +24,15 @@ export function mockFetch(t: TestContext, handler: (url: string, init?: RequestI
 
 /**
  * Fakes `safeFetch`'s DNS check so a fixed real hostname (e.g. arxiv.org, hardcoded inside an
- * extractor) resolves to `address` without a live query. `dns` is a default-imported object here,
+ * extractor) resolves to `addresses` (default: TEST_IP) without a live query, all of them in one
+ * answer the way `lookup(host, { all: true })` gives them. `dns` is a default-imported object here,
  * so `t.mock.method` can redefine its `lookup` property (an `import * as` namespace object can't —
  * its exports are frozen); the test's own mock tracker restores it automatically afterward, no
  * production-side hook involved. Pair with `mockFetch` for the actual response.
  */
-export function mockDns(t: TestContext, address = TEST_IP): void {
-  t.mock.method(dns, "lookup", async () => [{ address, family: 4 }]);
+export function mockDns(t: TestContext, ...addresses: string[]): void {
+  const answer = (addresses.length ? addresses : [TEST_IP]).map((address) => ({ address, family: address.includes(":") ? 6 : 4 }));
+  t.mock.method(dns, "lookup", async () => answer);
 }
 
 /** Extracts the text prompt from a captured Gemini `generateContent` request body — the first

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import dns from "node:dns/promises";
 import { test, type TestContext } from "node:test";
 import { apiFetch, ensureOk, FetchError, readLimited, safeFetch, USER_AGENT } from "./fetch.ts";
-import { endlessBody, mockFetch, TEST_HOST } from "./mock-fetch.ts";
+import { endlessBody, mockDns, mockFetch, TEST_HOST, TEST_IP } from "./mock-fetch.ts";
 
 // A public IP literal: dns.lookup() resolves it locally without a real DNS query, so these
 // run offline. The mocked global fetch stands in for the actual network hop.
@@ -25,16 +25,40 @@ function redirectOnceThenOk(t: TestContext, location: string): string[] {
   return calls;
 }
 
-test("safeFetch blocks a redirect to a loopback address", async (t) => {
-  const calls = redirectOnceThenOk(t, "http://127.0.0.1/admin");
-  await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message));
-  assert.equal(calls.length, 1); // the blocked hop must never actually be fetched
+test("safeFetch blocks a redirect to a loopback or the cloud metadata address", async (t) => {
+  for (const location of ["http://127.0.0.1/admin", "http://169.254.169.254/latest/meta-data/"]) {
+    const calls = redirectOnceThenOk(t, location);
+    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message), location);
+    assert.equal(calls.length, 1, location); // the blocked hop must never actually be fetched
+  }
 });
 
-test("safeFetch blocks a redirect to the cloud metadata address", async (t) => {
-  const calls = redirectOnceThenOk(t, "http://169.254.169.254/latest/meta-data/");
-  await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message));
-  assert.equal(calls.length, 1);
+// F1: every hop is checked because safeFetch follows redirects itself; a fetch left to follow them
+// would reach the second hop unchecked.
+test("safeFetch never lets fetch follow a redirect on its own", async (t) => {
+  const modes: (RequestRedirect | undefined)[] = [];
+  mockFetch(t, async (url, init) => {
+    modes.push(init?.redirect);
+    return url === `${PUB}/a` ? redirect(`${PUB}/b`) : new Response("ok");
+  });
+  assert.equal(await (await safeFetch(`${PUB}/a`)).text(), "ok");
+  assert.deepEqual(modes, ["manual", "manual"]);
+});
+
+// F2, N10: one private address in the answer is enough to refuse the host, since the connection may
+// use any of them; and the submitted URL itself is checked, not only the redirects after it.
+test("safeFetch refuses a first hop that is private or resolves to any private address, before any request", async (t) => {
+  let calls = 0;
+  mockFetch(t, async () => {
+    calls++;
+    return new Response("ok");
+  });
+  mockDns(t, TEST_IP, "10.0.0.1");
+  await assert.rejects(() => safeFetch("http://mixed.example.test/"), (error: unknown) => error instanceof FetchError && error.message === "blocked address");
+  for (const first of ["http://127.0.0.1/", "http://169.254.169.254/latest/meta-data/"]) {
+    await assert.rejects(() => safeFetch(first), (error: unknown) => error instanceof FetchError && error.message === "blocked url", first);
+  }
+  assert.equal(calls, 0);
 });
 
 test("safeFetch checks each hop's DNS-resolved address, not only its hostname", async (t) => {
