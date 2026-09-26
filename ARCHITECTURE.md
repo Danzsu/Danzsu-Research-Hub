@@ -1,6 +1,6 @@
 # Architecture
 
-This is the map: what the parts are, where they live and what must stay true about them. The detail lives in CLAUDE.md. This file changes a few times a year and isn't kept in sync line by line.
+This is the map: what the parts are, where they live and what must stay true about them. The detail lives in CLAUDE.md. Update the codemap when a module is added, moved or removed.
 
 ## Bird's eye view
 

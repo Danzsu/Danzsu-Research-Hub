@@ -32,7 +32,7 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
 
 ## TypeScript
 
-- **No `any`.** `npm run lint` rejects it (`@typescript-eslint/no-explicit-any`). Take `unknown` and narrow it.
+- **No `any`.** `npm run lint` rejects it: `@typescript-eslint/no-explicit-any` is an error in typescript-eslint's recommended set, which `eslint-config-next/typescript` extends, and no override turns it off. Take `unknown` and narrow it.
 - **Parse untrusted input at the boundary** into a typed value or an explicit error, never a cast:
   - structured data goes through a `zod/v4` schema (import from `"zod/v4"`): model answers in `generate()`, stored JSON in `parseBlocks` and `readOverrides`, and the state action in `parseStateAction`;
   - everything else goes through a small parser: `parseSubmittedUrl`, `parseId`, `readNavMode`.
@@ -43,7 +43,7 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
 - **Components are server components by default,** and `"use client"` goes only on an interactive leaf. ARCHITECTURE.md → Boundaries shows where that line runs today.
 - **Never call `setState` during render without a guard that makes it converge.** `undo-toast.tsx` does it safely, by comparing `prevToastId` first. Without a guard, the render loops ("Too many re-renders"), which `app/components/shell.test.ts` catches.
 - **External stores go through `useSyncExternalStore`:** the toast queue, the reader store and the opened posts. An event handler that an effect needs, but shouldn't re-subscribe for, goes through `useEffectEvent` (`use-shortcuts.ts`).
-- **Never `eslint-disable` a `react-hooks` rule.** Fix the code. The one disable in app code is `@next/next/no-img-element` in `post-image.tsx`, and it states its reason. `eslint.config.mjs` turns two `react-hooks` rules off for the vendored `components/ui/` files only.
+- **Never `eslint-disable` a `react-hooks` rule.** Fix the code. The one disable in app code is `@next/next/no-img-element` in `post-image.tsx`, and it states its reason. `eslint.config.mjs` turns two `react-hooks` rules and `@typescript-eslint/no-unused-vars` off for the vendored `components/ui/` files and `hooks/use-mobile.ts` only.
 
 ## HU/EN copy
 

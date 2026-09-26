@@ -71,7 +71,7 @@ Each of these restores itself when the test ends.
 
 - **`mockFetch(t, handler)`** replaces `globalThis.fetch` for test `t`. The handler gets `(url, init)`, so it can route by URL or inspect the request.
 - **`withEnv(t, name, value)`** sets or unsets one variable. `withGeminiKey(t)` sets `GEMINI_API_KEY`, so `generate()` takes its Gemini route.
-- **`mockDns(t, ...addresses)`** fakes the DNS check in `safeFetch` for a fixed real hostname (default `TEST_IP`), returning several addresses in one answer. `TEST_IP` / `TEST_HOST` is a public IP literal that `safeFetch` resolves offline, so a test that uses it as the host needs no `mockDns` at all.
+- **`mockDns(t, ...addresses)`** makes every `dns.lookup` answer `addresses` (default `TEST_IP`), all of them in one answer, for example for a host an extractor hardcodes. `TEST_IP` / `TEST_HOST` is a public IP literal that `safeFetch` resolves offline, so a test that uses it as the host needs no `mockDns` at all.
 - **`endlessBody()`** is a body that never ends, with `reads()` and `cancelled()`. It proves that a body was released unread, not read up to a cap and then dropped.
 - **Model answers:**
   - `geminiResponse(out)` is a real-shaped Gemini answer, and `geminiText(text)` is a raw one for malformed-output cases.
@@ -82,7 +82,7 @@ Each of these restores itself when the test ends.
 
 Importing `render.ts` registers `tsx-hooks.ts` with `module.register`. The hooks do three things:
 
-- they resolve `@/` and extensionless relative imports (`./x` → `.ts`, `.tsx` or `index`) from a `.ts` or `.tsx` parent;
+- they resolve `@/` and extensionless relative imports (`./x` → `.ts`, `.tsx` or `index`);
 - they compile `.tsx` with the project's own TypeScript (`transpileModule`);
 - they swap `next/link` and `next/navigation` for `next-stub.ts`.
 

@@ -24,7 +24,7 @@ Only `main` and the production deployment built from it get security fixes. Othe
 
 ### Trust boundaries
 
-1. **Browser to app.** Only a signed-in member gets past the session gate (ARCHITECTURE.md → Cross-cutting concerns), and the browser holds no key (see Secrets).
+1. **Browser to app.** Only a signed-in member gets past the session gate (CLAUDE.md → Auth), and the browser holds no key (see Secrets).
 2. **Members.** Signed-in members are trusted with an account, not with the server. Everything they send is parsed and capped at the boundary: URLs, notes, to-dos and post edits.
 3. **The internet.** The pipeline fetches URLs that members submit, and whatever those pages link to, so any page can try to reach an internal host (SSRF). Its content can also try to smuggle in markup (XSS) or instructions (prompt injection).
 4. **Models.** A model's answer is untrusted input as well. `generate()` validates every answer against a zod schema before anything uses it (CLAUDE.md → How content gets in).
@@ -56,7 +56,7 @@ The reader's one write to `posts` is in CLAUDE.md → Database.
 **`parseSubmittedUrl`** (`lib/pipeline/util.ts`) checks a submission at the API boundary:
 
 - It accepts `http:` and `https:` only.
-- Before any other check, it strips trailing dots from the host and assigns the host back through the URL setter. That re-parse canonicalizes IPv4 shorthand, octal and hex literals (`127.1`, `0177.0.0.1`, `0x7f.0.0.1`) into dotted form.
+- After the protocol check and before the host checks, it strips trailing dots from the host and assigns the host back through the URL setter. That re-parse canonicalizes IPv4 shorthand, octal and hex literals (`127.1`, `0177.0.0.1`, `0x7f.0.0.1`) into dotted form.
 - It then refuses:
   - a host that still ends in a dot;
   - `localhost` and `*.localhost`;
@@ -68,7 +68,7 @@ The reader's one write to `posts` is in CLAUDE.md → Database.
 
 **`safeFetch`** (`lib/pipeline/fetch.ts`) fetches every user-supplied or page-derived URL: pages, images, arXiv HTML and PDFs.
 
-- It follows at most 5 hops, each one by hand (`redirect: "manual"`).
+- It makes at most 5 requests, so it follows at most 4 redirects, each one by hand (`redirect: "manual"`).
 - On every hop it runs `parseSubmittedUrl` again and resolves the host with `dns.lookup(…, { all: true })`. It refuses the hop if any address is private.
 - It has a 20s default timeout, and its bodies are read with size caps (`readLimited`).
 
@@ -78,7 +78,7 @@ The reader's one write to `posts` is in CLAUDE.md → Database.
 - IPv6: `fc00::/7`, `fe80::/10` and `ff00::/8`;
 - any IPv4 address that an IPv4-mapped, IPv4-compatible (including `::` and `::1`), NAT64 `64:ff9b::/96` or 6to4 `2002::/16` address carries.
 
-**`apiFetch`** is for the fixed API hosts: the feeds, Hacker News, GitHub, export.arxiv.org, and the X and YouTube oEmbed endpoints. It adds the user agent and a 20s timeout.
+**`apiFetch`** is for the fixed API hosts: the feeds, Hacker News, GitHub, export.arxiv.org, and the X and YouTube oEmbed endpoints. It adds the user agent and a 20s default timeout, which the X and YouTube oEmbed calls lower to 15s.
 
 ### XSS: rendering untrusted content
 
