@@ -319,7 +319,7 @@ export function DigestDashboard({
                   </section>
                 )}
 
-                <section className="mt-11">
+                <section className="mt-9">
                   <SectionLabel icon={Newspaper} label={t.feed} />
                   <div className="space-y-4">
                     {feed.map((item) => (

@@ -132,11 +132,6 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 }
 .must-card { box-shadow: 5px 5px 0 var(--ink); transition: transform 160ms ease, box-shadow 160ms ease; }
 .must-card h2 { overflow-wrap: anywhere; hyphens: auto; }
-/* The stagger only reads as deliberate with three cards across: the must-read grid's @3xl (48rem) breakpoint. */
-@container (min-width: 48rem) {
-  .must-card:nth-child(2) { transform: translateY(10px); }
-  .must-card:nth-child(3) { transform: translateY(-5px); }
-}
 .story-card { transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
 /* Touch screens keep :hover after a tap, which would leave cards shifted. */
 @media (hover: hover) {
