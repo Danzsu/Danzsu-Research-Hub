@@ -237,7 +237,7 @@ test("mirrorImages keys uploaded variants by the downloaded bytes, not the URL",
 // timeout fire at once and records how long it was asked to be.
 test("mirrorImages aborts a download that hangs past FETCH_TIMEOUT_MS and keeps the block unmirrored", { timeout: 5_000 }, async (t) => {
   const { db, uploads } = fakeStorageDb();
-  t.mock.method(console, "warn", () => {});
+  const warn = t.mock.method(console, "warn", () => {});
   const realTimeout = AbortSignal.timeout.bind(AbortSignal);
   const asked: number[] = [];
   t.mock.method(AbortSignal, "timeout", (ms: number) => {
@@ -253,12 +253,16 @@ test("mirrorImages aborts a download that hangs past FETCH_TIMEOUT_MS and keeps 
   assert.deepEqual(asked, [FETCH_TIMEOUT_MS]);
   assert.equal((out[0] as ImageBlock).path, null);
   assert.equal(uploads.length, 0);
+  // Proves the abort signal was actually wired into the fetch call, not just asked for: a mutant that
+  // computes the timeout signal but forgets to pass it to fetch() still records the right `asked`
+  // value, but the download then fails for an unrelated reason instead of a real timeout.
+  assert.match(String(warn.mock.calls[0]?.arguments[0]), /due to timeout/);
 });
 
 // G1b: every image URL on a submitted page is fetched server-side, next to the secret key.
 test("mirrorImages never fetches an image on a private address, and keeps it unmirrored", async (t) => {
   const { db, uploads } = fakeStorageDb();
-  t.mock.method(console, "warn", () => {});
+  const warn = t.mock.method(console, "warn", () => {});
   mockDns(t, "10.0.0.1"); // cdn.example.test resolves to a private address
   let fetches = 0;
   mockFetch(t, async () => {
@@ -270,6 +274,8 @@ test("mirrorImages never fetches an image on a private address, and keeps it unm
   assert.equal(fetches, 0);
   assert.deepEqual(out.map((block) => (block as ImageBlock).path), [null, null, null]);
   assert.equal(uploads.length, 0);
+  assert.equal(warn.mock.calls.length, 3);
+  for (const call of warn.mock.calls) assert.match(String(call.arguments[0]), /blocked/);
 });
 
 // G2: a small file can decode to billions of pixels (a decompression bomb); sharp refuses past PIXEL_LIMIT.
@@ -281,7 +287,7 @@ test("encodeImage refuses an image over the 40-megapixel limit", async () => {
 // G3: an image declared over 5 MB is refused before a single byte is read, let alone handed to sharp.
 test("mirrorImages keeps a 5 MB + 1 byte image unmirrored, without reading it", async (t) => {
   const { db, uploads } = fakeStorageDb();
-  t.mock.method(console, "warn", () => {});
+  const warn = t.mock.method(console, "warn", () => {});
   const { body, cancelled, reads } = endlessBody(1024 * 1024);
   mockFetch(t, async () => new Response(body, { headers: { "content-type": "image/png", "content-length": String(5 * 1024 * 1024 + 1) } }));
   const out = await mirrorImages(db, 1, [image("i1", `${HOST}/big.png`)]);
@@ -289,4 +295,5 @@ test("mirrorImages keeps a 5 MB + 1 byte image unmirrored, without reading it", 
   assert.equal(uploads.length, 0);
   assert.equal(cancelled(), true);
   assert.equal(reads(), 0); // the declared length alone decides; nothing is pulled from the body
+  assert.match(String(warn.mock.calls[0]?.arguments[0]), /larger than/);
 });
