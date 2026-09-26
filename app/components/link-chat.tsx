@@ -61,7 +61,12 @@ export function TaiyakiButton({ open, onClick, className }: { open: boolean; onC
 /** Where Tab can land, as the browser sees it, less Radix's invisible focus guards at either end of <body>. */
 function tabStops(root: ParentNode): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]:not([data-radix-focus-guard])")].filter(
-    (element) => element.tabIndex >= 0 && !element.matches(":disabled") && element.getClientRects().length > 0,
+    (element) =>
+      element.tabIndex >= 0 &&
+      !element.matches(":disabled") &&
+      element.getClientRects().length > 0 &&
+      getComputedStyle(element).visibility === "visible" &&
+      !element.closest("[inert]"),
   );
 }
 
@@ -69,7 +74,9 @@ function tabStops(root: ParentNode): HTMLElement[] {
  * Desktop: Radix's FocusScope loops Tab inside the panel even when it isn't modal, which would keep a
  * keyboard reader from the page behind it. Instead the panel sits right after its opener in tab order:
  * Shift+Tab off its first stop goes back to the opener, and Tab off its last goes on to the first stop
- * after the opener outside the panel, or back to the opener when there is none.
+ * after the opener outside the panel, or back to the opener when there is none. The key is cancelled
+ * only once the focus has really moved: an opener hidden since (the mobile slot, after the window
+ * widened past md) takes no focus, and the key is then left to Radix, which wraps it inside the panel.
  */
 function tabPastPanel(event: KeyboardEvent<HTMLDivElement>, opener: HTMLElement | null) {
   if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey || !opener) return;
@@ -79,8 +86,8 @@ function tabPastPanel(event: KeyboardEvent<HTMLDivElement>, opener: HTMLElement 
   const next = event.shiftKey
     ? opener
     : (tabStops(document).find((element) => !panel.contains(element) && opener.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) ?? opener);
-  event.preventDefault();
   next.focus();
+  if (document.activeElement === next) event.preventDefault();
 }
 
 /**
