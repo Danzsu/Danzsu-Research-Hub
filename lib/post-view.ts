@@ -42,6 +42,10 @@ export type Post = {
   createdAt: string;
 };
 
+/** The title readers see: the submitter's override wins over the model's (the post page, the link chat). */
+export const shownTitle = (row: { title?: unknown; overrides?: unknown }): Localized =>
+  readOverrides(row.overrides).title ?? (row.title as Localized);
+
 /** A `posts` row (optionally with its `sources(submitted_by, error)` embed) as the page's Post. */
 export function toPost(row: Record<string, unknown>): Post {
   const overrides = readOverrides(row.overrides);
@@ -55,7 +59,7 @@ export function toPost(row: Record<string, unknown>): Post {
     siteName: row.source_site as string | null,
     publishedAt: row.published_at as string | null,
     // Submitter edits win over the model's text; re-extraction never overwrites them.
-    title: overrides.title ?? (row.title as Localized),
+    title: shownTitle(row),
     summary: overrides.summary ?? (row.summary as Localized),
     generatedTitle: row.title as Localized,
     generatedSummary: row.summary as Localized,

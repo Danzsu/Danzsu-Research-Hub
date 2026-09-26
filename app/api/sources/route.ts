@@ -21,7 +21,13 @@ export async function POST(request: Request) {
     .insert({ url: url.toString(), kind: detectSource(url), note })
     .select("id")
     .single();
-  if (error?.code === "23505") return jsonError(409, "already_submitted");
+  if (error?.code === "23505") {
+    // Already in: point the submitter at its post, once there is one (the chat's "MEGNYITÁS →").
+    const { data: existing, error: lookupError } = await reader.db.from("sources").select("posts(id)").eq("url", url.toString()).maybeSingle();
+    if (lookupError) console.warn("duplicate source's post lookup failed", lookupError);
+    const postId = (existing?.posts as unknown as { id: number } | null | undefined)?.id;
+    return jsonError(409, "already_submitted", postId ? { postId } : {});
+  }
   if (error || !data) {
     console.error("source insert failed", error);
     return jsonError(500, "insert_failed");

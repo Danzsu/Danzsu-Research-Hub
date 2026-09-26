@@ -33,6 +33,21 @@ test("POST /api/sources answers 409 already_submitted when the link is already i
   assert.deepEqual(routeStub.scheduled, []);
 });
 
+// Kills a lookup keyed on the raw body instead of the normalized url (host case, #hash), and a
+// dropped postId: the chat's "MEGNYITÁS →" would never show, or would open another link's post.
+test("POST /api/sources answers 409 with the post's id when the link is already in and has a post", async () => {
+  reader({
+    sourceInsertError: pgError("23505", 'duplicate key value violates unique constraint "sources_url_key"'),
+    sources: [
+      { id: 3, url: "https://blog.test/other", posts: { id: 8 } },
+      { id: 4, url: "https://blog.test/post", posts: { id: 9 } },
+    ],
+  });
+  const response = await submit({ url: "https://BLOG.test/post#top" });
+  assert.deepEqual([response.status, await response.json()], [409, { error: "already_submitted", postId: 9 }]);
+  assert.deepEqual(routeStub.scheduled, []);
+});
+
 // N4: the 202 is a promise that the link gets processed after the response.
 test("POST /api/sources stores the link as the reader, answers 202 with its id, and schedules its processing", async () => {
   const db = reader({ sources: [{ id: 1 }, { id: 2 }] });
