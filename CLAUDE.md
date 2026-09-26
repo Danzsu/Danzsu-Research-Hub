@@ -162,7 +162,7 @@ npm run ingest -- <url>   # node --env-file=.env.local … scripts/ingest-url.mt
 
 Before a commit, all five checks pass: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`.
 
-CI (`.github/workflows/ci.yml`) runs the same five, in this order, on every push and pull request: Node 24.16.0 on `ubuntu-24.04`, `corepack pnpm@11.25.0 install --frozen-lockfile`, no cache. `next build` needs no environment variables, so the workflow holds no secrets and only `contents: read`.
+CI (`.github/workflows/ci.yml`) runs the same five, in this order, on every push and pull request: Node 24.16.0 on `ubuntu-24.04`, `corepack pnpm@11.25.0 install --frozen-lockfile`, no cache. A superseded run on the same ref is cancelled (`concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }`). `next build` needs no environment variables, so the workflow holds no secrets and only `contents: read`.
 
 `corepack enable` fails with EPERM under nvm-for-windows, so pnpm is invoked through corepack directly. `engines` requires Node `>=22.13.0`; use Node 24 LTS, the only version the render harness is verified on. Newer Node releases no longer bundle corepack; install the version Node 24.16 ships with (`npm i -g corepack@0.35.0`).
 
@@ -181,12 +181,13 @@ app/(app)/library/  submit-form, library-view (the list body), refresh-while-pro
                   (posts opened in this tab, the dimmed card link);
                   [id]/ post-article (the post body), post-toolbar (translate, edit link), post-editor
                   (edit, hide, re-extract), post-notices (the notices under the title, the submitter's
-                  last extraction error), mark-post-read; post-article, post-toolbar, post-editor and
+                  last extraction error), mark-post-read; post-toolbar, post-editor and
                   post-notices each + test
 app/(app)/archive/  archive-view (the archive body)
-app/api/          state, sources, posts/[id] (PATCH), posts/[id]/translate, posts/[id]/reextract, cron/daily
+app/api/          state, sources, posts/[id] (PATCH), posts/[id]/translate, posts/[id]/reextract, cron/daily;
+                  each route has a `route.test.ts`
 app/auth/         login, callback, signout
-app/media/[...path]/  session-checked mirrored-image serving
+app/media/[...path]/  session-checked mirrored-image serving (+ test)
 lib/pipeline/     daily, collect, feeds, ingest, fetch (safeFetch, apiFetch, ensureOk, readLimited),
                   html-to-blocks, html-noise (noise layers 1–2), html-images (srcset, icon filter),
                   cleanup (layer 3), images (mirrorImages), summary (summarize, writeNotes), util
@@ -194,8 +195,9 @@ lib/pipeline/extract/  index (extract, the fallback sets, metadataOnly), types, 
                   article, youtube, arxiv, github, x, pdf
 lib/pipeline/fake-db.ts  test helper: offline Supabase stand-in (fakeDb)
 lib/pipeline/mock-fetch.ts  test helper: fetch, DNS, env and response-body fakes
-lib/test/         render harness for component tests (render, tsx-hooks, next-stub), fixtures
-                  (testPost, also the base of lib/fixtures.ts's preview posts)
+lib/test/         render harness for component tests (render, tsx-hooks, next-stub) and the
+                  route-handler stubs (route-hooks), fixtures (testPost, also the base of
+                  lib/fixtures.ts's preview posts)
 lib/blocks.ts     the block schema (`zod/v4`), parseBlocks, assignIds, limitBlocks, safeHref
 lib/post-view.ts  Post, toPost (a posts row → the page's Post), media/video helpers, withQuery
 lib/post-edit.ts  editPayload, savePostEdits, requestReextract
@@ -233,13 +235,15 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 ## Conventions
 
 - **No duplication.** Search (`grep -rn`) before writing a helper or a class list, and reuse the shared homes: `lib/media.ts` (image paths), `lib/api.ts` (`jsonError`, `postRoute`), `lib/supabase/server.ts` (`getReader` / `getViewer`), `lib/pipeline/util.ts` (`hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…), `lib/pipeline/fetch.ts` (`safeFetch`, `apiFetch`, `ensureOk`, `readText`), `lib/blocks.ts` (`localizedSchema`, `parseBlocks`), `readPageMeta` in `extract/article.ts`, and in the UI the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHero`, `StatusCard` and `Tag`. `npm run dup` is the gate: at most 1% duplication, and no new clone.
-- **Relative imports in `lib/`.** Every file under `lib/` uses relative `.ts` imports (no `@/`), so `node --test` loads it without a bundler, and the client editor can import `lib/post-edit.ts` without server-only code. The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which tests never load.
+- **Relative imports in `lib/`.** Every file under `lib/` uses relative `.ts` imports (no `@/`), so `node --test` loads it without a bundler, and the client editor can import `lib/post-edit.ts` without server-only code. The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`. No test loads `lib/supabase/server.ts` or `lib/language.ts` (route tests get `lib/test/route-hooks.ts` in the first one's place); `lib/content.ts` is loaded by the state route's test, with `server-only` mapped to an empty module.
 - **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library. Existing names: `copy` (most components, `digest-dashboard` included), `labels` (`post-blocks`), `notices` (`app/(app)/library/[id]/post-notices.tsx`, also read by `post-article.tsx`). Code identifiers, comments and model prompts are English.
 - **Tests.** `node --test` with type stripping, no framework. Helpers:
-  - `lib/pipeline/fake-db.ts`: `fakeDb(route?, tables?)`, an offline Supabase client: `model_settings` answers with `route` and records each task asked for (`.tasks`); `sources`, `posts`, storage and RPCs answer from `tables`; every write is recorded (`sourceUpdates`, `postUpserts`, `postUpdates`, `postUpdateFilters`, `rpcCalls`, `upserts`, `writes`, …).
-  - `lib/pipeline/mock-fetch.ts`: `mockFetch(t, handler)`, `withGeminiKey(t)` and `withEnv(t, name, value)`, which restore themselves with `t.after`; `mockDns(t)`; `endlessBody()` with `reads()` / `cancelled()` to prove a body was released unread; `TEST_IP` / `TEST_HOST`, a public IP literal `safeFetch` resolves offline; `geminiResponse`, `geminiText`, `geminiPrompt`.
+  - `lib/pipeline/fake-db.ts`: `fakeDb(route?, tables?)`, an offline Supabase client. `model_settings` answers with `route` and records each task asked for (`.tasks`); `sources` (one `source`, or several `sources`), `posts`, storage and RPCs answer from `tables`. Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows; a column the fixture never set passes every filter, so a test of which row code reads needs a fixture whose `id` and `source_id` differ. A `sources` `single()` that matches no row, or several, answers PGRST116; `pgError(code, message)` builds any other PostgREST-shaped error (`rpcError`, `sourceInsertError`). Every write is recorded (`sourceUpdates`, `sourceInserts`, `postUpserts`, `postUpdates`, `postUpdateFilters`, `rpcCalls`, `upserts`, `writes`, …); storage also answers `download`.
+  - `lib/pipeline/mock-fetch.ts`: `mockFetch(t, handler)`, `withGeminiKey(t)` and `withEnv(t, name, value)`, which restore themselves with `t.after`; `mockDns(t, ...addresses)` (default: `TEST_IP`; several addresses come back in one answer) — calling it twice in one test body corrupts the restore (`t.mock.method` restores to the first mock, not the real `dns.lookup`), so nest `t.test()` subtests, one mock each; `endlessBody()` with `reads()` / `cancelled()` to prove a body was released unread; `TEST_IP` / `TEST_HOST`, a public IP literal `safeFetch` resolves offline; `geminiResponse`, `geminiText`, `geminiPrompt`, `geminiSchemaKeys(init)` (which schema a Gemini call asks for: route a fake by it, not by prompt wording).
   - `lib/test/render.ts`: importing it registers `tsx-hooks.ts` with `module.register`; the hooks resolve `@/` and extensionless relative imports (`./x` → `.ts`/`.tsx`/`index`) from a `.ts`/`.tsx` parent, compile `.tsx` with the project's TypeScript (`transpileModule`), and swap `next/link` and `next/navigation` for `next-stub.ts`. `render(element)` runs `renderToStaticMarkup` and returns a linkedom `Document`. Import `render.ts` first, then the component with `await import("./x.tsx")`. Limits: a static render runs hooks once with no effects, so clicks and state changes are invisible (check those in the browser); verified on Node 24.16 only, Node 22.13 is unverified.
-  - `node --test "app/(app)/library/[id]/x.test.ts"` runs 0 tests and exits 0, because `[id]` is read as a glob character class. Use `npm test`, or run one file with the bracket escaped: `node --experimental-strip-types --no-warnings --test "app/(app)/library/[[]id]/post-editor.test.ts"`.
+  - `lib/test/route-hooks.ts`: route-handler tests. Importing it registers `tsx-hooks.ts`, whose `STUBS` map resolves `@/lib/supabase/server` and `next/server` to this file and `server-only` to an empty module. It stands in for both: `getReader` / `getViewer` / `createClient` answer `routeStub.reader` (set it with `signedIn(db, id?)`), `createAdminClient` answers `routeStub.admin` and counts `adminCalls`, `after(task)` queues the task on `routeStub.scheduled`, and `NextResponse` is the real one. Call `resetRoute()` first in every test, import this file by its relative path (a second path would load a second instance), then the route with `await import("./route.ts")`. Every route test file keeps one signed-in case that reaches the handler, so a 401 can't pass vacuously.
+  - Never hand a linkedom node to `assert`: on failure Node formats the whole document (~25 s, then `RangeError: Array buffer allocation failed`). Compare an attribute, `textContent` or a count.
+  - `node --test` reads each `[` in a path as the start of a glob character class, so every bracketed segment needs escaping, not only `[id]`: `[id]` → `[[]id]`, `[...path]` → `[[]...path]`. `"app/(app)/library/[id]/x.test.ts"` and `"app/media/[...path]/route.test.ts"` both run 0 tests and exit 0 unmodified. Use `npm test`, or run one file with every `[` escaped: `node --experimental-strip-types --no-warnings --test "app/(app)/library/[[]id]/post-editor.test.ts"`.
 - **Supply chain.** Every dependency is pinned to an exact version; `pnpm-lock.yaml` is committed and installed with `--frozen-lockfile` (pnpm also defaults to a frozen lockfile under CI). `pnpm-workspace.yaml` sets `minimumReleaseAge: 10080` (7 days) with `minimumReleaseAgeIgnoreMissingTime: false`, and `strictDepBuilds` with only `sharp` and `unrs-resolver` allowed to build — never lower or bypass these. Whether Vercel honours the lockfile depends on its Install Command setting (an open TODO item). `jscpd` is a devDependency, so `npm run dup` uses the local binary. `.gitattributes` marks the lockfile `-diff`: review lockfile changes with `git diff --text`. The CI workflow pins each action by its full commit SHA, with the tag as a comment. `.github/dependabot.yml` updates `github-actions` only, weekly, with `cooldown: { default-days: 7 }`. npm dependencies have no update bot; adding one needs the same 7-day cooldown.
 - **Commits.** Conventional Commits with lowercase, imperative subjects, committed with an explicit pathspec.
 
@@ -259,6 +263,7 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 ## Hand-authored components
 
 - **`components/ui/progress.tsx`, `separator.tsx`, `skeleton.tsx`, `textarea.tsx`** — written in this project's house style (function components, `data-slot`, unified `radix-ui`). The registry still serves forwardRef-era source, so pasting it would have broken the convention *and* omitted `data-slot="progress-indicator"`, which the dashboard targets to paint the bar signal-orange.
+  `progress.tsx` also forwards `value` to Radix's Root. The registry's version keeps it back, which leaves every bar `data-state="indeterminate"` with no `aria-valuenow`; `app/components/shell.test.ts` pins it.
 - **`components/ui/sheet.tsx`, `dialog.tsx`**: the close button is patched to a 40px house-style square (`size-10`, ink border, paper → signal on hover); the stock one is a ~16px target. Both content components also take an optional `closeLabel` (default `"Close"`), the button's sr-only name, so a caller passes its localized `copy.close`.
 - **`components/ui/sidebar.tsx`** — fetched read-only from the registry and hand-patched (import paths, `Slot.Root`, Tailwind 4 `w-(--sidebar-width)` instead of the v3 square-bracket variable form, which compiles to invalid CSS). See the header comment in the file. The app no longer renders it (the app shell has its own nav); it stays until the unused-component cleanup.
 

@@ -183,7 +183,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the feed list, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
 | [`lib/`](lib/) | The block model, the post view, post edits, translation, the model client, content queries, the language cookie, Supabase clients |
-| [`lib/test/`](lib/test/) | The offline render harness for component tests, and a `Post` fixture (`testPost`) |
+| [`lib/test/`](lib/test/) | The offline render harness for component tests, the route-handler stubs (`route-hooks.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [CLAUDE.md](CLAUDE.md#design-language--do-not-erode-it)) |
 | [`supabase/migrations/`](supabase/migrations/) | Schema, RLS, database functions, model seeds |
@@ -248,7 +248,7 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 
 **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the five pre-commit checks (`npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, `npm run dup`) on every push and pull request, with no secrets. Branch protection on `main` is the owner's setting (see [TODO.md](TODO.md)).
 
-- **Helpers:** [`lib/pipeline/fake-db.ts`](lib/pipeline/fake-db.ts) stands in for Supabase and records every write; [`lib/pipeline/mock-fetch.ts`](lib/pipeline/mock-fetch.ts) fakes fetch, DNS, environment variables and model answers, and undoes itself when the test ends. The full list is in [CLAUDE.md](CLAUDE.md#conventions).
+- **Helpers:** [`lib/pipeline/fake-db.ts`](lib/pipeline/fake-db.ts) stands in for Supabase and records every write; [`lib/pipeline/mock-fetch.ts`](lib/pipeline/mock-fetch.ts) fakes fetch, DNS, environment variables and model answers, and undoes itself when the test ends. The fake applies `eq`, `neq` and `lt` filters to its fixture rows and answers PostgREST-shaped errors (`pgError`). The full list is in [CLAUDE.md](CLAUDE.md#conventions).
 - **Components:** [`lib/test/render.ts`](lib/test/render.ts) compiles `.tsx` with the project's TypeScript and renders it to static HTML, with `next/link` and `next/navigation` stubbed. A component test looks like this:
 
   ```ts
@@ -260,6 +260,17 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
   ```
 
   A static render runs hooks once and no effects, so it cannot see clicks or state changes. It is verified on Node 24; Node 22 is unverified.
+- **Routes:** [`lib/test/route-hooks.ts`](lib/test/route-hooks.ts) stands in for `@/lib/supabase/server` and `next/server`, so a route handler runs under `node --test` with no Next.js server. A route test looks like this:
+
+  ```ts
+  import { resetRoute, routeStub, signedIn } from "../../../lib/test/route-hooks.ts"; // first: it registers the loader
+  const { POST } = await import("./route.ts");
+
+  resetRoute();
+  routeStub.reader = signedIn(fakeDb());
+  const response = await POST(new Request("http://localhost/api/state", { method: "POST", body: "{}" }));
+  ```
+
 - **One test file** runs with the same flags as `npm test`. A path with `[id]` in it is read as a glob character class, so `"app/(app)/library/[id]/post-editor.test.ts"` runs 0 tests and still exits 0. Escape the bracket:
 
   ```bash
@@ -268,14 +279,14 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 
 UI without live data: `npm run dev`, then open `/dev/preview` (development only). It renders every view on fixtures, including empty states and a `&fail=1` offline mode; Playwright checks run against it at 360, 768 and 1280 px.
 
-**What the tests don't cover:** the interactive UI, real RLS policies, live model calls and live websites. Those are checked by hand in a browser (Playwright) against a deployment: sign in, the Radar's read, saved and to-do state, an archived week, one link per source kind, the post page (blocks, images, video and chapters), translation, editing, hiding, re-extraction and its 10-minute cooldown, a `noarchive` page, and no horizontal scroll at 360 and 1280 px.
+**What the tests don't cover:** the interactive UI, `proxy.ts` and the auth routes, real RLS policies, live model calls and live websites. Those are checked by hand in a browser (Playwright) against a deployment: sign in, the Radar's read, saved and to-do state, an archived week, one link per source kind, the post page (blocks, images, video and chapters), translation, editing, hiding, re-extraction and its 10-minute cooldown, a `noarchive` page, and no horizontal scroll at 360 and 1280 px.
 
 ## Conventions
 
 - **Design language.** Hard corners (`--radius` is 0), system fonts only, hard offset shadows, one fixed theme, and everything fits 360 px with at least 40 px touch targets. The full rules: [CLAUDE.md](CLAUDE.md#design-language--do-not-erode-it).
 - **Bilingual.** Every UI string should exist in Hungarian and English, in the component's copy object; the reader's choice is the `lang` cookie. Some labels are still English-only: the post kind labels (`kindLabel`), the Library's FAILED / PROCESSING… and MIRRORED tags, the archive's ITEMS / MIN, the header back links and the dashboard's SYNCED. Model output that readers see (titles, summaries, key points) is written in both languages. Code, comments and prompts are English.
 - **No duplication.** Search before writing a helper, and reuse the shared ones listed in [CLAUDE.md](CLAUDE.md#conventions). `npm run dup` (jscpd) fails above 1% duplication.
-- **Relative imports in `lib/`,** with the `.ts` extension, so `node --test` can load the files without a bundler. The three exceptions are the Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which use `@/` and are never loaded by tests.
+- **Relative imports in `lib/`,** with the `.ts` extension, so `node --test` can load the files without a bundler. The three exceptions are the Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which use `@/`. Tests never load `lib/supabase/server.ts` or `lib/language.ts`; the state route's test loads `lib/content.ts`.
 - **Commits** follow Conventional Commits, with lowercase, imperative subjects.
 - **Dependencies** are pinned to exact versions, and `pnpm-lock.yaml` is committed. `pnpm-workspace.yaml` refuses any package published less than 7 days ago (`minimumReleaseAge: 10080`); never lower it. The lockfile is marked `-diff` in `.gitattributes`, so review its changes with `git diff --text`. The CI's actions are pinned by commit SHA, and Dependabot proposes their updates no sooner than 7 days after a release.
 

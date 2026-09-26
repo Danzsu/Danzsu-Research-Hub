@@ -89,6 +89,7 @@
 - [x] **Nyelvválasztás megjegyzése:** `lang` cookie, minden oldal ezt használja
 - [x] **Márkanév:** NEON NEWS RADAR
 - [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon összecsukható oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (`/dev/preview`).
+- [x] **Teszt-keményítés és CI** (2026-09-25): route-tesztek a route-teszt réteggel, a `safeFetch` minden hívóhelye, a `fakeDb` szűrői, rögzített blokk-id-k, a `Progress` értéke a képernyőolvasónak, GitHub Actions CI az öt ellenőrzéssel. Terv: [docs/superpowers/plans/2026-09-25-test-hardening.md](docs/superpowers/plans/2026-09-25-test-hardening.md).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
@@ -205,16 +206,17 @@
   - Alternatívák: `@electric-sql/pglite` devDependencyként (hogy a szerepei és az RLS-e elég-e, az ellenőrizetlen), vagy a Supabase CLI helyi stackje (Docker, nehezebb).
   - Haszna: az RLS, a grantok, az `update_post_overrides` 42501-e és a `refresh_must_read` „pontosan 3” szabálya az egyetlen valódi jogosultsági réteg, és ma egyiket sem teszteli semmi.
 - [ ] **Az audit következő tételei** (`.superpowers/sdd/test-audit.md`, 5. fejezet, „Next after these”):
-  - az arxiv → article tartalék (I2);
-  - a github-kinyerés AI-tisztítása (I5);
-  - egy `arxiv.org/pdf/<id>.pdf` URL felismerése (U10).
+  - az arxiv → article tartalék (I2: mutációs próba arra, hogy az `arxiv` bekerül-e a `NO_ARTICLE_FALLBACK` halmazba, kihagyva a cikk-tartalékot);
+  - a github-kinyerés AI-tisztítása (I5: mutációs próba arra, hogy az AI-tisztítás kimarad-e a `github` forrástípusnál);
+  - egy `arxiv.org/pdf/<id>.pdf` URL felismerése (U10: mutációs próba arra, hogy egy ilyen URL többé nem azonosítható-e arxivként).
 
   A `Task` ↔ `model_settings_task_check` teszt az M2 terv 1. feladatában van (`TASKS`), ide nem kell.
 - [ ] **A túlélő próbák maradéka és a még teszt nélküli bekötések:**
-  - a `/auth` előtag a `lib/public-paths.ts`-ben (P2, egy tesztsor);
-  - a `proxy.ts` (X4): ehhez a `@supabase/ssr` `createServerClient`-jének helyettese kell a route-rétegben;
+  - a `/auth` előtag a `lib/public-paths.ts`-ben (P2: mutációs próba arra, hogy a záró `/` nélküli `/auth` előtag is nyilvános útvonalnak számít-e; egy tesztsor);
+  - a `proxy.ts` (X4: mutációs próba arra, hogy a proxy a megfordított útvonal-halmazon irányít-e át): ehhez a `@supabase/ssr` `createServerClient`-jének helyettese kell a route-rétegben;
   - az `app/auth/login` és az `app/auth/callback` tényleg a `safeNext`-en át irányít-e;
   - a `getReaderState` sor-leképezése (`lib/content.ts`).
+- [ ] **A `corepack pnpm@11.25.0` és a CI Node-verziója a Dependabot és a pnpm 7 napos korhatára (`minimumReleaseAge`) alól kimaradnak** — egyik sem npm- vagy Actions-függőség, amit valamelyik gate ellenőrizne. Bármelyik emelése előtt kézzel kell ellenőrizni, hogy a célverzió legalább 7 napos kiadás-e (lásd lent a Node-verzió emelésének lépéseit, ugyanez a szabály a pnpm-re is).
 - [ ] **A CI Node-ja legalább 24.18.1-re.** A `.github/workflows/ci.yml` ma a `24.16.0`-n fut, mert a render harness csak ezen ellenőrzött.
   - A nodejs.org `dist/index.json` a 24.17.0-t (2026-06-17) és a 24.18.1-et (2026-07-28) biztonsági kiadásnak jelöli.
   - A lépések: előbb a render harness (`lib/test/render.ts`, `lib/test/tsx-hooks.ts`) és a teljes `npm test` ellenőrzése az új verzión, aztán a `node-version` sor emelése egy legalább 7 napos kiadásra.
