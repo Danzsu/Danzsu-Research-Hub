@@ -156,6 +156,10 @@
 
 ### Következő lépések
 - [ ] **Taiyaki link-chat** (döntve 2026-09-25, az UX-A után, az M2 előtt). Egy taiyaki-ikonos buborék: asztalon a jobb alsó sarokban lebeg, mobilon az alsó sáv kiemelt középső gombja, az Archívum pedig átkerül a „Több” panelbe. Megnyitva mini chat nyílik: egy link és egy opcionális megjegyzés, a válasz élő állapottal. A specifikáció: `docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md`.
+- [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Mindkét értelemben:
+  - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
+  - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
+  Emellett jobb visszajelző effektek és további javítások. Előbb egy átvilágítás az egész appon: Playwright-mérések 360/768/1280 px-en és a lassú pontok felmérése. Ebből lesz egy jóváhagyandó terv.
 - [ ] **`/glossary` a főmenübe** (döntve 2026-09-25, az M2 után): egy nem elsődleges tétel a `lib/nav.ts`-ben, a tesztjei bővítésével.
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
