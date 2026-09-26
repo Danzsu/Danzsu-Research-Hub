@@ -195,15 +195,13 @@ test("TaiyakiButton names itself in the reader's language, and says which panel 
   assert.deepEqual(button("en", true), ["Drop a link", "true", CHAT_PANEL_ID]);
 });
 
-// Kills the corner button left out of the shell. The panel itself is portalled (null in this harness),
-// so a closed chat leaves no panel in the page and an open one must render without a render loop.
-test("AppShell carries the taiyaki, and the link chat renders open or closed", () => {
+// Kills the corner button left out of the shell. This harness renders Radix's portal as null, so the
+// panel itself never reaches the markup, open or not: the LinkChat render proves only that its top
+// level (the chat store, the transport, the hooks) runs without a crash or a render loop.
+test("AppShell carries the taiyaki, and LinkChat's top level renders without a render loop", () => {
   const doc = render(
     createElement(AppShell, { language: "hu", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>, createElement("p", null, "Child")),
   );
   assert.equal(doc.querySelectorAll(`button[aria-controls="${CHAT_PANEL_ID}"]`).length, 1);
-  assert.equal(doc.getElementById(CHAT_PANEL_ID), null);
-  for (const open of [false, true]) {
-    withLanguage(LinkChat, { open, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
-  }
+  withLanguage(LinkChat, { open: true, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
 });
