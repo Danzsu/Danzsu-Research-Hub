@@ -2,8 +2,10 @@
 // resolves `@/lib/supabase/server` and `next/server` to this file and `server-only` to an empty
 // module. Import it before the route, which is why route tests load theirs with a dynamic import.
 
+import assert from "node:assert/strict";
 import { register } from "node:module";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { FakeIngestDb } from "../pipeline/fake-db.ts";
 import type { Viewer } from "../supabase/server.ts";
 
 register("./tsx-hooks.ts", import.meta.url);
@@ -48,4 +50,17 @@ export function createAdminClient(): SupabaseClient {
 /** `next/server`'s `after()`: the task is queued, so a test can see it was scheduled and run it. */
 export function after(task: () => unknown): void {
   routeStub.scheduled.push(task);
+}
+
+/**
+ * Runs every task `after()` queued — each expected to reject with PGRST116, since the fake it runs
+ * against holds no matching `sources` row — and returns the `sources.id` value each run's own
+ * `eqCalls` recorded, in call order. Shared by the sources and reextract route tests, whose "the
+ * scheduled run touches the right source" assertion was otherwise near-identical.
+ */
+export async function scheduledSourceIds(admin: FakeIngestDb): Promise<unknown[]> {
+  for (const task of routeStub.scheduled) {
+    await assert.rejects(async () => task(), { code: "PGRST116" });
+  }
+  return admin.eqCalls.filter((call) => call.table === "sources" && call.column === "id").map((call) => call.value);
 }

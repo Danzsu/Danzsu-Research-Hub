@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeDb, pgError, type FakeIngestTables } from "../../../lib/pipeline/fake-db.ts";
-import { resetRoute, routeStub, signedIn } from "../../../lib/test/route-hooks.ts";
+import { resetRoute, routeStub, scheduledSourceIds, signedIn } from "../../../lib/test/route-hooks.ts";
 
 const { POST } = await import("./route.ts");
 
@@ -45,8 +45,7 @@ test("POST /api/sources stores the link as the reader, answers 202 with its id, 
   // The scheduled task really processes the new source (id 3), not just any resolved promise.
   const admin = fakeDb();
   routeStub.admin = admin;
-  await assert.rejects(async () => routeStub.scheduled[0](), { code: "PGRST116" }); // the fake holds no sources row
-  assert.deepEqual(admin.eqCalls.filter((call) => call.table === "sources"), [{ table: "sources", column: "id", value: 3 }]);
+  assert.deepEqual(await scheduledSourceIds(admin), [3]);
 });
 
 // N3 continued: only the 23505 (duplicate url) code is the reader's news; any other insert

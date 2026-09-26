@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fakeDb } from "../../../../../lib/pipeline/fake-db.ts";
-import { resetRoute, routeStub, signedIn } from "../../../../../lib/test/route-hooks.ts";
+import { resetRoute, routeStub, scheduledSourceIds, signedIn } from "../../../../../lib/test/route-hooks.ts";
 
 const { POST } = await import("./route.ts");
 
@@ -31,8 +31,7 @@ test("POST /reextract answers 202 to the submitter and schedules a run of the po
   const response = await reextract();
   assert.deepEqual([response.status, await response.json()], [202, { ok: true }]);
   assert.equal(routeStub.scheduled.length, 1);
-  await assert.rejects(async () => routeStub.scheduled[0](), { code: "PGRST116" }); // the fake holds no sources row
-  assert.deepEqual(admin.eqCalls.filter((call) => call.table === "sources"), [{ table: "sources", column: "id", value: 3 }]);
+  assert.deepEqual(await scheduledSourceIds(admin), [3]);
 });
 
 // N7: the client shows "try again in N minutes" from retryAfter.

@@ -16,6 +16,10 @@ const picked: Candidate[] = [
 ];
 const repos: Repo[] = Array.from({ length: 12 }, (_, i) => ({ repo: `owner/repo-${i}`, focus: "", url: `https://github.com/owner/repo-${i}`, stars: 100 - i }));
 
+/** `n` synthetic Hacker News Algolia hits ("Story 0".."Story n-1"), all above the points threshold. */
+const hnHits = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({ title: `Story ${i}`, url: `https://news.test/${i}`, created_at: "2026-09-22T08:00:00Z", points: 100, objectID: String(i) }));
+
 type Curated = Parameters<typeof toDigestRows>[0];
 const curatedItem = (index: number, title: string): Curated["items"][number] => ({
   index,
@@ -120,7 +124,7 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
 test("runDaily shortlists more than 40 candidates, and keeps the first 40 when the shortlist call fails", async (t) => {
   withGeminiKey(t);
   t.mock.method(console, "warn", () => {}); // the feeds' 404s and the failed shortlist
-  const hits = Array.from({ length: 45 }, (_, i) => ({ title: `Story ${i}`, url: `https://news.test/${i}`, created_at: "2026-09-22T08:00:00Z", points: 100, objectID: String(i) }));
+  const hits = hnHits(45);
   let prompt = "";
   mockFetch(t, async (url, init) => {
     if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits });
@@ -145,7 +149,7 @@ test("runDaily shortlists more than 40 candidates, and keeps the first 40 when t
 test("runDaily skips the shortlist call at exactly 40 candidates, curating all of them", async (t) => {
   withGeminiKey(t);
   t.mock.method(console, "warn", () => {}); // the feeds' 404s
-  const hits = Array.from({ length: 40 }, (_, i) => ({ title: `Story ${i}`, url: `https://news.test/${i}`, created_at: "2026-09-22T08:00:00Z", points: 100, objectID: String(i) }));
+  const hits = hnHits(40);
   mockFetch(t, async (url) => {
     if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits });
     if (url.startsWith("https://generativelanguage.googleapis.com/")) return geminiResponse({ items: [], github: [] });
