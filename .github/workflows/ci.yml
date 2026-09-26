@@ -1,4 +1,4 @@
-# The five checks CLAUDE.md requires before a commit, on every push and pull request.
+# The five checks AGENTS.md requires before a commit, on every push and pull request.
 # Actions are pinned by full commit SHA (the tag is the comment); Dependabot proposes updates.
 name: CI
 
