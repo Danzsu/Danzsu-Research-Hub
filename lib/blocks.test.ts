@@ -19,6 +19,19 @@ test("assignIds suffixes repeated identical blocks", () => {
   assert.match(ids[2], /-3$/);
 });
 
+// B2: every saved `hidden_blocks` entry, and every future annotation, is one of these ids.
+test("assignIds output is pinned forever: type prefix, content hash, normalization and the duplicate suffix", () => {
+  // ⚠️ If this test fails, the change orphans every submitter's hidden blocks: fix the code, never the expected ids.
+  const ids = assignIds([
+    { type: "paragraph", content: [{ text: "Local models are  " }, { text: "Fast", bold: true }] },
+    { type: "heading", level: 2, text: "Results" },
+    { type: "image", originalUrl: "https://blog.test/figure.png", alt: "A figure", path: null },
+    { type: "video", provider: "youtube", videoId: "dQw4w9WgXcQ" },
+    { type: "paragraph", content: [{ text: "local MODELS are fast" }] },
+  ]).map((block) => block.id);
+  assert.deepEqual(ids, ["pd6988894", "h073e213f", "i599b87fb", "v1aaaff45", "pd6988894-2"]);
+});
+
 test("safeHref keeps only http(s) and resolves relative links", () => {
   assert.equal(safeHref("/a?b=1", "https://site.test/post/"), "https://site.test/a?b=1");
   // Protocol-relative is fine: it still resolves to an http(s) URL, just on another host.

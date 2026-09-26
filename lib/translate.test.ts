@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assignIds, type BlockDraft } from "./blocks.ts";
+import { assignIds, type Block, type BlockDraft } from "./blocks.ts";
 import { fakeDb, type FakeIngestTables } from "./pipeline/fake-db.ts";
 import { geminiPrompt, geminiResponse, geminiText, mockFetch, withGeminiKey } from "./pipeline/mock-fetch.ts";
 import { applyTranslation, chunkTranslatable, translatable, translatePost, type TranslationItem } from "./translate.ts";
@@ -56,104 +56,6 @@ test("applyTranslation span mismatch: that block falls back to plain text", () =
   assert.deepEqual(result[1].type === "paragraph" && result[1].content, [{ text: "Olvasd el most a cikket." }]);
 });
 
-test("applyTranslation rejects a missing block", () => {
-  assert.equal(applyTranslation(blocks, [{ id: blocks[0].id, text: "Eredmények" }]), null);
-});
-
-// An answer that returns only ids (every other field missing) must not silently keep the original
-// English text and report "ok": a filled blocks_hu hides the Translate button for good.
-test("applyTranslation rejects an answer that translates nothing (ids only, every field missing)", () => {
-  const onlyIds = translatable(blocks).map((item) => ({ id: item.id }));
-  assert.equal(applyTranslation(blocks, onlyIds), null);
-});
-
-test("applyTranslation rejects a list whose items array is shorter than the original (2 items, 1 translated)", () => {
-  assert.equal(applyTranslation(blocks, answerWith(blocks[2].id, { items: [["egy"]] })), null);
-});
-
-test("applyTranslation rejects a non-empty original coming back empty", () => {
-  assert.equal(applyTranslation(blocks, answerWith(blocks[0].id, { text: "" })), null);
-});
-
-test("applyTranslation rejects an answer ~10x the original length (degenerate repetition loop)", () => {
-  const original = "A fairly long heading that is definitely not a short string to translate";
-  const longBlocks = assignIds([{ type: "heading", level: 2, text: original }] satisfies BlockDraft[]);
-  const result = applyTranslation(longBlocks, [{ id: longBlocks[0].id, text: "x".repeat(original.length * 10) }]);
-  assert.equal(result, null);
-});
-
-// A span-count mismatch (paragraph/quote, or one list item) falls back to the joined text, and that
-// joined text is validated like any other field: a mismatched count must not let garbage through.
-test("applyTranslation rejects empty spans for a mismatched paragraph (spans: [])", () => {
-  // 0 vs 3 original spans — joined translated text is ""
-  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, { spans: [] })), null);
-});
-
-test('applyTranslation rejects a whitespace-only span for a mismatched paragraph (["   "])', () => {
-  // 1 vs 3 original spans — joined translated text is whitespace
-  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, { spans: ["   "] })), null);
-});
-
-test("applyTranslation rejects a mismatched paragraph whose joined spans total 100 001 characters", () => {
-  // 2 vs 3 original spans
-  const spans = ["x".repeat(50_000), "x".repeat(50_001)];
-  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, { spans })), null);
-});
-
-test("applyTranslation rejects a single-span paragraph answered with spans: []", () => {
-  const singleSpanBlocks = assignIds([{ type: "paragraph", content: [{ text: "Hello there" }] }] satisfies BlockDraft[]);
-  const result = applyTranslation(singleSpanBlocks, [{ id: singleSpanBlocks[0].id, spans: [] }]);
-  assert.equal(result, null);
-});
-
-test("applyTranslation rejects an empty list item ([])", () => {
-  // first item: 0 vs 1 original span — joined text ""
-  assert.equal(applyTranslation(blocks, answerWith(blocks[2].id, { items: [[], ["kettő"]] })), null);
-});
-
-test("applyTranslation rejects a 50 000-character list item", () => {
-  // first item: 2 vs 1 original span
-  const items = [["a", "x".repeat(50_000)], ["kettő"]];
-  assert.equal(applyTranslation(blocks, answerWith(blocks[2].id, { items })), null);
-});
-
-// The "ids only" test above fails through every type at once, so it can't tell whether any one
-// type's own presence check works. One isolated probe each.
-test("applyTranslation rejects a missing heading text alone", () => {
-  // { id } only — the entry itself is present (unlike "rejects a missing block" above, which drops
-  // the entry entirely and only exercises the "missing id" check, not this type's own presence check).
-  assert.equal(applyTranslation(blocks, answerWith(blocks[0].id, {})), null);
-});
-
-test("applyTranslation rejects a missing paragraph spans field alone", () => {
-  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, {})), null); // entry present, spans absent
-});
-
-test("applyTranslation rejects a missing image alt alone, when the original alt was non-empty", () => {
-  // alt omitted, everything else valid — blocks[4].alt is "chart"
-  assert.equal(applyTranslation(blocks, answerWith(blocks[4].id, { caption: "Sebesség" })), null);
-});
-
-// validText rejecting empty/whitespace text, pinned per field — not just via the "10x length" or
-// "ids only" tests above, which exercise different fields.
-test("applyTranslation rejects a whitespace-only span at a matching span count", () => {
-  // 3 spans (matches), middle is blank
-  assert.equal(applyTranslation(blocks, answerWith(blocks[1].id, { spans: ["Olvasd el a ", "   ", " most."] })), null);
-});
-
-test("applyTranslation rejects a whitespace-only list-item span at a matching count", () => {
-  // 1 span (matches), blank
-  assert.equal(applyTranslation(blocks, answerWith(blocks[2].id, { items: [["  "], ["kettő"]] })), null);
-});
-
-test("applyTranslation rejects a whitespace-only caption when the original had one", () => {
-  assert.equal(applyTranslation(blocks, answerWith(blocks[4].id, { alt: "grafikon", caption: "   " })), null);
-});
-
-test("applyTranslation rejects a whitespace-only heading answer", () => {
-  assert.equal(applyTranslation(blocks, answerWith(blocks[0].id, { text: "   " })), null);
-});
-
 // block.caption is optional; a model that invents one for a block that
 // never had one must not have that invention saved.
 test("applyTranslation applies a translated caption only when the original block had one", () => {
@@ -165,14 +67,8 @@ test("applyTranslation applies a translated caption only when the original block
   assert.equal(result[0].type === "image" && result[0].caption, undefined);
 });
 
-// Two mirror-image rules: a caption the original had must not be silently droppable, and alt must
-// not be required when the original alt was already empty (otherwise an image with alt: "" plus a
-// caption fails every retry once the model drops the empty alt).
-test("applyTranslation rejects a missing caption when the original block had one", () => {
-  // caption omitted — blocks[4].caption is "Speed"
-  assert.equal(applyTranslation(blocks, answerWith(blocks[4].id, { alt: "grafikon" })), null);
-});
-
+// alt must not be required when the original alt was already empty: otherwise an image with alt: ""
+// plus a caption fails every retry once the model drops the empty alt.
 test("applyTranslation accepts a missing alt when the original alt was empty", () => {
   const emptyAltBlocks = assignIds([
     { type: "image", originalUrl: "https://a.test/k.png", alt: "", caption: "A caption", path: "1/ghi", placeholder: "data:image/webp;base64,CCC" },
@@ -209,13 +105,44 @@ test("applyTranslation translates chapter titles, keeping their seconds untouche
   assert.equal(result[0].type === "chapters" && result[0].items[0].seconds, 0); // only titles go to the model
 });
 
-test("applyTranslation rejects a chapters answer whose array is shorter than the original", () => {
-  assert.equal(applyTranslation(chaptersBlocks, [{ id: chaptersBlocks[0].id, chapters: ["Bevezető"] }]), null);
-});
+const longOriginal = "A fairly long heading that is definitely not a short string to translate";
+const longBlocks = assignIds([{ type: "heading", level: 2, text: longOriginal }] satisfies BlockDraft[]);
+const singleSpanBlocks = assignIds([{ type: "paragraph", content: [{ text: "Hello there" }] }] satisfies BlockDraft[]);
 
-test("applyTranslation rejects a whitespace-only chapter title", () => {
-  assert.equal(applyTranslation(chaptersBlocks, [{ id: chaptersBlocks[0].id, chapters: ["Bevezető", "   "] }]), null);
-});
+// Each answer below is valid but for one flaw, and must be refused whole: a filled blocks_hu hides the
+// Translate button for good, so a half-right translation would be the last one the post gets.
+const refused: [string, Block[], TranslationItem[]][] = [
+  ["a missing block", blocks, [{ id: blocks[0].id, text: "Eredmények" }]],
+  ["an answer that translates nothing (ids only, every field missing)", blocks, translatable(blocks).map((item) => ({ id: item.id }))],
+  ["a list whose items array is shorter than the original (2 items, 1 translated)", blocks, answerWith(blocks[2].id, { items: [["egy"]] })],
+  ["a non-empty original coming back empty", blocks, answerWith(blocks[0].id, { text: "" })],
+  ["an answer ~10x the original length (degenerate repetition loop)", longBlocks, [{ id: longBlocks[0].id, text: "x".repeat(longOriginal.length * 10) }]],
+  // A span-count mismatch falls back to the joined text, which is validated like any other field.
+  ["empty spans for a mismatched paragraph (spans: [])", blocks, answerWith(blocks[1].id, { spans: [] })],
+  ['a whitespace-only span for a mismatched paragraph (["   "])', blocks, answerWith(blocks[1].id, { spans: ["   "] })],
+  ["a mismatched paragraph whose joined spans total 100 001 characters", blocks, answerWith(blocks[1].id, { spans: ["x".repeat(50_000), "x".repeat(50_001)] })],
+  ["a single-span paragraph answered with spans: []", singleSpanBlocks, [{ id: singleSpanBlocks[0].id, spans: [] }]],
+  ["an empty list item ([])", blocks, answerWith(blocks[2].id, { items: [[], ["kettő"]] })],
+  ["a 50 000-character list item", blocks, answerWith(blocks[2].id, { items: [["a", "x".repeat(50_000)], ["kettő"]] })],
+  // Each type's own presence check, alone: the entry is there, its field is not.
+  ["a missing heading text alone", blocks, answerWith(blocks[0].id, {})],
+  ["a missing paragraph spans field alone", blocks, answerWith(blocks[1].id, {})],
+  ["a missing image alt alone, when the original alt was non-empty", blocks, answerWith(blocks[4].id, { caption: "Sebesség" })],
+  ["a missing caption when the original block had one", blocks, answerWith(blocks[4].id, { alt: "grafikon" })],
+  // Blank text, per field.
+  ["a whitespace-only span at a matching span count", blocks, answerWith(blocks[1].id, { spans: ["Olvasd el a ", "   ", " most."] })],
+  ["a whitespace-only list-item span at a matching count", blocks, answerWith(blocks[2].id, { items: [["  "], ["kettő"]] })],
+  ["a whitespace-only caption when the original had one", blocks, answerWith(blocks[4].id, { alt: "grafikon", caption: "   " })],
+  ["a whitespace-only heading answer", blocks, answerWith(blocks[0].id, { text: "   " })],
+  ["a chapters answer whose array is shorter than the original", chaptersBlocks, [{ id: chaptersBlocks[0].id, chapters: ["Bevezető"] }]],
+  ["a whitespace-only chapter title", chaptersBlocks, [{ id: chaptersBlocks[0].id, chapters: ["Bevezető", "   "] }]],
+];
+
+for (const [name, original, answer] of refused) {
+  test(`applyTranslation rejects ${name}`, () => {
+    assert.equal(applyTranslation(original, answer), null);
+  });
+}
 
 test("chunkTranslatable splits by size and keeps order", () => {
   const items = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}`, text: "x".repeat(4000) }));
