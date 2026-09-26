@@ -122,10 +122,13 @@ async function wait(t: TestContext, ms: number) {
   await flush();
 }
 
-/** An open chat whose thread holds `sources` (one pending by default), its first load landed. */
-async function opened(sources = [source(1, "pending")], isVisible = () => true) {
+/** An open chat whose thread holds `sources` (one pending by default), its first load landed.
+ *  Registers its own teardown: a failing assertion must not leave a polling chat behind to keep
+ *  the process alive once the test ends and its mocked timers give way to real ones. */
+async function opened(t: TestContext, sources = [source(1, "pending")], isVisible = () => true) {
   const { transport, calls } = fakeTransport(sources);
   const chat = createLinkChat(transport, isVisible);
+  t.after(() => chat.close());
   chat.open();
   await flush();
   return { chat, calls };
@@ -152,7 +155,7 @@ test("toThread lists the oldest first, answers each status, and never links a no
 // POLL_MS other than 4 s.
 test("the thread polls every 4 s while the panel is open and a source is pending, and never after it closes", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const { chat, calls } = await opened();
+  const { chat, calls } = await opened(t);
   await wait(t, POLL_MS - 1);
   assert.equal(calls.mine, 1);
   await wait(t, 1);
@@ -166,13 +169,13 @@ test("the thread polls every 4 s while the panel is open and a source is pending
 // Kills the pending rule (a finished thread polls on), and the visibility rule (a hidden tab still fetches).
 test("the thread polls only while a source is pending, and a hidden tab skips the fetch until it is visible again", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const finished = await opened([source(1, "done"), source(2, "failed")]);
+  const finished = await opened(t, [source(1, "done"), source(2, "failed")]);
   await wait(t, POLL_MS * 3);
   assert.equal(finished.calls.mine, 1);
   finished.chat.close();
 
   let visible = false;
-  const { calls } = await opened(undefined, () => visible);
+  const { calls } = await opened(t, undefined, () => visible);
   await wait(t, POLL_MS);
   assert.equal(calls.mine, 1);
   visible = true;
@@ -184,7 +187,7 @@ test("the thread polls only while a source is pending, and a hidden tab skips th
 // count that opening the panel again doesn't restart.
 test("polling stops after MAX_POLLS, and opening the panel again restarts it", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const { chat, calls } = await opened();
+  const { chat, calls } = await opened(t);
   for (let tick = 0; tick <= MAX_POLLS; tick++) await wait(t, POLL_MS);
   assert.equal(calls.mine, 1 + MAX_POLLS);
   chat.close();
@@ -196,7 +199,7 @@ test("polling stops after MAX_POLLS, and opening the panel again restarts it", a
 
 // Kills the `latest` guard: a load that answers after a newer one would put a finished source back to
 // pending, and, being the last word, keep showing it as processing.
-test("an older load that answers late never overwrites a newer one", async () => {
+test("an older load that answers late never overwrites a newer one", async (t) => {
   let answerFirst: (value: Answer) => void = () => {};
   const loads: Promise<Answer>[] = [
     new Promise((resolve) => {
@@ -206,6 +209,7 @@ test("an older load that answers late never overwrites a newer one", async () =>
   ];
   let call = 0;
   const chat = createLinkChat(fakeTransport([], { mine: () => loads[call++] }).transport, () => true);
+  t.after(() => chat.close());
   chat.open();
   assert.equal(await chat.send("https://blog.test/1"), true);
   answerFirst({ status: 200, body: { sources: [source(1, "pending")] } });
@@ -221,6 +225,7 @@ test("a failed load says the list is out of reach and polls again until a good o
   const loads = [offline, answer(200, { sources: [] }), answer(401, { error: "unauthorized" }), answer(401, { error: "unauthorized" })];
   let call = 0;
   const chat = createLinkChat(fakeTransport([], { mine: () => loads[call++]() }).transport, () => true);
+  t.after(() => chat.close());
   chat.open();
   await flush();
   assert.equal(chat.getSnapshot().unreachable, true);
@@ -312,8 +317,9 @@ test("retry: offline or refused, it says so and frees the button", async () => {
 });
 
 // Kills local replies that outlive the panel: they live only while it stays open.
-test("closing the panel drops the local replies", async () => {
+test("closing the panel drops the local replies", async (t) => {
   const chat = createLinkChat(fakeTransport([]).transport, () => true);
+  t.after(() => chat.close());
   chat.open();
   await chat.send("nincs link");
   chat.close();
