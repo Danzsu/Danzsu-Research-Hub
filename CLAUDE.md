@@ -9,11 +9,12 @@ These sections used to live here:
 - What this repository is: AGENTS.md (the overview) and ARCHITECTURE.md → Bird's eye view. The provenance note is under ARCHITECTURE.md → Codemap, `docs/`.
 - Commands: AGENTS.md → Commands.
 - Layout: ARCHITECTURE.md → Codemap.
-- UI text (HU/EN): the Conventions section below, and ARCHITECTURE.md → Cross-cutting concerns.
-- Content and copyright: ARCHITECTURE.md → Invariants.
+- UI text (HU/EN): CODE_STYLE.md → HU/EN copy, and ARCHITECTURE.md → Cross-cutting concerns.
+- Security: SECURITY.md. Which code may use the admin client: SECURITY.md → Reader vs admin client.
+- CI: TESTING.md → Test layers.
+- Conventions: CODE_STYLE.md. Its Tests part moved to TESTING.md, and its Supply chain part to SECURITY.md → Supply chain.
 - Design language: DESIGN.md.
-- CI, and Conventions → Tests: TESTING.md.
-- Security, and Conventions → Supply chain: SECURITY.md. Which code may use the admin client: SECURITY.md → Reader vs admin client.
+- Content and copyright: ARCHITECTURE.md → Invariants.
 
 ## How content gets in
 
@@ -131,12 +132,6 @@ Every JSON error goes through `jsonError` (`lib/api.ts`); `/media` answers plain
 - **Save** (`?edit=1`, `PostEditor`): the fields and buttons sit in a `<form>`, so Enter in a title field saves and the browser enforces `required` / `maxLength`; Save is its only submit button. `editPayload` sends `title` / `summary` only when the draft differs, trimmed, from the model's own text (`generatedTitle` / `generatedSummary`), so an unchanged field never freezes the model's text as an override. An omitted field clears its override: the RPC replaces `overrides` wholesale. `savePostEdits` drops hidden ids that aren't among the post's blocks. Caps: `TITLE_MAX` 300, `SUMMARY_MAX` 2000 (`lib/overrides.ts`), 400 hidden ids.
 - **Re-extract**: `requestReextract` enforces a 10-minute cooldown from `extracted_at` (`REEXTRACT_COOLDOWN_MINUTES` in `lib/pipeline/util.ts`) and claims it with a compare-and-swap update on `posts.extracted_at`, guarded by the value just read (`.is(null)` for a never-extracted post). The loser of two overlapping requests gets 429 too. The claim itself counts as extraction time, so a failed re-extraction also waits 10 minutes.
 - **Translate** (`translatePost`): a no-op when `blocks_hu` already holds a translation or nothing is translatable. It sends only text to the model, in chunks of about 15,000 characters with at most 3 in flight, and rejects an answer whose shape doesn't match the blocks. The `blocks_hu` write is the same compare-and-swap on `extracted_at`: if a re-extraction landed meanwhile, 0 rows match and the route answers 409 `translation_stale`.
-
-## Conventions
-
-- **No duplication.** Search (`grep -rn`) before writing a helper or a class list, and reuse the shared homes: `lib/media.ts` (image paths), `lib/api.ts` (`jsonError`, `postRoute`), `lib/supabase/server.ts` (`getReader` / `getViewer`), `lib/pipeline/util.ts` (`hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…), `lib/pipeline/fetch.ts` (`safeFetch`, `apiFetch`, `ensureOk`, `readText`), `lib/blocks.ts` (`localizedSchema`, `parseBlocks`), `readPageMeta` in `extract/article.ts`, and in the UI the shared controls in DESIGN.md → Components. `npm run dup` is the gate: at most 1% duplication, and no new clone.
-- **Relative imports in `lib/`.** Every file under `lib/` uses relative `.ts` imports (no `@/`), so `node --test` loads it without a bundler, and the client editor can import `lib/post-edit.ts` without server-only code. The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`.
-- **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library, no inline `language === "hu" ? … : …`, no English-only labels. Existing names: `copy` (most components, `digest-dashboard` included), `labels` (`post-blocks`), `notices` (`app/(app)/library/[id]/post-notices.tsx`, also read by `post-article.tsx`). Code identifiers, comments and model prompts are English.
 
 ## Hand-authored components
 

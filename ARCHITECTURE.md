@@ -83,7 +83,7 @@ Breaking one of these is a bug even when every test passes.
 
 ## Boundaries
 
-- **`lib/` and `app/`.** `lib/` never imports from `app/`, and it loads without Next.js, except for the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`. `app/` is routes and components. It keeps its logic thin, so that the logic sits in a `lib/` function that a unit test can reach.
+- **`lib/` and `app/`.** `lib/` never imports from `app/`, and it loads without Next.js, except for the three Next-only server modules named in CODE_STYLE.md → Imports. `app/` is routes and components. It keeps its logic thin, so that the logic sits in a `lib/` function that a unit test can reach.
 - **Server and client components.** Pages, the post article and the Library and Archive lists are server components. `"use client"` marks the interactive leaves, such as the shell, the Radar dashboard, the language toggle, the submit form, the editor and the toolbar. A presentational component that both sides render stays hook-free (`post-blocks.tsx`, `page-header.tsx`), and its one stateful piece is split out (`post-image.tsx`).
 - **Reader and admin client.** `lib/supabase/server.ts` creates both, and SECURITY.md → Reader vs admin client says which code may use which.
 - **Pipeline and routes.** A route authenticates, parses, calls `lib/` and maps the result to JSON. Ingest (`processSource`, from the sources and reextract routes) runs in `after()`, once the response has been sent. The cron and translate routes do their work inside the request, because the result is their answer.
@@ -94,9 +94,8 @@ Breaking one of these is a bug even when every test passes.
 - **Language.** The reader's choice is the `lang` cookie, read on the server by `getLanguage()` and on the client by `useLanguage()`.
   - Some pages switch language in place (`switchesLanguageInPlace()` in `lib/nav.ts`): the Radar, the Library list, the archive and an archived week. Their client components read `copy[language]`, and their server components hand both languages to `<LocalizedText value={…} />`.
   - Every other page, such as a post, renders in the server's language, and the toggle refreshes it.
-  - The copy objects themselves are covered in CLAUDE.md → Conventions.
-- **Errors.**
-  - An API error is a status code plus a snake_case code, sent through `jsonError`, and the client maps the code to its copy.
+  - The copy objects themselves are covered in CODE_STYLE.md → HU/EN copy.
+- **Errors.** How code raises and reports them is in CODE_STYLE.md → Error handling. At runtime:
   - A failed ingest ends up on its `sources` row (`error`, or `status: "failed"`). The Library list shows it, and so does the post page, to the submitter.
   - A failed reader write rolls back and shows the undo toast's failure message.
 - **Testing layers** are unit tests on `lib/`, static component renders, route handlers under stubs, and the offline preview (TESTING.md).

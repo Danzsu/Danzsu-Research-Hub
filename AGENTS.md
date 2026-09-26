@@ -5,10 +5,11 @@ NEON NEWS RADAR (the repository is Danzsu Research Hub) is a private, invite-onl
 ## Read next
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): how the parts fit together, with the codemap, the invariants and the boundaries.
-- [DESIGN.md](DESIGN.md): the design system, with tokens, layout, components, and do's and don'ts. Read it before any UI work.
-- [SECURITY.md](SECURITY.md): how to report a vulnerability, the security model, and the supply-chain rules.
+- [DESIGN.md](DESIGN.md): the design system, with tokens, layout, the UI kit, and do's and don'ts. Read it before any UI work.
 - [TESTING.md](TESTING.md): the test layers, how to run tests, the helpers, the conventions and the pitfalls.
-- [CLAUDE.md](CLAUDE.md): the deep reference for the pipeline, auth, the app shell, the database, the routes, and the data contract.
+- [SECURITY.md](SECURITY.md): how to report a vulnerability, the security model, and the supply-chain rules.
+- [CODE_STYLE.md](CODE_STYLE.md): naming, imports, TypeScript, React, the copy objects, error handling, the shared helpers and commits.
+- [CLAUDE.md](CLAUDE.md): the deep reference for the pipeline, auth, the app shell, the database, the routes and the data contract.
 - [README.md](README.md): onboarding for humans, covering setup, environment, deploy, recipes and troubleshooting.
 
 ## Commands
@@ -40,12 +41,12 @@ Before every commit, all five checks must pass, in this order: `npx tsc --noEmit
 - **Migrations only add, and a person applies them by hand.** Each one is a new `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql`, run in the Supabase SQL Editor in filename order, one file at a time. While older code is deployed a migration may only add (columns, wider checks). A column is dropped only once no deployed code reads it. List each new migration in README.md → Migrations.
 - **A Radar `item.id` is append-only forever.** It keys every reader's read/saved state (ARCHITECTURE.md → Invariants).
 - **Dependencies:** pin exact versions, commit the lockfile, and never lower or bypass the 7-day release age (SECURITY.md → Supply chain).
-- **Imports in `lib/` are relative `.ts` paths, never `@/`,** so `node --test` loads them without a bundler (CLAUDE.md → Conventions).
-- **UI text lives in one `{ hu, en }` copy object per component,** with both languages and no i18n library (CLAUDE.md → Conventions).
+- **Imports in `lib/` are relative `.ts` paths, never `@/`,** so `node --test` loads them without a bundler (CODE_STYLE.md → Imports).
+- **UI text lives in one `{ hu, en }` copy object per component,** with both languages and no i18n library (CODE_STYLE.md → HU/EN copy).
 - **Never add a `NEXT_PUBLIC_` variable or raw HTML (`dangerouslySetInnerHTML`), and fetch every user-supplied or page-derived URL through `safeFetch`.** The reasons are secrets, XSS and SSRF (SECURITY.md).
 - **The preview never touches real data.** New fixtures get negative ids, and preview writes go to the in-memory senders (ARCHITECTURE.md → Invariants).
 - **Never push.** The owner pushes.
-- **Commits** use Conventional Commits with a lowercase, imperative subject, carry no attribution lines, and are made with an explicit pathspec.
+- **Commits** use Conventional Commits with a lowercase, imperative subject, carry no attribution lines, and are made with an explicit pathspec (CODE_STYLE.md → Commits).
 
 ## Testing
 
@@ -59,9 +60,8 @@ Before every commit, all five checks must pass, in this order: `npx tsc --noEmit
 
 - After every significant part, run a quick test and review your own diff very critically before you move on.
 - For UI work, do a runtime smoke check on `/dev/preview` (TESTING.md → Test layers) before you call it done.
-- No code duplication. Search before you write a helper, and reuse the shared homes. `npm run dup` must report no new clone.
+- No code duplication. Search before you write a helper, and reuse the shared homes (CODE_STYLE.md → No duplication). `npm run dup` must report no new clone.
 - If the permission system blocks a command, stop and report it. Never run a variant.
-- Code identifiers, comments and model prompts are in English. Only the UI copy is bilingual.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
