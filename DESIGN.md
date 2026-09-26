@@ -378,23 +378,23 @@ Shadows are hard offsets with zero blur:
 
 ## Components
 
-Use these instead of repeating class lists. Every excerpt below is copied from the file it names, with the common indentation removed.
+Use these instead of repeating class lists. Every excerpt below is copied verbatim from the file named on its fence, and `lib/design-excerpts.test.ts` fails when one no longer matches its source: re-copy the excerpt whenever you change the code it quotes.
 
 ### Page shell
 
 `app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar, and the dialogs and the toast are mounted once:
 
-```tsx
-<LanguageProvider initial={language}>
-  <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
-    {/* Room for the fixed bottom bar, so it never covers the end of the page. */}
-    <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
-  </DesktopNav>
-  <MobileNav email={email} onSearch={openSearch} />
-  <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
-  <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
-  <UndoToast />
-</LanguageProvider>
+```tsx app/components/app-shell.tsx
+    <LanguageProvider initial={language}>
+      <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
+        {/* Room for the fixed bottom bar, so it never covers the end of the page. */}
+        <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
+      </DesktopNav>
+      <MobileNav email={email} onSearch={openSearch} />
+      <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+      <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
+      <UndoToast />
+    </LanguageProvider>
 ```
 
 Each page then sets its own surface. The Radar uses `<div className="min-w-0 bg-cream text-ink">` (`digest-dashboard.tsx`), and the Library and Archive use `<main className="min-h-dvh bg-ink text-paper">`.
@@ -407,18 +407,18 @@ Each page then sets its own surface. The Radar uses `<div className="min-w-0 bg-
 - **Entries:** 40px mono rows. The active one gets a 2px signal left border, a `bg-signal/10` wash and signal text. The coming views are listed at 40% opacity with a "soon" label.
 - **The rail:** only the icons stay. Each one shows its name in a `NavTooltip` on hover and on keyboard focus. The rail's nav has no overflow, because a scroll container would clip the tooltips. On viewports under 32rem tall, the whole aside scrolls instead.
 
-```tsx
+```tsx app/components/desktop-nav.tsx
 className={`sticky top-0 z-30 hidden h-dvh shrink-0 flex-col border-r border-paper/15 bg-ink text-paper [@media(max-height:32rem)]:overflow-y-auto [@media(max-height:32rem)]:overflow-x-hidden md:flex ${rail ? "w-14" : "w-64"}`}
 ```
 
-```tsx
+```tsx app/components/desktop-nav.tsx
 const itemClassFull =
   "focus-ring flex min-h-10 w-full items-center gap-3 border-l-2 border-transparent px-3 font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
 ```
 
 The tooltip (`NavTooltip`):
 
-```tsx
+```tsx app/components/nav-parts.tsx
 className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap border-2 border-ink bg-paper px-2 py-1 font-mono text-xs text-ink opacity-0 shadow-[3px_3px_0_var(--ink)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
 ```
 
@@ -426,23 +426,23 @@ className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y
 
 Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots. The active slot, or the open "Több", turns signal:
 
-```tsx
+```tsx app/components/app-shell.tsx
 className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
 ```
 
-```tsx
+```tsx app/components/app-shell.tsx
 const slotClass =
   "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[state=open]:text-signal";
 ```
 
 "Több" is a cream bottom Sheet holding a display title with its `//`, the language row, the coming views and the account row:
 
-```tsx
-<SheetContent
-  side="bottom"
-  closeLabel={t.close}
-  className="max-h-[85dvh] gap-5 overflow-y-auto border-t-2 border-ink bg-cream p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] text-ink"
->
+```tsx app/components/app-shell.tsx
+        <SheetContent
+          side="bottom"
+          closeLabel={t.close}
+          className="max-h-[85dvh] gap-5 overflow-y-auto border-t-2 border-ink bg-cream p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] text-ink"
+        >
 ```
 
 The Sheet's close button, and the one in dialogs, is a 40px square with a 2px ink border, paper turning signal on hover (`components/ui/sheet.tsx`, `dialog.tsx`). Shell dialogs are cream, with a signal shadow: `className="border-2 border-ink bg-cream text-ink shadow-[8px_8px_0_var(--signal)]"` (`shell-dialogs.tsx`).
@@ -451,63 +451,63 @@ The Sheet's close button, and the one in dialogs, is a 40px square with a 2px in
 
 `app/components/page-header.tsx`. `PageHero` is the cream title band of the secondary pages. It has a signal mono eyebrow, a display title ending in a signal `//`, and an optional side panel that moves beside the text at `@4xl`:
 
-```tsx
-<section className="@container border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
-  <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
-    <div className="min-w-0">
-      <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
-      <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em] [overflow-wrap:anywhere]">
-        {title}
-        <span className="text-signal">{"//"}</span>
-      </h1>
-      <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
-    </div>
-    {aside}
-  </div>
-</section>
+```tsx app/components/page-header.tsx
+    <section className="@container border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
+      <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
+        <div className="min-w-0">
+          <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
+          <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em] [overflow-wrap:anywhere]">
+            {title}
+            <span className="text-signal">{"//"}</span>
+          </h1>
+          <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
+        </div>
+        {aside}
+      </div>
+    </section>
 ```
 
 In use (`app/(app)/library/library-view.tsx`):
 
-```tsx
+```tsx app/(app)/library/library-view.tsx
 <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm preview={preview} />} />
 ```
 
 `StatusCard` is a lone cream card on ink, with an optional wordmark (`brand`). It is used for sign-in, error and not-found, the pages outside the app shell:
 
-```tsx
-<main className="grid min-h-dvh place-items-center bg-ink px-4 text-paper">
-  <section className="w-full max-w-md border-2 border-ink bg-cream p-7 text-ink shadow-[8px_8px_0_var(--signal)] sm:p-9">
+```tsx app/components/page-header.tsx
+    <main className="grid min-h-dvh place-items-center bg-ink px-4 text-paper">
+      <section className="w-full max-w-md border-2 border-ink bg-cream p-7 text-ink shadow-[8px_8px_0_var(--signal)] sm:p-9">
 ```
 
 ### `Button`
 
 `components/ui/button.tsx` keeps the stock shadcn variants and adds three house variants and an extended size set:
 
-```tsx
-  // House variants. rounded-* is already 0 through --radius, so no rounded-none needed.
-  ink: "bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
-  signal: "border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper",
-  brutal: "border-2 border-ink bg-paper font-mono text-xs text-ink hover:bg-signal",
-},
-size: {
-  default: "h-9 px-4 py-2 has-[>svg]:px-3",
-  xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-  sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
-  lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-  icon: "size-9",
-  "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-  "icon-sm": "size-8",
-  "icon-lg": "size-10",
+```tsx components/ui/button.tsx
+        // House variants. rounded-* is already 0 through --radius, so no rounded-none needed.
+        ink: "bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
+        signal: "border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper",
+        brutal: "border-2 border-ink bg-paper font-mono text-xs text-ink hover:bg-signal",
+      },
+      size: {
+        default: "h-9 px-4 py-2 has-[>svg]:px-3",
+        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
+        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
+        icon: "size-9",
+        "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm": "size-8",
+        "icon-lg": "size-10",
 ```
 
 The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does, and a toggle shows its pressed state in ink (both from `story-card.tsx`):
 
-```tsx
+```tsx app/components/story-card.tsx
 <Button asChild variant="ink" className="min-h-10">
 ```
 
-```tsx
+```tsx app/components/story-card.tsx
 const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
 ```
 
@@ -515,7 +515,7 @@ const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
 
 The keyboard focus style, defined as an `@utility` in `app/globals.css`:
 
-```css
+```css app/globals.css
 @utility focus-ring {
   &:focus-visible {
     outline: 2px solid var(--focus, var(--signal));
@@ -526,7 +526,7 @@ The keyboard focus style, defined as an `@utility` in `app/globals.css`:
 
 Every custom interactive element carries it. On a signal-coloured control, override the colour with `--focus`, as the category chips do (`digest-dashboard.tsx`):
 
-```tsx
+```tsx app/components/digest-dashboard.tsx
 className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
 ```
 
@@ -536,7 +536,7 @@ className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center g
 
 `app/components/tag.tsx`. The border follows the text colour, so a tag works on paper, cream and ink alike:
 
-```tsx
+```tsx app/components/tag.tsx
 export function Tag({ tag }: { tag: string }) {
   return <span className="border border-current/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>;
 }
@@ -546,7 +546,7 @@ export function Tag({ tag }: { tag: string }) {
 
 `app/components/story-card.tsx` renders them, and `app/globals.css` gives them their lift. Both lifts run 160ms, and only on pointer devices:
 
-```css
+```css app/globals.css
 .must-card { box-shadow: 5px 5px 0 var(--ink); transition: transform 160ms ease, box-shadow 160ms ease; }
 .must-card h2 { overflow-wrap: anywhere; hyphens: auto; }
 .story-card { transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
@@ -558,15 +558,15 @@ export function Tag({ tag }: { tag: string }) {
 .story-read { opacity: 0.58; }
 ```
 
-```tsx
+```tsx app/components/story-card.tsx
 className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${state.read ? "story-read" : ""}`}
 ```
 
-```tsx
+```tsx app/components/story-card.tsx
 <span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
 ```
 
-```tsx
+```tsx app/components/story-card.tsx
 className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${state.read ? "story-read" : ""}`}
 ```
 
@@ -578,7 +578,7 @@ className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${stat
 
 `ImageFrame` in `app/components/post-blocks.tsx` is the one place the post image frame is defined. The caption goes inside the frame, and the "image unavailable" box is the same frame with a dashed border:
 
-```tsx
+```tsx app/components/post-blocks.tsx
 const imageFrameClass = "border-2 border-ink bg-paper p-2 shadow-[4px_4px_0_var(--ink)]";
 
 function ImageFrame({ dashed = false, caption, children }: { dashed?: boolean; caption?: string; children: ReactNode }) {
@@ -593,7 +593,7 @@ function ImageFrame({ dashed = false, caption, children }: { dashed?: boolean; c
 
 `PostImage` (`app/components/post-image.tsx`) keeps a small mirror at its own size and never stretches it. A blurred placeholder sits behind the image until it loads:
 
-```tsx
+```tsx app/components/post-image.tsx
 className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain"
 ```
 
@@ -601,19 +601,19 @@ className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain
 
 `app/components/undo-toast.tsx`. There is one fixed lane, above the bottom bar below `md` and 1.5rem from the bottom from `md` up. It is `z-[60]`, so it sits over open sheets. A failed write turns the toast signal:
 
-```tsx
+```tsx app/components/undo-toast.tsx
 className="pointer-events-none fixed inset-x-4 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:bottom-6"
 ```
 
-```tsx
-className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs ${
-  toast.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"
-}`}
+```tsx app/components/undo-toast.tsx
+          className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs ${
+            toast.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"
+          }`}
 ```
 
 Raise one from any event handler (`digest-dashboard.tsx`). The Undo button uses the `signal` variant:
 
-```tsx
+```tsx app/components/digest-dashboard.tsx
 toasts.show({ kind: "markedRead", undo: () => store.setFlag(item.id, "read", false) });
 ```
 
@@ -621,13 +621,13 @@ toasts.show({ kind: "markedRead", undo: () => store.setFlag(item.id, "read", fal
 
 `app/components/reader-panel.tsx`:
 
-```tsx
-<section className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
-  <div className="flex items-center justify-between">
-    <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
-    <span className="font-display text-3xl text-signal">{progress}%</span>
-  </div>
-  <Progress value={progress} aria-label={t.progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
+```tsx app/components/reader-panel.tsx
+      <section className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
+          <span className="font-display text-3xl text-signal">{progress}%</span>
+        </div>
+        <Progress value={progress} aria-label={t.progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
 ```
 
 - **The to-do list:** a 40px field and a `signal` add button, then rows whose label is the 40px target (the 16px checkbox alone would be too small).
@@ -637,32 +637,32 @@ toasts.show({ kind: "markedRead", undo: () => store.setFlag(item.id, "read", fal
 
 `Input` and `Textarea` (`components/ui/`) get a 2px ink border and a paper or cream fill at the call site, and usually turn signal on focus:
 
-```tsx
+```tsx app/(app)/library/submit-form.tsx
 className="min-h-10 flex-1 border-2 border-ink bg-cream focus-visible:border-signal"
 ```
 
 That field is from `app/(app)/library/submit-form.tsx`, whose form sits on a paper card:
 
-```tsx
+```tsx app/(app)/library/submit-form.tsx
 <form id="submit" onSubmit={submit} className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
 ```
 
 A multi-line field, from `app/(app)/library/[id]/post-editor.tsx`:
 
-```tsx
-<Textarea
-  id={summaryId(lang)}
-  value={summary[lang]}
-  onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })}
-  rows={5}
-  className="border-2 border-ink bg-paper"
+```tsx app/(app)/library/[id]/post-editor.tsx
+                <Textarea
+                  id={summaryId(lang)}
+                  value={summary[lang]}
+                  onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })}
+                  rows={5}
+                  className="border-2 border-ink bg-paper"
 ```
 
 ### Empty states
 
 An empty view says what to do next. On cream (`digest-dashboard.tsx`), a dashed box holds the note and, when a filter is on, a `brutal` "All stories" button:
 
-```tsx
+```tsx app/components/digest-dashboard.tsx
 function EmptyNote({ children }: { children: ReactNode }) {
   return <div className="border-2 border-dashed border-ink/35 p-10 text-center font-mono text-sm text-ink/55">{children}</div>;
 }
@@ -670,13 +670,13 @@ function EmptyNote({ children }: { children: ReactNode }) {
 
 On ink (`library-view.tsx`), a mono line is followed by a 40px signal link:
 
-```tsx
-<p className="font-mono text-sm text-paper/55">
-  <LocalizedText value={copy.empty} />{" "}
-  <a href="#submit" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
-    <LocalizedText value={copy.toForm} />
-  </a>
-</p>
+```tsx app/(app)/library/library-view.tsx
+          <p className="font-mono text-sm text-paper/55">
+            <LocalizedText value={copy.empty} />{" "}
+            <a href="#submit" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
+              <LocalizedText value={copy.toForm} />
+            </a>
+          </p>
 ```
 
 ## Do's and Don'ts

@@ -3383,6 +3383,7 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
   - A TESTING.md → Pitfalls-ba: „`t.mock.timers.enable()` once per test: a helper that enables it breaks when a test calls it twice (`ERR_INVALID_STATE`)”.
 - **DESIGN.md** (a régi Design language): a Layout „Navigation by width” pontjában a „Below `md` the app shell shows a fixed, five-slot bottom bar” után: „with the taiyaki raised in its centre slot; the content column's bottom padding (`5.25rem`) clears both”. Az Elevation & Depth árnyék-táblázata alá: „`.lift` is the shared "come forward" state (the Top 3 cards on hover; the taiyaki on hover and keyboard focus, and without the translate under `prefers-reduced-motion`).”
 - **Data contract:** a `toPost` mondatába: „…where a submitter's override wins over the model's title (`shownTitle`, shared with the link chat) and summary…”.
+- re-copy any DESIGN.md excerpt whose source you changed; `design-excerpts.test.ts` fails otherwise.
 
 - [ ] **Step 2: `README.md`**
 

@@ -4822,6 +4822,7 @@ lib/post-analysis.ts     buildInsights, buildGlossary: the on-demand model runs
 
 - **CODE_STYLE.md → No duplication** (a régi Conventions), a közös helyek listájába: `lib/marks.ts` (`markText`, `PROSE`, `hasProse`), `lib/annotations.ts`, `lib/api.ts` (`onDemandRoute`), `lib/blocks.ts` (`normalizeText`), `lib/pipeline/util.ts` (`escapeRegExp`), `lib/post-view.ts` (`revealHref`), `lib/test/fixtures.ts` (`testHighlight`). A TESTING.md → Pitfalls-ba: „linkedom keeps attribute names as React writes them, so a component test reads `getAttribute("popoverTarget")` / `getAttribute("maxLength")`, and finds those buttons by filtering on the attribute, not with a `[popovertarget]` selector.”
 - **Data contract**, új bekezdés: „**Annotations** point at a block by its content-derived id and at text by `exact` + `prefix` / `suffix` (W3C TextQuoteSelector style) into that block's `markText` (`lib/marks.ts`): list items joined with nothing between them, exactly the text of the block's `data-mark-root` element. Changing `markText` or the elements that carry `data-mark-root` orphans every saved highlight; `post-blocks.test.ts` pins the two together.”
+- re-copy any DESIGN.md excerpt whose source you changed; `design-excerpts.test.ts` fails otherwise.
 
 - [ ] **Step 2: `README.md`**
 
