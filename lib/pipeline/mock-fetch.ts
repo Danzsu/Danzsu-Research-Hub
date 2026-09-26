@@ -43,6 +43,13 @@ export function geminiPrompt(init?: RequestInit): string {
   return body.contents[0].parts.find((part) => part.text)?.text ?? "";
 }
 
+/** The top-level fields of the JSON Schema a captured Gemini request asks for: which task is calling
+ *  (`remove` is the cleanup, `sections` the noarchive notes, `keep` the shortlist), whatever the prompt says. */
+export function geminiSchemaKeys(init?: RequestInit): string[] {
+  const body = JSON.parse(String(init?.body)) as { generationConfig: { responseJsonSchema: { properties?: Record<string, unknown> } } };
+  return Object.keys(body.generationConfig.responseJsonSchema.properties ?? {});
+}
+
 /** A raw Gemini `generateContent` envelope with `text` as the model's literal (unparsed) output — for building malformed-response fixtures. */
 export const geminiText = (text: string): Response => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }));
 
@@ -53,8 +60,7 @@ export const geminiResponse = (out: unknown): Response => geminiText(JSON.string
 export const youtubeUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
 /**
- * A fetch handler for "oEmbed succeeds, the Gemini call itself fails" — the scenario shared by
- * `extractYoutube`'s own unit test and `extract()`'s integration test of the same behaviour.
+ * A fetch handler for "oEmbed succeeds, the Gemini call itself fails", shared by extractYoutube's tests.
  * `counter`, if given, is incremented once per request (oEmbed and Gemini alike).
  */
 export function oembedThenBrokenGemini(info: unknown, counter?: { calls: number }): (url: string) => Response | Promise<Response> {

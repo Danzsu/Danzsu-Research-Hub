@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FetchError } from "../fetch.ts";
 import { fakeDb } from "../fake-db.ts";
-import { endlessBody, geminiResponse, geminiText, mockDns, mockFetch, oembedThenBrokenGemini, TEST_IP, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
+import { endlessBody, geminiResponse, geminiText, mockDns, mockFetch, TEST_IP, withGeminiKey, youtubeUrl } from "../mock-fetch.ts";
 import { extract, isHtml, metadataOnly } from "./index.ts";
 
 const db = fakeDb();
@@ -80,18 +80,6 @@ test("extract() gives extractionFailed metadata with no blocks when everything f
   assert.equal(result.meta.extractionFailed, true);
   assert.deepEqual(result.blocks, []);
   assert.equal(result.title, "Thin page");
-});
-
-// A youtube Gemini failure is handled inside extractYoutube; extract() just surfaces the result.
-test("extract() surfaces extractYoutube's own metadata-only result (video block + extractionFailed) when Gemini fails, without fetching the watch page", async (t) => {
-  mockDns(t);
-  withGeminiKey(t);
-  const counter = { calls: 0 };
-  mockFetch(t, oembedThenBrokenGemini({ title: "A video", author_name: "A Channel" }, counter));
-  const result = await extract(db, "youtube", youtubeUrl, "");
-  assert.equal(counter.calls, 2); // oEmbed + Gemini only — no third call for the (JS-rendered) watch page
-  assert.deepEqual(result.blocks.map((b) => b.type), ["video"]);
-  assert.equal(result.meta.extractionFailed, true);
 });
 
 test("extract() rethrows FetchError('youtube video not found') for kind='youtube' when oEmbed 400s (live: an invalid video id)", async (t) => {

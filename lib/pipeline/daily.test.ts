@@ -4,7 +4,7 @@ import type { Candidate, Repo } from "./collect.ts";
 import { curatePrompt, runDaily, toDigestRows } from "./daily.ts";
 import { fakeDb } from "./fake-db.ts";
 import { feeds } from "./feeds.ts";
-import { geminiPrompt, geminiResponse, mockFetch, withGeminiKey } from "./mock-fetch.ts";
+import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockFetch, withGeminiKey } from "./mock-fetch.ts";
 import { isoWeek } from "./util.ts";
 
 const week = isoWeek(new Date("2026-09-23T05:00:00Z"));
@@ -114,4 +114,29 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
   // "Known" means stored in the last 14 days, by creation time.
   assert.deepEqual(db.gteCalls, [{ table: "digest_items", column: "created_at", value: "2026-09-09T05:00:00.000Z" }]);
   assert.deepEqual(db.rpcCalls, [{ name: "refresh_must_read", args: { p_issue: "2026-W39" } }]);
+});
+
+// W1: past 40 candidates the cheap shortlist runs before curation; when it fails, the first 40 go on.
+test("runDaily shortlists more than 40 candidates, and keeps the first 40 when the shortlist call fails", async (t) => {
+  withGeminiKey(t);
+  t.mock.method(console, "warn", () => {}); // the feeds' 404s and the failed shortlist
+  const hits = Array.from({ length: 45 }, (_, i) => ({ title: `Story ${i}`, url: `https://news.test/${i}`, created_at: "2026-09-22T08:00:00Z", points: 100, objectID: String(i) }));
+  let prompt = "";
+  mockFetch(t, async (url, init) => {
+    if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits });
+    if (url.startsWith("https://generativelanguage.googleapis.com/")) {
+      if (geminiSchemaKeys(init).includes("keep")) return geminiText("not json");
+      prompt = geminiPrompt(init);
+      return geminiResponse({ items: [], github: [] });
+    }
+    return new Response("", { status: 404 });
+  });
+  const db = fakeDb();
+
+  const result = await runDaily(db, new Date("2026-09-23T05:00:00Z"));
+
+  assert.deepEqual([result.candidates, result.shortlisted], [45, 40]);
+  assert.deepEqual(db.tasks, ["daily_shortlist", "daily_curate"]);
+  assert.match(prompt, /\[39\] \(companies\) Story 39 —/);
+  assert.doesNotMatch(prompt, /Story 4[0-4] —/);
 });

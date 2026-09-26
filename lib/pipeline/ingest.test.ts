@@ -13,7 +13,7 @@ import {
   SUMMARY_RESERVE_MS,
 } from "./ingest.ts";
 import { fakeDb, pgError } from "./fake-db.ts";
-import { geminiPrompt, geminiResponse, geminiText, mockDns, mockFetch, TEST_HOST, withGeminiKey, youtubeUrl } from "./mock-fetch.ts";
+import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockDns, mockFetch, TEST_HOST, withGeminiKey, youtubeUrl } from "./mock-fetch.ts";
 
 test("failureUpdate keeps a published post when re-extraction fails", () => {
   assert.deepEqual(failureUpdate(true, "fetch 404"), { error: "fetch 404" });
@@ -59,12 +59,14 @@ function assertExtractionFailedNotMirrored(post: Record<string, unknown>) {
   assert.equal((post.meta as { mirrored: boolean }).mirrored, false);
 }
 
-/** Serves `html` at TEST_HOST and routes every Gemini call to `cleanupOut` or `summaryOut` by which prompt it is. */
+/** Whether a captured Gemini request is the ingest_cleanup call: its schema asks for `remove`. */
+const isCleanup = (init?: RequestInit) => geminiSchemaKeys(init).includes("remove");
+
+/** Serves `html` at TEST_HOST and routes every Gemini call to `cleanupOut` or `summaryOut` by the schema it asks for. */
 function articleGeminiHandler(html: string, cleanupOut: unknown, summaryOut: unknown = okSummary) {
   return async (url: string, init?: RequestInit) => {
     if (url.startsWith(TEST_HOST)) return new Response(html, { headers: { "content-type": "text/html" } });
-    const prompt = geminiPrompt(init);
-    return geminiResponse(prompt.includes("NOT part of the article") ? cleanupOut : summaryOut);
+    return geminiResponse(isCleanup(init) ? cleanupOut : summaryOut);
   };
 }
 
@@ -101,8 +103,7 @@ function noarchiveGeminiHandler(sectionsOut: unknown, onImageFetch: () => void, 
       return new Response(await testPng(), { headers: { "content-type": "image/png" } });
     }
     if (url.startsWith(TEST_HOST)) return new Response(NOARCHIVE_HTML, { headers: { "content-type": "text/html" } });
-    const prompt = geminiPrompt(init);
-    return geminiResponse(prompt.includes("study notes") ? sectionsOut : summaryOut);
+    return geminiResponse(geminiSchemaKeys(init).includes("sections") ? sectionsOut : summaryOut);
   };
 }
 
@@ -320,8 +321,7 @@ test("processSource(): the failure-path cleanup re-reads the current post right 
   const db = fakeDb(undefined, { source, post: { id: 1, blocks: oldBlocks }, media: ["aaaaaaaaaaaaaaaa-640.avif", "bbbbbbbbbbbbbbbb-640.avif"] });
   mockFetch(t, async (url, init) => {
     if (url.startsWith(TEST_HOST)) return new Response(ARTICLE_HTML, { headers: { "content-type": "text/html" } });
-    const prompt = geminiPrompt(init);
-    if (prompt.includes("NOT part of the article")) return geminiResponse({ remove: [] }); // cleanup: keep going
+    if (isCleanup(init)) return geminiResponse({ remove: [] }); // cleanup: keep going
     // Simulate a concurrent run publishing new media via its own real (write-through) upsert,
     // right as our own summarize() call is about to fail this attempt.
     await db.from("posts").upsert({ source_id: source.id, blocks: newBlocks }, { onConflict: "source_id" });
@@ -481,9 +481,8 @@ test("processSource(): clips before cleaning, so the ingest_cleanup listing sent
   let cleanupListingLines = 0;
   mockFetch(t, async (url, init) => {
     if (url.startsWith(TEST_HOST)) return new Response(hugeHtml, { headers: { "content-type": "text/html" } });
-    const prompt = geminiPrompt(init);
-    if (prompt.includes("NOT part of the article")) {
-      cleanupListingLines = prompt.split("\n").filter((line) => /^[a-z0-9-]+ \[/.test(line)).length;
+    if (isCleanup(init)) {
+      cleanupListingLines = geminiPrompt(init).split("\n").filter((line) => /^[a-z0-9-]+ \[/.test(line)).length;
       return geminiResponse({ remove: [] });
     }
     return geminiResponse(okSummary);
@@ -618,9 +617,12 @@ test("retryPendingSources(): with plenty of time left, every pending source is p
   assert.equal(db.postUpserts.length, 3);
 });
 
-test("retryPendingSources() stops starting new sources once the deadline is too close, without touching any of them (j)", async () => {
-  const db = fakeDb(undefined, { pending: [{ id: 1 }, { id: 2 }, { id: 3 }] });
-  const processed = await retryPendingSources(db, Date.now() - 1);
+// I7: a source is started only while START_GATE_RESERVE_MS (120 s) is still left, not merely before the deadline.
+test("retryPendingSources() starts no source with less than START_GATE_RESERVE_MS left, without touching any of them (j)", async (t) => {
+  mockFetch(t, async () => new Response("", { status: 404 })); // reached only if a source were started
+  const sources = [newSource(1), newSource(2), newSource(3)];
+  const db = fakeDb(undefined, { sources, pending: sources });
+  const processed = await retryPendingSources(db, Date.now() + START_GATE_RESERVE_MS - 1_000);
   assert.equal(processed, 0);
   assert.deepEqual(db.sourceUpdates, []); // no source was ever started
 });
