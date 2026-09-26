@@ -140,3 +140,22 @@ test("runDaily shortlists more than 40 candidates, and keeps the first 40 when t
   assert.match(prompt, /\[39\] \(companies\) Story 39 —/);
   assert.doesNotMatch(prompt, /Story 4[0-4] —/);
 });
+
+// W1 boundary: exactly 40 candidates must still skip the shortlist call (<=, not <).
+test("runDaily skips the shortlist call at exactly 40 candidates, curating all of them", async (t) => {
+  withGeminiKey(t);
+  t.mock.method(console, "warn", () => {}); // the feeds' 404s
+  const hits = Array.from({ length: 40 }, (_, i) => ({ title: `Story ${i}`, url: `https://news.test/${i}`, created_at: "2026-09-22T08:00:00Z", points: 100, objectID: String(i) }));
+  mockFetch(t, async (url) => {
+    if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits });
+    if (url.startsWith("https://generativelanguage.googleapis.com/")) return geminiResponse({ items: [], github: [] });
+    return new Response("", { status: 404 });
+  });
+  const db = fakeDb();
+
+  const result = await runDaily(db, new Date("2026-09-23T05:00:00Z"));
+
+  assert.equal(result.candidates, 40);
+  assert.equal(result.shortlisted, 40);
+  assert.deepEqual(db.tasks, ["daily_curate"]); // exactly 40: the shortlist call itself never runs
+});
