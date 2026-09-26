@@ -235,6 +235,10 @@ export function parseSubmittedUrl(raw: string): URL | null {
   ) {
     return null;
   }
+  // The returned URL must carry this same normalized host — otherwise "example.com." bypasses the
+  // sources.url unique dedup against "example.com", and detectSource (youtubeId, githubRepo, arxivId,
+  // all exact hostname matches) misclassifies a trailing-dot link as a plain article.
+  url.hostname = host;
   url.hash = "";
   return url;
 }

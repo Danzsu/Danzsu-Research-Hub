@@ -145,6 +145,18 @@ test("isPrivateAddress and parseSubmittedUrl hold at every range boundary", () =
   }
 });
 
+// A real bug: parseSubmittedUrl stripped the trailing dot only for its own checks, then returned the
+// URL with the dot still in place — bypassing the sources.url unique dedup against the dotless form,
+// and making detectSource's exact hostname matches (youtubeId, githubRepo) miss a trailing-dot link.
+test("parseSubmittedUrl normalizes a trailing-dot hostname on the URL it returns, not just for its own checks", () => {
+  assert.equal(parseSubmittedUrl("https://example.com./x")?.toString(), parseSubmittedUrl("https://example.com/x")?.toString());
+  assert.equal(detectSource(parseSubmittedUrl("https://youtube.com./watch?v=dQw4w9WgXcQ")!), "youtube");
+  assert.equal(detectSource(parseSubmittedUrl("https://github.com./ggml-org/llama.cpp")!), "github");
+  for (const bad of ["http://localhost./", "http://printer.local./", "http://10.0.0.1./x"]) {
+    assert.equal(parseSubmittedUrl(bad), null, bad);
+  }
+});
+
 test("detectSource and its URL helpers", () => {
   const kind = (u: string) => detectSource(new URL(u));
   assert.equal(kind("https://youtu.be/dQw4w9WgXcQ?si=abc"), "youtube");
