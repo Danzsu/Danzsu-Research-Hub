@@ -99,7 +99,7 @@ AGENTS.md → Commands lists the URLs. The preview renders the real view compone
 
 ## Database
 
-The schema lives in `supabase/migrations/`. [README.md → Migrations](README.md#migrations) lists the files and what each one adds. AGENTS.md → Hard rules says how to add and apply one. `20260925000000_drop_post_body.sql` runs only after the block-based code is live. It drops `posts.body`, which the current code no longer reads or writes.
+The schema lives in `supabase/migrations/`. [README.md → Migrations](README.md#migrations) lists the files and what each one adds. README.md → Recipes says how to add and apply one. `20260925000000_drop_post_body.sql` runs only after the block-based code is live. It drops `posts.body`, which the current code no longer reads or writes.
 
 RLS is on for every table:
 

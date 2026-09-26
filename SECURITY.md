@@ -49,7 +49,7 @@ Every environment variable is server-only, and none is `NEXT_PUBLIC_` (`.env.exa
 - **`createAdminClient()`** bypasses RLS. It is for the pipeline: the cron route, and the `processSource` runs that the sources and reextract routes schedule in `after()`. The translate, reextract and `/media` routes may also use it, each after its own check. Never pass its results to a reader unfiltered.
 - **`scripts/ingest-url.mts`** is a dev tool, and it builds its own secret-key client.
 
-RLS can't restrict individual columns, so a reader's one write to `posts` goes through the `update_post_overrides` RPC (CLAUDE.md → Database).
+The reader's one write to `posts` is in CLAUDE.md → Database.
 
 ### SSRF: user-supplied and page-derived URLs
 

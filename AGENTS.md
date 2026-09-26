@@ -29,19 +29,19 @@ npm run dup        # jscpd app lib proxy.ts scripts --min-lines 6 --min-tokens 6
 
 Before every commit, all five checks must pass, in this order: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`.
 
-- **Offline preview** (run `npm run dev` first): `/dev/preview?view=radar|radar-empty|library|library-empty|archive|archive-empty`, plus `&fail=1` to make every write fail as if offline. `/dev/preview/post` shows every block type and banner. It works in development only, needs no keys and no sign-in.
+- **Offline preview** (run `npm run dev` first): `/dev/preview?view=radar|radar-empty|library|library-empty|archive|archive-empty`, plus `&fail=1` to make every write fail as if offline. `/dev/preview/post` shows every block type and banner (CLAUDE.md → Offline preview).
 - **One cron run:** `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/daily`.
-- **One link without the UI:** `npm run ingest -- <url>` submits and processes one URL against the Supabase project in `.env.local`, as the first user `auth.admin.listUsers()` returns. That project is production, since it is the only one, so this writes real rows, and so does the cron curl. Running the same URL twice fails, because `sources.url` is unique.
-- **Node:** use Node 24 LTS. `engines` allows `>=22.13.0`, but the render harness is verified on 24.16 only. `corepack enable` fails with EPERM under nvm-for-windows, which is why pnpm runs as `corepack pnpm@…`. Newer Node releases don't bundle corepack, so install the version Node 24.16 ships with: `npm i -g corepack@0.35.0`.
+- **One link without the UI:** `npm run ingest -- <url>`. It and the cron curl write real rows to production (README.md → Sign in and fill it).
+- **Node 24 LTS, with pnpm run only as `corepack pnpm@11.25.0`** (README.md → Prerequisites, Install).
 
 ## Hard rules
 
 - **Never run `npx shadcn add`.** It rewrites `app/globals.css` and `components/ui/button.tsx`, which the theme and the house variants depend on (DESIGN.md → Do's and Don'ts).
-- **Never run `supabase db push`.** It would apply `20260925000000_drop_post_body.sql` early, while production still reads `posts.body`. This holds until the TODO.md item "Csak az M1 deployja után" is done. The CLI isn't set up here anyway (there is no `supabase/config.toml`).
-- **Migrations only add, and a person applies them by hand.** Each one is a new `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql`, run in the Supabase SQL Editor in filename order, one file at a time. While older code is deployed a migration may only add (columns, wider checks). A column is dropped only once no deployed code reads it. List each new migration in README.md → Migrations.
+- **Never run `supabase db push`:** it would apply the drop migration early (README.md → Migrations).
+- **Migrations only add, and a person runs them by hand in the SQL Editor** (README.md → Recipes, Add a migration).
 - **A Radar `item.id` is append-only forever.** It keys every reader's read/saved state (ARCHITECTURE.md → Invariants).
 - **Dependencies:** pin exact versions, commit the lockfile, and never lower or bypass the 7-day release age (SECURITY.md → Supply chain).
-- **Imports in `lib/` are relative `.ts` paths, never `@/`,** so `node --test` loads them without a bundler (CODE_STYLE.md → Imports).
+- **Imports in `lib/` are relative `.ts` paths, never `@/`,** so `node --test` loads them without a bundler (three exceptions: CODE_STYLE.md → Imports).
 - **UI text lives in one `{ hu, en }` copy object per component,** with both languages and no i18n library (CODE_STYLE.md → HU/EN copy).
 - **Never add a `NEXT_PUBLIC_` variable or raw HTML (`dangerouslySetInnerHTML`), and fetch every user-supplied or page-derived URL through `safeFetch`.** The reasons are secrets, XSS and SSRF (SECURITY.md).
 - **The preview never touches real data.** New fixtures get negative ids, and preview writes go to the in-memory senders (ARCHITECTURE.md → Invariants).

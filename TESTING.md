@@ -1,6 +1,6 @@
 # Testing
 
-There is no test framework. Tests use `node:test` and `node:assert/strict`, and TypeScript runs through Node's type stripping. No test touches the network or Supabase.
+Every test runs offline under plain `node --test` (README.md → Testing). This guide is the detail.
 
 ## Test layers
 
@@ -30,8 +30,8 @@ There is no test framework. Tests use `node:test` and `node:assert/strict`, and 
 ## How to run
 
 ```bash
-npm test   # node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts"
-node --experimental-strip-types --no-warnings --test lib/blocks.test.ts                          # one file
+npm test   # every test
+node --experimental-strip-types --no-warnings --test lib/blocks.test.ts   # one file
 node --experimental-strip-types --no-warnings --test "app/(app)/library/[[]id]/post-editor.test.ts"
 node --experimental-strip-types --no-warnings --test "app/media/[[]...path]/route.test.ts"
 ```
