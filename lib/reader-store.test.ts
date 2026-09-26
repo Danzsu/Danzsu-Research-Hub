@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { mockFetch } from "./pipeline/mock-fetch.ts";
 import {
   createReaderStore,
+  loadState,
   memorySend,
+  postState,
   postStateKey,
   readPostIds,
   type ReaderData,
@@ -264,4 +267,24 @@ test("a to-do add that resolves before the hydrate is not duplicated when hydrat
   await store.settled();
   store.hydrate({ states: {}, todos: [{ id: 7, itemId: null, text: "read the paper", done: false }] });
   assert.deepEqual(store.getSnapshot().todos.map((item) => item.id), [7]);
+});
+
+// S1: the store rolls a write back only when `send` rejects, so a 4xx/5xx answer has to throw.
+// S2: a delete made final by `pagehide` has to outlive the tab, which only `keepalive` allows.
+test("postState sends keepalive JSON and throws on a non-2xx answer; loadState reads uncached and throws likewise", async (t) => {
+  const seen: { url: string; init?: RequestInit }[] = [];
+  let status = 200;
+  mockFetch(t, async (url, init) => {
+    seen.push({ url, init });
+    return Response.json({ id: 7 }, { status });
+  });
+  assert.deepEqual(await postState({ action: "add_todo", text: "x" }), { id: 7 });
+  assert.equal(seen[0].url, "/api/state");
+  assert.equal(seen[0].init?.method, "POST");
+  assert.equal(seen[0].init?.keepalive, true);
+  assert.deepEqual(JSON.parse(String(seen[0].init?.body)), { action: "add_todo", text: "x" });
+  status = 500;
+  await assert.rejects(() => postState({ action: "delete_todo", id: 1 }), /state write 500/);
+  await assert.rejects(() => loadState(), /state read 500/);
+  assert.equal(seen.at(-1)?.init?.cache, "no-store");
 });

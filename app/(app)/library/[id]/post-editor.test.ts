@@ -68,5 +68,5 @@ test("PostEditor puts its fields in a form whose one submit button is Save, so E
   assert.deepEqual(buttons.filter((button) => button.getAttribute("type") === "submit").map((button) => button.textContent), ["Save"]);
   // A button with no type would submit the form too: re-extract and the resets must say "button".
   assert.deepEqual(buttons.filter((button) => button.getAttribute("type") !== "submit").map((button) => button.getAttribute("type")), Array(5).fill("button"));
-  assert.equal(form.querySelector("button[aria-pressed]"), null); // the hide toggles sit outside the form
+  assert.equal(form.querySelectorAll("button[aria-pressed]").length, 0); // the hide toggles sit outside the form
 });

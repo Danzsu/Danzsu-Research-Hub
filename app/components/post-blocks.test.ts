@@ -48,13 +48,13 @@ test("PostBlocks emits no link that isn't http(s) or an in-page query or fragmen
     for (const link of doc.querySelectorAll("a")) assert.match(link.getAttribute("href") ?? "", /^(https?:|\?|#)/);
   }
   // The unsafe repo URL and image URL still show, as plain text.
-  assert.equal(wrapper(renderBlocks(), repo)!.querySelector("a"), null);
+  assert.equal(wrapper(renderBlocks(), repo)!.querySelectorAll("a").length, 0);
   assert.match(wrapper(renderBlocks(), missingImage)!.textContent!, /javascript:alert\(3\)/);
 });
 
 test("PostBlocks embeds a video only when its id validates", () => {
   const doc = renderBlocks();
-  assert.equal(wrapper(doc, invalidVideo)!.querySelector("iframe"), null);
+  assert.equal(wrapper(doc, invalidVideo)!.querySelectorAll("iframe").length, 0);
   const sources = [...doc.querySelectorAll("iframe")].map((frame) => frame.getAttribute("src"));
   assert.deepEqual(sources, ["https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ", "https://player.vimeo.com/video/76979871?dnt=1"]);
 });
@@ -91,51 +91,28 @@ test("PostBlocks in controls mode gives every block a 40px-tall row and dims onl
   assert.equal(hiddenRow.classList.contains("opacity-40"), false, "the control itself must keep full contrast");
   assert.equal(hiddenRow.children[0].tagName, "BUTTON");
   assert.ok(hiddenRow.children[1].classList.contains("opacity-40"));
-  assert.equal(wrapper(doc, vimeo)!.querySelector(".opacity-40"), null);
+  assert.equal(wrapper(doc, vimeo)!.querySelectorAll(".opacity-40").length, 0);
 });
 
-test("both the missing-image box and a loaded image share the same frame", () => {
-  const doc = renderBlocks();
-  const missingFrame = wrapper(doc, missingImage)!.querySelector("figure")!;
-  const loadedFrame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
-  for (const frame of [missingFrame, loadedFrame]) {
-    assert.ok(frame.classList.contains("bg-paper"), frame.className);
-    assert.ok(frame.classList.contains("shadow-[4px_4px_0_var(--ink)]"), frame.className);
-  }
-  assert.ok(missingFrame.classList.contains("border-dashed"), "the missing box's border is dashed");
-  assert.equal(loadedFrame.classList.contains("border-dashed"), false, "a loaded image keeps a solid border");
-});
-
-test("a loaded image's caption sits inside its frame, in mono", () => {
-  const doc = renderBlocks();
-  const frame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
-  const caption = frame.querySelector("figcaption")!;
-  assert.equal(caption.textContent, "Figure 1");
-  assert.ok(caption.classList.contains("font-mono"));
-});
-
-test("the image itself is contained, capped at 80dvh tall, and stacked above the placeholder", () => {
-  const doc = renderBlocks();
-  const img = wrapper(doc, mirroredImage)!.querySelector("img")!;
-  assert.ok(img.classList.contains("relative"), img.className);
-  assert.ok(img.classList.contains("object-contain"), img.className);
-  assert.ok(img.classList.contains("max-h-[80dvh]"), img.className);
-});
-
-test("a loaded image's placeholder sits behind it, ready to be hidden once the browser fires onload", () => {
-  const doc = renderBlocks();
-  const frame = wrapper(doc, mirroredImage)!.querySelector("figure")!;
-  const placeholderLayer = frame.querySelector('span[aria-hidden="true"]')!;
-  assert.match(placeholderLayer.getAttribute("style") ?? "", /background-image/);
-  // The server-rendered markup is always the pre-load state (render.ts runs no effects or refs); the
-  // browser removes this layer once the image has loaded (onLoad, or `complete` at hydration) —
-  // Task 11's Playwright checklist item 12 checks that in a real browser.
-});
-
-test("images, code and video break out of the prose width; paragraphs keep it", () => {
+// The one layout rule kept here (spec 1.4.11): images, code and video break out of the 75ch prose
+// width, and an image's caption sits inside its own frame. The rest of the look is checked in a browser.
+test("images, code and video break out of the prose width, and a caption sits inside the image's frame", () => {
   const doc = renderBlocks();
   for (const wide of [mirroredImage, codeBlock, youtube]) {
     assert.equal(wrapper(doc, wide)!.classList.contains("max-w-[75ch]"), false, wide.id);
   }
   assert.ok(wrapper(doc, paragraph)!.classList.contains("max-w-[75ch]"));
+  assert.equal(wrapper(doc, mirroredImage)!.querySelector("figure figcaption")!.textContent, "Figure 1");
+});
+
+// R1: the placeholder is written into a CSS url("…"); anything but a base64 data:image URL could
+// break out of it (a tracking url(), an injected declaration).
+test("an image's blur placeholder is rendered only when it is a base64 data:image URL", () => {
+  const placeholderStyle = (block: Block) =>
+    wrapper(render(createElement(PostBlocks, { blocks: [block], language: "en", baseUrl })), block)!
+      .querySelector('span[aria-hidden="true"]')
+      ?.getAttribute("style") ?? null;
+  assert.match(placeholderStyle(mirroredImage) ?? "", /background-image/);
+  const injected = { ...mirroredImage, placeholder: 'data:image/png;base64,AAAA"), url("https://evil.test/track' } as Block;
+  assert.equal(placeholderStyle(injected), null);
 });
