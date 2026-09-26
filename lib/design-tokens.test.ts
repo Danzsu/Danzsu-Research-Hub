@@ -28,7 +28,7 @@ function designColors(markdown: string): Map<string, string> {
   return colors;
 }
 
-/** Every `--name: #hex;` declaration of the first `:root { … }` block. Non-colour custom properties (`--radius`) are skipped. */
+/** Every `--name: #hex;` declaration of the `:root { … }` block (the test below keeps it the only one). Non-colour custom properties (`--radius`) are skipped. */
 function rootColors(css: string): Map<string, string> {
   const block = /^:root \{\n([\s\S]*?)\n\}/m.exec(css)?.[1];
   assert.ok(block, "app/globals.css has no :root block");
@@ -55,4 +55,12 @@ test("DESIGN.md's colour tokens equal app/globals.css's :root, and neither side 
     },
     { onlyInDesign: [], onlyInCss: [], different: [] },
   );
+});
+
+// `npx shadcn add` appends a second :root and a .dark block after @theme inline, where they win the cascade.
+test("app/globals.css keeps one :root and a single fixed theme: no .dark block, no prefers-color-scheme", () => {
+  const css = readRepoFile("app/globals.css");
+  assert.equal(css.match(/:root\b/g)?.length ?? 0, 1, "app/globals.css must have exactly one :root");
+  assert.doesNotMatch(css, /\.dark\b/, "app/globals.css has a .dark rule (DESIGN.md: one fixed theme)");
+  assert.doesNotMatch(css, /prefers-color-scheme/, "app/globals.css has a prefers-color-scheme query (DESIGN.md: one fixed theme)");
 });
