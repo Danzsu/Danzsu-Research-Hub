@@ -1,6 +1,7 @@
 import type { DigestCategory } from "../../data/digest-types.ts";
 
 // Checked live on 2026-09-23. A dead feed only logs a warning; the run continues.
+// truthful_sites.md documents these lists, with the candidates; lib/truthful-sites.test.ts keeps them equal.
 // `limit` caps high-volume feeds (arXiv publishes hundreds a day).
 export const feeds: Array<{ name: string; url: string; hint: DigestCategory; limit?: number }> = [
   { name: "arXiv cs.CL", url: "https://rss.arxiv.org/rss/cs.CL", hint: "research", limit: 40 },

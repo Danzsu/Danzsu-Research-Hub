@@ -11,6 +11,7 @@ NEON NEWS RADAR (the repository is Danzsu Research Hub) is a private, invite-onl
 - [CODE_STYLE.md](CODE_STYLE.md): naming, imports, TypeScript, React, the copy objects, error handling, the shared helpers and commits.
 - [CLAUDE.md](CLAUDE.md): the deep reference for the pipeline, auth, the app shell, the database, the routes and the data contract.
 - [README.md](README.md): onboarding for humans, covering setup, environment, deploy, recipes and troubleshooting.
+- [truthful_sites.md](truthful_sites.md): the trusted sources the Radar reads, the candidates, and the criteria for adding one.
 
 ## Commands
 

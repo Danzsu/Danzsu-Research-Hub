@@ -215,7 +215,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 
 ## Recipes
 
-**Add a news feed.** Add an entry to `feeds` in [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts): `{ name, url, hint, limit? }`. `hint` is the category the model starts from; `limit` caps a high-volume feed (25 by default). The parser reads RSS 2.0 and Atom. A dead feed only logs a warning. Hacker News queries and GitHub topics are the two lists below it. If the feed has an unusual shape, add a case to [`collect.test.ts`](lib/pipeline/collect.test.ts).
+**Add a news feed.** Check it against the criteria in [truthful_sites.md](truthful_sites.md), which lists every source the pipeline reads and the candidates. Then add an entry to `feeds` in [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts): `{ name, url, hint, limit? }`, and move its row in `truthful_sites.md` to the "Bent van" table (`lib/truthful-sites.test.ts` fails until the two match). `hint` is the category the model starts from; `limit` caps a high-volume feed (25 by default). The parser reads RSS 2.0 and Atom. A dead feed only logs a warning. Hacker News queries and GitHub topics are the two lists below it. If the feed has an unusual shape, add a case to [`collect.test.ts`](lib/pipeline/collect.test.ts).
 
 **Add a source extractor.**
 

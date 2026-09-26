@@ -139,14 +139,7 @@
   - **Nyitott kérdés:** a chat-indexhez a szövegdarabokat is a DB-ben tartjuk-e, vagy a GitHubról olvassuk. Ezt a chat tervezésekor döntjük el.
 - [ ] **Kabala (mascot) az oldalra**, hogy barátságosabb legyen.
 - [ ] **Kutatási források bővítése és priorizálás:**
-  - Új források az arXiv mellé:
-    - Hugging Face Daily Papers (a közösség által felszavazott napi cikkek)
-    - Semantic Scholar és OpenAlex (a Google Scholar helyett: annak nincs API-ja, és a letöltését a feltételei tiltják)
-    - **research.google** (a felhasználó kérésére, közvetlenül az M1 15. feladata után): a Google Research blogja és a publikációs oldala (`research.google/pubs`). A pontos RSS- vagy API-végpontot a megvalósítás elején ellenőrizni kell.
-    - IBM Research és Microsoft Research blog, valamint az IBM Technology cikkei és videói
-    - Google DeepMind: már bent van, csak a súlyozását kell a kiemelt források közé emelni
-    - Anthropic: news és engineering posztok. Hivatalos RSS-t nem ismerek, ezért ezt a megvalósítás elején ellenőrizni kell. Ha nincs, oldal-letöltéssel kerülhet be.
-    - **ByteByteGo** (a felhasználó ötlete, 2026-09-26): rendszertervezés és AI-infrastruktúra. RSS: `https://blog.bytebytego.com/feed`, 2026-09-26-án élőben ellenőrizve: 200, 20 tétel, a felükben a teljes szöveg (`content:encoded`). A poszt-oldalak szerverről letölthetők, `noarchive` nincs rajtuk. A „No thanks” feliratkozó ablak csak a böngészőben jelenik meg, a pipeline nem látja, így a Könyvtárba beküldött link is működik. Két dologra kell figyelni: a fizetős posztokból csak egy részlet érhető el (Substack), és vannak tisztán promóciós posztok (pl. „LAST CALL FOR ENROLLMENT”), ezeket a pontozásnak kell kiszűrnie. Javaslat: `feeds.ts`-be `limit: 5`-tel.
+  - Új források: a jelöltek, az állapotuk és a felvétel lépései a [truthful_sites.md](truthful_sites.md) → Jelöltek részben. Ide tartozik a research.google (a felhasználó kérésére, közvetlenül az M1 15. feladata után), a ByteByteGo és a DeepMind súlyozása.
   - Szűrés, hogy ne legyen túl sok (döntés, 2026-09-24):
     - naponta legfeljebb kb. 8 kiemelt tétel, csak 60 pont felett;
     - a 40–59 pontosak egy összecsukott „Többi” szakaszba kerülnek, és a keresésben is megtalálhatók;
