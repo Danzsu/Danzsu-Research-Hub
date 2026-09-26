@@ -237,19 +237,33 @@ test("a failed load says the list is out of reach and polls again until a good o
   assert.equal(chat.getSnapshot().unreachable, false);
 });
 
-// Kills the signed_out dedupe guard's removal (mutation row 10): two reloads that each land a 401
-// within the same open panel must say it once, not twice. Proven through two retries — `retry()`'s
-// reload doesn't reset notices the way `open()`/`close()` do, so this scenario can actually happen.
-test("a 401 says signed_out once across two reloads in the same open panel", async (t) => {
-  const mineLoads = [answer(200, { sources: [source(1, "failed")] }), answer(401, { error: "unauthorized" }), answer(401, { error: "unauthorized" })];
+// Kills the signed_out dedupe's removal (mutation row 10): a send's own 401 refusal (through
+// `noticeFor`), followed by the next poll's 401 (through `load`'s own branch), must say it once. The
+// dedupe lives in `say` itself (not only in `load`) precisely because a real expired session answers
+// 401 to *every* call, submit included — a retry that still gets a 202 before its GET turns 401
+// (the old re-pin) can't actually happen, so it isn't a fair proof of the guard.
+test("a send's 401 refusal and the next poll's 401 say signed_out once", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const mineLoads = [answer(200, { sources: [source(1, "pending")] }), answer(401, { error: "unauthorized" })];
   let call = 0;
   const chat = createLinkChat(
-    fakeTransport([], { mine: () => mineLoads[Math.min(call++, mineLoads.length - 1)](), retry: () => answer(202, { ok: true })() }).transport,
+    fakeTransport([], { mine: () => mineLoads[Math.min(call++, mineLoads.length - 1)](), submit: () => answer(401, { error: "unauthorized" })() })
+      .transport,
     () => true,
   );
   t.after(() => chat.close());
   chat.open();
   await flush();
+  assert.equal(await chat.send("https://blog.test/2"), false);
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "signed_out" }]);
+  await wait(t, POLL_MS);
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "signed_out" }]);
+});
+
+// The same guard, proven through two retries that each answer 401 directly (a scenario that also
+// really happens: two "Újra" clicks after the session already expired).
+test("two retries that each answer 401 say signed_out once", async () => {
+  const chat = createLinkChat(fakeTransport([], { retry: () => answer(401, { error: "unauthorized" })() }).transport, () => true);
   await chat.retry(1);
   assert.deepEqual(chat.getSnapshot().notices, [{ kind: "signed_out" }]);
   await chat.retry(1);
@@ -295,6 +309,33 @@ test("closing the panel while a send is in flight drops that send's reply on reo
   assert.deepEqual(chat.getSnapshot().notices, []);
 });
 
+// Kills `open()`'s `unreachable: false` reset (Important 2): a send's reload that fails after
+// `close()` leaves `unreachable: true`; reopening must clear it synchronously, before its own reload
+// even lands — a later check (after an `await`) would pass even without the reset, since the fresh
+// reload's own good answer would clear it a moment later regardless.
+test("reopening clears a stale unreachable synchronously, not just once its own reload lands", async (t) => {
+  let answerSubmit: (value: Answer) => void = () => {};
+  const mineLoads = [answer(200, { sources: [] }), offline, answer(200, { sources: [] })];
+  let call = 0;
+  const chat = createLinkChat(
+    fakeTransport([], {
+      mine: () => mineLoads[Math.min(call++, mineLoads.length - 1)](),
+      submit: () => new Promise((resolve) => (answerSubmit = resolve)),
+    }).transport,
+    () => true,
+  );
+  t.after(() => chat.close());
+  chat.open();
+  await flush();
+  const sent = chat.send("https://blog.test/a");
+  chat.close();
+  answerSubmit({ status: 202, body: { ok: true, id: 1 } });
+  await sent;
+  assert.equal(chat.getSnapshot().unreachable, true);
+  chat.open();
+  assert.equal(chat.getSnapshot().unreachable, false);
+});
+
 // Kills counting a hidden tick against MAX_POLLS (Minor 1): a tab hidden for the whole cap must still
 // fetch once it becomes visible again.
 test("a hidden tab's ticks don't count against MAX_POLLS; it still fetches once visible", async (t) => {
@@ -308,23 +349,44 @@ test("a hidden tab's ticks don't count against MAX_POLLS; it still fetches once 
   assert.equal(calls.mine, 2);
 });
 
-// Kills a 401 falling through to `schedule()` (Minor 2): once signed out, the thread must stop
-// polling until the panel reopens, and `unreachable` must not sit next to `signed_out`.
-test("a 401 stops polling on its own; unreachable doesn't sit next to signed_out", async (t) => {
+// Kills a 401 falling through to `schedule()` (Minor 2), and — with `[offline, 401]`, not a good
+// load before it — actually pins the 401 branch's own `set({ unreachable: false })`: a good first
+// load would make that assertion true either way, since nothing had set it otherwise.
+test("a 401 right after a failed load clears unreachable and stops polling on its own", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const loads = [answer(200, { sources: [source(1, "pending")] }), answer(401, { error: "unauthorized" })];
+  const loads = [offline, answer(401, { error: "unauthorized" })];
   let call = 0;
   const { transport, calls } = fakeTransport([], { mine: () => loads[Math.min(call++, loads.length - 1)]() });
   const chat = createLinkChat(transport, () => true);
   t.after(() => chat.close());
   chat.open();
   await flush();
-  assert.equal(calls.mine, 1);
+  assert.equal(chat.getSnapshot().unreachable, true);
   await wait(t, POLL_MS);
-  assert.equal(calls.mine, 2);
-  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "signed_out" }]);
-  assert.equal(chat.getSnapshot().unreachable, false);
+  assert.deepEqual([chat.getSnapshot().unreachable, chat.getSnapshot().notices], [false, [{ kind: "signed_out" }]]);
   await wait(t, POLL_MS * 5);
+  assert.equal(calls.mine, 2);
+});
+
+// Kills dropping the `clearTimeout(timer)` moved to the top of `load()`: the 401 branch returns
+// before reaching `schedule()`'s own clearTimeout, so a timer armed before a retry's reload would
+// otherwise survive a 401 untouched and fire one extra GET on its own, well after the panel stopped.
+test("a retry's reload that lands a 401 leaves no old poll timer armed", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const mineLoads = [answer(200, { sources: [source(1, "pending"), source(2, "failed")] }), answer(401, { error: "unauthorized" })];
+  let call = 0;
+  const { transport, calls } = fakeTransport([], {
+    mine: () => mineLoads[Math.min(call++, mineLoads.length - 1)](),
+    retry: () => answer(202, { ok: true })(),
+  });
+  const chat = createLinkChat(transport, () => true);
+  t.after(() => chat.close());
+  chat.open();
+  await flush();
+  await wait(t, 1000);
+  await chat.retry(2);
+  assert.equal(calls.mine, 2);
+  await wait(t, POLL_MS * 2);
   assert.equal(calls.mine, 2);
 });
 
@@ -383,16 +445,33 @@ test("send: every refusal, offline included, becomes a reply and keeps the text"
 });
 
 // Kills a no-link message that still goes out, a 202 that waits for the next poll to show the new
-// submission, and the "one link at a time" reply dropped.
-test("send: no link, no request; a sent link reloads the thread at once and says when a second link was left out", async () => {
+// submission, and the "one link at a time" reply dropped. `t.after(close())` matters here even though
+// the chat is never opened: its reload lands a pending source, and a `!open`-guard mutant elsewhere
+// would otherwise arm a *real* setTimeout with no teardown to clear it (finding f).
+test("send: no link, no request; a sent link reloads the thread at once and says when a second link was left out", async (t) => {
   const { transport, calls } = fakeTransport([source(1, "pending")]);
   const chat = createLinkChat(transport, () => true);
+  t.after(() => chat.close());
   assert.equal(await chat.send("csak egy kérdés"), false);
   assert.deepEqual(calls.submit, []);
   assert.equal(await chat.send("https://a.test/1 és https://b.test/2"), true);
   assert.deepEqual(calls.submit, [["https://a.test/1", "és https://b.test/2"]]);
   assert.equal(calls.mine, 1);
   assert.deepEqual(chat.getSnapshot().notices, [{ kind: "no_link" }, { kind: "more_links" }]);
+});
+
+// Kills dropping the `!open` guard in `schedule()` (finding f): a send that lands while the chat was
+// never opened must not start polling, even though the reload's thread holds a pending source —
+// unbounded background polling here would otherwise run on live timers for as long as MAX_POLLS.
+test("a send that lands without the panel ever open starts no polling", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { transport, calls } = fakeTransport([source(1, "pending")]);
+  const chat = createLinkChat(transport, () => true);
+  t.after(() => chat.close());
+  assert.equal(await chat.send("https://blog.test/1"), true);
+  const before = calls.mine;
+  await wait(t, POLL_MS * 3);
+  assert.equal(calls.mine, before);
 });
 
 // Kills the `sending` guard: a quick double Enter would submit the link twice, and the second copy
@@ -492,7 +571,10 @@ test("memoryTransport: answers like the real routes, only the targeted retry fli
   const preview = memoryTransport([source(-1, "failed"), dup], false);
   assert.equal((await preview.submit("https://youtu.be/dQw4w9WgXcQ", null)).status, 202);
   assert.equal((await preview.submit("http://localhost/x", null)).status, 400);
-  assert.deepEqual(await preview.submit("https://blog.test/dup", null), { status: 409, body: { error: "already_submitted", postId: 7 } });
+  // Non-canonical case (a stored, already-normalized "blog.test" vs. a submitted "BLOG.test"): kills
+  // comparing the raw `url` argument instead of `parsed.toString()`, since only the parsed form
+  // lowercases the host to match what's actually stored.
+  assert.deepEqual(await preview.submit("https://BLOG.test/dup", null), { status: 409, body: { error: "already_submitted", postId: 7 } });
   assert.deepEqual(await preview.retry(-999), { status: 404, body: { error: "not_found" } });
   assert.deepEqual(await preview.retry(-2), { status: 409, body: { error: "not_failed" } });
   await preview.retry(-1);
@@ -533,7 +615,7 @@ test("httpTransport.mine: GET /api/sources/mine, uncached", async (t) => {
   assert.deepEqual(body, { sources: [] });
 });
 
-test("httpTransport.submit: POST /api/sources with a JSON body (an empty note as null) and no-store", async (t) => {
+test("httpTransport.submit: POST /api/sources with a JSON body — a null note stays JSON null — and no-store", async (t) => {
   const seen: { url: string; init?: RequestInit }[] = [];
   mockFetch(t, async (url, init) => {
     seen.push({ url, init });
