@@ -297,7 +297,7 @@ UI without live data: `npm run dev`, then open `/dev/preview` (development only)
 ## Conventions
 
 - **Design language.** Hard corners (`--radius` is 0), system fonts only, hard offset shadows, one fixed theme, and everything fits 360 px with at least 40 px touch targets. The full rules: [DESIGN.md](DESIGN.md).
-- **Bilingual.** Every UI string should exist in Hungarian and English, in the component's copy object; the reader's choice is the `lang` cookie. Some labels are still English-only: the post kind labels (`kindLabel`), the Library's FAILED / PROCESSING… and MIRRORED tags, the archive's ITEMS / MIN, the header back links and the dashboard's SYNCED. Model output that readers see (titles, summaries, key points) is written in both languages. Code, comments and prompts are English.
+- **Bilingual.** Every UI string should exist in Hungarian and English, in the component's copy object; the reader's choice is the `lang` cookie. Model output that readers see (titles, summaries, key points) is written in both languages. Code, comments and prompts are English.
 - **No duplication.** Search before writing a helper, and reuse the shared ones listed in [CODE_STYLE.md](CODE_STYLE.md#no-duplication). `npm run dup` (jscpd) fails above 1% duplication.
 - **Relative imports in `lib/`,** with the `.ts` extension, so `node --test` can load the files without a bundler. The three exceptions are the Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which use `@/`. Tests never load `lib/supabase/server.ts` or `lib/language.ts`; the state route's test loads `lib/content.ts`.
 - **Commits** follow Conventional Commits, with lowercase, imperative subjects.
