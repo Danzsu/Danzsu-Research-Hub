@@ -14,9 +14,10 @@ export default async function PreviewPostPage({ searchParams }: { searchParams: 
   // Before any await: production answers a real 404 and never renders the fixtures.
   if (process.env.NODE_ENV !== "development") notFound();
   const [query, language, navMode] = await Promise.all([searchParams, getLanguage(), getNavMode()]);
+  const delayMs = previewDelayMs(query.slow);
   return (
-    <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites: false, delayMs: previewDelayMs(query.slow) }}>
-      <PreviewNav current="post" failWrites={false} />
+    <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites: false, delayMs }}>
+      <PreviewNav current="post" failWrites={false} slow={delayMs > 0} />
       <main className="min-h-dvh bg-ink">
         {previewPosts.map((post) => (
           <PostArticle key={post.id} post={post} language={language} query={query} canEdit={false} />

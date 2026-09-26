@@ -26,10 +26,11 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
   const [{ view: requested, fail, slow }, language, navMode] = await Promise.all([searchParams, getLanguage(), getNavMode()]);
   const view: PreviewView = PREVIEW_VIEWS.find((candidate) => candidate === requested) ?? "radar";
   const failWrites = fail === "1";
+  const delayMs = previewDelayMs(slow);
 
   return (
-    <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites, delayMs: previewDelayMs(slow) }}>
-      <PreviewNav current={view} failWrites={failWrites} />
+    <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites, delayMs }}>
+      <PreviewNav current={view} failWrites={failWrites} slow={delayMs > 0} />
       {view === "radar" && (
         <DigestDashboard key={String(failWrites)} issue={previewIssue} items={previewItems} githubTop10={previewGithub} preview={{ data: previewReader, failWrites }} />
       )}
