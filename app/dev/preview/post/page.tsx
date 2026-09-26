@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { MarkPostRead } from "@/app/(app)/library/[id]/mark-post-read";
 import { PostArticle } from "@/app/(app)/library/[id]/post-article";
 import { AppShell } from "@/app/components/app-shell";
-import { previewEmail, previewPosts } from "@/lib/fixtures";
+import { previewEmail, previewMySources, previewPosts } from "@/lib/fixtures";
 import { getLanguage, getNavMode } from "@/lib/language";
 import type { PostQuery } from "@/lib/post-view";
 import { PreviewNav } from "../preview-nav";
@@ -15,7 +15,7 @@ export default async function PreviewPostPage({ searchParams }: { searchParams: 
   if (process.env.NODE_ENV !== "development") notFound();
   const [query, language, navMode] = await Promise.all([searchParams, getLanguage(), getNavMode()]);
   return (
-    <AppShell language={language} email={previewEmail} initialNavMode={navMode}>
+    <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites: false }}>
       <PreviewNav current="post" failWrites={false} />
       <main className="min-h-dvh bg-ink">
         {previewPosts.map((post) => (

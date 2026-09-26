@@ -6,6 +6,7 @@ import {
   previewGithub,
   previewIssue,
   previewItems,
+  previewMySources,
   previewPosts,
   previewReader,
   previewReadPostIds,
@@ -29,6 +30,7 @@ const { PostImage } = await import("./post-image.tsx");
 const { Progress } = await import("../../components/ui/progress.tsx");
 const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
+const { CHAT_PANEL_ID, LinkChat, TaiyakiButton } = await import("./link-chat.tsx");
 
 const noop = () => {};
 const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop };
@@ -178,4 +180,30 @@ test("Progress reports its value to assistive tech: aria-valuenow, loading below
   assert.deepEqual(bar(40), ["40", "loading"]);
   assert.deepEqual(bar(100), ["100", "complete"]);
   assert.deepEqual(bar(undefined), [null, "indeterminate"]);
+});
+
+// Kills a taiyaki that doesn't say which panel it opens, whether it is open, or what it does in the
+// reader's language.
+test("TaiyakiButton names itself in the reader's language, and says which panel it opens and whether it is open", () => {
+  const button = (language: "hu" | "en", open: boolean) => {
+    const element = render(
+      createElement(LanguageProvider, { initial: language } as ComponentProps<typeof LanguageProvider>, createElement(TaiyakiButton, { open, onClick: noop, className: "grid" })),
+    ).querySelector("button");
+    return [element?.getAttribute("aria-label"), element?.getAttribute("aria-expanded"), element?.getAttribute("aria-controls")];
+  };
+  assert.deepEqual(button("hu", false), ["Link bedobása", "false", CHAT_PANEL_ID]);
+  assert.deepEqual(button("en", true), ["Drop a link", "true", CHAT_PANEL_ID]);
+});
+
+// Kills the corner button left out of the shell. The panel itself is portalled (null in this harness),
+// so a closed chat leaves no panel in the page and an open one must render without a render loop.
+test("AppShell carries the taiyaki, and the link chat renders open or closed", () => {
+  const doc = render(
+    createElement(AppShell, { language: "hu", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>, createElement("p", null, "Child")),
+  );
+  assert.equal(doc.querySelectorAll(`button[aria-controls="${CHAT_PANEL_ID}"]`).length, 1);
+  assert.equal(doc.getElementById(CHAT_PANEL_ID), null);
+  for (const open of [false, true]) {
+    withLanguage(LinkChat, { open, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
+  }
 });

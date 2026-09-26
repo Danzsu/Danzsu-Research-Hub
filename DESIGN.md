@@ -392,6 +392,13 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
         <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
       </DesktopNav>
       <MobileNav email={email} onSearch={openSearch} />
+      <TaiyakiButton
+        open={chatOpen}
+        onClick={toggleChat}
+        className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+      />
+      {/* Keyed so the preview's fail=1 switch gets a fresh in-memory transport. */}
+      <LinkChat key={String(chatPreview?.failWrites)} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
       <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
       <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
       <UndoToast />
@@ -548,14 +555,18 @@ export function Tag({ tag }: { tag: string }) {
 `app/components/story-card.tsx` renders them, and `app/globals.css` gives them their lift. Both lifts run 160ms, and only on pointer devices:
 
 ```css app/globals.css
-.must-card { box-shadow: 5px 5px 0 var(--ink); transition: transform 160ms ease, box-shadow 160ms ease; }
+/* .lift: the Top 3 cards' "come forward" state, shared with the taiyaki button (link-chat.tsx), which
+   also lifts on keyboard focus. Each keeps its own resting shadow. */
+.must-card, .lift { transition: transform 160ms ease, box-shadow 160ms ease; }
+.must-card { box-shadow: 5px 5px 0 var(--ink); }
 .must-card h2 { overflow-wrap: anywhere; hyphens: auto; }
 .story-card { transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
 /* Touch screens keep :hover after a tap, which would leave cards shifted. */
 @media (hover: hover) {
-  .must-card:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
+  .must-card:hover, .lift:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
   .story-card:hover { transform: translateX(3px); box-shadow: -6px 0 0 var(--signal); }
 }
+.lift:focus-visible { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
 .story-read { opacity: 0.58; }
 ```
 
@@ -603,7 +614,7 @@ className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain
 `app/components/undo-toast.tsx`. There is one fixed lane, above the bottom bar below `md` and 1.5rem from the bottom from `md` up. It is `z-[60]`, so it sits over open sheets. A failed write turns the toast signal:
 
 ```tsx app/components/undo-toast.tsx
-className="pointer-events-none fixed inset-x-4 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:bottom-6"
+className="pointer-events-none fixed inset-x-4 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
 ```
 
 ```tsx app/components/undo-toast.tsx

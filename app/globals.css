@@ -130,14 +130,18 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   box-shadow: 0 0 0 0 rgb(241 95 34 / 60%);
   animation: pulse-ring 2s infinite;
 }
-.must-card { box-shadow: 5px 5px 0 var(--ink); transition: transform 160ms ease, box-shadow 160ms ease; }
+/* .lift: the Top 3 cards' "come forward" state, shared with the taiyaki button (link-chat.tsx), which
+   also lifts on keyboard focus. Each keeps its own resting shadow. */
+.must-card, .lift { transition: transform 160ms ease, box-shadow 160ms ease; }
+.must-card { box-shadow: 5px 5px 0 var(--ink); }
 .must-card h2 { overflow-wrap: anywhere; hyphens: auto; }
 .story-card { transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
 /* Touch screens keep :hover after a tap, which would leave cards shifted. */
 @media (hover: hover) {
-  .must-card:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
+  .must-card:hover, .lift:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
   .story-card:hover { transform: translateX(3px); box-shadow: -6px 0 0 var(--signal); }
 }
+.lift:focus-visible { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
 .story-read { opacity: 0.58; }
 
 @keyframes pulse-ring {
@@ -147,6 +151,13 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  /* The taiyaki's shadow still lifts; it just doesn't move. */
+  .lift:focus-visible { transform: none; }
+}
+
+/* The same for hover, which stays pointer-only like every custom :hover here. */
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .lift:hover { transform: none; }
 }
 
 @media (max-width: 640px) {

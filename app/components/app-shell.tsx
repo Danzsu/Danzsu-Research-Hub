@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
@@ -10,6 +10,7 @@ import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
+import { LinkChat, TaiyakiButton, type ChatPreview } from "./link-chat";
 import { AccountActions, NavEntry, navIcons, SoonList } from "./nav-parts";
 import { SearchSoon, ShortcutHelp } from "./shell-dialogs";
 import { toasts, UndoToast } from "./undo-toast";
@@ -25,21 +26,31 @@ function persistNavMode(mode: NavMode) {
   document.cookie = `nav=${mode}; path=/; max-age=31536000; samesite=lax`;
 }
 
-/** Every signed-in page: the desktop nav or the mobile bottom bar around the page, plus the shell-wide dialogs. */
+/** Every signed-in page: the desktop nav or the mobile bottom bar around the page, the link chat, plus the shell-wide dialogs. */
 export function AppShell({
   language,
   email,
   initialNavMode,
+  chatPreview,
   children,
 }: {
   language: Language;
   email: string;
   initialNavMode: NavMode;
+  /** The offline preview's link chat: fixtures, no network. */
+  chatPreview?: ChatPreview;
   children: ReactNode;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [navMode, setNavMode] = useState<NavMode>(initialNavMode);
+  const [chatOpen, setChatOpen] = useState(false);
+  // Whichever taiyaki opened the panel gets the focus back when it closes.
+  const chatOpener = useRef<HTMLButtonElement>(null);
+  const toggleChat = (event: MouseEvent<HTMLButtonElement>) => {
+    chatOpener.current = event.currentTarget;
+    setChatOpen(!chatOpen);
+  };
   const openSearch = () => setSearchOpen(true);
   const openHelp = () => setHelpOpen(true);
   const toggleNav = () => {
@@ -65,6 +76,13 @@ export function AppShell({
         <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
       </DesktopNav>
       <MobileNav email={email} onSearch={openSearch} />
+      <TaiyakiButton
+        open={chatOpen}
+        onClick={toggleChat}
+        className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+      />
+      {/* Keyed so the preview's fail=1 switch gets a fresh in-memory transport. */}
+      <LinkChat key={String(chatPreview?.failWrites)} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
       <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
       <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
       <UndoToast />

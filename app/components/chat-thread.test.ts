@@ -28,19 +28,20 @@ const retryButtons = (doc: Document) => [...doc.querySelectorAll("button[aria-di
 
 // Kills the kind's name read from anywhere but SOURCE_KIND_LABELS (the reply would say "arxiv"), a
 // reply that ignores the status, a post link to anything but /library/<postId>, either sr-only
-// speaker prefix (I2b) dropped, the note line dropped, the done title's <p> dropped, and
-// reply.title[language] pinned to .hu regardless of the render's own language (M1).
+// speaker prefix (I2b) dropped or run into the text after it with no space, the note line dropped,
+// the done title's <p> dropped, and reply.title[language] pinned to .hu regardless of the render's
+// own language (M1).
 test("the thread greets first, then shows each submission oldest first with the reply its state calls for", () => {
   const doc = thread();
   const [greeting, done, failed, pending] = items(doc);
   assert.equal(items(doc).length, 1 + previewMySources.length);
   assert.match(greeting, /Dobj be egy linket!/);
-  assert.equal(done, `Te:https://example.test/posts/-1Hosszú megjegyzés: ${LONG_WORD}Taiyaki:${LONG_WORD} – készKÉSZ · MEGNYITÁS →`);
-  assert.equal(failed, `Te:${LONG_URL}Taiyaki:Nem sikerült feldolgozni.fetch 404: ${LONG_URL}ÚJRA`);
-  assert.equal(pending, "Te:https://arxiv.org/abs/2609.01234A módszertan-részre figyelj.Taiyaki:Megkaptam, arXiv-tanulmány.FELDOLGOZÁS…");
+  assert.equal(done, `Te: https://example.test/posts/-1Hosszú megjegyzés: ${LONG_WORD}Taiyaki: ${LONG_WORD} – készKÉSZ · MEGNYITÁS →`);
+  assert.equal(failed, `Te: ${LONG_URL}Taiyaki: Nem sikerült feldolgozni.fetch 404: ${LONG_URL}ÚJRA`);
+  assert.equal(pending, "Te: https://arxiv.org/abs/2609.01234A módszertan-részre figyelj.Taiyaki: Megkaptam, arXiv-tanulmány.FELDOLGOZÁS…");
   assert.equal(doc.querySelector('a[href="/library/-1"]')?.textContent, "KÉSZ · MEGNYITÁS →");
   const en = items(thread({}, "en"));
-  assert.equal(en[3], "You:https://arxiv.org/abs/2609.01234A módszertan-részre figyelj.Taiyaki:Got it: arXiv paper.PROCESSING…");
+  assert.equal(en[3], "You: https://arxiv.org/abs/2609.01234A módszertan-részre figyelj.Taiyaki: Got it: arXiv paper.PROCESSING…");
   assert.ok(en[1].includes(`${LONG_WORD} – done`), en[1]);
 });
 
@@ -92,14 +93,14 @@ test("every local reply says what happened, with the post link and the sign-in l
   ];
   const doc = thread({ sources: [], notices, unreachable: true });
   assert.deepEqual(items(doc).slice(1), [
-    "Taiyaki:Egyelőre csak linket tudok fogadni.",
-    "Taiyaki:Egyszerre egy linket tudok fogadni, az elsőt küldtem be.",
-    "Taiyaki:Ezt nem tudom megnyitni: csak nyilvános http(s) linket fogadok.",
-    "Taiyaki:Ezt már beküldte valaki.MEGNYITÁS →",
-    "Taiyaki:Ezt már beküldte valaki.",
-    "Taiyaki:Lejárt a belépésed.BELÉPÉS →",
-    "Taiyaki:Nem ment át, próbáld újra.",
-    "Taiyaki:Most nem érem el a beküldéseidet.",
+    "Taiyaki: Egyelőre csak linket tudok fogadni.",
+    "Taiyaki: Egyszerre egy linket tudok fogadni, az elsőt küldtem be.",
+    "Taiyaki: Ezt nem tudom megnyitni: csak nyilvános http(s) linket fogadok.",
+    "Taiyaki: Ezt már beküldte valaki.MEGNYITÁS →",
+    "Taiyaki: Ezt már beküldte valaki.",
+    "Taiyaki: Lejárt a belépésed.BELÉPÉS →",
+    "Taiyaki: Nem ment át, próbáld újra.",
+    "Taiyaki: Most nem érem el a beküldéseidet.",
   ]);
   assert.equal(doc.querySelectorAll('a[href^="/library/"]').length, 1);
   assert.equal(doc.querySelector('a[href="/library/9"]')?.textContent, "MEGNYITÁS →");

@@ -12,7 +12,8 @@ import { TaiyakiIcon } from "./taiyaki-icon";
 const copy = {
   hu: {
     greeting: "Dobj be egy linket! Ha akarod, írd mellé, mire figyeljek.",
-    // sr-only speaker prefixes (I2): a screen reader announces who is "talking" in each bubble.
+    // sr-only speaker prefixes (I2): a screen reader announces who is "talking" in each bubble. The
+    // bubbles add a space after them, so "Te:" never runs into the link that follows.
     me: "Te:",
     taiyaki: "Taiyaki:",
     received: "Megkaptam,",
@@ -67,7 +68,7 @@ function Taiyaki({ language, children }: { language: Language; children: ReactNo
     <div className="flex items-start gap-2">
       <TaiyakiIcon className="mt-1 size-7 shrink-0" />
       <div className={`${bubble} bg-paper shadow-[3px_3px_0_var(--ink)]`}>
-        <span className="sr-only">{copy[language].taiyaki}</span>
+        <span className="sr-only">{`${copy[language].taiyaki} `}</span>
         {children}
       </div>
     </div>
@@ -77,7 +78,7 @@ function Taiyaki({ language, children }: { language: Language; children: ReactNo
 function Mine({ entry, language }: { entry: ChatEntry; language: Language }) {
   return (
     <div className={`${bubble} ml-auto w-fit bg-ink text-paper shadow-[3px_3px_0_var(--signal)]`}>
-      <span className="sr-only">{copy[language].me}</span>
+      <span className="sr-only">{`${copy[language].me} `}</span>
       {entry.href ? (
         <a href={entry.href} target="_blank" rel="noreferrer" className="focus-ring underline">
           {entry.url}

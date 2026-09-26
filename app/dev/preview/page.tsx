@@ -9,6 +9,7 @@ import {
   previewGithub,
   previewIssue,
   previewItems,
+  previewMySources,
   previewPosts,
   previewReader,
   previewReadPostIds,
@@ -27,7 +28,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
   const failWrites = fail === "1";
 
   return (
-    <AppShell language={language} email={previewEmail} initialNavMode={navMode}>
+    <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites }}>
       <PreviewNav current={view} failWrites={failWrites} />
       {view === "radar" && (
         <DigestDashboard key={String(failWrites)} issue={previewIssue} items={previewItems} githubTop10={previewGithub} preview={{ data: previewReader, failWrites }} />
