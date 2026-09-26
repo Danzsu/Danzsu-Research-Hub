@@ -1,6 +1,7 @@
 import { assignIds, type BlockDraft } from "./blocks.ts";
 import type { ArchiveIssue, CurrentIssue, DigestItem, GithubTopEntry } from "../data/digest-types.ts";
 import type { SubmittedSource } from "./content.ts";
+import type { MySource } from "./my-sources.ts";
 import { publishedLabel } from "./pipeline/util.ts";
 import type { Post } from "./post-view.ts";
 import type { ReaderData } from "./reader-store.ts";
@@ -172,3 +173,21 @@ export const previewReader: ReaderData = {
 
 /** Post -2 was opened before: the Library list dims it. */
 export const previewReadPostIds = new Set([-2]);
+
+/** The link chat's thread, newest first as GET /api/sources/mine answers it: one submission in each
+ *  state, a long link and a long note. Negative ids, like the posts: the retry route 404s them, and
+ *  the done one opens preview post -1's real page, which 404s too. */
+export const previewMySources: MySource[] = [
+  { id: -11, url: "https://arxiv.org/abs/2609.01234", kind: "arxiv", status: "pending", error: null, note: "A módszertan-részre figyelj.", createdAt: "2026-09-24T09:00:00Z", post: null },
+  { id: -12, url: LONG_URL, kind: "article", status: "failed", error: `fetch 404: ${LONG_URL}`, note: null, createdAt: "2026-09-24T08:00:00Z", post: null },
+  {
+    id: -13,
+    url: "https://example.test/posts/-1",
+    kind: "article",
+    status: "done",
+    error: null,
+    note: `Hosszú megjegyzés: ${LONG_WORD}`,
+    createdAt: "2026-09-23T08:00:00Z",
+    post: { id: -1, title: { hu: LONG_WORD, en: LONG_WORD } },
+  },
+];

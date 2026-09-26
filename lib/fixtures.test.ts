@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { blockSchema, parseBlocks } from "./blocks.ts";
-import { previewItems, previewPosts } from "./fixtures.ts";
+import { previewItems, previewMySources, previewPosts } from "./fixtures.ts";
 import { parseId } from "./pipeline/util.ts";
 
 test("the preview posts cover every block type", () => {
@@ -32,4 +32,11 @@ test("the preview post ids are negative, so the posts/[id] routes 404 before tou
     assert.ok(post.id < 0, `post ${post.id}`);
     assert.equal(parseId(String(post.id)), null, `post ${post.id}`);
   }
+});
+
+// Kills a positive fixture id (a preview click could then reach a real source), and a state missing
+// from the preview's thread.
+test("the preview chat's sources have negative ids and show all three states", () => {
+  for (const source of previewMySources) assert.equal(parseId(String(source.id)), null, `source ${source.id}`);
+  assert.deepEqual(new Set(previewMySources.map(({ status }) => status)), new Set(["pending", "done", "failed"]));
 });

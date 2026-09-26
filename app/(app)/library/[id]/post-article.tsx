@@ -6,21 +6,17 @@ import type { Language } from "@/data/digest-types";
 import { safeHref } from "@/lib/blocks";
 import { hostOf } from "@/lib/pipeline/util";
 import { readMinutes, type Post, type PostQuery } from "@/lib/post-view";
+import { SOURCE_KIND_LABELS } from "@/lib/source-kinds";
 import { translatable } from "@/lib/translate";
 import { PostEditor } from "./post-editor";
 import { notices, PostNotices } from "./post-notices";
 import { PostToolbar } from "./post-toolbar";
 
-// Only the two strings the page used to hard-code; the rest of its text is `notices` (post-notices.tsx).
+// The page's own string; the rest of its text is `notices` (post-notices.tsx), and the kind badge is
+// SOURCE_KIND_LABELS (lib/source-kinds.ts), shared with the link chat.
 const copy = {
-  hu: {
-    keyPoints: "KULCSPONTOK",
-    kind: { article: "CIKK", youtube: "VIDEÓ", arxiv: "TANULMÁNY", github: "REPO", x: "POSZT", pdf: "PDF" },
-  },
-  en: {
-    keyPoints: "KEY POINTS",
-    kind: { article: "ARTICLE", youtube: "VIDEO", arxiv: "PAPER", github: "REPO", x: "POST", pdf: "PDF" },
-  },
+  hu: { keyPoints: "KULCSPONTOK" },
+  en: { keyPoints: "KEY POINTS" },
 };
 
 /** The post page body. The offline preview (app/dev/preview) renders it with fixture posts. */
@@ -41,7 +37,7 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-10 sm:py-16">
         <header className="border-b-2 border-ink pb-6">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tracking-[0.15em] text-signal">
-            <span className="border border-signal px-2 py-0.5">{labels.kind[post.kind]}</span>
+            <span className="border border-signal px-2 py-0.5 uppercase">{SOURCE_KIND_LABELS[post.kind][language]}</span>
             <span>{post.siteName ?? hostOf(post.url)}</span>
             {post.author && <span className="text-ink/60">{post.author}</span>}
             {post.publishedAt && <span className="text-ink/60">{post.publishedAt}</span>}
