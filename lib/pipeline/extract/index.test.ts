@@ -166,6 +166,25 @@ test("extract() throws FetchError from metadataOnly when the page is unreachable
   await assert.rejects(() => extract(db, "github", "https://github.com/owner/repo", ""), FetchError);
 });
 
+// H1–H3: a submitted link to a private address is refused before any request, on every path that
+// fetches it: the article extractor, the pdf extractor, and the metadata-only fallback both end in.
+test("extract() refuses a private URL before any fetch, for article, pdf and the metadata-only fallback", async (t) => {
+  t.mock.method(console, "warn", () => {});
+  mockDns(t, "10.0.0.1"); // intranet.example.test resolves to a private address
+  let fetches = 0;
+  mockFetch(t, async () => {
+    fetches++;
+    return new Response("<html><head><title>Internal</title></head><body></body></html>", { headers: { "content-type": "text/html" } });
+  });
+  const blocked = (error: unknown) => error instanceof FetchError && /^blocked/.test(error.message);
+  for (const url of ["http://10.0.0.1/admin", "http://intranet.example.test/admin"]) {
+    await assert.rejects(() => extract(db, "article", url, ""), blocked, `article ${url}`);
+    await assert.rejects(() => extract(db, "pdf", `${url}.pdf`, ""), blocked, `pdf ${url}`);
+    await assert.rejects(() => metadataOnly(url), blocked, `metadataOnly ${url}`);
+  }
+  assert.equal(fetches, 0);
+});
+
 test("isHtml treats a missing content-type, case variation and whitespace before the charset all as HTML; a pdf as not", () => {
   assert.equal(isHtml("text/html; charset=UTF-8"), true);
   assert.equal(isHtml("TEXT/HTML"), true);

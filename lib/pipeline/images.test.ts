@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { isMediaKey, variantPath } from "../media.ts";
 import { FETCH_TIMEOUT_MS, encodeImage, imageKey, mirrorImages, unusedMediaPaths } from "./images.ts";
-import { endlessBody, mockFetch, TEST_HOST } from "./mock-fetch.ts";
+import { endlessBody, mockDns, mockFetch, TEST_HOST } from "./mock-fetch.ts";
 import type { Block, ImageBlock } from "../blocks.ts";
 
 const png = (width: number, height: number) =>
@@ -232,22 +232,61 @@ test("mirrorImages keys uploaded variants by the downloaded bytes, not the URL",
   assert.ok(uploads.every((u) => u.path.startsWith(`${expectedKey}-`)));
 });
 
-test("mirrorImages bounds each download with its own fetch timeout", async (t) => {
-  const { db } = fakeStorageDb();
-  const seenTimeouts: number[] = [];
-  const realTimeout = AbortSignal.timeout;
-  // safeFetch calls AbortSignal.timeout(init.timeoutMs ?? 20_000); spying on it pins the exact
-  // value mirrorImages passes in, so dropping `timeoutMs: FETCH_TIMEOUT_MS` falls back to 20_000
-  // and fails this assertion instead of silently reverting to the caller-agnostic default.
-  (AbortSignal as unknown as { timeout: (ms: number) => AbortSignal }).timeout = (ms: number) => {
-    seenTimeouts.push(ms);
-    return realTimeout(ms);
-  };
-  mockFetch(t, async () => new Response(await png(200, 150), { headers: { "content-type": "image/png" } }));
-  try {
-    await mirrorImages(db, 1, [image("i1", `${HOST}/x.png`)]);
-    assert.deepEqual(seenTimeouts, [FETCH_TIMEOUT_MS]);
-  } finally {
-    AbortSignal.timeout = realTimeout;
-  }
+// G1, N13: a hung image host costs one FETCH_TIMEOUT_MS, not the whole image budget. The response
+// below never comes, so only the download's own abort signal can end it; the stubbed clock makes that
+// timeout fire at once and records how long it was asked to be.
+test("mirrorImages aborts a download that hangs past FETCH_TIMEOUT_MS and keeps the block unmirrored", { timeout: 5_000 }, async (t) => {
+  const { db, uploads } = fakeStorageDb();
+  t.mock.method(console, "warn", () => {});
+  const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+  const asked: number[] = [];
+  t.mock.method(AbortSignal, "timeout", (ms: number) => {
+    asked.push(ms);
+    return realTimeout(1);
+  });
+  mockFetch(t, (_url, init) =>
+    new Promise<Response>((_resolve, reject) => {
+      init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason));
+    }),
+  );
+  const out = await mirrorImages(db, 1, [image("i1", `${HOST}/hangs.png`)]);
+  assert.deepEqual(asked, [FETCH_TIMEOUT_MS]);
+  assert.equal((out[0] as ImageBlock).path, null);
+  assert.equal(uploads.length, 0);
+});
+
+// G1b: every image URL on a submitted page is fetched server-side, next to the secret key.
+test("mirrorImages never fetches an image on a private address, and keeps it unmirrored", async (t) => {
+  const { db, uploads } = fakeStorageDb();
+  t.mock.method(console, "warn", () => {});
+  mockDns(t, "10.0.0.1"); // cdn.example.test resolves to a private address
+  let fetches = 0;
+  mockFetch(t, async () => {
+    fetches++;
+    return new Response(await png(200, 150), { headers: { "content-type": "image/png" } });
+  });
+  const blocks = ["http://127.0.0.1/x.png", "http://cdn.example.test/y.png", "http://169.254.169.254/latest/meta-data/"].map((url, i) => image(`i${i}`, url));
+  const out = await mirrorImages(db, 1, blocks);
+  assert.equal(fetches, 0);
+  assert.deepEqual(out.map((block) => (block as ImageBlock).path), [null, null, null]);
+  assert.equal(uploads.length, 0);
+});
+
+// G2: a small file can decode to billions of pixels (a decompression bomb); sharp refuses past PIXEL_LIMIT.
+test("encodeImage refuses an image over the 40-megapixel limit", async () => {
+  const huge = await sharp({ create: { width: 8000, height: 5001, channels: 3, background: "#141414" } }).png().toBuffer();
+  await assert.rejects(() => encodeImage(huge), /pixel limit/);
+});
+
+// G3: an image declared over 5 MB is refused before a single byte is read, let alone handed to sharp.
+test("mirrorImages keeps a 5 MB + 1 byte image unmirrored, without reading it", async (t) => {
+  const { db, uploads } = fakeStorageDb();
+  t.mock.method(console, "warn", () => {});
+  const { body, cancelled, reads } = endlessBody(1024 * 1024);
+  mockFetch(t, async () => new Response(body, { headers: { "content-type": "image/png", "content-length": String(5 * 1024 * 1024 + 1) } }));
+  const out = await mirrorImages(db, 1, [image("i1", `${HOST}/big.png`)]);
+  assert.equal((out[0] as ImageBlock).path, null);
+  assert.equal(uploads.length, 0);
+  assert.equal(cancelled(), true);
+  assert.equal(reads(), 0); // the declared length alone decides; nothing is pulled from the body
 });
