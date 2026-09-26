@@ -5,6 +5,7 @@ NEON NEWS RADAR (the repository is Danzsu Research Hub) is a private, invite-onl
 ## Read next
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): how the parts fit together, with the codemap, the invariants and the boundaries.
+- [DESIGN.md](DESIGN.md): the design system, with tokens, layout, components, and do's and don'ts. Read it before any UI work.
 - [CLAUDE.md](CLAUDE.md): the deep reference for the pipeline, auth, the app shell, the database, the routes, security and the data contract.
 - [README.md](README.md): onboarding for humans, covering setup, environment, deploy, recipes and troubleshooting.
 
@@ -32,7 +33,7 @@ Before every commit, all five checks must pass, in this order: `npx tsc --noEmit
 
 ## Hard rules
 
-- **Never run `npx shadcn add`.** It rewrites `app/globals.css` and `components/ui/button.tsx`, which the theme and the house variants depend on (CLAUDE.md → Design language).
+- **Never run `npx shadcn add`.** It rewrites `app/globals.css` and `components/ui/button.tsx`, which the theme and the house variants depend on (DESIGN.md → Do's and Don'ts).
 - **Never run `supabase db push`.** It would apply `20260925000000_drop_post_body.sql` early, while production still reads `posts.body`. This holds until the TODO.md item "Csak az M1 deployja után" is done. The CLI isn't set up here anyway (there is no `supabase/config.toml`).
 - **Migrations only add, and a person applies them by hand.** Each one is a new `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql`, run in the Supabase SQL Editor in filename order, one file at a time. While older code is deployed a migration may only add (columns, wider checks). A column is dropped only once no deployed code reads it. List each new migration in README.md → Migrations.
 - **A Radar `item.id` is append-only forever.** It keys every reader's read/saved state (ARCHITECTURE.md → Invariants).

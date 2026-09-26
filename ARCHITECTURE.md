@@ -25,7 +25,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `dev/preview/`, the offline preview on fixtures;
   - the error, not-found and manifest files;
   - `layout.tsx`, which sets `robots: noindex`;
-  - `globals.css`, which is the whole theme.
+  - `globals.css`, the theme (DESIGN.md).
 - `app/components/` has the shared UI:
   - the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts`, `shell-dialogs`, `undo-toast`;
   - the language: `language-context`, `language-toggle`;
