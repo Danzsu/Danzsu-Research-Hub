@@ -225,7 +225,9 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
             rows={1}
             aria-label={t.input}
             placeholder={t.placeholder}
-            className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base focus-visible:border-signal"
+            // One-line placeholder: under field-sizing it would wrap at 360px, so clearing the field after a send
+            // would grow it a line and push the new reply out of view.
+            className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base placeholder:truncate focus-visible:border-signal"
           />
           {/* aria-disabled, not disabled, while sending: a disabled button would drop the focus. send() ignores a second press.
               A tap or click leaves the focus in the field, so a phone keyboard doesn't drop and come back. */}
