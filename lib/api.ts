@@ -14,8 +14,9 @@ export const POST_ERRORS = {
 } satisfies Record<string, ErrorAnswer>;
 
 /**
- * A `posts/[id]` route handler: 401 when `getReader` finds no session, 404 for an id no post can
- * have (the same answer as "no such post"), otherwise `handler` with the reader and the post id.
+ * An `[id]` route handler (the `posts/[id]` routes and `sources/[id]/retry`, which reads the id as
+ * `{ postId: sourceId }`): 401 when `getReader` finds no session, 404 for an id no row can have
+ * (the same answer as "no such row"), otherwise `handler` with the reader and the id.
  */
 export function postRoute<Reader>(
   getReader: () => Promise<Reader | null>,

@@ -75,3 +75,32 @@ export async function existingPostId(db: SupabaseClient, url: string): Promise<n
   }
   return embeddedPost(data?.posts)?.id;
 }
+
+export type RetryResult = "accepted" | "forbidden" | "not_found" | "not_failed" | "failed";
+
+/**
+ * "Újra" on the viewer's own failed submission. Read as the reader, then claimed with the admin
+ * client (readers can't update `sources`) in one compare-and-swap that repeats both checks: only a
+ * row that is still the viewer's and still `failed` goes back to `pending`. Of two overlapping
+ * clicks only one can win; the other's update matches 0 rows and answers "not_failed".
+ * The claim also resets `attempts`: a retry run killed at 300 s would otherwise stay `pending` at
+ * 3+ attempts, which `retryPendingSources` never picks up.
+ */
+export async function retrySource(db: SupabaseClient, admin: SupabaseClient, viewerId: string, sourceId: number): Promise<RetryResult> {
+  const { data: source, error } = await db.from("sources").select("submitted_by, status").eq("id", sourceId).maybeSingle();
+  if (error) return "failed";
+  if (!source) return "not_found";
+  if (source.submitted_by !== viewerId) return "forbidden";
+  if (source.status !== "failed") return "not_failed";
+
+  // ponytail: no cooldown — the status CAS rules out overlapping runs, and each run is one click; add a wait here if it gets abused.
+  const { data: claimed, error: claimError } = await admin
+    .from("sources")
+    .update({ status: "pending", error: null, attempts: 0 })
+    .eq("id", sourceId)
+    .eq("submitted_by", viewerId)
+    .eq("status", "failed")
+    .select("id");
+  if (claimError) return "failed";
+  return claimed?.length ? "accepted" : "not_failed";
+}

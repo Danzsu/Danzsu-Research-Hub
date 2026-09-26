@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existingPostId, listMySources, MINE_LIMIT } from "./my-sources.ts";
+import { existingPostId, listMySources, MINE_LIMIT, retrySource } from "./my-sources.ts";
 import { fakeDb, pgError } from "./pipeline/fake-db.ts";
 
 /** A `sources` row as the listing selects it, submitted by "owner" on 2026-09-(10 + id). */
@@ -82,4 +82,54 @@ test("existingPostId answers undefined and logs once when the lookup itself fail
   const db = fakeDb(undefined, { sourceSelectError: pgError("08006", "connection failure") });
   assert.equal(await existingPostId(db, "https://blog.test/post"), undefined);
   assert.equal(warn.mock.calls.length, 1);
+});
+
+/** Source 5 as the reader reads it (RLS select) and as the admin client claims it (the CAS), plus
+ *  source 6, the viewer's other failed one, which a retry of 5 must leave alone. */
+function retryDbs(asRead: Record<string, unknown>, asClaimed: Record<string, unknown> = asRead) {
+  const tables = { sources: [{ id: 5, ...asClaimed }, { id: 6, submitted_by: "owner", status: "failed" }] };
+  return { db: fakeDb(undefined, { sources: [{ id: 5, ...asRead }] }), admin: fakeDb(undefined, tables), tables };
+}
+
+// Kills a claim that writes the wrong values (the old error stays on the row, or the attempts aren't
+// reset: a retry killed at 300 s would then stay pending at 3+ attempts, which the daily cron never
+// picks up), and one not keyed on the id (source 6 would be sent back too).
+test("retrySource sends the viewer's failed source, and only it, back to pending with no error and its attempts reset", async () => {
+  const { db, admin, tables } = retryDbs({ submitted_by: "owner", status: "failed", error: "fetch 404", attempts: 3 });
+  assert.equal(await retrySource(db, admin, "owner", 5), "accepted");
+  assert.deepEqual(tables.sources, [
+    { id: 5, submitted_by: "owner", status: "pending", error: null, attempts: 0 },
+    { id: 6, submitted_by: "owner", status: "failed" },
+  ]);
+});
+
+// Kills the read's owner check, its status check, and a read keyed on anything but the id.
+test("retrySource refuses another reader's source, one that isn't failed, and a missing one, writing nothing", async () => {
+  const cases = [
+    [{ submitted_by: "other", status: "failed" }, 5, "forbidden"],
+    [{ submitted_by: "owner", status: "done" }, 5, "not_failed"],
+    [{ submitted_by: "owner", status: "failed" }, 6, "not_found"],
+  ] as const;
+  for (const [asRead, sourceId, expected] of cases) {
+    const { db, admin } = retryDbs(asRead);
+    assert.equal(await retrySource(db, admin, "owner", sourceId), expected);
+    assert.deepEqual(admin.sourceUpdates, [], expected);
+  }
+});
+
+// The spec's rule: the checks are in the CAS too, not only in the read. The read passes both; the
+// row the admin client finds is someone else's, then no longer failed. Kills the CAS's
+// `.eq("submitted_by", …)` and its `.eq("status", "failed")`, each on its own.
+test("retrySource's compare-and-swap repeats the owner and the status check: a row that changed since the read stays as it is", async () => {
+  for (const asClaimed of [{ submitted_by: "other", status: "failed" }, { submitted_by: "owner", status: "pending" }]) {
+    const { db, admin, tables } = retryDbs({ submitted_by: "owner", status: "failed" }, asClaimed);
+    assert.equal(await retrySource(db, admin, "owner", 5), "not_failed");
+    assert.deepEqual(tables.sources[0], { id: 5, ...asClaimed });
+  }
+});
+
+// Kills a read error taken for "not found" (the route would answer 404 instead of 500).
+test("retrySource answers failed when the read fails", async () => {
+  const db = fakeDb(undefined, { sourceSelectError: pgError("08006", "connection failure") });
+  assert.equal(await retrySource(db, fakeDb(), "owner", 5), "failed");
 });
