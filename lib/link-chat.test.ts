@@ -28,8 +28,9 @@ test("parseLinkMessage takes the link and keeps the rest of the message as its n
 });
 
 // Review Focus 4. Kills the CLOSING strip (the full stop ends up in the URL, a 404), the OPENING strip
-// (a link in parentheses is not found), and the balanced-parenthesis rule (Wikipedia's links break).
-test("parseLinkMessage strips sentence punctuation around the link, but keeps a parenthesis the link itself opened", () => {
+// (a link in parentheses is not found), the balanced-bracket rule (Wikipedia's links break), the `<…>`
+// autolink's `>`, the Hungarian quotes, the ellipsis, and IPv6's bracket.
+test("parseLinkMessage strips sentence punctuation around the link, but keeps a bracket the link itself opened", () => {
   assert.equal(linkOf("Ezt olvasd: https://example.test/a."), "https://example.test/a");
   assert.equal(linkOf("Szerinted jó? https://example.test/a?!"), "https://example.test/a");
   assert.equal(linkOf('"https://example.test/a",'), "https://example.test/a");
@@ -37,6 +38,11 @@ test("parseLinkMessage strips sentence punctuation around the link, but keeps a 
   assert.equal(linkOf("https://en.wikipedia.org/wiki/Taiyaki_(food)."), "https://en.wikipedia.org/wiki/Taiyaki_(food)");
   assert.equal(linkOf("(lásd https://en.wikipedia.org/wiki/Taiyaki_(food))"), "https://en.wikipedia.org/wiki/Taiyaki_(food)");
   assert.equal(linkOf("<https://example.test/a>"), "https://example.test/a");
+  assert.equal(linkOf("„https://example.test/a” – ezt nézd"), "https://example.test/a");
+  assert.equal(linkOf("“https://example.test/a”"), "https://example.test/a");
+  assert.equal(linkOf("Nézd meg: https://example.test/a…"), "https://example.test/a");
+  assert.equal(linkOf("http://[::1]"), "http://[::1]");
+  assert.equal(linkOf("[http://[::1]]"), "http://[::1]");
 });
 
 // Review Focus 4. Kills `moreLinks` always false (the reader never learns the second link was left

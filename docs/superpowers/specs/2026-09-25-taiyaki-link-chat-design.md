@@ -69,7 +69,7 @@ A forrástípus neve (cikk, YouTube-videó, arXiv-tanulmány, GitHub-repó, X-po
 ## 2. Üzenet → beküldés
 
 - **Tiszta függvény** a `lib/`-ben (`parseLinkMessage(text)`), teszttel:
-  - az első `http://` vagy `https://` kezdetű szó a link; a végéről a `.,;:!?)]}'"` írásjelek levágódnak;
+  - az első `http://` vagy `https://` kezdetű szó a link; az elejéről a `([{<'"„“‘«` nyitójelek, a végéről a `.,;:!?)]}>'"”’»…` zárójelek levágódnak, kivéve a záró `)` vagy `]` jelet, ha azt maga a link nyitotta;
   - a szöveg többi része, a link nélkül, szóközökre egyszerűsítve és levágva, a megjegyzés; üresen `null`;
   - ha nincs link, az eredmény `{ error: "no_link" }`;
   - ha több link van, az első megy be, és az eredmény jelzi, hogy volt több (`moreLinks: true`).
