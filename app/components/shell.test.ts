@@ -165,12 +165,17 @@ test("PostImage keeps the pre-load placeholder behind the img until it settles",
 });
 
 // N11: Radix reads the value from Root; a Progress that keeps `value` to itself renders every bar
-// indeterminate, and a screen reader hears no number.
-test("Progress reports its value to assistive tech: aria-valuenow, loading below the max, complete at it", () => {
-  const bar = (value: number) => {
+// indeterminate, and a screen reader hears no number. 0 is the edge a falsy check (`value || null`)
+// would get wrong — it's a real, reportable "loading" value, not "no value given" — and `undefined`
+// (no `value` prop at all, e.g. before the first sync) is Radix's own indeterminate case: no
+// aria-valuenow at all, not "0".
+test("Progress reports its value to assistive tech: aria-valuenow, loading below the max, complete at it, indeterminate with none", () => {
+  const bar = (value: number | undefined) => {
     const root = render(createElement(Progress, { value, "aria-label": "Week" })).querySelector('[role="progressbar"]');
     return [root?.getAttribute("aria-valuenow"), root?.getAttribute("data-state")];
   };
+  assert.deepEqual(bar(0), ["0", "loading"]);
   assert.deepEqual(bar(40), ["40", "loading"]);
   assert.deepEqual(bar(100), ["100", "complete"]);
+  assert.deepEqual(bar(undefined), [null, "indeterminate"]);
 });

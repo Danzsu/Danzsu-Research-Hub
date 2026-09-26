@@ -79,7 +79,10 @@ test("itemId is stable, bounded, and URL-unique", () => {
 
 test("parseSubmittedUrl rejects internal and non-http targets", () => {
   assert.equal(parseSubmittedUrl("https://example.com/a#frag")?.toString(), "https://example.com/a");
-  for (const bad of ["ftp://x.com", "http://localhost:3000", "http://127.0.0.1", "http://192.168.1.2", "http://[::1]/", "not a url", "http://intranet"]) {
+  for (const bad of [
+    "ftp://x.com", "http://localhost:3000", "http://127.0.0.1", "http://192.168.1.2", "http://[::1]/", "not a url", "http://intranet",
+    "http://[fd00::1]/", "http://[fe80::1]/", "http://[::ffff:10.0.0.1]/",
+  ]) {
     assert.equal(parseSubmittedUrl(bad), null, bad);
   }
 });
