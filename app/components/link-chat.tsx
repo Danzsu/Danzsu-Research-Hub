@@ -1,12 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { isSendKey } from "@/lib/keymap";
 import { createLinkChat, httpTransport, memoryTransport } from "@/lib/link-chat";
 import type { MySource } from "@/lib/my-sources";
 import { ChatThread } from "./chat-thread";
@@ -36,8 +37,8 @@ const copy = {
 /** The panel's id, for both buttons' aria-controls. */
 export const CHAT_PANEL_ID = "taiyaki-panel";
 
-/** The offline preview (app/dev/preview): the thread's fixtures and the fail=1 switch; nothing is sent. */
-export type ChatPreview = { sources: MySource[]; failWrites: boolean };
+/** The offline preview (app/dev/preview): the thread's fixtures and the fail=1 and slow=1 switches; nothing is sent. */
+export type ChatPreview = { sources: MySource[]; failWrites: boolean; delayMs?: number };
 
 /** The taiyaki that opens the panel: the desktop corner button and the mobile bar's centre slot. The caller
  *  places it and sets its resting shadow; `lift` (globals.css) brings it forward on hover and keyboard focus. */
@@ -57,6 +58,31 @@ export function TaiyakiButton({ open, onClick, className }: { open: boolean; onC
   );
 }
 
+/** Where Tab can land, as the browser sees it, less Radix's invisible focus guards at either end of <body>. */
+function tabStops(root: ParentNode): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]:not([data-radix-focus-guard])")].filter(
+    (element) => element.tabIndex >= 0 && !element.matches(":disabled") && element.getClientRects().length > 0,
+  );
+}
+
+/**
+ * Desktop: Radix's FocusScope loops Tab inside the panel even when it isn't modal, which would keep a
+ * keyboard reader from the page behind it. Instead the panel sits right after its opener in tab order:
+ * Shift+Tab off its first stop goes back to the opener, and Tab off its last goes on to the first stop
+ * after the opener outside the panel, or back to the opener when there is none.
+ */
+function tabPastPanel(event: KeyboardEvent<HTMLDivElement>, opener: HTMLElement | null) {
+  if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey || !opener) return;
+  const panel = event.currentTarget;
+  const stops = tabStops(panel);
+  if (event.target !== (event.shiftKey ? stops[0] : stops.at(-1))) return;
+  const next = event.shiftKey
+    ? opener
+    : (tabStops(document).find((element) => !panel.contains(element) && opener.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) ?? opener);
+  event.preventDefault();
+  next.focus();
+}
+
 /**
  * The link chat. Desktop: a non-modal panel above the corner button; only Esc and its close button
  * close it, so a link can be copied from the page behind. Mobile: a bottom Sheet. Focus goes to the
@@ -73,14 +99,18 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const [chat] = useState(() =>
-    createLinkChat(preview ? memoryTransport(preview.sources, preview.failWrites) : httpTransport, () => document.visibilityState === "visible"),
+    createLinkChat(
+      preview ? memoryTransport(preview.sources, preview.failWrites, preview.delayMs) : httpTransport,
+      () => document.visibilityState === "visible",
+    ),
   );
   const snapshot = useSyncExternalStore(chat.subscribe, chat.getSnapshot, chat.getSnapshot);
   const [text, setText] = useState("");
   const input = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const t = copy[language];
-  const lines = (snapshot.sources?.length ?? 0) + snapshot.notices.length + Number(snapshot.unreachable);
+  // The newest id, not the count: the thread is capped at MINE_LIMIT, so a new send can leave the count as it was.
+  const newest = snapshot.sources?.[0]?.id;
 
   useEffect(() => {
     if (!open) return;
@@ -92,10 +122,13 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
     // `scroll-smooth` glides to the new message; globals.css makes it a jump under prefers-reduced-motion.
     const thread = scroller.current;
     if (thread) thread.scrollTop = thread.scrollHeight;
-  }, [lines, open]);
+  }, [newest, snapshot.notices.length, snapshot.unreachable]);
 
   async function send() {
-    if (await chat.send(text)) setText("");
+    if (!(await chat.send(text))) return;
+    setText("");
+    // A click on Send leaves the focus there; the next link goes in the field.
+    input.current?.focus();
   }
 
   return (
@@ -107,6 +140,8 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           input.current?.focus();
+          // The portalled thread only mounts now, after the effect above ran: open at the latest message.
+          scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "instant" });
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
@@ -115,7 +150,9 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
         onInteractOutside={(event) => {
           if (!isMobile || isUndoToast(event.target)) event.preventDefault();
         }}
-        className="max-h-[75dvh] gap-0 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
+        onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, opener.current)}
+        // The house 160ms, not the stock Sheet's 500ms in and 300ms out.
+        className="max-h-[75dvh] gap-0 data-[state=closed]:duration-160 data-[state=open]:duration-160 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
       >
         <SheetHeader className="flex-row items-center gap-2 bg-ink py-3 pr-14 pl-4">
           <TaiyakiIcon className="size-6 shrink-0" />
@@ -142,21 +179,29 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
             value={text}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
-              // Enter sends, Shift+Enter is a new line; an IME's Enter only confirms the word.
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+              if (isSendKey(event.nativeEvent)) {
                 event.preventDefault();
                 void send();
               }
             }}
+            enterKeyHint="send"
             // Read-only, not disabled, while sending: a disabled field would drop the focus.
             readOnly={snapshot.sending}
             aria-disabled={snapshot.sending}
             rows={1}
             aria-label={t.input}
             placeholder={t.placeholder}
-            className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base focus-visible:border-signal focus-visible:ring-0"
+            className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base focus-visible:border-signal"
           />
-          <Button type="submit" variant="signal" size="icon-lg" disabled={snapshot.sending} aria-label={t.send}>
+          {/* aria-disabled, not disabled, while sending: a disabled button would drop the focus. send() ignores a second press. */}
+          <Button
+            type="submit"
+            variant="signal"
+            size="icon-lg"
+            aria-disabled={snapshot.sending}
+            aria-label={t.send}
+            className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+          >
             <SendHorizontal />
           </Button>
         </form>

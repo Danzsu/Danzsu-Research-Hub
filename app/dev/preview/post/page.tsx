@@ -5,17 +5,17 @@ import { AppShell } from "@/app/components/app-shell";
 import { previewEmail, previewMySources, previewPosts } from "@/lib/fixtures";
 import { getLanguage, getNavMode } from "@/lib/language";
 import type { PostQuery } from "@/lib/post-view";
-import { PreviewNav } from "../preview-nav";
+import { PreviewNav, previewDelayMs } from "../preview-nav";
 
 /** Every block type and all four banners, one fixture post after the other, sharing the one query
  *  string — like the real post page (app/(app)/library/[id]/page.tsx), so ?hidden=show, ?t=, ?text=hu
  *  and ?edit=1 all work here too (canEdit is still false, so ?edit=1 never shows the editor). */
-export default async function PreviewPostPage({ searchParams }: { searchParams: Promise<PostQuery> }) {
+export default async function PreviewPostPage({ searchParams }: { searchParams: Promise<PostQuery & { slow?: string }> }) {
   // Before any await: production answers a real 404 and never renders the fixtures.
   if (process.env.NODE_ENV !== "development") notFound();
   const [query, language, navMode] = await Promise.all([searchParams, getLanguage(), getNavMode()]);
   return (
-    <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites: false }}>
+    <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites: false, delayMs: previewDelayMs(query.slow) }}>
       <PreviewNav current="post" failWrites={false} />
       <main className="min-h-dvh bg-ink">
         {previewPosts.map((post) => (

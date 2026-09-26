@@ -388,8 +388,9 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
 ```tsx app/components/app-shell.tsx
     <LanguageProvider initial={language}>
       <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
-        {/* Room for the fixed bottom bar, so it never covers the end of the page. */}
-        <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
+        {/* Room for the fixed bottom bar, and from md for the corner taiyaki, so neither covers the end of the
+            page. The taiyaki's goes inside the page's own last element, so that page's surface runs on under it. */}
+        <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
       </DesktopNav>
       <MobileNav email={email} onSearch={openSearch} />
       <TaiyakiButton
@@ -397,8 +398,8 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
         onClick={toggleChat}
         className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
       />
-      {/* Keyed so the preview's fail=1 switch gets a fresh in-memory transport. */}
-      <LinkChat key={String(chatPreview?.failWrites)} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
+      {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
+      <LinkChat key={`${chatPreview?.failWrites}:${chatPreview?.delayMs}`} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
       <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
       <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
       <UndoToast />

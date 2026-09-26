@@ -5,6 +5,9 @@ import Link from "next/link";
 export const PREVIEW_VIEWS = ["radar", "radar-empty", "library", "library-empty", "archive", "archive-empty"] as const;
 export type PreviewView = (typeof PREVIEW_VIEWS)[number];
 
+/** `&slow=1`: the link chat's in-memory transport holds every answer this long, so its in-flight states show. */
+export const previewDelayMs = (slow: string | undefined) => (slow === "1" ? 800 : 0);
+
 // min-w-10: the 40px rule holds here too, and the Playwright checklist measures these links ("post" alone is ~29px wide).
 const linkClass = "focus-ring flex min-h-10 min-w-10 items-center justify-center aria-[current=page]:text-signal";
 
