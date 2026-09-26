@@ -281,6 +281,10 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
           say(noticeFor(answer));
           return false;
         }
+        // A resend that goes through this time must not leave an earlier refusal (e.g. "Nem ment
+        // át…") sitting above the new pending entry (Important 3): cleared before this send's own
+        // more_links notice, so that one still shows.
+        set({ notices: [] });
         if (message.moreLinks) say({ kind: "more_links" });
         await reload();
         return true;
@@ -297,8 +301,12 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
       set({ retrying: [...snapshot.retrying, sourceId] });
       try {
         const answer = await transport.retry(sourceId);
-        if (answer.status === 202 || answer.status === 409) await reload();
-        else say(noticeFor(answer));
+        if (answer.status === 202 || answer.status === 409) {
+          // Same reasoning as send's own clear above: a prior failed retry's reply must not outlive
+          // this one's success.
+          set({ notices: [] });
+          await reload();
+        } else say(noticeFor(answer));
       } catch {
         say({ kind: "network" });
       } finally {

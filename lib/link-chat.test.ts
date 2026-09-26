@@ -457,7 +457,28 @@ test("send: no link, no request; a sent link reloads the thread at once and says
   assert.equal(await chat.send("https://a.test/1 és https://b.test/2"), true);
   assert.deepEqual(calls.submit, [["https://a.test/1", "és https://b.test/2"]]);
   assert.equal(calls.mine, 1);
-  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "no_link" }, { kind: "more_links" }]);
+  // The successful second send clears the first send's own "no_link" reply (Important 3): only this
+  // send's own more_links notice remains.
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "more_links" }]);
+});
+
+// Important 3: a resend that goes through must not leave the earlier "Nem ment át…" refusal sitting
+// above the new pending entry (a stale local reply would otherwise anchor the panel's auto-scroll to
+// itself instead of the fresh submission) — cleared before this send's own more_links notice (order
+// matters: the clear must happen first, or a resend with more than one link would also wipe its own).
+test("a successful send clears the notices a previous failed send left behind, but not its own more_links", async () => {
+  const submits = [answer(500, { error: "insert_failed" }), answer(202, { ok: true, id: 2 }), answer(500, { error: "insert_failed" }), answer(202, { ok: true, id: 3 })];
+  let call = 0;
+  const chat = createLinkChat(fakeTransport([], { submit: () => submits[Math.min(call++, submits.length - 1)]() }).transport, () => true);
+  assert.equal(await chat.send("https://blog.test/a"), false);
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "network" }]);
+  assert.equal(await chat.send("https://blog.test/a"), true);
+  assert.deepEqual(chat.getSnapshot().notices, []);
+
+  assert.equal(await chat.send("https://blog.test/b"), false);
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "network" }]);
+  assert.equal(await chat.send("https://a.test/1 és https://b.test/2"), true);
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "more_links" }]);
 });
 
 // Kills dropping the `!open` guard in `schedule()` (finding f): a send that lands while the chat was
@@ -550,6 +571,18 @@ test("retry: offline or refused, it says so and frees the button", async () => {
     await chat.retry(1);
     assert.deepEqual([chat.getSnapshot().notices, chat.getSnapshot().retrying], [[{ kind: "network" }], []]);
   }
+});
+
+// Important 3: a successful retry, same as a successful send, must not leave an earlier failed
+// retry's "Nem ment át…" reply behind.
+test("a successful retry clears the notices a previous failed retry left behind", async () => {
+  const retries = [offline, answer(202, { ok: true })];
+  let call = 0;
+  const chat = createLinkChat(fakeTransport([], { retry: () => retries[Math.min(call++, retries.length - 1)]() }).transport, () => true);
+  await chat.retry(1);
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "network" }]);
+  await chat.retry(1);
+  assert.deepEqual(chat.getSnapshot().notices, []);
 });
 
 // Kills local replies that outlive the panel: they live only while it stays open.
