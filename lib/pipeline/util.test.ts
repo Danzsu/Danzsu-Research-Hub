@@ -139,6 +139,11 @@ test("isPrivateAddress and parseSubmittedUrl hold at every range boundary", () =
     // octal or hex IPv4 notation ("127.1", "0177.0.0.1", "0x7f.0.0.1") that a private-literal check
     // running on the pre-setter string wouldn't recognize as an IPv4 address at all.
     "http://127.1../", "http://0177.0.0.1../", "http://0x7f.0.0.1../", "http://10.1../",
+    // The hostname setter silently no-ops on a value it can't parse, leaving the pre-assignment
+    // (still-dotted) host in place: "." strips to "" (empty host is invalid for a special scheme),
+    // and "256.1" fails IPv4 parsing outright (256 > 255) — both must be caught by the
+    // `host.endsWith(".")` guard, since nothing else about either string looks like a private literal.
+    "http://./", "http://256.1../",
   ]) {
     assert.equal(parseSubmittedUrl(bad), null, bad);
   }
@@ -150,16 +155,59 @@ test("isPrivateAddress and parseSubmittedUrl hold at every range boundary", () =
   }
 });
 
-// However a private IPv4 literal is spelled — shorthand, octal, hex, or hidden behind extra trailing
-// dots — whatever parseSubmittedUrl accepts must never itself resolve to one once returned.
-test("parseSubmittedUrl's returned URL never carries a private-literal hostname, however the private literal was spelled", () => {
-  for (const raw of [
-    "http://127.1../", "http://0177.0.0.1../", "http://0x7f.0.0.1../", "http://10.1../",
-    "http://127.1/", "http://0177.0.0.1/", "http://0x7f.0.0.1/", "http://10.1/",
-  ]) {
-    const url = parseSubmittedUrl(raw);
-    assert.ok(url === null || !isPrivateAddress(url.hostname), raw);
+// However a private IPv4 literal is spelled — shorthand, octal, hex, decimal or hex-as-one-number,
+// hidden behind 0-3 extra trailing dots, with userinfo/port, or with a %2e-encoded dot — it must
+// never be returned. Asserting strict `=== null` (not "the hostname doesn't look private") matters:
+// a mutant that leaves the URL's hostname untouched (never reassigns it) would return a non-null URL
+// whose still-dotted hostname ("127.1..") doesn't itself match isPrivateAddress's 4-group regex, so a
+// weaker "url === null || !isPrivateAddress(url.hostname)" predicate would let that mutant through.
+test("parseSubmittedUrl rejects a private IPv4 literal across every disguise, trailing-dot count and URL form", () => {
+  const privateSpellings = [
+    "127.1", "10.1", "192.168.1", "172.16.1", "100.64.1", // shorthand (last part absorbs the rest)
+    "0177.0.0.1", "0177.1", // octal
+    "0x7f.1", "0x7f000001", // hex, and hex as one 32-bit number
+    "2130706433", // decimal as one 32-bit number
+    "0xa9.0xfe.0xa9.0xfe", // hex, all four groups (169.254.169.254 — the cloud metadata address)
+    "127.0.0x1", // mixed decimal/hex
+    "169.254.169.254", // already-canonical decimal
+    "0.0.0.0",
+  ];
+  const dotCounts = [0, 1, 2, 3];
+  const urlForms: ((host: string) => string)[] = [
+    (host) => `http://${host}/`,
+    (host) => `http://u:p@${host}:8080/`,
+  ];
+
+  let tested = 0;
+  let encodedTested = 0;
+  for (const spelling of privateSpellings) {
+    for (const dots of dotCounts) {
+      const literalHost = spelling + ".".repeat(dots);
+      for (const form of urlForms) {
+        const raw = form(literalHost);
+        assert.equal(parseSubmittedUrl(raw), null, raw);
+        tested++;
+      }
+      // A %2e-encoded trailing dot is percent-decoded inside the URL's own host parsing, so it must
+      // behave exactly like the literal-dot form above — tested only where it parses as a URL at all.
+      const encodedRaw = `http://${spelling}${"%2e".repeat(dots)}/`;
+      try {
+        new URL(encodedRaw);
+      } catch {
+        continue;
+      }
+      assert.equal(parseSubmittedUrl(encodedRaw), null, encodedRaw);
+      encodedTested++;
+    }
   }
+  // Guards against the generators silently producing nothing (e.g. every input failing to parse).
+  assert.equal(tested, privateSpellings.length * dotCounts.length * urlForms.length);
+  assert.ok(encodedTested > 0);
+
+  // Public controls: the same trailing-dot handling must still accept an ordinary domain and a public
+  // IPv4 literal — two dots, not just the one covered elsewhere in this file.
+  assert.equal(parseSubmittedUrl("https://example.com../x")?.toString(), "https://example.com/x");
+  assert.ok(parseSubmittedUrl("http://8.8.8.8../"));
 });
 
 // A real bug: parseSubmittedUrl stripped the trailing dot only for its own checks, then returned the
