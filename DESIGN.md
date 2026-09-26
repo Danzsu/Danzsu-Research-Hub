@@ -92,7 +92,7 @@ spacing:
   card-roomy: 24px
   frame: 8px
   touch: 40px
-components:
+components: # padding is CSS shorthand (block inline) on tag, page-hero and nav-tooltip, where the spec's single Dimension can't express it
   button-ink:
     backgroundColor: "{colors.ink}"
     textColor: "{colors.paper}"
@@ -218,7 +218,7 @@ The roles of the brand tokens:
 
 | Token | Hex | Role |
 | --- | --- | --- |
-| ink | `#141414` | text, every 2px border, most offset shadows; the dark surfaces: the navigation, the Library and Archive pages, code blocks, the undo toast, the Radar hero. `themeColor` in `app/layout.tsx` is the same `#141414`. |
+| ink | `#141414` | text, every 2px border, most offset shadows; the dark surfaces: the navigation, the Library and Archive pages, code blocks, the undo toast, the Radar hero |
 | paper | `#fbefca` | the body background; the card surface (story, must-read, repo, image frame, form cards); light text on ink |
 | cream | `#f8e8b4` | the working surface: the Radar column with its header and chip bar, `PageHero`, `StatusCard`, the post article, sheets and dialogs |
 | signal | `#f15f22` | the one accent: the `//` after titles, eyebrows, source labels and inline links, the active nav entry, the focus outline, the hover state (an 8px signal shadow, or a card that turns signal), the rank numerals, the progress bar, the live dot, the failed toast, the pressed chip |
@@ -231,7 +231,7 @@ The remapped shadcn tokens:
 - `muted` is `#e8d9aa`, `muted-foreground` is `#6b6252` and `destructive` is `#c7352a`. They are only reached through vendored components, and no app code uses them directly.
 - The `sidebar-*` tokens serve the vendored shadcn sidebar, which the app no longer renders.
 
-Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-paper/45` to `/70`), and hairlines on ink are `border-paper/15` to `/30`. One hex lives outside `:root`: the `bg-[#1c1c1c]` of the Library and Archive cards on ink.
+Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-paper/45` to `/70`), and hairlines on ink are `border-paper/15` to `/30`. Three colour literals live outside `:root`: the `bg-[#1c1c1c]` of the Library and Archive cards on ink, `themeColor: "#141414"` (ink) in `app/layout.tsx`, which paints the mobile browser chrome, and `rgb(241 95 34 / …)` (signal at an opacity) in the `.live-pulse` ring in `globals.css`.
 
 **Contrast** (WCAG ratios, computed from the tokens):
 
@@ -242,10 +242,11 @@ Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-pape
 | cyan on ink | 11.7 | the PROCESSING status |
 | `text-ink/72` on paper | 6.9 | card summaries |
 | `text-paper/55` on ink | 5.5 | secondary text on ink |
+| `text-paper/45` on ink / on `#1c1c1c` | 4.1 / 4.0 | the Library's error line, the ⌘K hint |
 | `text-ink/55` on paper | 3.9 | 10px meta labels, empty notes |
-| signal on paper / cream | 2.9 / 2.7 | eyebrows, source labels, inline links in posts |
+| signal on paper / cream | 2.86 / 2.69 | large text / non-text only: the `//`, the rank numerals, rules, the focus outline. Today it also sets eyebrows, source labels and inline post links, which is the known gap |
 
-The last two rows are below the 4.5:1 that WCAG AA asks of small text. Signal on a light surface is fine for large display glyphs (the `//`, the rank numerals). For small text it is a known weakness: an inline link at least carries an underline, but a label does not.
+WCAG AA asks 4.5:1 of small text, and 3:1 of large text and of non-text UI. The last three rows miss the first bar. `text-paper/45` and `text-ink/55` still clear 3:1, so they suit large or incidental text. Signal on a light surface sits just under 3:1 as well, so it is meant for large text and non-text marks only. Its small-text uses are the gap tracked in TODO.md (a brand decision: a darker signal for small text, or large and decorative use only). An inline link at least carries an underline, but a label does not.
 
 ## Typography
 
@@ -282,7 +283,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 ## Layout
 
 - **360px first.** Everything must fit a 360px viewport with no horizontal scroll.
-- **Display sizes are fluid.** Headings use `clamp(2.6rem, 11vw, …)` or a smaller floor (the scale above). Only the Radar hero scales with its container (`cqi`).
+- **Display sizes are fluid.** Headings use `clamp(2.6rem, 11vw, …)` or a smaller floor (the scale above). Only the Radar hero scales with its container (`cqi`); moving `PageHero` to `cqi` too is tracked in TODO.md.
 - **Container queries, not `vw`.** Layout widths inside the main column use container queries (`@container`, `cqi`, `@3xl:`), because the desktop nav and the panel make that column far narrower than the viewport. `PageHero` switches to two columns at `@4xl`, the must-read grid at `@3xl`, and the GitHub list at `@2xl`.
 - **Navigation by width.**
   - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, and the content column has matching bottom padding.
@@ -366,7 +367,7 @@ Shadows are hard offsets with zero blur:
   - the mobile bottom bar, `z-40`;
   - sheets, dialogs and their `bg-black/50` overlays, `z-50`;
   - the undo toast lane, `z-[60]`.
-- **Known exceptions:** the vendored Sheet keeps shadcn's blurred `shadow-lg`, and `Input` and `Textarea` keep `shadow-xs`. House components never add a blurred shadow.
+- **Known exceptions:** the vendored Sheet keeps shadcn's blurred `shadow-lg`. `Input`, `Textarea` and `Checkbox` keep `shadow-xs`, and so does the `outline` Button variant, which the Radar's progress pill uses. House components never add a blurred shadow. The fix for these, and for the checkbox corners (Shapes), is tracked in TODO.md.
 
 ## Shapes
 
@@ -687,7 +688,7 @@ Do:
 - Frame with 2px ink, lift with a hard offset shadow, and end a display title with a signal `//`.
 - Give every control a 40px target, use container queries inside the main column, and use `dvh`.
 - Keep the brand choices above, even when generic design advice calls them tells.
-- Check UI changes on `/dev/preview` at 360, 768 and 1280px (TESTING.md → Test layers).
+- Check UI changes on `/dev/preview` (TESTING.md → Test layers).
 
 Don't:
 

@@ -76,6 +76,7 @@
   - **Block force pushes** és **Restrict deletions**.
   - **Require a pull request before merging**: ki. PR-kötelezettség nincs, a `main` továbbra is fast-forwarddal kap új commitot.
   - A `main`-re így csak olyan commit kerülhet, amelyen a CI már zöld. Előbb az ágat pushold, várd meg a zöld futást, utána jöhet a fast-forward `main` pusha.
+- [ ] **Privát sebezhetőség-bejelentés bekapcsolása:** *Settings → Code security → Private vulnerability reporting*. A SECURITY.md erre az útra küldi a bejelentőket; amíg ki van kapcsolva, csak a tulajdonos közvetlen elérése marad.
 - [ ] **Dependabot-PR-ek:** hetente jöhet egy PR a két action frissítéséről, és csak legalább 7 napos kiadásról. Merge előtt a CI legyen zöld, és a kommentben szereplő tag legyen az új.
 
 ---
@@ -199,6 +200,8 @@
 - [ ] **Kevesebb getClaims() kérésenként.** A UI/UX A óta kérésenként három fut: a `proxy.ts`-é, az `(app)` layout `getViewer()`-e és az oldal `getReader()`-e. Ha a `getReader`-t és a `getViewer`-t React `cache()`-be csomagoljuk (`lib/supabase/server.ts`), a layout és az oldal egy hívást oszt meg, így kettő marad (a proxy külön fut, azt a `cache()` nem éri el).
 - [ ] **Elvész a fókusz** egy teendő törlése és a „+ teendő” után: a billentyűzettel dolgozó olvasónak újra kell keresnie a helyét.
 - [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, és az ikonsáv gombjainak osztálylistái.
+- [ ] Signal-narancs szöveg paper/cream háttéren 2,7–2,9:1, kis szövegnél WCAG AA alatt; márka-döntés kell: sötétebb árnyalat kis szövegre vagy csak nagy/díszítő használat.
+- [ ] fix(ui): a DESIGN.md-ben felsorolt eltérések: checkbox `rounded-none shadow-none` (`reader-panel.tsx:104`), Sheet/Input/Checkbox/pill homályos árnyéka, `PageHero` címe `cqi`-re (a szakasz már `@container`).
 - [ ] **Playwright e2e a CI-ban** — opció, nincs jóváhagyva (2026-09-25).
   - Ára: új devDependency (`@playwright/test`, pontos és legalább 7 napos verzió, a lockfile-lal együtt), egy Chromium-letöltés a lockfile-on kívül (a csomag verziója rögzíti, CI-cache kell hozzá), `next dev` a CI-ban (a `/dev/preview` csak fejlesztői módban él), és a flaky tesztek kockázata.
   - Haszna: a billentyűparancsok, a visszavonás-csík szünete és 5 s-os véglegesítése, a dupla kattintásos törlés, a panel fókusza, a `&fail=1` visszaállás, a konzol- és hidratációs hibák, és a 360 / 768 / 1280 px-es vízszintes görgetés automatikus ellenőrzése (`.superpowers/sdd/test-audit.md`, 4. és 5. fejezet).
