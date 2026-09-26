@@ -96,7 +96,10 @@ export const httpTransport: ChatTransport = {
 /**
  * The offline preview's stand-in (local dev points at the production project): the seed is the
  * thread, a submission joins it as pending, and "Újra" sends a failed one back to pending. Nothing
- * is ever processed. `fail` rejects every write the way an offline fetch does; reads still answer.
+ * is ever processed. Answers like the real routes: a URL already in the thread is `already_submitted`
+ * (`postId` present only when that source already has a post, same as `existingPostId`), a retry of
+ * an id not in the thread is `not_found`, and a retry of a source that isn't `failed` is `not_failed`.
+ * `fail` rejects every write the way an offline fetch does; reads still answer.
  */
 export function memoryTransport(seed: MySource[], fail: boolean): ChatTransport {
   let sources = seed;
@@ -111,6 +114,8 @@ export function memoryTransport(seed: MySource[], fail: boolean): ChatTransport 
       write(() => {
         const parsed = parseSubmittedUrl(url);
         if (!parsed) return { status: 400, body: { error: "invalid_url" } };
+        const existing = sources.find((source) => source.url === parsed.toString());
+        if (existing) return { status: 409, body: { error: "already_submitted", ...(existing.post ? { postId: existing.post.id } : {}) } };
         const source: MySource = {
           id: nextId--,
           url: parsed.toString(),
@@ -126,6 +131,9 @@ export function memoryTransport(seed: MySource[], fail: boolean): ChatTransport 
       }),
     retry: (sourceId) =>
       write(() => {
+        const source = sources.find((source) => source.id === sourceId);
+        if (!source) return { status: 404, body: { error: "not_found" } };
+        if (source.status !== "failed") return { status: 409, body: { error: "not_failed" } };
         sources = sources.map((source) => (source.id === sourceId ? { ...source, status: "pending", error: null } : source));
         return { status: 202, body: { ok: true } };
       }),
@@ -161,10 +169,11 @@ function noticeFor({ status, body }: Answer): ChatNotice {
 }
 
 /**
- * The live thread. `open()` loads it, then polls every POLL_MS while the panel stays open, the tab is
- * visible (`isVisible`) and a source is pending (or the list never loaded because it was out of
- * reach), at most MAX_POLLS times; a submission or a retry loads it at once and restarts the count.
- * `close()` stops the polling and drops the local replies.
+ * The live thread. `open()` clears any local replies left over from before, then loads it and polls
+ * every POLL_MS while the panel stays open, the tab is visible (`isVisible`) and a source is pending
+ * (or the last load was out of reach), at most MAX_POLLS times; a submission or a retry loads it at
+ * once and restarts the count. `close()` stops the polling and drops the local replies too, so one
+ * that lands after `close()` never leaks into the next `open()` (spec 1.3).
  */
 export function createLinkChat(transport: ChatTransport, isVisible: () => boolean) {
   let snapshot = INITIAL;
@@ -183,14 +192,17 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
 
   function schedule() {
     clearTimeout(timer);
-    // Before a first good answer there's no list to go by: ask again only if it was out of reach
-    // (spec 3.3: the next good load clears that reply), not after a 401.
-    const pending = snapshot.sources?.some((source) => source.status === "pending") ?? snapshot.unreachable;
+    // A failed load — the first ever, or a later one after a good list already landed — keeps
+    // polling until a good one clears it (spec 3.3); `unreachable` is OR'd in, not just a fallback
+    // for "never loaded", because a stale list (e.g. all finished) would otherwise read as `false`
+    // and mask the failure. A 401 never reaches here (see the `mine` 401 branch in `load()`).
+    const pending = snapshot.unreachable || (snapshot.sources?.some((source) => source.status === "pending") ?? false);
     if (!open || !pending || polls >= MAX_POLLS) return;
     timer = setTimeout(() => {
-      polls++;
-      if (isVisible()) void load();
-      else schedule();
+      if (isVisible()) {
+        polls++;
+        void load();
+      } else schedule();
     }, POLL_MS);
   }
 
@@ -206,7 +218,11 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     if (answer?.status === 200 && Array.isArray(answer.body.sources)) {
       set({ sources: answer.body.sources as MySource[], unreachable: false });
     } else if (answer?.status === 401) {
+      // Signed out: say so (once), clear `unreachable` so the two notices never sit side by side,
+      // and stop — reopening (which reloads) is what restarts polling, not another tick.
       if (!snapshot.notices.some((notice) => notice.kind === "signed_out")) say({ kind: "signed_out" });
+      set({ unreachable: false });
+      return;
     } else {
       set({ unreachable: true });
     }
@@ -228,6 +244,9 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     getSnapshot: () => snapshot,
     open() {
       open = true;
+      // A local reply lives only while the panel stays open (spec 1.3): a send or retry that lands
+      // after `close()` must not leak its reply into the next `open()`.
+      set({ notices: [], unreachable: false });
       void reload();
     },
     close() {
