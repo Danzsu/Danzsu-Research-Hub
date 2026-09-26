@@ -52,7 +52,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `media.ts` (the bucket and its key format), `public-paths.ts`, `api.ts` (`jsonError`, `postRoute`), `language.ts`;
   - `supabase/server.ts`, the Supabase clients;
   - `fixtures.ts`, the preview's data.
-- `lib/test/`, `lib/pipeline/fake-db.ts` and `lib/pipeline/mock-fetch.ts` are the test harnesses and fakes (CLAUDE.md → Conventions → Tests).
+- `lib/test/`, `lib/pipeline/fake-db.ts` and `lib/pipeline/mock-fetch.ts` are the test harnesses and fakes (TESTING.md).
 - `data/digest-types.ts` is the Radar content contract and the tag vocabulary.
 - `proxy.ts` refreshes the session and redirects signed-out requests to sign-in, on every request.
 - `supabase/migrations/` has the schema, RLS, the RPCs, the `model_settings` seeds and the `media` bucket.
@@ -99,5 +99,5 @@ Breaking one of these is a bug even when every test passes.
   - An API error is a status code plus a snake_case code, sent through `jsonError`, and the client maps the code to its copy.
   - A failed ingest ends up on its `sources` row (`error`, or `status: "failed"`). The Library list shows it, and so does the post page, to the submitter.
   - A failed reader write rolls back and shows the undo toast's failure message.
-- **Testing layers** are unit tests on `lib/`, static component renders, route handlers under stubs, and the offline preview (CLAUDE.md → Conventions → Tests).
-- **CI and supply chain.** CLAUDE.md → CI covers the workflow, and CLAUDE.md → Conventions → Supply chain covers the dependency rules.
+- **Testing layers** are unit tests on `lib/`, static component renders, route handlers under stubs, and the offline preview (TESTING.md).
+- **CI and supply chain.** TESTING.md → Test layers covers the workflow, and CLAUDE.md → Conventions → Supply chain covers the dependency rules.

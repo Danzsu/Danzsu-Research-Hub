@@ -17,7 +17,7 @@ import { render } from "../../lib/test/render.ts";
 // data. lib/test/render.ts runs hooks once with no effects, so this catches crashes and the
 // render-phase-loop class of bug — 271d147's unconditional setState-in-render made this very file
 // throw "Too many re-renders" (see the report for the before/after repro) — not full interaction
-// coverage; clicks and state changes are checked in the browser (CLAUDE.md, Conventions → Tests).
+// coverage; clicks and state changes are checked in the browser (TESTING.md, Test layers).
 
 const { AppShell } = await import("./app-shell.tsx");
 const { LanguageProvider } = await import("./language-context.tsx");

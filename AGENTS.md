@@ -6,6 +6,7 @@ NEON NEWS RADAR (the repository is Danzsu Research Hub) is a private, invite-onl
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): how the parts fit together, with the codemap, the invariants and the boundaries.
 - [DESIGN.md](DESIGN.md): the design system, with tokens, layout, components, and do's and don'ts. Read it before any UI work.
+- [TESTING.md](TESTING.md): the test layers, how to run tests, the helpers, the conventions and the pitfalls.
 - [CLAUDE.md](CLAUDE.md): the deep reference for the pipeline, auth, the app shell, the database, the routes, security and the data contract.
 - [README.md](README.md): onboarding for humans, covering setup, environment, deploy, recipes and troubleshooting.
 
@@ -47,7 +48,7 @@ Before every commit, all five checks must pass, in this order: `npx tsc --noEmit
 
 ## Testing
 
-`npm test` runs every test (CLAUDE.md → Conventions → Tests has the helpers and the rules). These are the three traps that bite most often:
+`npm test` runs every test. TESTING.md has the layers, the helpers and the conventions. These are the three traps that bite most often:
 
 - In a `node --test` path, write every `[` as `[[]` (`"app/(app)/library/[[]id]/post-editor.test.ts"`). Unescaped, the path runs 0 tests and still exits 0.
 - Call `mockDns` at most once per test body. For a second answer, nest `t.test()` subtests.
@@ -56,7 +57,7 @@ Before every commit, all five checks must pass, in this order: `npx tsc --noEmit
 ## Working agreements
 
 - After every significant part, run a quick test and review your own diff very critically before you move on.
-- For UI work, do a runtime smoke check on `/dev/preview` before you call it done.
+- For UI work, do a runtime smoke check on `/dev/preview` (TESTING.md → Test layers) before you call it done.
 - No code duplication. Search before you write a helper, and reuse the shared homes. `npm run dup` must report no new clone.
 - If the permission system blocks a command, stop and report it. Never run a variant.
 - Code identifiers, comments and model prompts are in English. Only the UI copy is bilingual.
