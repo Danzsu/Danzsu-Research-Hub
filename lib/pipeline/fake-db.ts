@@ -25,10 +25,13 @@ export type FakeIngestTables = {
   postUpdateError?: unknown;
   /** Bare object names (no `<sourceId>/` prefix) the media bucket already holds for this source. */
   media?: string[];
-  /** Rows `retryPendingSources`' pending-sources listing filters (`eq`/`neq`/`lt`), then limits. */
+  /** Rows `retryPendingSources`' pending-sources listing filters (`eq`/`neq`/`lt`), orders, then limits.
+   *  Without it, a listing (`listMySources`) reads `sources` / `source` instead. */
   pending?: Record<string, unknown>[];
   /** Forces `sources`' `insert(...).select().single()` to resolve with this error, e.g. `pgError("23505", …)`. */
   sourceInsertError?: PostgrestErrorShape;
+  /** Forces every `sources` select (the listing, `single()`, `maybeSingle()`) to resolve with this error. */
+  sourceSelectError?: PostgrestErrorShape;
   /** Every `storage.from().list/upload/remove` call rejects, for testing failure-path cleanup. */
   storageError?: boolean;
   /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g.
@@ -95,11 +98,30 @@ function passes(row: Record<string, unknown>, { column, op, value }: Filter): bo
   return (row[column] as number) < (value as number);
 }
 
-/** `sources`' select chain, filters applied: the pending listing (`limit`) over `listed`, the
- *  one-row lookup (`single`) over `lookedUp`, which answers PGRST116 unless exactly one row matches. */
-function sourcesQuery(listed: Record<string, unknown>[], lookedUp: Record<string, unknown>[], onEq: (column: string, value: unknown) => void) {
+const notOneRow = (count: number) => pgError("PGRST116", "JSON object requested, multiple (or no) rows returned", `The result contains ${count} rows`);
+
+/** `sources`' select chain, filters applied: the listing (`order`, then `limit`) over `listed`, the
+ *  one-row lookups over `lookedUp` — `single` answers PGRST116 unless exactly one row matches,
+ *  `maybeSingle` answers null for none and PGRST116 for several. `error` answers all three. */
+function sourcesQuery(
+  listed: Record<string, unknown>[],
+  lookedUp: Record<string, unknown>[],
+  onEq: (column: string, value: unknown) => void,
+  error: PostgrestErrorShape | undefined,
+) {
   const filters: Filter[] = [];
+  let sortBy: { column: string; ascending: boolean } | undefined;
   const matching = (rows: Record<string, unknown>[]) => rows.filter((row) => filters.every((filter) => passes(row, filter)));
+  // A row missing the column keeps its place (a stable sort), like the rest of the sparse-fixture rules.
+  const sorted = (rows: Record<string, unknown>[]) => {
+    if (!sortBy) return rows;
+    const { column, ascending } = sortBy;
+    return [...rows].sort((a, b) => {
+      const [x, y] = [a[column], b[column]] as [string | number | undefined, string | number | undefined];
+      if (x === undefined || y === undefined || x === y) return 0;
+      return (x < y ? -1 : 1) * (ascending ? 1 : -1);
+    });
+  };
   const filter = (op: Filter["op"]) => (column: string, value: unknown) => {
     if (op === "eq") onEq(column, value);
     filters.push({ column, op, value });
@@ -109,16 +131,43 @@ function sourcesQuery(listed: Record<string, unknown>[], lookedUp: Record<string
     eq: filter("eq"),
     neq: filter("neq"),
     lt: filter("lt"),
-    order: () => query,
-    limit: async (n: number) => ({ data: matching(listed).slice(0, n), error: null }),
+    order: (column: string, { ascending = true }: { ascending?: boolean } = {}) => {
+      sortBy = { column, ascending };
+      return query;
+    },
+    limit: async (n: number) => (error ? { data: null, error } : { data: sorted(matching(listed)).slice(0, n), error: null }),
     single: async () => {
+      if (error) return { data: null, error };
       const rows = matching(lookedUp);
-      return rows.length === 1
-        ? { data: rows[0], error: null }
-        : { data: null, error: pgError("PGRST116", "JSON object requested, multiple (or no) rows returned", `The result contains ${rows.length} rows`) };
+      return rows.length === 1 ? { data: rows[0], error: null } : { data: null, error: notOneRow(rows.length) };
+    },
+    maybeSingle: async () => {
+      if (error) return { data: null, error };
+      const rows = matching(lookedUp);
+      return rows.length > 1 ? { data: null, error: notOneRow(rows.length) } : { data: rows[0] ?? null, error: null };
     },
   };
   return query;
+}
+
+type UpdateResult = { data: unknown; error: unknown };
+
+/** An update's chain as supabase-js builds it: `.eq` / `.is` filters, each handed to `filter`, then
+ *  awaited as is or through `.select(...)`; `run` learns which, since only `.select` reports rows. */
+function updateChain(filter: (column: string, value: unknown, op: "eq" | "is") => void, run: (withRepresentation: boolean) => Promise<UpdateResult>) {
+  const builder = {
+    eq: (column: string, value: unknown) => {
+      filter(column, value, "eq");
+      return builder;
+    },
+    is: (column: string, value: unknown) => {
+      filter(column, value, "is");
+      return builder;
+    },
+    select: () => run(true),
+    then: (onFulfilled: (result: UpdateResult) => unknown, onRejected?: (reason: unknown) => unknown) => run(false).then(onFulfilled, onRejected),
+  };
+  return builder;
 }
 
 /** A storage path's bare object name: whatever follows the first `/` (the `<sourceId>/` prefix real
@@ -153,7 +202,9 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows, and a column the fixture never
  * set passes every filter; a null filter value, or a null row value, never passes (SQL's own rule —
  * only `.is(...)` matches null); a `sources` `single()` that matches no row, or several, answers
- * PostgREST's PGRST116 error.
+ * PostgREST's PGRST116 error, and `maybeSingle()` does for several. A `sources` listing applies
+ * `order(column, { ascending })` before `limit(n)`. A `sources` update applies its `.eq` filters
+ * and writes through, so a later select sees it.
  * Any other table only upserts (recorded on `.upserts`) and answers `select().gte()` from `tables.rows`.
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it,
  * `list` reflects it, and `download` answers an object it holds with the object's own path as its
@@ -198,8 +249,9 @@ export function fakeDb(
     }
     if (table === "sources") {
       const lookedUp = tables.sources ?? (tables.source ? [tables.source] : []);
+      const recordEq = (column: string, value: unknown) => eqCalls.push({ table: "sources", column, value });
       return {
-        select: () => sourcesQuery(tables.pending ?? [], lookedUp, (column, value) => eqCalls.push({ table: "sources", column, value })),
+        select: () => sourcesQuery(tables.pending ?? lookedUp, lookedUp, recordEq, tables.sourceSelectError),
         insert: (values: Record<string, unknown>) => ({
           select: () => ({
             single: async () => {
@@ -208,14 +260,26 @@ export function fakeDb(
             },
           }),
         }),
-        update: (values: Record<string, unknown>) => ({
-          eq: async (column: string, value: unknown) => {
-            eqCalls.push({ table: "sources", column, value });
+        // Written through, like `posts`' update below: only the rows every `.eq` filter matches change,
+        // and a later `sources` select sees them, so a second compare-and-swap on a column the first
+        // one moved matches 0 rows.
+        update: (values: Record<string, unknown>) => {
+          const filters: Filter[] = [];
+          const filter = (column: string, value: unknown, op: "eq" | "is") => {
+            if (op === "is") throw new Error("fakeDb: a sources update filters with .eq only");
+            recordEq(column, value);
+            filters.push({ column, op, value });
+          };
+          return updateChain(filter, async (withRepresentation) => {
             sourceUpdates.push(values);
             writes.push("sources.update");
-            return { data: null, error: null };
-          },
-        }),
+            const matched = lookedUp.filter((row) => filters.every((rule) => passes(row, rule)));
+            const merged = lookedUp.map((row) => (matched.includes(row) ? { ...row, ...values } : row));
+            if (tables.sources) tables.sources = merged;
+            else if (tables.source) tables.source = merged[0];
+            return { data: withRepresentation ? matched.map((row) => ({ id: row.id })) : null, error: null };
+          });
+        },
       };
     }
     if (table === "posts") {
@@ -270,20 +334,7 @@ export function fakeDb(
             if (!withRepresentation) return { data: null, error: null };
             return { data: matched ? [{ id: row!.id }] : [], error: null };
           };
-          const builder = {
-            eq: (column: string, value: unknown) => {
-              filters.push({ column, value, op: "eq" });
-              return builder;
-            },
-            is: (column: string, value: unknown) => {
-              filters.push({ column, value, op: "is" });
-              return builder;
-            },
-            select: () => run(true),
-            then: (onFulfilled: (result: { data: unknown; error: unknown }) => unknown, onRejected?: (reason: unknown) => unknown) =>
-              run(false).then(onFulfilled, onRejected),
-          };
-          return builder;
+          return updateChain((column, value, op) => filters.push({ column, value, op }), run);
         },
       };
     }

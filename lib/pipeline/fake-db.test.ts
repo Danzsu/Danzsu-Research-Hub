@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { retryPendingSources } from "./ingest.ts";
-import { fakeDb } from "./fake-db.ts";
+import { fakeDb, pgError } from "./fake-db.ts";
 import { mockFetch, TEST_HOST } from "./mock-fetch.ts";
 
 // Fix round 1: SQL's own null rule — `.neq("status", "done")` must not match a row whose status is
@@ -18,4 +18,50 @@ test("fakeDb's select filters never match a row whose column is null (SQL null r
   const db = fakeDb(undefined, { sources: [source], post: null, pending: [source] });
   assert.equal(await retryPendingSources(db), 0);
   assert.deepEqual(fetched, []);
+});
+
+// Kills: `order()` ignored (the listing comes back in fixture order), the sort after `limit`, and a
+// listing that reads only `pending` (listMySources passes none, and would always get []).
+test("a sources listing without `pending` reads the sources rows: filtered, ordered, then limited", async () => {
+  const sources = [
+    { id: 1, submitted_by: "owner", created_at: "2026-09-20T10:00:00Z" },
+    { id: 2, submitted_by: "other", created_at: "2026-09-23T10:00:00Z" },
+    { id: 3, submitted_by: "owner", created_at: "2026-09-22T10:00:00Z" },
+    { id: 4, submitted_by: "owner", created_at: "2026-09-21T10:00:00Z" },
+  ];
+  const db = fakeDb(undefined, { sources });
+  const { data } = await db.from("sources").select("id").eq("submitted_by", "owner").order("created_at", { ascending: false }).limit(2);
+  assert.deepEqual(data?.map((row) => row.id), [3, 4]);
+});
+
+// Kills: maybeSingle() answering the first of several rows, or an error for none.
+test("a sources maybeSingle() answers the one matching row, null for none, and PGRST116 for several", async () => {
+  const db = fakeDb(undefined, { sources: [{ id: 1, status: "failed" }, { id: 2, status: "failed" }] });
+  assert.equal((await db.from("sources").select("id, status").eq("id", 2).maybeSingle()).data?.id, 2);
+  assert.deepEqual(await db.from("sources").select("status").eq("id", 3).maybeSingle(), { data: null, error: null });
+  assert.equal((await db.from("sources").select("status").eq("status", "failed").maybeSingle()).error?.code, "PGRST116");
+});
+
+// Kills: an update that ignores its filters (every row changes), or one that isn't written through —
+// then a second compare-and-swap on the same status matches again, and one retry starts two runs.
+test("a sources update changes only the rows its filters match, writes through, and .select() reports them", async () => {
+  const tables = { sources: [{ id: 5, status: "failed" }, { id: 6, status: "failed" }] };
+  const db = fakeDb(undefined, tables);
+  const claim = () => db.from("sources").update({ status: "pending" }).eq("id", 5).eq("status", "failed").select("id");
+  assert.deepEqual((await claim()).data, [{ id: 5 }]);
+  assert.deepEqual((await claim()).data, []);
+  assert.deepEqual(tables.sources.map((row) => row.status), ["pending", "failed"]);
+  assert.deepEqual(db.sourceUpdates, [{ status: "pending" }, { status: "pending" }]);
+});
+
+// Kills: sourceSelectError ignored by one of the three terminal calls.
+test("sourceSelectError answers the listing, single() and maybeSingle() alike", async () => {
+  const error = pgError("08006", "connection failure");
+  const db = fakeDb(undefined, { sources: [{ id: 1 }], sourceSelectError: error });
+  const results = [
+    await db.from("sources").select("id").order("id").limit(10),
+    await db.from("sources").select("id").eq("id", 1).single(),
+    await db.from("sources").select("id").eq("id", 1).maybeSingle(),
+  ];
+  for (const result of results) assert.deepEqual(result, { data: null, error });
 });
