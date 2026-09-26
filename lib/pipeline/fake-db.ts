@@ -1,6 +1,7 @@
 // Test helper only (not *.test.ts, so `npm test`'s glob skips it as its own suite).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { MEDIA_BUCKET } from "../media.ts";
 
 /** Rows the `sources`/`posts` tables of a {@link fakeDb} answer with, offline. */
 export type FakeIngestTables = {
@@ -157,6 +158,8 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it,
  * `list` reflects it, and `download` answers an object it holds with the object's own path as its
  * bytes, so a test can mirror an image and then see it (or its absence) in a later list.
+ * `storage.from(bucket)` throws for any `bucket` other than `MEDIA_BUCKET` — every real caller
+ * only ever names that one, so this catches a hardcoded wrong bucket rather than silently ignoring it.
  * Every write is recorded on `.sourceUpdates`/`.sourceInserts`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
  * Unlike `posts`' `upsert` above, a `sources` `insert` isn't written through: a later `sources`
  * `select()` in the same test still only sees `tables.source`/`tables.sources`, never the row
@@ -299,31 +302,37 @@ export function fakeDb(
   };
 
   const storage = {
-    from: () => ({
-      // `writes` records the attempt before the storageError check in all three: a caller that
-      // swallows this failure (e.g. skips cleanup once the post is already saved) should still be
-      // distinguishable, by call count, from one that let the attempt through and it just failed.
-      list: async () => {
-        writes.push("storage.list");
-        if (tables.storageError) throw new Error("storage down");
-        return { data: [...objects].map((name) => ({ name })), error: null };
-      },
-      upload: async (path: string) => {
-        writes.push("storage.upload");
-        if (tables.storageError) throw new Error("storage down");
-        objects.add(bareObjectName(path));
-        return { data: { path }, error: null };
-      },
-      download: async (path: string) =>
-        objects.has(bareObjectName(path)) ? { data: new Blob([path]), error: null } : { data: null, error: { message: "Object not found" } },
-      remove: async (paths: string[]) => {
-        writes.push("storage.remove");
-        if (tables.storageError) throw new Error("storage down");
-        for (const path of paths) objects.delete(bareObjectName(path));
-        removedMedia.push(...paths);
-        return { data: null, error: null };
-      },
-    }),
+    // Every real caller reaches for MEDIA_BUCKET (lib/media.ts); refusing any other name here catches
+    // a hardcoded wrong bucket (e.g. "public") that would otherwise go unnoticed, since nothing else
+    // about this fake depends on the bucket argument.
+    from: (bucket: string) => {
+      if (bucket !== MEDIA_BUCKET) throw new Error(`fakeDb storage only serves the "${MEDIA_BUCKET}" bucket, not "${bucket}"`);
+      return {
+        // `writes` records the attempt before the storageError check in all three: a caller that
+        // swallows this failure (e.g. skips cleanup once the post is already saved) should still be
+        // distinguishable, by call count, from one that let the attempt through and it just failed.
+        list: async () => {
+          writes.push("storage.list");
+          if (tables.storageError) throw new Error("storage down");
+          return { data: [...objects].map((name) => ({ name })), error: null };
+        },
+        upload: async (path: string) => {
+          writes.push("storage.upload");
+          if (tables.storageError) throw new Error("storage down");
+          objects.add(bareObjectName(path));
+          return { data: { path }, error: null };
+        },
+        download: async (path: string) =>
+          objects.has(bareObjectName(path)) ? { data: new Blob([path]), error: null } : { data: null, error: { message: "Object not found" } },
+        remove: async (paths: string[]) => {
+          writes.push("storage.remove");
+          if (tables.storageError) throw new Error("storage down");
+          for (const path of paths) objects.delete(bareObjectName(path));
+          removedMedia.push(...paths);
+          return { data: null, error: null };
+        },
+      };
+    },
   };
 
   const rpc = async (name: string, args: Record<string, unknown> = {}) => {

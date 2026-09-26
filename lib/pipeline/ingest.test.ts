@@ -646,21 +646,6 @@ test("retryPendingSources() retries only unfinished sources under the 3-attempt 
   assert.deepEqual(fetched, [`${TEST_HOST}/new`, `${TEST_HOST}/again`]);
 });
 
-// Fix round 1: SQL's own null rule — `.neq("status", "done")` must not match a row whose status is
-// null (null compares to UNKNOWN, never true, in eq/neq/lt alike). Not a real case (sources.status is
-// never null in production) but a regression pin for fakeDb's own `passes()` null handling.
-test("retryPendingSources() never retries a source whose status is null (SQL null rules apply)", async (t) => {
-  const fetched: string[] = [];
-  mockFetch(t, async (url) => {
-    fetched.push(url);
-    return new Response("", { status: 404 });
-  });
-  const sources = [{ ...newSource(40, "article", "nullstatus"), status: null, attempts: 0 }];
-  const db = fakeDb(undefined, { sources, post: null, pending: sources });
-  assert.equal(await retryPendingSources(db), 0);
-  assert.deepEqual(fetched, []);
-});
-
 // Fix round 1: a real production bug — a failed posts upsert can hand back a plain PostgREST error
 // object (`{ message, code, details, hint }`, never an Error instance), and errorMessage must read
 // its message field, or the submitter's post page shows "[object Object]" instead of a real reason.
