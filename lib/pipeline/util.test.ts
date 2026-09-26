@@ -118,16 +118,29 @@ test("isPrivateAddress applies the IPv4 rules to IPv4 carried in NAT64, IPv4-com
 
 // U4–U7: each private range and internal-name rule, pinned on both sides of its edge.
 test("isPrivateAddress and parseSubmittedUrl hold at every range boundary", () => {
-  for (const ip of ["172.16.0.1", "172.31.255.255", "100.64.0.0", "100.127.255.255", "224.0.0.1", "fe90::1", "feb0::1", "febf::1", "fc00::1"]) {
+  for (const ip of [
+    "172.16.0.1", "172.31.255.255", "100.64.0.0", "100.127.255.255", "224.0.0.1",
+    "fe90::1", "feb0::1", "febf::1", "fc00::1",
+    "127.255.255.255", // 127/8 in full, not just 127.0.x
+    "169.254.0.0", "169.254.255.255", // 169.254/16 in full, not just the metadata address
+  ]) {
     assert.equal(isPrivateAddress(ip), true, ip);
   }
   for (const ip of ["172.15.255.255", "172.32.0.0", "100.63.255.255", "100.128.0.0", "223.255.255.255"]) {
     assert.equal(isPrivateAddress(ip), false, ip);
   }
-  for (const bad of ["http://printer.local/", "http://NAS.LOCAL/", "http://metadata.google.internal/", "http://172.16.0.1/", "http://172.31.0.1/"]) {
+  for (const bad of [
+    "http://printer.local/", "http://NAS.LOCAL/", "http://metadata.google.internal/", "http://172.16.0.1/", "http://172.31.0.1/",
+    // A trailing dot is a valid root-label separator that must not let these slip past the name checks.
+    "http://localhost./", "http://printer.local./", "http://metadata.google.internal./",
+    "http://app.localhost/", // RFC 6761: .localhost is reserved
+  ]) {
     assert.equal(parseSubmittedUrl(bad), null, bad);
   }
-  for (const good of ["https://local.example.com/", "https://internal.example.com/", "http://172.15.0.1/", "http://172.32.0.1/"]) {
+  for (const good of [
+    "https://local.example.com/", "https://internal.example.com/", "http://172.15.0.1/", "http://172.32.0.1/",
+    "https://example.com./", // a trailing dot on an otherwise public host is still public
+  ]) {
     assert.ok(parseSubmittedUrl(good), good);
   }
 });

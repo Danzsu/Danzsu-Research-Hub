@@ -28,7 +28,9 @@ function redirectOnceThenOk(t: TestContext, location: string): string[] {
 test("safeFetch blocks a redirect to a loopback or the cloud metadata address", async (t) => {
   for (const location of ["http://127.0.0.1/admin", "http://169.254.169.254/latest/meta-data/"]) {
     const calls = redirectOnceThenOk(t, location);
-    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && /blocked/.test(error.message), location);
+    // Both addresses are IPv4 literals, so parseSubmittedUrl itself rejects them — "blocked url",
+    // never reaching the DNS-resolved "blocked address" branch.
+    await assert.rejects(() => safeFetch(`${PUB}/a`), (error: unknown) => error instanceof FetchError && error.message === "blocked url", location);
     assert.equal(calls.length, 1, location); // the blocked hop must never actually be fetched
   }
 });
@@ -53,8 +55,17 @@ test("safeFetch refuses a first hop that is private or resolves to any private a
     calls++;
     return new Response("ok");
   });
-  mockDns(t, TEST_IP, "10.0.0.1");
-  await assert.rejects(() => safeFetch("http://mixed.example.test/"), (error: unknown) => error instanceof FetchError && error.message === "blocked address");
+  // Either order of a mixed answer must block: a "checks only the last address" mutant would pass
+  // when the private one comes last but wrongly let the host through when it comes first. Each
+  // order gets its own subtest so its `mockDns` mock is restored before the next one is installed —
+  // `t.mock.method` snapshots whatever is live when it's called, so mocking dns.lookup twice on the
+  // same `t` would restore to the first mock instead of the real function.
+  for (const addresses of [[TEST_IP, "10.0.0.1"], ["10.0.0.1", TEST_IP]]) {
+    await t.test(`order ${addresses.join(",")}`, async (st) => {
+      mockDns(st, ...addresses);
+      await assert.rejects(() => safeFetch("http://mixed.example.test/"), (error: unknown) => error instanceof FetchError && error.message === "blocked address");
+    });
+  }
   for (const first of ["http://127.0.0.1/", "http://169.254.169.254/latest/meta-data/"]) {
     await assert.rejects(() => safeFetch(first), (error: unknown) => error instanceof FetchError && error.message === "blocked url", first);
   }
