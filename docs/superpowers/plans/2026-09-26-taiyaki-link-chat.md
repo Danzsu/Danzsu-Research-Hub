@@ -46,12 +46,18 @@
   - a `STUBS` térkép a `lib/test/tsx-hooks.ts`-ben;
   - a `fakeDb` szűrői és a `pgError`.
 - Ág: `git switch main`, a `main` frissítése a tulajdonos lépése, majd `git switch -c taiyaki-link-chat`.
-- A kiinduló tesztszám **488**. Ennyi a `test-hardening` `8bd62e9` commitján, és ennyi a mostani fején, a `9e5cf80`-on is (`fix: align the top three must-read cards`). Az utóbbi csak a Top 3 lépcsőzését vette ki a `globals.css`-ből, egy margót a `digest-dashboard.tsx`-ben és egy mondatot a `CLAUDE.md`-ből, tesztet nem érintett. Ha a `main`-en más a szám, a feladatonkénti növekményt vesd össze: 1. +4, 2. +7, 3. +10, 4. +6, 5. +13, 6. +6, 7. +2, 8. +2, végül 538.
+- A kiinduló tesztszám **522**. Ennyi a `test-hardening` fején (`2b17b78`). A `8bd62e9`-es 488-hoz a dokumentáció átrendezése két tesztfájlt adott:
+  - `lib/design-tokens.test.ts`: 2 teszt;
+  - `lib/design-excerpts.test.ts`: 32 teszt, a DESIGN.md 31 tsx/css részlete és egy darabszám-teszt. Minden új tsx/css részlet a DESIGN.md-ben egy újabb teszt.
+
+  A `9e5cf80` (`fix: align the top three must-read cards`) csak a Top 3 lépcsőzését vette ki a `globals.css`-ből, egy margót a `digest-dashboard.tsx`-ben és egy mondatot a `CLAUDE.md`-ből, tesztet nem érintett. Ha a `main`-en más a szám (például mert közben a DESIGN.md részleteinek száma változott), a feladatonkénti növekményt vesd össze: 1. +4, 2. +7, 3. +10, 4. +6, 5. +13, 6. +6, 7. +2, 8. +2, végül 572 (522 + 50).
 - **Ellenőrzés.** A terv minden kódját egy `git archive 8bd62e9` másolaton futtattam le, a `node_modules`-t junctionnel rákötve. Ezen a másolaton ellenőriztem:
   - `npx tsc --noEmit`, `npm run lint`, `npm test` (538 zöld) és `npm run dup` (0 klón);
   - `npx next build --webpack`. A Turbopack a junctionnel kötött `node_modules`-t nem fogadja el, a valódi repóban a sima `npm run build` fut;
   - a feladatok mutációs próbáit (mind bukást ad);
   - a 7. és a 8. feladat Playwright-köreit `next dev --webpack` alatt, a `/dev/preview`-n.
+
+  A pre-flight (2026-09-26) ugyanezt a `2b17b78`-on megismételte. Egy dolog nem stimmelt: a 7. és a 8. feladat a DESIGN.md részleteit elavulttá tette, és a `design-excerpts.test.ts` bukott. A két feladat ezért maga másolja újra a részleteket. A pre-flight döntései be vannak dolgozva: B1, I1, I2, I3, és a javítást kérő m1–m7, m9 és m10. Az m8 csak jelzés, a `readOnly` mező eltérése a spec 1.3-tól, amely a Döntések között áll. Az m11 tájékoztató. A futás ezekkel is 572 zöld, 0 klón, és a `next build --webpack` is zöld.
 - **Minden fájlt olvass újra szerkesztés előtt.** Ha egy „előtte” részlet eltér a fájltól, a fájl az irányadó, és csak ennek a tervnek a változtatását vidd át. A `9e5cf80` után a 7. feladat `globals.css`-horgonyait (a `.must-card` sora, a hover-blokk, a `.story-read` és a reduced-motion blokk) újra ellenőriztem: mind megvan, változatlanul.
 
 ## Egyeztetés a spec-kel és a kóddal
@@ -112,6 +118,10 @@
 - Ruling: a mobil visszavonás-csík sávja `4.75rem` → `5.75rem`, a tartalom alsó paddingje `4rem` → `5.25rem` (8. feladat) — a kiemelt gomb teteje a lap aljától 82 px — ha téves: a csík 16 px-szel magasabban ül.
 - Ruling: az asztali gomb alatt nincs külön padding — lebegő gomb, csak egy 56 px-es sarkot takar, a lap alján álló kattintható elemek (kártyák, linkek) ennél szélesebbek — ha téves: egy `md:pb-24` a keret tartalom-oszlopán.
 - Ruling: a „Több” gomb aktív jelölése `data-active` (+ `data-[active]:text-signal`), az `aria-current` a panelbeli Archívum linken marad — egy panelt nyitó gomb nem „az aktuális oldal”, a spec 1.2 is a linkre teszi az `aria-current`-et — ha téves: nincs költsége, egy attribútum cseréje.
+- Ruling (pre-flight I2): a szál kis (11 px-es) címkéi és linkjei („KÉSZ · MEGNYITÁS →”, „MEGNYITÁS →”, „BELÉPÉS →”, „FELDOLGOZÁS…”) ink szövegek signal aláhúzással (`signalUnderline` a `chat-thread.tsx`-ben), a narancs `.live-pulse` pötty marad — a DESIGN.md → Colors a paperen álló signalt csak nagy szövegre és nem-szöveges jelre engedi (2,86:1), a márka kontraszt-döntése a TODO-ban nyitott, így nem adunk hozzá új esetet — ha téves: a tulajdonos döntése után egy osztály visszacserélése.
+- Ruling (pre-flight m7): amíg a szál egyszer sem töltődött be, mert a lista elérhetetlen volt, a lekérdezés pending forrás nélkül is folytatódik (`?? snapshot.unreachable` a `schedule()`-ben), a `MAX_POLLS` határáig. Egy 401 után nem kérdez tovább — a spec 3.3 szerint a „Most nem érem el…” sort a következő sikeres lekérés tünteti el, és enélkül nem jönne következő lekérés; a 401-re viszont a pollozás csak újabb 401-et hozna — ha téves: az olvasó újranyitja a panelt.
+- Ruling (pre-flight m4): a csökkentett mozgás `.lift:hover`-szabálya is `@media (hover: hover)` alatt van (`@media (hover: hover) and (prefers-reduced-motion: reduce)`) — a DESIGN.md → Do's and Don'ts tiltja a pusztán `:hover`-es szabályt a `globals.css`-ben — ha téves: nincs költsége.
+- Ruling (pre-flight B1): a 7. és a 8. feladat maga másolja újra a DESIGN.md azon részleteit, amelyek forrását megváltoztatja — a `lib/design-excerpts.test.ts` különben a két feladat `npm test`-jét és commitját is megbuktatná — ha téves: nincs költsége.
 
 ## Nyitott kérdések a felhasználónak
 
@@ -162,10 +172,20 @@ Nincs. Az egyetlen kérdésre (nullázza-e az „Újra” az `attempts`-et) a tu
   - az árnyékok kemények, 0 blur;
   - az átmenetek 160ms ease-ek;
   - a hover-stílus `@media (hover: hover)`-ban (a Tailwind `hover:` ezt magától teszi);
-  - a fő oszlopon belül container query.
+  - a fő oszlopon belül container query;
+  - kis signal szöveg paper vagy cream háttéren nincs (DESIGN.md → Colors: 2,86:1). A szál kis címkéi és linkjei ink szövegek signal aláhúzással.
+- **A DESIGN.md részletei** (`lib/design-excerpts.test.ts`): a Components tsx/css részletei szó szerint a forrásfájlból valók. Amelyik feladat egy idézett forrást megváltoztat, az ugyanabban a commitban újramásolja a részletet (7. és 8. feladat).
 - **Szövegek:** komponensenként egy `copy` objektum `{ hu, en }`, angol-only felirat nincs. A megosztott adatlisták (`NAV_ITEMS`, `SHORTCUTS`, `SOURCE_KIND_LABELS`) `Localized` értékeket tartanak.
 - **Commitok:** Conventional Commits, kisbetűs, felszólító módú angol tárgy, attribúciós sor nélkül, explicit pathspec-kel (`git add <fájlok>`, majd `git commit -m`).
-- **Dokumentáció:** a 9. feladat frissíti a README.md-t, a CLAUDE.md-t (Routes, App shell, Database), az ARCHITECTURE.md-t (Codemap, Invariants), a DESIGN.md-t, a TESTING.md-t, a SECURITY.md-t, a CODE_STYLE.md-t és a TODO.md-t.
+- **Dokumentáció:** a 9. feladat frissíti a következőket:
+  - a README.md-t;
+  - a CLAUDE.md-t (How content gets in, App shell, Database, Routes, Data contract);
+  - az ARCHITECTURE.md-t (Codemap, Invariants, Boundaries);
+  - a DESIGN.md prózáját (Colors, Layout, Components, Elevation & Depth);
+  - a TESTING.md-t, a SECURITY.md-t, a CODE_STYLE.md-t és a TODO.md-t;
+  - a spec fejlécét.
+
+  A DESIGN.md részleteit a 7. és a 8. feladat másolja újra.
 - **Tiltott parancs:** ha az engedélyrendszer egy parancsot blokkol, állj meg, és jelentsd. Változatot soha ne futtass.
 
 ## Review Focus
@@ -202,7 +222,8 @@ Nincs. Az egyetlen kérdésre (nullázza-e az „Újra” az `attempts`-et) a tu
 | `app/globals.css` | `.lift` | 7 |
 | `app/components/app-shell.tsx`, `undo-toast.tsx`, `app/dev/preview/page.tsx`, `app/dev/preview/post/page.tsx`, `app/components/shell.test.ts` | bekötés, a csík sávja, az előnézet | 7, 8 |
 | `lib/nav.ts` (+ teszt), `app/components/nav-parts.tsx` | `mobileMore`, `MOBILE_BAR_NAV`, `MOBILE_CHAT_SLOT`, `MOBILE_MORE_NAV`, `inMobileMore`; `NavEntry` `onClick` | 8 |
-| `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md` | dokumentáció | 9 |
+| `DESIGN.md` | a megváltozott forrású részletek újramásolása (Page shell, must-card and story-card, Bottom bar, Undo toast); a próza | 7, 8; 9 |
+| `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md`, `docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md` (fejléc) | dokumentáció | 9 |
 
 **Nem része ennek a tervnek** (spec, „Nem része a v1-nek”): szabad chat, „Törlés”, Android share target, jelzés zárt panel mellett, billentyűparancs.
 
@@ -502,7 +523,7 @@ Futtatás: `node --experimental-strip-types --no-warnings --test lib/pipeline/fa
 Elvárt: `ℹ tests 5`, `ℹ pass 5`.
 
 Futtatás: `npm test`
-Elvárt: `ℹ tests 492`, `ℹ fail 0`. A régi 488 teszt változatlanul zöld. Ellenőrizve: a `processSource`-os tesztek sem érzik az átírást, mert egy futás egy forrást egyszer olvas.
+Elvárt: `ℹ tests 526`, `ℹ fail 0`. A régi 522 teszt változatlanul zöld. Ellenőrizve: a `processSource`-os tesztek sem érzik az átírást, mert egy futás egy forrást egyszer olvas.
 
 - [ ] **Step 5: Mutációs próba** (`lib/pipeline/fake-db.ts`, mind a `lib/pipeline/fake-db.test.ts`-szel)
 
@@ -518,7 +539,7 @@ Elvárt: `ℹ tests 492`, `ℹ fail 0`. A régi 488 teszt változatlanul zöld. 
 - [ ] **Step 6: Ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run dup`
-Elvárt: mind zöld, `ℹ tests 492`, `Found 0 clones.` (az `updateChain` nélkül a jscpd a két update-építőt klónnak látná).
+Elvárt: mind zöld, `ℹ tests 526`, `Found 0 clones.` (az `updateChain` nélkül a jscpd a két update-építőt klónnak látná).
 
 - [ ] **Step 7: Commit**
 
@@ -800,13 +821,14 @@ helyett:
 ```ts
   if (error?.code === "23505") {
     // Already in: point the submitter at its post, once there is one (the chat's "MEGNYITÁS →").
-    const { data: existing } = await reader.db.from("sources").select("posts(id)").eq("url", url.toString()).maybeSingle();
+    const { data: existing, error: lookupError } = await reader.db.from("sources").select("posts(id)").eq("url", url.toString()).maybeSingle();
+    if (lookupError) console.warn("duplicate source's post lookup failed", lookupError);
     const postId = (existing?.posts as unknown as { id: number } | null | undefined)?.id;
     return jsonError(409, "already_submitted", postId ? { postId } : {});
   }
 ```
 
-(A lookup hibája csendben `postId` nélküli 409-et ad. Ez a mostani válasz, a meglévő hívók nem változnak.)
+(A lookup hibája `console.warn`-t ír, és `postId` nélküli 409-et ad: ez a mostani válasz, a meglévő hívók nem változnak. A CODE_STYLE.md → Error handling szerint csendes hiba nincs.)
 
 - [ ] **Step 6: Futtatás, zöld**
 
@@ -831,7 +853,7 @@ Elvárt: `ℹ tests 37`, `ℹ fail 0`. A `listMySources answers null…` a `cons
 - [ ] **Step 8: Ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run dup`
-Elvárt: mind zöld, `ℹ tests 499`, `Found 0 clones.`
+Elvárt: mind zöld, `ℹ tests 533`, `Found 0 clones.`
 
 - [ ] **Step 9: Commit**
 
@@ -1116,7 +1138,7 @@ Elvárt: `ℹ tests 13`, `ℹ fail 0`.
 - [ ] **Step 7: Ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run dup`
-Elvárt: mind zöld, `ℹ tests 509`, `Found 0 clones.`
+Elvárt: mind zöld, `ℹ tests 543`, `Found 0 clones.`
 
 - [ ] **Step 8: Commit**
 
@@ -1264,7 +1286,7 @@ Elvárt: `ℹ tests 6`, `ℹ pass 6`.
 - [ ] **Step 6: Ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run dup`
-Elvárt: mind zöld, `ℹ tests 515`, `Found 0 clones.`
+Elvárt: mind zöld, `ℹ tests 549`, `Found 0 clones.`
 
 - [ ] **Step 7: Commit**
 
@@ -1464,17 +1486,18 @@ test("an older load that answers late never overwrites a newer one", async () =>
   assert.equal(chat.getSnapshot().sources?.[0].status, "done");
 });
 
-// Kills an unreachable flag that the next good load doesn't clear, a failed load that says nothing,
-// and a 401 said again on every poll.
-test("a failed load says the list is out of reach until a good one; a 401 asks, once, to sign in again", async () => {
+// Kills an unreachable flag that the next good load doesn't clear, a thread that never loaded and
+// never asks again (spec 3.3: the next good load clears the reply, so one must come), a failed load
+// that says nothing, and a 401 said again on every poll.
+test("a failed load says the list is out of reach and polls again until a good one; a 401 asks, once, to sign in again", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   const loads = [offline, answer(200, { sources: [] }), answer(401, { error: "unauthorized" }), answer(401, { error: "unauthorized" })];
   let call = 0;
   const chat = createLinkChat(fakeTransport([], { mine: () => loads[call++]() }).transport, () => true);
   chat.open();
   await flush();
   assert.equal(chat.getSnapshot().unreachable, true);
-  chat.open();
-  await flush();
+  await wait(t, POLL_MS);
   assert.equal(chat.getSnapshot().unreachable, false);
   chat.open();
   await flush();
@@ -1589,7 +1612,7 @@ A dupla kattintásos tesztek a két hívást `await` nélkül indítják. A más
 - [ ] **Step 2: Futtatás, el kell buknia**
 
 Futtatás: `node --experimental-strip-types --no-warnings --test lib/link-chat.test.ts`
-Elvárt: a fájl betöltése `SyntaxError: The requested module './link-chat.ts' does not provide an export named 'createLinkChat'`.
+Elvárt: a fájl betöltése `SyntaxError: The requested module './link-chat.ts' does not provide an export named 'MAX_POLLS'`. A Node a hiányzó nevek közül a kódpont szerint elsőt nevezi meg: a nagybetűs `MAX_POLLS`-t, nem a `createLinkChat`-et.
 
 - [ ] **Step 3: A logika** (`lib/link-chat.ts`)
 
@@ -1728,8 +1751,9 @@ function noticeFor({ status, body }: Answer): ChatNotice {
 
 /**
  * The live thread. `open()` loads it, then polls every POLL_MS while the panel stays open, the tab is
- * visible (`isVisible`) and a source is pending, at most MAX_POLLS times; a submission or a retry
- * loads it at once and restarts the count. `close()` stops the polling and drops the local replies.
+ * visible (`isVisible`) and a source is pending (or the list never loaded because it was out of
+ * reach), at most MAX_POLLS times; a submission or a retry loads it at once and restarts the count.
+ * `close()` stops the polling and drops the local replies.
  */
 export function createLinkChat(transport: ChatTransport, isVisible: () => boolean) {
   let snapshot = INITIAL;
@@ -1748,7 +1772,9 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
 
   function schedule() {
     clearTimeout(timer);
-    const pending = snapshot.sources?.some((source) => source.status === "pending");
+    // Before a first good answer there's no list to go by: ask again only if it was out of reach
+    // (spec 3.3: the next good load clears that reply), not after a 401.
+    const pending = snapshot.sources?.some((source) => source.status === "pending") ?? snapshot.unreachable;
     if (!open || !pending || polls >= MAX_POLLS) return;
     timer = setTimeout(() => {
       polls++;
@@ -1895,6 +1921,7 @@ Elvárt: `ℹ tests 19`, `ℹ pass 19`, kb. 150 ms (a 150 lépéses óra-tesztte
 | a `reload()`-ból a `polls = 0;` törlése | ugyanaz |
 | `if (request !== latest) return;` törlése | `an older load that answers late…` |
 | `set({ sources: …, unreachable: false })` → `set({ sources: … })` | `a failed load says the list is out of reach…` |
+| a `schedule()`-ben a `?? snapshot.unreachable` elhagyása | ugyanaz (a be nem töltött szál többé nem kérdez) |
 | a `signed_out` őr törlése (`say({ kind: "signed_out" })` feltétel nélkül) | ugyanaz |
 | `postId: typeof body.postId === "number" ? body.postId : null` → `postId: null` | `send: every refusal…` |
 | a `send` `catch`-éből a `say({ kind: "network" })` törlése | ugyanaz |
@@ -1914,7 +1941,7 @@ Elvárt: `ℹ tests 19`, `ℹ pass 19`, kb. 150 ms (a 150 lépéses óra-tesztte
 - [ ] **Step 7: Ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run dup`
-Elvárt: mind zöld, `ℹ tests 528`, `Found 0 clones.` (A `wait` és az `opened` segéd nélkül a jscpd az óra-tesztek elejét klónnak látná.)
+Elvárt: mind zöld, `ℹ tests 562`, `Found 0 clones.` (A `wait` és az `opened` segéd nélkül a jscpd az óra-tesztek elejét klónnak látná.)
 
 - [ ] **Step 8: Commit**
 
@@ -2219,7 +2246,10 @@ const copy = {
 };
 
 const bubble = "max-w-[85%] border-2 border-ink px-3 py-2 text-sm leading-6 [overflow-wrap:anywhere]";
-const action = "focus-ring inline-flex min-h-10 items-center font-mono text-[11px] tracking-[0.14em] text-signal hover:underline";
+// Small signal text on paper is under 3:1 (DESIGN.md → Colors), so the thread's small labels and
+// links are ink, and the signal goes into their underline.
+const signalUnderline = "text-ink underline decoration-signal decoration-2 underline-offset-4";
+const action = `focus-ring inline-flex min-h-10 items-center font-mono text-[11px] tracking-[0.14em] ${signalUnderline} hover:decoration-ink`;
 
 function Taiyaki({ children }: { children: ReactNode }) {
   return (
@@ -2263,9 +2293,9 @@ function Reply({ entry, retrying, language, onRetry, onOpenPost }: ThreadActions
         <p>
           {t.received} <em>{SOURCE_KIND_LABELS[reply.kind][language]}</em>.
         </p>
-        <p className="mt-1 flex items-center gap-2 font-mono text-[11px] tracking-[0.14em] text-signal">
+        <p className="mt-1 flex items-center gap-2 font-mono text-[11px] tracking-[0.14em]">
           <span className="live-pulse shrink-0" />
-          {t.processing}
+          <span className={signalUnderline}>{t.processing}</span>
         </p>
       </>
     );
@@ -2356,7 +2386,7 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
 }
 ```
 
-(A narancs pont a meglévő `.live-pulse`, a ház „élő” pöttye. A szál a saját `max-h`-s görgetőjében fut, ezt a 7. feladat adja.)
+(A narancs pont a meglévő `.live-pulse`, a ház „élő” pöttye, és signal marad: nem szöveg. A kis címkék és linkek ink szövegek signal aláhúzással (`signalUnderline`, pre-flight I2). A színt a 7. feladat Playwright-körének 13. pontja méri, nem osztálynév-teszt. A szál a saját `max-h`-s görgetőjében fut, ezt a 7. feladat adja.)
 
 - [ ] **Step 6: Az előnézeti minták** (`lib/fixtures.ts`)
 
@@ -2412,7 +2442,7 @@ Elvárt: `ℹ tests 11`, `ℹ fail 0`.
 - [ ] **Step 9: Ellenőrzés és futásidejű próba**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
-Elvárt: mind zöld, `ℹ tests 534`, `Found 0 clones.`
+Elvárt: mind zöld, `ℹ tests 568`, `Found 0 clones.`
 
 Futásidejű próba: `npm run dev` a háttérben, amikor kiírja a `Ready`-t:
 
@@ -2457,7 +2487,8 @@ git commit -m "feat: render the link chat thread with shared source kind names"
 - Modify: `app/components/app-shell.tsx` (nyitott állapot, asztali gomb, `LinkChat`, `chatPreview`)
 - Modify: `app/components/undo-toast.tsx` (`md:right-24`)
 - Modify: `app/dev/preview/page.tsx`, `app/dev/preview/post/page.tsx`
-- Test: `app/components/shell.test.ts`
+- Modify: `DESIGN.md` (három részlet újramásolása: Page shell, must-card and story-card, Undo toast)
+- Test: `app/components/shell.test.ts`, `lib/design-excerpts.test.ts` (változatlan, csak futtatva)
 
 **Interfaces:**
 - Consumes: `createLinkChat`, `httpTransport`, `memoryTransport` (5. feladat); `ChatThread`, `TaiyakiIcon`, `previewMySources` (6. feladat); `Sheet`, `SheetContent` (`closeLabel`), `SheetHeader`, `SheetTitle`; `Textarea`; `Button` (`signal`, `icon-lg`); `useIsMobile`; `isUndoToast`; `useLanguage`.
@@ -2735,10 +2766,20 @@ A `@media (prefers-reduced-motion: reduce)` blokkban, a meglévő `*, *::before,
 
 ```css
   /* The taiyaki's shadow still lifts; it just doesn't move. */
-  .lift:hover, .lift:focus-visible { transform: none; }
+  .lift:focus-visible { transform: none; }
 ```
 
-(A `globals.css` szabályai rétegen kívül vannak, így a `.lift:hover` árnyéka a Tailwind `shadow-[…]` nyugalmi osztályát felülírja. A kártyák szabálya nem változik.)
+A `@media (max-width: 640px) {` sor elé (a reduced-motion blokk után):
+
+```css
+/* The same for hover, which stays pointer-only like every custom :hover here. */
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .lift:hover { transform: none; }
+}
+
+```
+
+(A `globals.css` szabályai rétegen kívül vannak, így a `.lift:hover` árnyéka a Tailwind `shadow-[…]` nyugalmi osztályát felülírja. A kártyák szabálya nem változik. A `:hover` szabály csökkentett mozgásnál is `@media (hover: hover)` alatt marad (pre-flight m4, DESIGN.md → Do's and Don'ts). A két reduced-motion szabály ugyanolyan specifikus, mint a fölöttük álló eltolás, és később jön, ezért nyer.)
 
 - [ ] **Step 5: A keret** (`app/components/app-shell.tsx`)
 
@@ -2878,10 +2919,68 @@ import { previewEmail, previewMySources, previewPosts } from "@/lib/fixtures";
 
 (Mindkét előnézeti oldal kapja: a poszt-előnézet chatje se hívjon valódi API-t egy helyi munkamenettel.)
 
-- [ ] **Step 8: Futtatás, zöld**
+- [ ] **Step 8: A DESIGN.md részletei, majd futtatás, zöld**
 
-Futtatás: `node --experimental-strip-types --no-warnings --test app/components/shell.test.ts`
-Elvárt: `ℹ tests 12`, `ℹ fail 0`.
+Futtatás: `node --experimental-strip-types --no-warnings --test lib/design-excerpts.test.ts`
+Elvárt: 3 FAIL, `excerpt … is no longer in …: re-copy it from the file` üzenettel:
+- `DESIGN.md excerpt … (tsx app/components/app-shell.tsx)`: a Page shell részlet;
+- `(css app/globals.css)`: a must-card and story-card részlet;
+- `(tsx app/components/undo-toast.tsx)`: az Undo toast első részlete.
+
+A sorszámuk ma 1, 17 és 23, a fájlnév az irányadó.
+
+`DESIGN.md` → Components: a három részlet törzsét a forrásfájlból szó szerint újramásolod. A kerítés sora (```` ```tsx app/components/app-shell.tsx ````) és a részletek körüli próza marad, a prózát a 9. feladat frissíti.
+
+**Page shell** (```` ```tsx app/components/app-shell.tsx ````, a `<LanguageProvider initial={language}>`-rel kezdődő részlet) új törzse:
+
+```tsx
+    <LanguageProvider initial={language}>
+      <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
+        {/* Room for the fixed bottom bar, so it never covers the end of the page. */}
+        <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
+      </DesktopNav>
+      <MobileNav email={email} onSearch={openSearch} />
+      <TaiyakiButton
+        open={chatOpen}
+        onClick={toggleChat}
+        className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+      />
+      {/* Keyed so the preview's fail=1 switch gets a fresh in-memory transport. */}
+      <LinkChat key={String(chatPreview?.failWrites)} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
+      <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+      <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
+      <UndoToast />
+    </LanguageProvider>
+```
+
+**must-card and story-card** (```` ```css app/globals.css ````, a `.must-card`-dal kezdődő részlet) új törzse, a `.lift` kommentjétől a `.story-read` soráig:
+
+```css
+/* .lift: the Top 3 cards' "come forward" state, shared with the taiyaki button (link-chat.tsx), which
+   also lifts on keyboard focus. Each keeps its own resting shadow. */
+.must-card, .lift { transition: transform 160ms ease, box-shadow 160ms ease; }
+.must-card { box-shadow: 5px 5px 0 var(--ink); }
+.must-card h2 { overflow-wrap: anywhere; hyphens: auto; }
+.story-card { transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
+/* Touch screens keep :hover after a tap, which would leave cards shifted. */
+@media (hover: hover) {
+  .must-card:hover, .lift:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
+  .story-card:hover { transform: translateX(3px); box-shadow: -6px 0 0 var(--signal); }
+}
+.lift:focus-visible { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
+.story-read { opacity: 0.58; }
+```
+
+**Undo toast** (```` ```tsx app/components/undo-toast.tsx ````, a sáv osztálylistája) új törzse:
+
+```tsx
+      className="pointer-events-none fixed inset-x-4 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
+```
+
+(A blokkok a forrásfájl behúzásával állnak. Ha kétséges, a szerkesztett forrásfájlból másold, ne innen.)
+
+Futtatás: `node --experimental-strip-types --no-warnings --test lib/design-excerpts.test.ts app/components/shell.test.ts`
+Elvárt: `ℹ tests 44` (32 + 12), `ℹ fail 0`. Ha a DESIGN.md részleteinek száma közben változott, a részletek száma + 1 + 12.
 
 - [ ] **Step 9: Mutációs próba** (a `app/components/shell.test.ts`-szel)
 
@@ -2896,7 +2995,7 @@ A panel viselkedését (fókusz, Esc, kívüli kattintás, lift, csík-sáv) a S
 - [ ] **Step 10: Ellenőrzés és futásidejű próba**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
-Elvárt: mind zöld, `ℹ tests 536`, `Found 0 clones.`, és a build listájában `ƒ /api/sources/mine` és `ƒ /api/sources/[id]/retry`.
+Elvárt: mind zöld, `ℹ tests 570`, `Found 0 clones.`, és a build listájában `ƒ /api/sources/mine` és `ƒ /api/sources/[id]/retry`.
 
 A futásidejű próba a 6. feladat 9. lépésének `curl`-ciklusa. Elvárt: minden sor `200 <nézet> 0`.
 
@@ -2929,7 +3028,7 @@ A futásidejű próba a 6. feladat 9. lépésének `curl`-ciklusa. Elvárt: mind
    () => {
      const b = [...document.querySelectorAll('button[aria-controls="taiyaki-panel"]')].find((x) => x.getClientRects().length);
      const s = getComputedStyle(b);
-     return { hover: b.matches(":hover"), focus: b.matches(":focus-visible"), transform: s.transform, shadow: s.boxShadow.split("), ").pop(), transition: `${s.transitionProperty} ${s.transitionDuration} ${s.transitionTimingFunction}` };
+     return { hover: b.matches(":hover"), focus: b.matches(":focus-visible"), transform: s.transform, shadow: s.boxShadow.split(/,\s*(?=rgba?\()/).pop(), transition: `${s.transitionProperty} ${s.transitionDuration} ${s.transitionTimingFunction}` };
    }
    ```
    - Nyugalomban (a fókusz máshol, `browser_hover` a „A HÉT ÉLŐ ADATFOLYAMA”-n): `transform: "none"`, `shadow: "rgb(20, 20, 20) 4px 4px 0px 0px"`, `transition: "transform, box-shadow 0.16s, 0.16s ease, ease"`.
@@ -2943,7 +3042,8 @@ A futásidejű próba a 6. feladat 9. lépésének `curl`-ciklusa. Elvárt: mind
      }
      ```
      Utána `browser_press_key` `Tab`. Elvárt: `hover: false`, `focus: true`, `transform: "matrix(1, 0, 0, 1, -2, -2)"`, `shadow: "rgb(241, 95, 34) 8px 8px 0px 0px"`, és a `focus-ring` körvonala is látszik (`outlineStyle: "solid"`).
-   - `browser_emulate_media` `reducedMotion: "reduce"`, majd hover a gombon: `transform: "none"`, `shadow: "rgb(241, 95, 34) 8px 8px 0px 0px"`. Ezután `reducedMotion: null`.
+   - `browser_emulate_media` `reducedMotion: "reduce"`, majd hover a gombon, utána a fenti Tab-lépés: mindkétszer `transform: "none"`, `shadow: "rgb(241, 95, 34) 8px 8px 0px 0px"`. Ezután `reducedMotion: null`.
+   - (A `shadow` a számított `box-shadow` utolsó rétege. A Tailwind a nyugalmi árnyék elé négy átlátszó réteget tesz, ezért a szkript a `rgb(`/`rgba(` előtti vesszőknél vág.)
    - Egy Top 3 kártya (`article.must-card`) hovere változatlan: `matrix(1, 0, 0, 1, -2, -2)` és `rgb(241, 95, 34) 8px 8px 0px 0px`, nyugalomban `rgb(20, 20, 20) 5px 5px 0px 0px`.
 7. **A csík és a gomb nem fedik egymást** (1280×800 és 768×1024, `radar`). Egy látható „Teendőhöz adás” gomb kattintása után:
    ```js
@@ -2962,13 +3062,21 @@ A futásidejű próba a 6. feladat 9. lépésének `curl`-ciklusa. Elvárt: mind
 10. **40 px** a panelben (a UX-A szkriptje, `#taiyaki-panel`-re szűkítve, az inline linkek kivételek). Elvárt: üres tömb.
 11. **A Library frissülése nem bántja a panelt** (`library` nézet, ahol 5 s-onként `router.refresh()` fut). Nyisd a panelt, írj be szöveget, várj 11 s-ot. Elvárt: a panel nyitva van, a szöveg megvan, a szál elemszáma változatlan.
 12. **Konzol** (`browser_console_messages`, `level: "warning"`). Elvárt: új hiba vagy figyelmeztetés nincs. A mintakép `/media/1/0123456789abcdef-640.avif` kérésének hibája ismert (a fixture tükrözött képe).
+13. **A kis címkék színe** (pre-flight I2, DESIGN.md → Colors). Friss `/dev/preview?view=radar`-on nyisd a panelt, majd:
+    ```js
+    () => [...document.querySelectorAll('#taiyaki-panel a[href^="/library/"], #taiyaki-panel li p > span:not(.live-pulse)')].map((el) => {
+      const s = getComputedStyle(el);
+      return [el.textContent, s.color, s.textDecorationLine, s.textDecorationColor];
+    })
+    ```
+    Elvárt: `[["KÉSZ · MEGNYITÁS →", "rgb(20, 20, 20)", "underline", "rgb(241, 95, 34)"], ["FELDOLGOZÁS…", "rgb(20, 20, 20)", "underline", "rgb(241, 95, 34)"]]`. A pötty (`.live-pulse`) háttere signal marad: `getComputedStyle(document.querySelector("#taiyaki-panel .live-pulse")).backgroundColor === "rgb(241, 95, 34)"`. Ez a pont fogja meg a `signalUnderline` `text-ink` → `text-signal` visszacserélését.
 
 Minden talált hibára előbb egy teszt a `lib/`-ben vagy a render-harnessben, ha a hiba logikai, aztán a javítás, és külön commit (`fix: …`).
 
 - [ ] **Step 12: Commit**
 
 ```bash
-git add app/components/link-chat.tsx app/globals.css app/components/app-shell.tsx app/components/undo-toast.tsx app/dev/preview/page.tsx app/dev/preview/post/page.tsx app/components/shell.test.ts
+git add app/components/link-chat.tsx app/globals.css app/components/app-shell.tsx app/components/undo-toast.tsx app/dev/preview/page.tsx app/dev/preview/post/page.tsx app/components/shell.test.ts DESIGN.md
 git commit -m "feat: open the taiyaki link chat from a corner button"
 ```
 
@@ -2981,7 +3089,8 @@ git commit -m "feat: open the taiyaki link chat from a corner button"
 - Modify: `app/components/nav-parts.tsx` (`NavEntry` `onClick`)
 - Modify: `app/components/app-shell.tsx` (`MobileNav`, a tartalom alsó paddingje)
 - Modify: `app/components/undo-toast.tsx` (a mobil sáv magassága)
-- Test: `app/components/shell.test.ts`
+- Modify: `DESIGN.md` (három részlet újramásolása: Page shell, a Bottom bar `slotClass`-a, Undo toast)
+- Test: `app/components/shell.test.ts`, `lib/design-excerpts.test.ts` (változatlan, csak futtatva)
 
 **Interfaces:**
 - Consumes: `TaiyakiButton` (7. feladat); `PRIMARY_NAV`, `activeNavId`, `NavItem`, `NavId` (`lib/nav.ts`).
@@ -3052,7 +3161,7 @@ test("the mobile bar reads Radar, Könyvtár, the taiyaki, Keresés, Több", () 
 
 Futtatás: `node --experimental-strip-types --no-warnings --test lib/nav.test.ts app/components/shell.test.ts`
 Elvárt:
-- a `lib/nav.test.ts` betöltése `SyntaxError: … does not provide an export named 'inMobileMore'`;
+- a `lib/nav.test.ts` betöltése `SyntaxError: … does not provide an export named 'MOBILE_BAR_NAV'` (a Node a hiányzó nevek közül a kódpont szerint elsőt nevezi meg);
 - a `shell.test.ts`-ben 2 FAIL: a darabszám `1 !== 2`, és a sor `["Radar", "Könyvtár", "Keresés", "Archívum", "Több"]`.
 
 - [ ] **Step 3: A menülista** (`lib/nav.ts`)
@@ -3140,7 +3249,7 @@ A tartalom paddingje:
 helyett:
 
 ```tsx
-        {/* Room for the fixed bottom bar and the taiyaki raised 18px above it, so neither covers the end of the page. */}
+        {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, so neither covers the end of the page. */}
         <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
 ```
 
@@ -3159,6 +3268,8 @@ A `<MobileNav email={email} onSearch={openSearch} />` helyett:
         }
       />
 ```
+
+(A `-mt-[18px]`-ből a sáv 2 px-es felső vonala levonódik: a gomb 16 px-rel nyúlik a sáv fölé, a spec 16–18 px-én belül. A kódkomment és a dokumentáció ezért 16 px-et mond, pre-flight m6.)
 
 A `slotClass` és a `MobileNav` eleje, a `<SheetTrigger className={slotClass}>` sorral bezárólag:
 
@@ -3269,12 +3380,68 @@ helyett:
 
 A sávban `bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))]` → `bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))]`.
 
-- [ ] **Step 7: Futtatás, zöld**
+- [ ] **Step 7: A DESIGN.md részletei, majd futtatás, zöld**
 
-Futtatás: `node --experimental-strip-types --no-warnings --test lib/nav.test.ts app/components/shell.test.ts`
-Elvárt: `ℹ tests 17`, `ℹ fail 0`.
+Futtatás: `node --experimental-strip-types --no-warnings --test lib/design-excerpts.test.ts`
+Elvárt: 3 FAIL:
+- `(tsx app/components/app-shell.tsx)` kétszer: a Page shell és a `slotClass`;
+- `(tsx app/components/undo-toast.tsx)` egyszer: a sáv.
 
-- [ ] **Step 8: Mutációs próba** (a Step 7 két fájljával)
+A sorszámuk ma 1, 6 és 23.
+
+`DESIGN.md` → Components: a három részlet törzsét a forrásfájlból szó szerint újramásolod, ahogy a 7. feladat 8. lépése. A kerítés sora és a próza marad.
+
+**Page shell** (a `<LanguageProvider initial={language}>`-rel kezdődő részlet) új törzse:
+
+```tsx
+    <LanguageProvider initial={language}>
+      <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
+        {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, so neither covers the end of the page. */}
+        <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
+      </DesktopNav>
+      <MobileNav
+        email={email}
+        onSearch={openSearch}
+        chat={
+          <TaiyakiButton
+            open={chatOpen}
+            onClick={toggleChat}
+            className="-mt-[18px] grid size-14 self-start justify-self-center shadow-[3px_3px_0_var(--signal)]"
+          />
+        }
+      />
+      <TaiyakiButton
+        open={chatOpen}
+        onClick={toggleChat}
+        className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+      />
+      {/* Keyed so the preview's fail=1 switch gets a fresh in-memory transport. */}
+      <LinkChat key={String(chatPreview?.failWrites)} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
+      <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+      <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
+      <UndoToast />
+    </LanguageProvider>
+```
+
+**Bottom bar and the "Több" sheet**, a `const slotClass =`-szal kezdődő részlet új törzse:
+
+```tsx
+const slotClass =
+  "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+```
+
+**Undo toast**, a sáv osztálylistája:
+
+```tsx
+      className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
+```
+
+(A „Több” Sheet `SheetContent`-részlete és a sáv `nav`-osztálylistája nem változik, azok zöldek maradnak.)
+
+Futtatás: `node --experimental-strip-types --no-warnings --test lib/design-excerpts.test.ts lib/nav.test.ts app/components/shell.test.ts`
+Elvárt: `ℹ tests 49` (a részlet-teszt 32-je és a két fájl 17-e), `ℹ fail 0`. Ha a DESIGN.md részleteinek száma közben változott, a részletek száma + 1 + 17.
+
+- [ ] **Step 8: Mutációs próba** (a `lib/nav.test.ts`-szel és az `app/components/shell.test.ts`-szel)
 
 | Mutáció | Elvárt bukás |
 | --- | --- |
@@ -3286,7 +3453,7 @@ Elvárt: `ℹ tests 17`, `ℹ fail 0`.
 - [ ] **Step 9: Ellenőrzés és futásidejű próba**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
-Elvárt: mind zöld, `ℹ tests 538`, `Found 0 clones.`
+Elvárt: mind zöld, `ℹ tests 572`, `Found 0 clones.`
 
 A futásidejű próba a 6. feladat 9. lépésének `curl`-ciklusa. Elvárt: minden sor `200 <nézet> 0`.
 
@@ -3301,7 +3468,7 @@ A futásidejű próba a 6. feladat 9. lépésének `curl`-ciklusa. Elvárt: mind
        slots: [...bar.children].map((el) => el.getAttribute("aria-label") ?? el.textContent),
        size: [Math.round(taiyaki.getBoundingClientRect().width), Math.round(taiyaki.getBoundingClientRect().height)],
        raise: Math.round(bar.getBoundingClientRect().top - taiyaki.getBoundingClientRect().top),
-       shadow: getComputedStyle(taiyaki).boxShadow.split("), ").pop(),
+       shadow: getComputedStyle(taiyaki).boxShadow.split(/,\s*(?=rgba?\()/).pop(),
      };
    }
    ```
@@ -3339,7 +3506,7 @@ A „Több” aktív jelölése (`data-active`) az előnézetben nem látszik, m
 - [ ] **Step 11: Commit**
 
 ```bash
-git add lib/nav.ts lib/nav.test.ts app/components/nav-parts.tsx app/components/app-shell.tsx app/components/undo-toast.tsx app/components/shell.test.ts
+git add lib/nav.ts lib/nav.test.ts app/components/nav-parts.tsx app/components/app-shell.tsx app/components/undo-toast.tsx app/components/shell.test.ts DESIGN.md
 git commit -m "feat: put the taiyaki in the mobile bar and move the archive into more"
 ```
 
@@ -3348,7 +3515,8 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
 ### Task 9: Dokumentáció és végső ellenőrzés
 
 **Files:**
-- Modify: `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md`
+- Modify: `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md` (csak próza), `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md`
+- Modify: `docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md` (csak a fejléc `Állapot` mezője)
 
 **Interfaces:**
 - Consumes: az 1–8. feladat nevei.
@@ -3358,12 +3526,14 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
 
 - **How content gets in, 2. Link submissions:** az első mondat elé: „Two front doors lead to it: the `/library` form and the taiyaki link chat (see App shell).” A felsorolás után új bekezdés: „`POST /api/sources/[id]/retry` sends the submitter's own `failed` source back to `pending` with `attempts` reset to 0 (`retrySource` in `lib/my-sources.ts`), so a retry killed at 300 s is still picked up by the daily cron, and runs `processSource` in `after()`.”
 - **App shell and navigation:**
-  - A „Mobile, below `md`” pont helyett: „**Mobile, below `md`:** the bottom bar in `app-shell.tsx`, five slots: Radar, Library, the taiyaki (raised 18px out of the bar), Search, Több. `lib/nav.ts` says where each item goes: `MOBILE_BAR_NAV` (the three page slots, the taiyaki after `MOBILE_CHAT_SLOT` of them) and `MOBILE_MORE_NAV` (items with `mobileMore`, today Archívum). "Több" opens a bottom Sheet: Archívum, the language toggle, the coming views, sign-out; on an Archívum page its slot carries the active mark (`inMobileMore`, `data-active`), and following the link closes the Sheet (`NavEntry`'s `onClick`).”
-  - Új pont a „Search” után: „**Link chat (taiyaki):** `link-chat.tsx`. `TaiyakiButton` is the desktop corner button (`fixed bottom-6 right-6`, `z-40`) and the mobile centre slot; `.lift` in `globals.css` brings it forward on hover and keyboard focus, like the Top 3 cards. `LinkChat` is one Radix Dialog: non-modal on desktop (360px above the button, `max-h-[70dvh]`; only Esc and its close button close it), a modal bottom Sheet on mobile (`max-h-[75dvh]`). Focus goes to the field on open and back to the button that opened it. Enter sends, Shift+Enter is a new line. The logic is `lib/link-chat.ts`: `parseLinkMessage` (the first http(s) word, sentence punctuation stripped; the rest is the note), `toThread`, and `createLinkChat`, which loads `GET /api/sources/mine` on open and polls it every 4 s while the panel is open, the tab is visible and a source is pending (at most `MAX_POLLS`, 150). The thread is `chat-thread.tsx`: the reader's 10 latest submissions (oldest first) with a reply per status, then local replies that live only while the panel is open.”
+  - A „Mobile, below `md`” pont helyett: „**Mobile, below `md`:** the bottom bar in `app-shell.tsx`, five slots: Radar, Library, the taiyaki (raised 16px out of the bar), Search, Több. `lib/nav.ts` says where each item goes: `MOBILE_BAR_NAV` (the three page slots, the taiyaki after `MOBILE_CHAT_SLOT` of them) and `MOBILE_MORE_NAV` (items with `mobileMore`, today Archívum). "Több" opens a bottom Sheet: Archívum, the language toggle, the coming views, sign-out; on an Archívum page its slot carries the active mark (`inMobileMore`, `data-active`), and following the link closes the Sheet (`NavEntry`'s `onClick`).”
+  - Új pont a „Search” után: „**Link chat (taiyaki):** `link-chat.tsx`. `TaiyakiButton` is the desktop corner button (`fixed bottom-6 right-6`, `z-40`) and the mobile centre slot; `.lift` in `globals.css` brings it forward on hover and keyboard focus, like the Top 3 cards. `LinkChat` is one Radix Dialog: non-modal on desktop (360px above the button, `max-h-[70dvh]`; only Esc and its close button close it), a modal bottom Sheet on mobile (`max-h-[75dvh]`). Focus goes to the field on open and back to the button that opened it. Enter sends, Shift+Enter is a new line. The logic is `lib/link-chat.ts`: `parseLinkMessage` (the first http(s) word, sentence punctuation stripped; the rest is the note), `toThread`, and `createLinkChat`, which loads `GET /api/sources/mine` on open and polls it every 4 s while the panel is open, the tab is visible and a source is pending, or the list never loaded because it was out of reach (at most `MAX_POLLS`, 150). The thread's small labels and links are ink with a signal underline (DESIGN.md → Colors). The thread is `chat-thread.tsx`: the reader's 10 latest submissions (oldest first) with a reply per status, then local replies that live only while the panel is open.”
   - A DESIGN.md → Components → Undo toast szakasz végére (a csík sávja oda költözött): „Its lane sits above the mobile bar and the raised taiyaki (`bottom: 5.75rem`), and from `md` up stops short of the taiyaki's corner (`md:right-24`).”
 - **ARCHITECTURE.md → Invariants, „The offline preview never reaches real data”** (a régi Offline preview ide költözött része): a „the Library form goes through an in-memory stub (`preview` on `LibraryView`);” alpont után új alpont: „the link chat goes through `memoryTransport` (`chatPreview` on `AppShell`, seeded from `previewMySources`);”. Ugyanitt: „The preview post ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Translate or a Library card link can't reach a real post.” → „The preview post and chat-source ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Translate, Retry or a Library card link can't reach a real row.”
 - **CODE_STYLE.md → HU/EN copy** (a régi UI text): a „Data lists that several components share” pont listájába: „`SOURCE_KIND_LABELS` in `lib/source-kinds.ts` (the post page's kind badge and the link chat)”.
-- **SECURITY.md → Reader vs admin client** (a mondat a Database-ből költözött ide): a „The translate, reextract and `/media` routes may also use it, each after its own check.” mondatban: „The translate, reextract, `sources/[id]/retry` and `/media` routes…”. **CLAUDE.md → Database**, a `sources` sor: „`sources`: readers `select` (every row: code that lists "my" sources filters on `submitted_by` itself, `listMySources`) and `insert` (stamped with `auth.uid()`); no reader updates, so the retry's claim runs with the admin client.”
+- **SECURITY.md → Reader vs admin client** (a mondat a Database-ből költözött ide), a `createAdminClient()` pont két mondata:
+  - „…and the `processSource` runs that the sources and reextract routes schedule in `after()`.” → „…and the `processSource` runs that the sources, reextract and `sources/[id]/retry` routes schedule in `after()`.”;
+  - „The translate, reextract and `/media` routes may also use it, each after its own check.” → „The translate, reextract, `sources/[id]/retry` (its compare-and-swap, after the reader-side read) and `/media` routes may also use it, each after its own check.” **CLAUDE.md → Database**, a `sources` sor: „`sources`: readers `select` (every row: code that lists "my" sources filters on `submitted_by` itself, `listMySources`) and `insert` (stamped with `auth.uid()`); no reader updates, so the retry's claim runs with the admin client.”
 - **Routes** tábla:
   - a `POST /api/sources` sora: „400 `invalid_url`, 409 `already_submitted` (with `postId` when the link already has a post), 500 `insert_failed`, else 202 `{ ok, id }` and `processSource` in `after()`”;
   - új sor: „| `GET /api/sources/mine` | `getReader()` | the caller's 10 latest sources, newest first, with `post: { id, title }` (the submitter's title override wins, `shownTitle`); 500 `db_error` |”;
@@ -3371,19 +3541,34 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
 
   A tábla alatti mondat: „The three `posts/[id]` routes are wrapped in `postRoute`” → „The three `posts/[id]` routes and `sources/[id]/retry` are wrapped in `postRoute`”. A `maxDuration = 300` listába a retry route.
 - **SECURITY.md → XSS** (a régi Security, Rendering), a Links pont: „in `PostBlocks` and on the post page” → „in `PostBlocks`, on the post page and in the link chat's thread (`toThread`)”.
-- **ARCHITECTURE.md → Codemap** (a régi Layout):
-  - az `app/components/` sorába: `taiyaki-icon, chat-thread, link-chat (the taiyaki button and panel)`;
-  - az `app/api/` sorába: `sources/mine, sources/[id]/retry`;
-  - új sorok: `lib/link-chat.ts  parseLinkMessage, toThread, the chat store (createLinkChat), httpTransport / memoryTransport`, `lib/my-sources.ts  listMySources, retrySource (GET /api/sources/mine, POST /api/sources/[id]/retry)`, `lib/source-kinds.ts  SOURCE_KIND_LABELS`;
-  - a `lib/post-view.ts` sora: „Post, toPost (a posts row → the page's Post), shownTitle, media/video helpers, withQuery”;
-  - a `lib/api.ts` sora: „…postRoute and POST_ERRORS for the `[id]` routes”.
+- **ARCHITECTURE.md → Codemap** (a régi Layout; beágyazott prózai lista, a stílusát követve):
+  - „`api/`: state, sources, `posts/[id]` (PATCH, translate, reextract) and `cron/daily`;” → „`api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract) and `cron/daily`;”;
+  - „the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts`, `shell-dialogs`, `undo-toast`;” → „the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts`, `shell-dialogs`, `undo-toast`, and the link chat: `link-chat` (the taiyaki button and panel), `chat-thread`, `taiyaki-icon`;”;
+  - „`hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel still uses it.” → „`hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel and the link chat use it.”;
+  - „`post-view.ts`, which turns a post row into the page's `Post`;” → „`post-view.ts`, which turns a post row into the page's `Post` (`shownTitle` is the title readers see);”;
+  - a „reader state: `reader-store.ts`, `state.ts`, `feed.ts`;” alpont után új alpont: „the link chat: `link-chat.ts` (the message parser, the thread and its store, the HTTP and in-memory transports), `my-sources.ts` (the reader's own submissions and their retry), `source-kinds.ts` (the kind names, `SOURCE_KIND_LABELS`);”.
+- **ARCHITECTURE.md → Boundaries**, a Pipeline and routes pont: „Ingest (`processSource`, from the sources and reextract routes) runs in `after()`” → „Ingest (`processSource`, from the sources, reextract and `sources/[id]/retry` routes) runs in `after()`”.
 - **Conventions** (a szakasz szétköltözött):
   - A CODE_STYLE.md → No duplication közös helyei közé: `lib/source-kinds.ts` (`SOURCE_KIND_LABELS`), `lib/post-view.ts` (`shownTitle`), `lib/link-chat.ts` (`httpTransport`, the one fetcher for `/api/sources`). A `.lift` osztály egyetlen helye a DESIGN.md → Elevation & Depth (lásd lent a DESIGN.md pontot).
   - A TESTING.md → Helpers → `fakeDb` pontba: „A `sources` listing applies `order(column, { ascending })` before `limit(n)` and, without `pending`, lists `sources`; `maybeSingle()` answers null for none and PGRST116 for several; a `sources` update chains `.eq` filters and writes through, so a second compare-and-swap sees the first; `sourceSelectError` fails every `sources` select.”
   - A TESTING.md → Pitfalls-ba: „`t.mock.timers.enable()` once per test: a helper that enables it breaks when a test calls it twice (`ERR_INVALID_STATE`)”.
-- **DESIGN.md** (a régi Design language): a Layout „Navigation by width” pontjában a „Below `md` the app shell shows a fixed, five-slot bottom bar” után: „with the taiyaki raised in its centre slot; the content column's bottom padding (`5.25rem`) clears both”. Az Elevation & Depth árnyék-táblázata alá: „`.lift` is the shared "come forward" state (the Top 3 cards on hover; the taiyaki on hover and keyboard focus, and without the translate under `prefers-reduced-motion`).”
+  - A TESTING.md → Helpers → Fixtures: „…unique ids, and negative post ids.” → „…unique ids, and negative post and chat-source ids (`previewMySources`).”
+- **DESIGN.md** (a régi Design language). A Components részleteit a 7. és a 8. feladat már újramásolta, itt csak a próza változik:
+  - **Colors**, a kontraszt-bekezdés végére, az „An inline link at least carries an underline, but a label does not.” mondat után: „The link chat's small labels and links (`chat-thread.tsx`) are ink with a signal underline instead, so they add no new case.”
+  - **Layout → Navigation by width**, az egész „Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, and the content column has matching bottom padding.” alpont helyett: „Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, with the taiyaki raised 16px out of its centre slot; the content column's bottom padding (`5.25rem`) clears both.”
+  - **Layout**, a mobil ASCII-ábrán a „`| Radar Libr. Search Arch. More|  bottom bar, 5 x 64px, ink`” sor helyett: „`| Radar Libr. [TY] Search More |  bottom bar, 5 x 64px, ink; [TY] the taiyaki, raised 16px`”. A keret belső szélessége marad 30 karakter.
+  - **Components → Bottom bar and the "Több" sheet**:
+    - „…and five 64px slots. The active slot, or the open "Több", turns signal:” → „…and five 64px slots, the taiyaki raised in the middle one. The active slot, the open "Több", or "Több" on an Archívum page (`data-active`) turns signal:”;
+    - „"Több" is a cream bottom Sheet holding a display title with its `//`, the language row, the coming views and the account row:” → „"Több" is a cream bottom Sheet holding a display title with its `//`, Archívum (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row:”.
+  - **Elevation & Depth**:
+    - az árnyék-táblázat két új sora a „nav tooltip” sor után: „| taiyaki button | `4px 4px 0 var(--ink)`; in the mobile bar `3px 3px 0 var(--signal)` | `8px 8px 0 var(--signal)`, also on keyboard focus (`.lift`) |” és „| link chat panel, from `md` | `6px 6px 0 var(--ink)` | none |”;
+    - a táblázat alá: „`.lift` is the shared "come forward" state (the Top 3 cards on hover; the taiyaki on hover and keyboard focus, and without the translate under `prefers-reduced-motion`).”;
+    - a Motion pontban: „(the must-card and story-card lifts)” → „(the must-card, `.lift` and story-card lifts)”;
+    - a Layering listában:
+      - „the mobile bottom bar, `z-40`;” → „the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel from `md` to `2xl`, covers the button until it closes);”;
+      - „sheets, dialogs and their `bg-black/50` overlays, `z-50`;” → „sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;”.
 - **Data contract:** a `toPost` mondatába: „…where a submitter's override wins over the model's title (`shownTitle`, shared with the link chat) and summary…”.
-- re-copy any DESIGN.md excerpt whose source you changed; `design-excerpts.test.ts` fails otherwise.
+- A DESIGN.md részleteit a 7. és a 8. feladat már újramásolta. Ez a feladat idézett forrásfájlt nem módosít, így a `design-excerpts.test.ts` zöld marad. Ha mégis, a részletet a forrásból másold újra.
 
 - [ ] **Step 2: `README.md`**
 
@@ -3396,24 +3581,24 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
   ```
   és a `sourcesRoute -.->|"after()"| ingest` sor után: `  retryRoute -.->|"after()"| ingest`.
 - **Project tour**, a keret-bekezdés végére: „The taiyaki button opens the link chat.” A táblában:
-  - az `app/components/` sora: „…the undo toast, the link chat and its taiyaki)…”;
+  - az `app/components/` sora: „The app shell (desktop nav, mobile bottom bar, dialogs, undo toast)” → „The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat)”;
   - az `app/api/` sora: „JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron”.
 - **Recipes → Add a source extractor**, 5. lépés: „Add the kind's name, in both languages, to `SOURCE_KIND_LABELS` in [`lib/source-kinds.ts`](lib/source-kinds.ts) (the post page's badge and the link chat), and its icon to `kindIcons` in the Library page; `tsc` reports a missing entry.”
-- **Conventions → Bilingual:** az angol-only felsorolásból kikerül „the post kind labels (`kindLabel`), ”.
 - **Troubleshooting → Submissions are stuck after three failed attempts:** a „There is no button to reset them yet (the TODO item "Hibás beküldések kezelése" in [TODO.md](TODO.md)).” mondat helyett: „The submitter can send a failed one through again with ÚJRA in the taiyaki link chat, which also resets its attempts; a stuck source of another member, or many at once, still needs the SQL below.”
 - **Roadmap:** új sor: „- [Taiyaki link chat](docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md) (spec) and its [plan](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md)”.
 
-- [ ] **Step 3: `TODO.md`**
+- [ ] **Step 3: `TODO.md` és a spec fejléce**
 
 - A „Következő lépések” alól a `- [ ] **Taiyaki link-chat** …` pont átkerül a „Kész” alá, pipálva: `- [x] **Taiyaki link-chat** (2026-09-2x): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).` (A dátum a beolvasztás napja.)
 - A „Hibás beküldések kezelése” alpontja: `  - [x] A saját beküldés „Újra” gombja kész: a taiyaki link-chatben (\`POST /api/sources/[id]/retry\`). A „Törlés” és az admin-rész marad itt.`
 - A „Következő lépések” alá új pont: `- [ ] **Élő próbák a taiyaki link-chat deployja után** (a kontroller futtatja, ha a felhasználó engedélyez egy bejelentkezett munkamenetet): egy valódi link beküldése a chatből, és a szál „FELDOLGOZÁS…” → „KÉSZ · MEGNYITÁS →” váltása a poszt címével (a \`posts(...)\` beágyazás objektumként jön-e); egy hibás beküldés „Újra”-ja (a sor `attempts` értéke 0 lesz, aztán 1); egy már bent lévő link 409-e a „MEGNYITÁS →”-sal; az \`/archive\` oldalon a „Több” aktív jelölése mobilon; a lekérdezés leáll a panel bezárása után (\`browser_network_requests\`).`
 - Az M2 pont alá: `    - A taiyaki link-chat óta a \`post-article.tsx\` \`copy\`-jában nincs \`kind\`: a forrástípus jelvénye a \`SOURCE_KIND_LABELS\`-ből jön (\`lib/source-kinds.ts\`). A \`labels.keyPoints\` megmaradt.`
+- A spec (`docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md`) fejlécében: `**Állapot:** jóváhagyásra vár` → `**Állapot:** jóváhagyva (2026-09-25), kiegészítve 2026-09-26`. A spec szövegén más nem változik.
 
 - [ ] **Step 4: Végső ellenőrzés**
 
 Futtatás: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`
-Elvárt: mind zöld, `ℹ tests 538` (a kiinduló 488 + 50), `Found 0 clones.` Ha a kiindulás más volt, a növekmény 50.
+Elvárt: mind zöld, `ℹ tests 572` (a kiinduló 522 + 50), `Found 0 clones.` Ha a kiindulás más volt, a növekmény 50.
 
 Futtatás: `git diff --stat main..HEAD -- package.json pnpm-lock.yaml pnpm-workspace.yaml supabase/`
 Elvárt: üres kimenet (nincs függőség- és sémaváltozás).
@@ -3421,7 +3606,7 @@ Elvárt: üres kimenet (nincs függőség- és sémaváltozás).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add README.md CLAUDE.md ARCHITECTURE.md DESIGN.md TESTING.md SECURITY.md CODE_STYLE.md TODO.md
+git add README.md CLAUDE.md ARCHITECTURE.md DESIGN.md TESTING.md SECURITY.md CODE_STYLE.md TODO.md docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md
 git commit -m "docs: document the taiyaki link chat"
 ```
 
@@ -3458,7 +3643,7 @@ A push a tulajdonosé: `! git push origin taiyaki-link-chat`. A `main` ruleset a
   - `parseLinkMessage`: 4. feladat;
   - a küldés a `{ url, note }` törzzsel, és minden válasz a táblázatból (202 + `moreLinks`, 400, 409 + „MEGNYITÁS →”, 401 + `/login?next=`, hálózat/5xx a szöveg megtartásával, link nélküli üzenet kérés nélkül): 5. és 6. feladat;
   - a 409 `postId`: 2. feladat.
-- 3.1: 2. feladat. 3.2: 3. feladat (a `ponytail:` megjegyzéssel, és az `attempts = 0` a tulajdonos döntése szerint). 3.3: 5. feladat (nyitáskor egy lekérés, 4 s csak nyitott panel, látható fül és függő beküldés mellett, azonnali lekérés küldés és „Újra” után, egyszeri „nem érem el”). Séma nincs: Global Constraints.
+- 3.1: 2. feladat. 3.2: 3. feladat (a `ponytail:` megjegyzéssel, és az `attempts = 0` a tulajdonos döntése szerint). 3.3: 5. feladat (nyitáskor egy lekérés, 4 s csak nyitott panel, látható fül és függő beküldés mellett, azonnali lekérés küldés és „Újra” után, egyszeri „nem érem el”, amelyet a következő lekérés akkor is eltüntet, ha a szál még egyszer sem töltődött be). Séma nincs: Global Constraints.
 - Spec 4. (hibakezelés és biztonság): a Global Constraints-ben és az 5., 3., 2. feladatban.
 - Spec 5. (tesztelés):
   - egységtesztek: 4., 5., 2., 3. feladat;
@@ -3468,6 +3653,7 @@ A push a tulajdonosé: `! git push origin taiyaki-link-chat`. A `main` ruleset a
   - futásidejű próba: 6., 7., 8. feladat;
   - az öt ellenőrzés: minden feladat, végül a 9.
 - A tulajdonos kiegészítése (lift): 7. feladat Step 4, Playwright 6. pont; 8. feladat Playwright 8. pont.
+- A pre-flight döntései: B1 a 7. feladat 8. és a 8. feladat 7. lépése (a DESIGN.md részletei); I1 minden `ℹ tests` sor; I2 a 6. feladat `signalUnderline`-ja és a 7. feladat Playwright 13. pontja; I3 és m9, m10 a 9. feladat; m1 és m2 az 5. és a 8. feladat bukó lépése; m3 a két Playwright-szkript; m4 a 7. feladat 4. lépése; m5 a 2. feladat 5. lépése; m6 a 8. feladat 5. lépése; m7 az 5. feladat `schedule()`-je, a „failed load” teszt és egy mutációs sor.
 
 **2. Helyőrzők:** „TBD”, „TODO” és „similar to” nincs. Minden kódlépésben teljes kód áll. A TODO.md-be írt „2026-09-2x” a beolvasztás napja, szándékosan.
 
