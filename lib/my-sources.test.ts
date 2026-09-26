@@ -128,8 +128,25 @@ test("retrySource's compare-and-swap repeats the owner and the status check: a r
   }
 });
 
-// Kills a read error taken for "not found" (the route would answer 404 instead of 500).
-test("retrySource answers failed when the read fails", async () => {
+// Kills a read error taken for "not found" (the route would answer 404 instead of 500), and a
+// dropped console.error (a DB failure must leave a trace, not vanish silently).
+test("retrySource answers failed and logs once when the read fails", async (t) => {
+  const error = t.mock.method(console, "error", () => {});
   const db = fakeDb(undefined, { sourceSelectError: pgError("08006", "connection failure") });
   assert.equal(await retrySource(db, fakeDb(), "owner", 5), "failed");
+  assert.equal(error.mock.calls.length, 1);
+});
+
+// Fix round 1. Kills `if (claimError) return "failed";` being dropped — every other test still
+// passes without it, because the fake's own update never errors on its own; a claim failure must not
+// read as "not_failed" (the chat would just refresh and hide a real DB outage). Also kills a dropped
+// console.error on this branch.
+test("retrySource answers failed and logs once when the claim fails, leaving the row alone", async (t) => {
+  const error = t.mock.method(console, "error", () => {});
+  const db = fakeDb(undefined, { sources: [{ id: 5, submitted_by: "owner", status: "failed" }] });
+  const tables = { sources: [{ id: 5, submitted_by: "owner", status: "failed" }], sourceUpdateError: pgError("08006", "connection failure") };
+  const admin = fakeDb(undefined, tables);
+  assert.equal(await retrySource(db, admin, "owner", 5), "failed");
+  assert.deepEqual(tables.sources, [{ id: 5, submitted_by: "owner", status: "failed" }]);
+  assert.equal(error.mock.calls.length, 1);
 });

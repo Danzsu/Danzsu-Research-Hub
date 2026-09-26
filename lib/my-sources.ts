@@ -88,12 +88,21 @@ export type RetryResult = "accepted" | "forbidden" | "not_found" | "not_failed" 
  */
 export async function retrySource(db: SupabaseClient, admin: SupabaseClient, viewerId: string, sourceId: number): Promise<RetryResult> {
   const { data: source, error } = await db.from("sources").select("submitted_by, status").eq("id", sourceId).maybeSingle();
-  if (error) return "failed";
+  if (error) {
+    console.error(`retry ${sourceId}: read failed`, error);
+    return "failed";
+  }
   if (!source) return "not_found";
   if (source.submitted_by !== viewerId) return "forbidden";
   if (source.status !== "failed") return "not_failed";
 
-  // ponytail: no cooldown — the status CAS rules out overlapping runs, and each run is one click; add a wait here if it gets abused.
+  // ponytail: the status CAS stops two overlapping clicks, not a click during the daily cron's own
+  // run of this same failed source — retryPendingSources picks up `failed` rows under 3 attempts
+  // without changing their status, so a second run can start, and in the worst case the cron's
+  // failureUpdate writes `failed` back onto a source that already has a post. Upgrade path: a
+  // "processing" status, which spec §3.3 doesn't have yet. The window is at most 300 s a day and
+  // self-heals on the next run. The attempts reset below also gives the retry a fresh 3-attempt
+  // cron budget.
   const { data: claimed, error: claimError } = await admin
     .from("sources")
     .update({ status: "pending", error: null, attempts: 0 })
@@ -101,6 +110,9 @@ export async function retrySource(db: SupabaseClient, admin: SupabaseClient, vie
     .eq("submitted_by", viewerId)
     .eq("status", "failed")
     .select("id");
-  if (claimError) return "failed";
+  if (claimError) {
+    console.error(`retry ${sourceId}: claim failed`, claimError);
+    return "failed";
+  }
   return claimed?.length ? "accepted" : "not_failed";
 }

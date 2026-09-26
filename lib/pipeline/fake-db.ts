@@ -32,6 +32,9 @@ export type FakeIngestTables = {
   sourceInsertError?: PostgrestErrorShape;
   /** Forces every `sources` select (the listing, `single()`, `maybeSingle()`) to resolve with this error. */
   sourceSelectError?: PostgrestErrorShape;
+  /** Forces `sources`' `update(...).eq(...)` to resolve with this error instead of applying the write
+   *  — the attempted payload is still recorded on `.sourceUpdates`, and the row is left untouched. */
+  sourceUpdateError?: PostgrestErrorShape;
   /** Every `storage.from().list/upload/remove` call rejects, for testing failure-path cleanup. */
   storageError?: boolean;
   /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g.
@@ -236,7 +239,8 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * and `maybeSingle()` alike — is projected down to the `.select(...)` column list, one level into
  * any `table(inner)` embed (`project`), so a select that drops a column, or narrows an embed, is
  * caught the same way a real PostgREST query would catch it. A `sources` update applies its `.eq`
- * filters and writes through, so a later select sees it.
+ * filters and writes through, so a later select sees it — unless `sourceUpdateError` is set, when it
+ * fails instead and the row is left untouched; the attempted payload is still recorded either way.
  * Any other table only upserts (recorded on `.upserts`) and answers `select().gte()` from `tables.rows`.
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it,
  * `list` reflects it, and `download` answers an object it holds with the object's own path as its
@@ -305,6 +309,7 @@ export function fakeDb(
           return updateChain(filter, async (withRepresentation) => {
             sourceUpdates.push(values);
             writes.push("sources.update");
+            if (tables.sourceUpdateError) return { data: null, error: tables.sourceUpdateError };
             const matched = lookedUp.filter((row) => filters.every((rule) => passes(row, rule)));
             const merged = lookedUp.map((row) => (matched.includes(row) ? { ...row, ...values } : row));
             if (tables.sources) tables.sources = merged;

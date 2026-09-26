@@ -85,3 +85,16 @@ test("sourceSelectError answers the listing, single() and maybeSingle() alike", 
   ];
   for (const result of results) assert.deepEqual(result, { data: null, error });
 });
+
+// Fix round 1: a `sources` update can fail too (e.g. retrySource's claim) — the row must stay
+// untouched and the error must come back, but the attempted payload is still recorded, same as a
+// real caller that logs what it tried. Kills sourceUpdateError being ignored, and the payload not
+// being pushed to .sourceUpdates before the error check.
+test("sourceUpdateError makes a sources update fail without touching the row, but still records the attempt", async () => {
+  const tables = { sources: [{ id: 5, status: "failed" }], sourceUpdateError: pgError("08006", "connection failure") };
+  const db = fakeDb(undefined, tables);
+  const result = await db.from("sources").update({ status: "pending" }).eq("id", 5).select("id");
+  assert.deepEqual(result, { data: null, error: tables.sourceUpdateError });
+  assert.deepEqual(tables.sources, [{ id: 5, status: "failed" }]);
+  assert.deepEqual(db.sourceUpdates, [{ status: "pending" }]);
+});

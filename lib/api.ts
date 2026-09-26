@@ -6,7 +6,7 @@ export const jsonError = (status: number, error: string, extra: Record<string, u
 
 export type ErrorAnswer = { status: number; error: string };
 
-/** The answers the post routes' result maps share; each route adds its own. */
+/** The answers the `[id]` routes' result maps share (the post routes and `sources/[id]/retry`); each route adds its own. */
 export const POST_ERRORS = {
   forbidden: { status: 403, error: "forbidden" },
   not_found: { status: 404, error: "not_found" },

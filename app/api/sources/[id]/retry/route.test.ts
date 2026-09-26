@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeDb, type FakeIngestDb } from "../../../../../lib/pipeline/fake-db.ts";
+import { fakeDb, pgError, type FakeIngestDb } from "../../../../../lib/pipeline/fake-db.ts";
 import { resetRoute, routeStub, scheduledSourceIds, signedIn } from "../../../../../lib/test/route-hooks.ts";
 
 const { POST } = await import("./route.ts");
@@ -54,13 +54,31 @@ test("POST /api/sources/[id]/retry answers 409 not_failed for a source that isn'
   assert.deepEqual(routeStub.scheduled, []);
 });
 
-// The preview's fixture ids are negative: postRoute answers 404 before any read.
+// The preview's fixture ids are negative: postRoute answers 404 before any read. For "-5" that's
+// before the id is even parsed, so it must not have created the admin client either — proven with
+// routeStub.adminCalls, since retrySource is only ever called with one already created.
 test("POST /api/sources/[id]/retry answers 404 for a missing source and for an id no source can have", async () => {
   for (const id of ["6", "-5"]) {
     sourceAs("owner");
     const response = await retry(id);
     assert.deepEqual([response.status, await response.json()], [404, { error: "not_found" }], id);
+    if (id === "-5") assert.equal(routeStub.adminCalls, 0, "-5 is rejected before any admin client is created");
   }
+});
+
+// Fix round 1: a claim failure must surface as a 500 the chat can show, not read as "not_failed"
+// (which the chat treats as "refresh" and hides a real DB outage). Kills `if (claimError) return
+// "failed";` being dropped, and a swallowed console.error.
+test("POST /api/sources/[id]/retry answers 500 db_error when the claim fails, and schedules nothing", async (t) => {
+  const error = t.mock.method(console, "error", () => {});
+  resetRoute();
+  const row = { id: 5, submitted_by: "owner", status: "failed" };
+  routeStub.reader = signedIn(fakeDb(undefined, { sources: [row] }), "owner");
+  routeStub.admin = fakeDb(undefined, { sources: [row], sourceUpdateError: pgError("08006", "connection failure") });
+  const response = await retry();
+  assert.deepEqual([response.status, await response.json()], [500, { error: "db_error" }]);
+  assert.deepEqual(routeStub.scheduled, []);
+  assert.equal(error.mock.calls.length, 1);
 });
 
 test("POST /api/sources/[id]/retry answers 401 when signed out", async () => {
