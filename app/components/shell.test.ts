@@ -26,6 +26,7 @@ const { ReaderPanel } = await import("./reader-panel.tsx");
 const { DigestDashboard } = await import("./digest-dashboard.tsx");
 const { MustReadCard, StoryCard } = await import("./story-card.tsx");
 const { PostImage } = await import("./post-image.tsx");
+const { Progress } = await import("../../components/ui/progress.tsx");
 const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
 
@@ -85,8 +86,7 @@ test("ReaderPanel renders the progress bar and every to-do row", () => {
   );
   assert.equal(doc.querySelectorAll("li").length, todos.length);
   assert.ok(doc.querySelector('[role="progressbar"]'), "the progress bar renders");
-  // components/ui/progress.tsx computes the indicator's own width from `value` directly (a separate,
-  // pre-existing issue leaves Root's aria-valuenow unset — out of this task's two named bugs).
+  assert.equal(doc.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"), "40");
   assert.match(doc.querySelector('[data-slot="progress-indicator"]')?.getAttribute("style") ?? "", /-60%/);
   assert.match(doc.body.textContent ?? "", /40%/);
 });
@@ -162,4 +162,15 @@ test("PostImage keeps the pre-load placeholder behind the img until it settles",
   );
   assert.ok(doc.querySelector("img"));
   assert.ok(doc.querySelector('span[aria-hidden="true"]'), "the placeholder layer sits behind the img before onLoad/onError fire");
+});
+
+// N11: Radix reads the value from Root; a Progress that keeps `value` to itself renders every bar
+// indeterminate, and a screen reader hears no number.
+test("Progress reports its value to assistive tech: aria-valuenow, loading below the max, complete at it", () => {
+  const bar = (value: number) => {
+    const root = render(createElement(Progress, { value, "aria-label": "Week" })).querySelector('[role="progressbar"]');
+    return [root?.getAttribute("aria-valuenow"), root?.getAttribute("data-state")];
+  };
+  assert.deepEqual(bar(40), ["40", "loading"]);
+  assert.deepEqual(bar(100), ["100", "complete"]);
 });
