@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { httpTransport, memoryTransport } from "@/lib/link-chat";
+import { httpTransport, memoryTransport, type ChatTransport } from "@/lib/link-chat";
 
 const copy = {
   hu: {
@@ -36,17 +36,11 @@ const copy = {
 type Status = "ok" | "invalid_url" | "already_submitted" | "error";
 type SubmitResult = { ok: boolean; error?: string };
 
-/** The link chat's own POST /api/sources call: one fetcher per route. */
-async function postSource(url: string, note: string): Promise<SubmitResult> {
-  const { status, body } = await httpTransport.submit(url, note);
-  return { ok: status === 202, error: typeof body.error === "string" ? body.error : undefined };
-}
-
-/** The offline preview never reaches a real route: local dev points at the production project. Reuses
- *  `memoryTransport`'s own submit, fresh each call (nothing here tracks a thread yet), so a bad URL
- *  answers the real 400 and `failWrites` rejects like an offline fetch, same as before. */
-async function previewSubmit(failWrites: boolean, url: string, note: string): Promise<SubmitResult> {
-  const { status, body } = await memoryTransport([], failWrites).submit(url, note || null);
+/** The one submit path, shared by the real route and the offline preview (`memoryTransport([], …)`,
+ *  fresh each call — nothing here tracks a thread yet): an empty note reaches either transport as
+ *  `null`, same as the route's own `String(body.note ?? "").trim() … || null` would turn it into. */
+async function submitVia(transport: ChatTransport, url: string, note: string): Promise<SubmitResult> {
+  const { status, body } = await transport.submit(url, note || null);
   return { ok: status === 202, error: typeof body.error === "string" ? body.error : undefined };
 }
 
@@ -63,7 +57,7 @@ export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
     event.preventDefault();
     setBusy(true);
     try {
-      const result = preview ? await previewSubmit(preview.failWrites, url, note) : await postSource(url, note);
+      const result = await submitVia(preview ? memoryTransport([], preview.failWrites) : httpTransport, url, note);
       const known = result.error === "invalid_url" || result.error === "already_submitted" ? result.error : "error";
       setStatus(result.ok ? "ok" : known);
       if (result.ok) {
