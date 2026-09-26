@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activeNavId, NAV_ITEMS, switchesLanguageInPlace } from "./nav.ts";
+import { activeNavId, inMobileMore, MOBILE_BAR_NAV, MOBILE_MORE_NAV, NAV_ITEMS, PRIMARY_NAV, switchesLanguageInPlace } from "./nav.ts";
 
 // Invariants, not the milestone's menu: a new item or a new page must not need this test edited.
 test("every nav item has a unique id and href and a label in both languages, and a soon item is never a link", () => {
@@ -32,4 +32,14 @@ test("the toggle switches in place only where both languages are on the page", (
   for (const path of ["/library/42", "/archive/2026-W38/x", "/dev/preview/post", "/login"]) {
     assert.equal(switchesLanguageInPlace(path), false, path);
   }
+});
+
+// Kills Archívum left in the bar (four page slots: no room for the taiyaki in grid-cols-5), a primary
+// item in neither place (unreachable on a phone), and a "Több" slot that never shows the active page.
+test("the mobile bar holds three page slots, Több holds every other primary item, and marks their pages", () => {
+  assert.equal(MOBILE_BAR_NAV.length, 3);
+  assert.deepEqual([...MOBILE_BAR_NAV, ...MOBILE_MORE_NAV].map(({ id }) => id).sort(), PRIMARY_NAV.map(({ id }) => id).sort());
+  assert.equal(inMobileMore(activeNavId("/archive/2026-W38")), true);
+  assert.equal(inMobileMore(activeNavId("/library/42")), false);
+  assert.equal(inMobileMore(null), false);
 });

@@ -5,7 +5,7 @@ import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
-import { activeNavId, PRIMARY_NAV } from "@/lib/nav";
+import { activeNavId, inMobileMore, MOBILE_BAR_NAV, MOBILE_CHAT_SLOT, MOBILE_MORE_NAV, type NavItem } from "@/lib/nav";
 import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
@@ -72,11 +72,22 @@ export function AppShell({
   return (
     <LanguageProvider initial={language}>
       <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
-        {/* Room for the fixed bottom bar, and from md for the corner taiyaki, so neither covers the end of the
-            page. The taiyaki's goes inside the page's own last element, so that page's surface runs on under it. */}
-        <div className="pb-[calc(4rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
+        {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
+            so none of them covers the end of the page. The corner one's goes inside the page's own last element,
+            so that page's surface runs on under it. */}
+        <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
       </DesktopNav>
-      <MobileNav email={email} onSearch={openSearch} />
+      <MobileNav
+        email={email}
+        onSearch={openSearch}
+        chat={
+          <TaiyakiButton
+            open={chatOpen}
+            onClick={toggleChat}
+            className="-mt-[18px] grid size-14 self-start justify-self-center shadow-[3px_3px_0_var(--signal)]"
+          />
+        }
+      />
       <TaiyakiButton
         open={chatOpen}
         onClick={toggleChat}
@@ -92,30 +103,35 @@ export function AppShell({
 }
 
 const slotClass =
-  "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[state=open]:text-signal";
+  "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 
-/** Below md: five slots in thumb reach. "Több" holds the language, sign-out and the coming views. */
-function MobileNav({ email, onSearch }: { email: string; onSearch: () => void }) {
+/** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds Archívum, the
+ *  language, the coming views and sign-out; on Archívum's pages its slot carries the active mark. */
+function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => void; chat: ReactNode }) {
   const { language } = useLanguage();
   const active = activeNavId(usePathname());
+  const [moreOpen, setMoreOpen] = useState(false);
   const t = copy[language];
+  const slot = (item: NavItem) => {
+    const Icon = navIcons[item.id];
+    return (
+      <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass}>
+        <Icon className="size-5" />
+        <span>{item.label[language]}</span>
+      </NavEntry>
+    );
+  };
   return (
     <nav
       id="mobile-nav"
       aria-label={t.nav}
       className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
     >
-      {PRIMARY_NAV.map((item) => {
-        const Icon = navIcons[item.id];
-        return (
-          <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass}>
-            <Icon className="size-5" />
-            <span>{item.label[language]}</span>
-          </NavEntry>
-        );
-      })}
-      <Sheet>
-        <SheetTrigger className={slotClass}>
+      {MOBILE_BAR_NAV.slice(0, MOBILE_CHAT_SLOT).map(slot)}
+      {chat}
+      {MOBILE_BAR_NAV.slice(MOBILE_CHAT_SLOT).map(slot)}
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetTrigger className={slotClass} data-active={inMobileMore(active) || undefined}>
           <Menu className="size-5" />
           <span>{t.more}</span>
         </SheetTrigger>
@@ -130,6 +146,25 @@ function MobileNav({ email, onSearch }: { email: string; onSearch: () => void })
               <span className="text-signal">{"//"}</span>
             </SheetTitle>
           </SheetHeader>
+          <ul className="border-b-2 border-ink pb-4">
+            {MOBILE_MORE_NAV.map((item) => {
+              const Icon = navIcons[item.id];
+              return (
+                <li key={item.id}>
+                  <NavEntry
+                    item={item}
+                    active={active === item.id}
+                    onSearch={onSearch}
+                    onClick={() => setMoreOpen(false)}
+                    className="focus-ring flex min-h-10 items-center gap-3 font-mono text-sm aria-[current=page]:text-signal"
+                  >
+                    <Icon className="size-4" />
+                    <span>{item.label[language]}</span>
+                  </NavEntry>
+                </li>
+              );
+            })}
+          </ul>
           <div className="flex items-center justify-between border-b-2 border-ink pb-4">
             <span className="font-mono text-xs tracking-[0.14em]">{t.language}</span>
             <LanguageToggle />

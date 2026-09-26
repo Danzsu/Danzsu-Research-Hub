@@ -195,13 +195,23 @@ test("TaiyakiButton names itself in the reader's language, and says which panel 
   assert.deepEqual(button("en", true), ["Drop a link", "true", CHAT_PANEL_ID]);
 });
 
-// Kills the corner button left out of the shell. This harness renders Radix's portal as null, so the
-// panel itself never reaches the markup, open or not: the LinkChat render proves only that its top
-// level (the chat store, the transport, the hooks) runs without a crash or a render loop.
+// Kills either taiyaki left out of the shell: the corner button and the bar's centre slot. This
+// harness renders Radix's portal as null, so the panel itself never reaches the markup, open or not:
+// the LinkChat render proves only that its top level (the chat store, the transport, the hooks) runs
+// without a crash or a render loop.
 test("AppShell carries the taiyaki, and LinkChat's top level renders without a render loop", () => {
   const doc = render(
     createElement(AppShell, { language: "hu", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>, createElement("p", null, "Child")),
   );
-  assert.equal(doc.querySelectorAll(`button[aria-controls="${CHAT_PANEL_ID}"]`).length, 1);
+  assert.equal(doc.querySelectorAll(`button[aria-controls="${CHAT_PANEL_ID}"]`).length, 2);
   withLanguage(LinkChat, { open: true, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
+});
+
+// Kills the bar's old order: Archívum in the bar, and no taiyaki between Könyvtár and Keresés.
+test("the mobile bar reads Radar, Könyvtár, the taiyaki, Keresés, Több", () => {
+  const doc = render(
+    createElement(AppShell, { language: "hu", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>, createElement("p", null, "Child")),
+  );
+  const slots = [...doc.querySelectorAll("#mobile-nav > *")].map((slot) => slot.getAttribute("aria-label") ?? slot.textContent);
+  assert.deepEqual(slots, ["Radar", "Könyvtár", "Link bedobása", "Keresés", "Több"]);
 });

@@ -25,16 +25,18 @@ export const navIcons: Record<NavId, LucideIcon> = {
   chat: MessageSquare,
 };
 
-/** A page link (aria-current when it is the active one) or, for the search slot, a button. */
-export function NavEntry({ item, active, onSearch, className, children }: {
+/** A page link (aria-current when it is the active one) or, for the search slot, a button. `onClick`
+ *  runs when the link is followed: the mobile "Több" sheet closes itself with it. */
+export function NavEntry({ item, active, onSearch, onClick, className, children }: {
   item: NavItem;
   active: boolean;
   onSearch: () => void;
+  onClick?: () => void;
   className: string;
   children: ReactNode;
 }) {
   return item.href ? (
-    <Link href={item.href} aria-current={active ? "page" : undefined} className={className}>
+    <Link href={item.href} aria-current={active ? "page" : undefined} onClick={onClick} className={className}>
       {children}
     </Link>
   ) : (

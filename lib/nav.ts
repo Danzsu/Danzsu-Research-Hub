@@ -11,13 +11,15 @@ export type NavItem = {
   label: Localized;
   /** Dimmed with a "soon" badge, not clickable. */
   soon?: true;
+  /** Below md it sits in the "Több" sheet, not in the bottom bar: the bar's centre slot is the taiyaki's. */
+  mobileMore?: true;
 };
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: "radar", href: "/", label: { hu: "Radar", en: "Radar" } },
   { id: "library", href: "/library", label: { hu: "Könyvtár", en: "Library" } },
   { id: "search", href: null, label: { hu: "Keresés", en: "Search" } },
-  { id: "archive", href: "/archive", label: { hu: "Archívum", en: "Archive" } },
+  { id: "archive", href: "/archive", mobileMore: true, label: { hu: "Archívum", en: "Archive" } },
   { id: "collection", href: null, soon: true, label: { hu: "Gyűjtemény", en: "Collection" } },
   { id: "stats", href: null, soon: true, label: { hu: "Statisztika", en: "Statistics" } },
   { id: "chat", href: null, soon: true, label: { hu: "Chat", en: "Chat" } },
@@ -25,6 +27,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
 
 export const PRIMARY_NAV = NAV_ITEMS.filter((item) => !item.soon);
 export const SOON_NAV = NAV_ITEMS.filter((item) => item.soon);
+/** The mobile bar's page slots, in order: the taiyaki goes after the first MOBILE_CHAT_SLOT of them, "Több" last. */
+export const MOBILE_BAR_NAV = PRIMARY_NAV.filter((item) => !item.mobileMore);
+export const MOBILE_CHAT_SLOT = 2;
+/** The primary items the mobile "Több" sheet holds, above the language toggle. */
+export const MOBILE_MORE_NAV = PRIMARY_NAV.filter((item) => item.mobileMore);
+/** On one of their pages the "Több" slot carries the active mark. */
+export const inMobileMore = (id: NavId | null) => MOBILE_MORE_NAV.some((item) => item.id === id);
 
 /** The item a path belongs to, by prefix at a segment boundary: /archive/2026-W38 → archive. "/" matches only itself. */
 export function activeNavId(pathname: string): NavId | null {

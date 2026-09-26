@@ -33,8 +33,8 @@ const noToast = () => null;
 /** True for a click on the toast: a panel open underneath must not treat it as a click outside. */
 export const isUndoToast = (target: EventTarget | null) => target instanceof Element && target.closest("[data-undo-toast]") !== null;
 
-/** Mounted once by the app shell, above the mobile bottom bar and above any open panel. From md up its
- *  lane stops short of the taiyaki's corner (`md:right-24`: the button is 24 px in and 56 px wide). */
+/** Mounted once by the app shell, above any open panel. Below md it sits above the bottom bar and the
+ *  taiyaki raised out of it; from md up its lane stops short of the taiyaki's corner (`md:right-24`). */
 export function UndoToast() {
   const { language } = useLanguage();
   const toast = useSyncExternalStore(toasts.subscribe, toasts.getSnapshot, noToast);
@@ -66,7 +66,7 @@ export function UndoToast() {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-4 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
+      className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
     >
       {toast && (
         <div
