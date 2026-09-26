@@ -128,7 +128,7 @@ Nincs. Az egyetlen kérdésre (nullázza-e az „Újra” az `attempts`-et) a tu
   - `npx shadcn add`.
 - **Duplikáció:** minden feladat végén `npm run dup` → `Found 0 clones.`
   - Segéd előtt `grep -rn`.
-  - A CLAUDE.md közös helyeit használjuk: `jsonError`, `postRoute`, `POST_ERRORS`, `getReader`, `parseId`, `parseSubmittedUrl`, `detectSource`, `safeHref`, `readOverrides`, a `Button` `signal` változata, a `focus-ring`, a `Sheet` `closeLabel`-je.
+  - A CODE_STYLE.md → No duplication és a DESIGN.md → Components közös helyeit használjuk: `jsonError`, `postRoute`, `POST_ERRORS`, `getReader`, `parseId`, `parseSubmittedUrl`, `detectSource`, `safeHref`, `readOverrides`, a `Button` `signal` változata, a `focus-ring`, a `Sheet` `closeLabel`-je.
   - Ez a terv új közös helyeket is ad: `SOURCE_KIND_LABELS`, `shownTitle`, `httpTransport`, `updateChain`, `.lift`.
   - A tulajdonosnak a duplikáció a legfontosabb.
 - **Importok és tesztek:**
@@ -154,7 +154,7 @@ Nincs. Az egyetlen kérdésre (nullázza-e az „Újra” az `attempts`-et) a tu
   - A szálban minden href `safeHref`, nyers HTML nincs.
   - A böngészőbe nem kerül Supabase-kulcs, minden adat a route-okon át jön.
   - Az előnézet soha nem hív valódi API-t: a minták id-je negatív, és a beküldés, a lekérdezés és az „Újra” a `memoryTransport`-on megy, ahogy a Library előnézete a beküldést csonkolja.
-- **Dizájn és reszponzivitás** (CLAUDE.md):
+- **Dizájn és reszponzivitás** (DESIGN.md):
   - 360 px-en nincs vízszintes görgetés;
   - az érintési felület legalább 40 px;
   - `dvh`, nem `vh`;
@@ -165,7 +165,7 @@ Nincs. Az egyetlen kérdésre (nullázza-e az „Újra” az `attempts`-et) a tu
   - a fő oszlopon belül container query.
 - **Szövegek:** komponensenként egy `copy` objektum `{ hu, en }`, angol-only felirat nincs. A megosztott adatlisták (`NAV_ITEMS`, `SHORTCUTS`, `SOURCE_KIND_LABELS`) `Localized` értékeket tartanak.
 - **Commitok:** Conventional Commits, kisbetűs, felszólító módú angol tárgy, attribúciós sor nélkül, explicit pathspec-kel (`git add <fájlok>`, majd `git commit -m`).
-- **Dokumentáció:** a 9. feladat frissíti a README.md-t, a CLAUDE.md-t (Routes, Layout, App shell, Offline preview, Conventions, Database, Security) és a TODO.md-t.
+- **Dokumentáció:** a 9. feladat frissíti a README.md-t, a CLAUDE.md-t (Routes, App shell, Database), az ARCHITECTURE.md-t (Codemap, Invariants), a DESIGN.md-t, a TESTING.md-t, a SECURITY.md-t, a CODE_STYLE.md-t és a TODO.md-t.
 - **Tiltott parancs:** ha az engedélyrendszer egy parancsot blokkol, állj meg, és jelentsd. Változatot soha ne futtass.
 
 ## Review Focus
@@ -202,7 +202,7 @@ Nincs. Az egyetlen kérdésre (nullázza-e az „Újra” az `attempts`-et) a tu
 | `app/globals.css` | `.lift` | 7 |
 | `app/components/app-shell.tsx`, `undo-toast.tsx`, `app/dev/preview/page.tsx`, `app/dev/preview/post/page.tsx`, `app/components/shell.test.ts` | bekötés, a csík sávja, az előnézet | 7, 8 |
 | `lib/nav.ts` (+ teszt), `app/components/nav-parts.tsx` | `mobileMore`, `MOBILE_BAR_NAV`, `MOBILE_CHAT_SLOT`, `MOBILE_MORE_NAV`, `inMobileMore`; `NavEntry` `onClick` | 8 |
-| `README.md`, `CLAUDE.md`, `TODO.md` | dokumentáció | 9 |
+| `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md` | dokumentáció | 9 |
 
 **Nem része ennek a tervnek** (spec, „Nem része a v1-nek”): szabad chat, „Törlés”, Android share target, jelzés zárt panel mellett, billentyűparancs.
 
@@ -3348,40 +3348,40 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
 ### Task 9: Dokumentáció és végső ellenőrzés
 
 **Files:**
-- Modify: `README.md`, `CLAUDE.md`, `TODO.md`
+- Modify: `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md`
 
 **Interfaces:**
 - Consumes: az 1–8. feladat nevei.
 - Produces: —
 
-- [ ] **Step 1: `CLAUDE.md`** (előbb olvasd újra; ha közben változott, az új szövegbe illeszd)
+- [ ] **Step 1: `CLAUDE.md` és a belőle kiköltözött szakaszok új helyei** (előbb olvasd újra őket; ha közben változtak, az új szövegbe illeszd)
 
 - **How content gets in, 2. Link submissions:** az első mondat elé: „Two front doors lead to it: the `/library` form and the taiyaki link chat (see App shell).” A felsorolás után új bekezdés: „`POST /api/sources/[id]/retry` sends the submitter's own `failed` source back to `pending` with `attempts` reset to 0 (`retrySource` in `lib/my-sources.ts`), so a retry killed at 300 s is still picked up by the daily cron, and runs `processSource` in `after()`.”
 - **App shell and navigation:**
   - A „Mobile, below `md`” pont helyett: „**Mobile, below `md`:** the bottom bar in `app-shell.tsx`, five slots: Radar, Library, the taiyaki (raised 18px out of the bar), Search, Több. `lib/nav.ts` says where each item goes: `MOBILE_BAR_NAV` (the three page slots, the taiyaki after `MOBILE_CHAT_SLOT` of them) and `MOBILE_MORE_NAV` (items with `mobileMore`, today Archívum). "Több" opens a bottom Sheet: Archívum, the language toggle, the coming views, sign-out; on an Archívum page its slot carries the active mark (`inMobileMore`, `data-active`), and following the link closes the Sheet (`NavEntry`'s `onClick`).”
   - Új pont a „Search” után: „**Link chat (taiyaki):** `link-chat.tsx`. `TaiyakiButton` is the desktop corner button (`fixed bottom-6 right-6`, `z-40`) and the mobile centre slot; `.lift` in `globals.css` brings it forward on hover and keyboard focus, like the Top 3 cards. `LinkChat` is one Radix Dialog: non-modal on desktop (360px above the button, `max-h-[70dvh]`; only Esc and its close button close it), a modal bottom Sheet on mobile (`max-h-[75dvh]`). Focus goes to the field on open and back to the button that opened it. Enter sends, Shift+Enter is a new line. The logic is `lib/link-chat.ts`: `parseLinkMessage` (the first http(s) word, sentence punctuation stripped; the rest is the note), `toThread`, and `createLinkChat`, which loads `GET /api/sources/mine` on open and polls it every 4 s while the panel is open, the tab is visible and a source is pending (at most `MAX_POLLS`, 150). The thread is `chat-thread.tsx`: the reader's 10 latest submissions (oldest first) with a reply per status, then local replies that live only while the panel is open.”
-  - Az „Undo toast” pont végére: „Its lane sits above the mobile bar and the raised taiyaki (`bottom: 5.75rem`), and from `md` up stops short of the taiyaki's corner (`md:right-24`).”
-- **Offline preview:** a „reader state goes through `memorySend` and the Library form through an in-memory stub (`preview` on `LibraryView`)” rész után: „, and the link chat through `memoryTransport` (`chatPreview` on `AppShell`, seeded from `previewMySources`)”. Ugyanitt: „`lib/fixtures.ts`'s preview post ids are negative on purpose” → „`lib/fixtures.ts`'s preview post and chat-source ids are negative on purpose: `parseId` rejects them, so translate, retry or a Library card link can't reach a real row.”
-- **UI text (HU/EN):** a végére: „Lists shared by several components keep `Localized` values in `lib/`: `NAV_ITEMS`, `SHORTCUTS`, and `SOURCE_KIND_LABELS` (`lib/source-kinds.ts`, the post page's kind badge and the link chat).”
-- **Database:** a „`createAdminClient()` bypasses RLS — the pipeline, plus the translate, reextract and `/media` routes after their own checks” mondatban: „…the translate, reextract, `sources/[id]/retry` and `/media` routes…”. A `sources` sor: „`sources`: readers `select` (every row: code that lists "my" sources filters on `submitted_by` itself, `listMySources`) and `insert` (stamped with `auth.uid()`); no reader updates, so the retry's claim runs with the admin client.”
+  - A DESIGN.md → Components → Undo toast szakasz végére (a csík sávja oda költözött): „Its lane sits above the mobile bar and the raised taiyaki (`bottom: 5.75rem`), and from `md` up stops short of the taiyaki's corner (`md:right-24`).”
+- **ARCHITECTURE.md → Invariants, „The offline preview never reaches real data”** (a régi Offline preview ide költözött része): a „the Library form goes through an in-memory stub (`preview` on `LibraryView`);” alpont után új alpont: „the link chat goes through `memoryTransport` (`chatPreview` on `AppShell`, seeded from `previewMySources`);”. Ugyanitt: „The preview post ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Translate or a Library card link can't reach a real post.” → „The preview post and chat-source ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Translate, Retry or a Library card link can't reach a real row.”
+- **CODE_STYLE.md → HU/EN copy** (a régi UI text): a „Data lists that several components share” pont listájába: „`SOURCE_KIND_LABELS` in `lib/source-kinds.ts` (the post page's kind badge and the link chat)”.
+- **SECURITY.md → Reader vs admin client** (a mondat a Database-ből költözött ide): a „The translate, reextract and `/media` routes may also use it, each after its own check.” mondatban: „The translate, reextract, `sources/[id]/retry` and `/media` routes…”. **CLAUDE.md → Database**, a `sources` sor: „`sources`: readers `select` (every row: code that lists "my" sources filters on `submitted_by` itself, `listMySources`) and `insert` (stamped with `auth.uid()`); no reader updates, so the retry's claim runs with the admin client.”
 - **Routes** tábla:
   - a `POST /api/sources` sora: „400 `invalid_url`, 409 `already_submitted` (with `postId` when the link already has a post), 500 `insert_failed`, else 202 `{ ok, id }` and `processSource` in `after()`”;
   - új sor: „| `GET /api/sources/mine` | `getReader()` | the caller's 10 latest sources, newest first, with `post: { id, title }` (the submitter's title override wins, `shownTitle`); 500 `db_error` |”;
   - új sor: „| `POST /api/sources/[id]/retry` | `getReader()`, then admin | `retrySource`: 404 (also for an id that isn't a positive integer), 403 `forbidden` (not the submitter), 409 `not_failed` (not `failed`, or a concurrent retry won the compare-and-swap on `id` + `submitted_by` + `status = 'failed'`, which writes `status = 'pending'`, `error = null`, `attempts = 0`), 500 `db_error`, else 202 and `processSource` in `after()`. No cooldown (a `ponytail:` note) |”.
 
   A tábla alatti mondat: „The three `posts/[id]` routes are wrapped in `postRoute`” → „The three `posts/[id]` routes and `sources/[id]/retry` are wrapped in `postRoute`”. A `maxDuration = 300` listába a retry route.
-- **Security, Rendering:** „in `PostBlocks` and the post page” → „in `PostBlocks`, the post page and the link chat's thread (`toThread`)”.
-- **Layout:**
+- **SECURITY.md → XSS** (a régi Security, Rendering), a Links pont: „in `PostBlocks` and on the post page” → „in `PostBlocks`, on the post page and in the link chat's thread (`toThread`)”.
+- **ARCHITECTURE.md → Codemap** (a régi Layout):
   - az `app/components/` sorába: `taiyaki-icon, chat-thread, link-chat (the taiyaki button and panel)`;
   - az `app/api/` sorába: `sources/mine, sources/[id]/retry`;
   - új sorok: `lib/link-chat.ts  parseLinkMessage, toThread, the chat store (createLinkChat), httpTransport / memoryTransport`, `lib/my-sources.ts  listMySources, retrySource (GET /api/sources/mine, POST /api/sources/[id]/retry)`, `lib/source-kinds.ts  SOURCE_KIND_LABELS`;
   - a `lib/post-view.ts` sora: „Post, toPost (a posts row → the page's Post), shownTitle, media/video helpers, withQuery”;
   - a `lib/api.ts` sora: „…postRoute and POST_ERRORS for the `[id]` routes”.
-- **Conventions:**
-  - A „No duplication” közös helyei közé: `lib/source-kinds.ts` (`SOURCE_KIND_LABELS`), `lib/post-view.ts` (`shownTitle`), `lib/link-chat.ts` (`httpTransport`, the one fetcher for `/api/sources`); a UI-ban a `.lift` osztály.
-  - A Tests → `fakeDb` pontba: „A `sources` listing applies `order(column, { ascending })` before `limit(n)` and, without `pending`, lists `sources`; `maybeSingle()` answers null for none and PGRST116 for several; a `sources` update chains `.eq` filters and writes through, so a second compare-and-swap sees the first; `sourceSelectError` fails every `sources` select.”
-  - Ugyanitt: „`t.mock.timers.enable()` once per test: a helper that enables it breaks when a test calls it twice (`ERR_INVALID_STATE`)”.
-- **Design language:** a „Responsive rules” pontban a „Below `md` the app shell shows a fixed five-slot bottom bar” után: „with the taiyaki raised in its centre slot; the content column's bottom padding (`5.25rem`) clears both”. A „Shadows are hard offsets…” pont végére: „`.lift` is the shared "come forward" state (the Top 3 cards on hover; the taiyaki on hover and keyboard focus, and without the translate under `prefers-reduced-motion`).”
+- **Conventions** (a szakasz szétköltözött):
+  - A CODE_STYLE.md → No duplication közös helyei közé (a `.lift` a DESIGN.md → Components-be): `lib/source-kinds.ts` (`SOURCE_KIND_LABELS`), `lib/post-view.ts` (`shownTitle`), `lib/link-chat.ts` (`httpTransport`, the one fetcher for `/api/sources`); a UI-ban a `.lift` osztály.
+  - A TESTING.md → Helpers → `fakeDb` pontba: „A `sources` listing applies `order(column, { ascending })` before `limit(n)` and, without `pending`, lists `sources`; `maybeSingle()` answers null for none and PGRST116 for several; a `sources` update chains `.eq` filters and writes through, so a second compare-and-swap sees the first; `sourceSelectError` fails every `sources` select.”
+  - A TESTING.md → Pitfalls-ba: „`t.mock.timers.enable()` once per test: a helper that enables it breaks when a test calls it twice (`ERR_INVALID_STATE`)”.
+- **DESIGN.md** (a régi Design language): a Layout „Navigation by width” pontjában a „Below `md` the app shell shows a fixed, five-slot bottom bar” után: „with the taiyaki raised in its centre slot; the content column's bottom padding (`5.25rem`) clears both”. Az Elevation & Depth árnyék-táblázata alá: „`.lift` is the shared "come forward" state (the Top 3 cards on hover; the taiyaki on hover and keyboard focus, and without the translate under `prefers-reduced-motion`).”
 - **Data contract:** a `toPost` mondatába: „…where a submitter's override wins over the model's title (`shownTitle`, shared with the link chat) and summary…”.
 
 - [ ] **Step 2: `README.md`**
@@ -3420,7 +3420,7 @@ Elvárt: üres kimenet (nincs függőség- és sémaváltozás).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add README.md CLAUDE.md TODO.md
+git add README.md CLAUDE.md ARCHITECTURE.md DESIGN.md TESTING.md SECURITY.md CODE_STYLE.md TODO.md
 git commit -m "docs: document the taiyaki link chat"
 ```
 

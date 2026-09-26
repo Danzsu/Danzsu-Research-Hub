@@ -1,6 +1,6 @@
 # Danzsu Research Hub
 
-A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON NEWS RADAR — Weekly AI Intelligence**. This README is the onboarding guide. The deep reference, with every rule an agent or a reviewer checks, is [CLAUDE.md](CLAUDE.md).
+A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON NEWS RADAR — Weekly AI Intelligence**. This README is the onboarding guide. The references for agents and reviewers start at [AGENTS.md](AGENTS.md), and the [Project tour](#project-tour) lists them all.
 
 ## What it is
 
@@ -52,7 +52,7 @@ flowchart TD
   editRoute -->|"update_post_overrides, as the reader"| posts
 ```
 
-**The daily cron** ([`lib/pipeline/daily.ts`](lib/pipeline/daily.ts)) takes the last two days of candidates, drops anything stored in the last 14 days, shortlists them to 40 with a cheap model when there are more, and asks a stronger model for at most 25 items plus a GitHub top-10. Every item gets a permanent id (see [Data contract](CLAUDE.md#data-contract)), and a database function marks the top 3 as must-reads. The same run then retries link submissions that never finished.
+**The daily cron** ([`lib/pipeline/daily.ts`](lib/pipeline/daily.ts)) takes the last two days of candidates, drops anything stored in the last 14 days, shortlists them to 40 with a cheap model when there are more, and asks a stronger model for at most 25 items plus a GitHub top-10. Every item gets a permanent id (see [Invariants](ARCHITECTURE.md#invariants)), and a database function marks the top 3 as must-reads. The same run then retries link submissions that never finished.
 
 **The block pipeline** ([`lib/pipeline/ingest.ts`](lib/pipeline/ingest.ts)) turns a submitted link into a post:
 
@@ -122,7 +122,7 @@ To sign in locally against it: request a link on `http://localhost:3000/login`. 
 
 ### Migrations
 
-This table is the one list of migrations; CLAUDE.md and TODO.md point here. Apply them in the Supabase **SQL Editor**, one file at a time, in this order, each only after the previous one succeeded:
+This table is the one list of migrations; AGENTS.md, CLAUDE.md and TODO.md point here. Apply them in the Supabase **SQL Editor**, one file at a time, in this order, each only after the previous one succeeded:
 
 | # | File | What it adds |
 | --- | --- | --- |
@@ -185,11 +185,23 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`lib/`](lib/) | The block model, the post view, post edits, translation, the model client, content queries, the language cookie, Supabase clients |
 | [`lib/test/`](lib/test/) | The offline render harness for component tests, the route-handler stubs (`route-hooks.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
-| [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [CLAUDE.md](CLAUDE.md#design-language--do-not-erode-it)) |
+| [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [DESIGN.md](DESIGN.md#dos-and-donts)) |
 | [`supabase/migrations/`](supabase/migrations/) | Schema, RLS, database functions, model seeds |
 | [`scripts/ingest-url.mts`](scripts/ingest-url.mts) | `npm run ingest` |
 | [`.github/`](.github/) | The CI workflow and Dependabot (GitHub Actions only, 7-day cooldown) |
 | [`docs/`](docs/) | Specs and plans, and the provenance map of the original archive |
+
+**The reference docs** at the root:
+
+| File | What is there |
+| --- | --- |
+| [`AGENTS.md`](AGENTS.md) | Where agents start: the commands, the hard rules, the testing traps and the working agreements |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The map: the data flow, the codemap, the invariants and the boundaries |
+| [`DESIGN.md`](DESIGN.md) | The design system: tokens, type, layout, the UI kit, and do's and don'ts |
+| [`TESTING.md`](TESTING.md) | The test layers, how to run tests, the helpers and the conventions |
+| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability, and the security model |
+| [`CODE_STYLE.md`](CODE_STYLE.md) | How code is written here, from naming to commits |
+| [`CLAUDE.md`](CLAUDE.md) | The deep reference: the pipeline, auth, the app shell, the database, the routes and the data contract |
 
 **Where to start reading**, in this order:
 
@@ -248,7 +260,7 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 
 **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the five pre-commit checks (`npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, `npm run dup`) on every push and pull request, with no secrets. Branch protection on `main` is the owner's setting (see [TODO.md](TODO.md)).
 
-- **Helpers:** [`lib/pipeline/fake-db.ts`](lib/pipeline/fake-db.ts) stands in for Supabase and records every write; [`lib/pipeline/mock-fetch.ts`](lib/pipeline/mock-fetch.ts) fakes fetch, DNS, environment variables and model answers, and undoes itself when the test ends. The fake applies `eq`, `neq` and `lt` filters to its fixture rows and answers PostgREST-shaped errors (`pgError`). The full list is in [CLAUDE.md](CLAUDE.md#conventions).
+- **Helpers:** [`lib/pipeline/fake-db.ts`](lib/pipeline/fake-db.ts) stands in for Supabase and records every write; [`lib/pipeline/mock-fetch.ts`](lib/pipeline/mock-fetch.ts) fakes fetch, DNS, environment variables and model answers, and undoes itself when the test ends. The fake applies `eq`, `neq` and `lt` filters to its fixture rows and answers PostgREST-shaped errors (`pgError`). The full list is in [TESTING.md](TESTING.md#helpers).
 - **Components:** [`lib/test/render.ts`](lib/test/render.ts) compiles `.tsx` with the project's TypeScript and renders it to static HTML, with `next/link` and `next/navigation` stubbed. A component test looks like this:
 
   ```ts
@@ -284,9 +296,9 @@ UI without live data: `npm run dev`, then open `/dev/preview` (development only)
 
 ## Conventions
 
-- **Design language.** Hard corners (`--radius` is 0), system fonts only, hard offset shadows, one fixed theme, and everything fits 360 px with at least 40 px touch targets. The full rules: [CLAUDE.md](CLAUDE.md#design-language--do-not-erode-it).
+- **Design language.** Hard corners (`--radius` is 0), system fonts only, hard offset shadows, one fixed theme, and everything fits 360 px with at least 40 px touch targets. The full rules: [DESIGN.md](DESIGN.md).
 - **Bilingual.** Every UI string should exist in Hungarian and English, in the component's copy object; the reader's choice is the `lang` cookie. Some labels are still English-only: the post kind labels (`kindLabel`), the Library's FAILED / PROCESSING… and MIRRORED tags, the archive's ITEMS / MIN, the header back links and the dashboard's SYNCED. Model output that readers see (titles, summaries, key points) is written in both languages. Code, comments and prompts are English.
-- **No duplication.** Search before writing a helper, and reuse the shared ones listed in [CLAUDE.md](CLAUDE.md#conventions). `npm run dup` (jscpd) fails above 1% duplication.
+- **No duplication.** Search before writing a helper, and reuse the shared ones listed in [CODE_STYLE.md](CODE_STYLE.md#no-duplication). `npm run dup` (jscpd) fails above 1% duplication.
 - **Relative imports in `lib/`,** with the `.ts` extension, so `node --test` can load the files without a bundler. The three exceptions are the Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which use `@/`. Tests never load `lib/supabase/server.ts` or `lib/language.ts`; the state route's test loads `lib/content.ts`.
 - **Commits** follow Conventional Commits, with lowercase, imperative subjects.
 - **Dependencies** are pinned to exact versions, and `pnpm-lock.yaml` is committed. `pnpm-workspace.yaml` refuses any package published less than 7 days ago (`minimumReleaseAge: 10080`); never lower it. The lockfile is marked `-diff` in `.gitattributes`, so review its changes with `git diff --text`. The CI's actions are pinned by commit SHA, and Dependabot proposes their updates no sooner than 7 days after a release.

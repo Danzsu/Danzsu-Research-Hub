@@ -93,7 +93,7 @@ Az M1 a `main`-ben van, a spec még előtte készült. Az alábbi eltéréseket 
 
 - **Node és tesztek:** Node `>=22.13.0`; a tesztek `node --experimental-strip-types --no-warnings --test`-tel futnak, a modul mellett (`npm test` = `"lib/**/*.test.ts" "app/**/*.test.ts"`). A `lib/` fájljai relatív `.ts` importot használnak, `@/` nélkül (kivétel: `lib/content.ts`, `lib/language.ts`, `lib/supabase/server.ts`). **Egy `[id]`-t tartalmazó út `node --test`-ben `[[]id]`-ként írandó**, különben 0 tesztet futtat és 0-val lép ki; a kimenet `ℹ tests` sora nem lehet 0. A `(app)` zárójele szó szerint értendő. A komponens-tesztekben a camelCase attribútumokat (`popoverTarget`, `maxLength`) camelCase névvel kell olvasni, mert a linkedom kis- és nagybetű-érzékeny (Egyeztetés 17.). A tesztek osztálynevet és szövegmásolatot nem rögzítenek, csak viselkedést.
 - **Új függőség nincs.** A `package.json` és a `pnpm-lock.yaml` nem változik. Minden függőség pontos verzión marad, a `pnpm-workspace.yaml` `minimumReleaseAge: 10080`-ja és `minimumReleaseAgeIgnoreMissingTime: false`-a érintetlen.
-- **`npx shadcn add` tilos** (CLAUDE.md). A `components/ui` fájljaihoz ez a terv nem nyúl.
+- **`npx shadcn add` tilos** (AGENTS.md, DESIGN.md). A `components/ui` fájljaihoz ez a terv nem nyúl.
 - **Migráció:** egyetlen új fájl, `supabase/migrations/20260925010000_reader_tools.sql` (a legújabb, `20260925000000_drop_post_body.sql` után), csak bővít. A felhasználó futtatja kézzel a Supabase SQL Editorban, **soha `supabase db push`**. Az implementáló nem futtat DDL-t.
 - **RLS minden új táblán.** `annotations`: csak a saját sorok, `user_id uuid not null default auth.uid()`. `glossary_terms`, `glossary_occurrences`: olvasni minden bejelentkezett tud (`to authenticated using (true)`), írni csak a secret key (a `save_post_glossary`, `service_role`).
 - **Modellnév nem kerül a kódba**, csak a `model_settings` táblába, pontos verzióval, `*-latest` alias nélkül (CLAUDE.md: „Pin exact versions there, not `*-latest` aliases.”). A `llama-3.3-70b-versatile` megszűnt, új sor nem használhatja. Válaszsémában tömbre nem kerül `.max()`.
@@ -101,7 +101,7 @@ Az M1 a `main`-ben van, a spec még előtte készült. Az alábbi eltéréseket 
 - **Route-ok:** minden olvasói route `getReader()`-rel azonosít; minden JSON-hiba `jsonError` (`lib/api.ts`); a `posts/[id]` route-ok `postRoute`-on át mennek; `maxDuration = 300` a modellt hívó route-okon.
 - **Nyers HTML nincs** (`dangerouslySetInnerHTML` tilos); linkből csak `http(s)` (`safeHref`). A kommentek, idézetek és definíciók szövegként renderelődnek.
 - **Felületi szövegek:** HU/EN, komponensenként egy colocated `copy` objektum (`copy[language]`); kódazonosító, komment és prompt angol. A poszt-oldal szerveren renderelt nyelvvel megy (a nyelvváltó ott frissít), ezért a poszt-oldali komponensek `language` propot kapnak; a `/glossary` a UX-A `useLanguage()`-ét használja, és helyben vált.
-- **Design (CLAUDE.md „Design language”):**
+- **Design (DESIGN.md):**
   - `--radius` és `--radius-sm/md/lg/xl` = 0; `rounded-full` csak szándékosan;
   - csak rendszerbetű (`.font-display`, `.font-mono`);
   - kemény, elmosás nélküli árnyék: `5px 5px 0 var(--ink)` → hoverre `8px 8px 0 var(--signal)`;
@@ -184,7 +184,7 @@ Az M1 a `main`-ben van, a spec még előtte készült. Az alábbi eltéréseket 
 | `app/(app)/glossary/page.tsx`, `glossary-view.tsx` (+ teszt) | a `/glossary` oldal |
 | `app/(app)/library/library-view.tsx`, `lib/nav.ts` (+ teszt) | link a fogalomtárra; a `/glossary` helyben vált nyelvet |
 | `lib/fixtures.ts` (+ teszt), `app/dev/preview/post/page.tsx`, `app/dev/preview/page.tsx`, `app/dev/preview/preview-nav.tsx` | mintajegyzetek, -insightok, -fogalmak; a `glossary` előnézeti nézet |
-| `README.md`, `CLAUDE.md`, `TODO.md` | dokumentáció |
+| `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md` | dokumentáció |
 
 **Nem része ennek a tervnek:**
 - a margós kommentek, a bekezdéseken átívelő kiemelés és az X-szálak (spec, „Jövőbeli funkciók”);
@@ -4764,13 +4764,13 @@ git commit -m "feat: add the glossary page"
 ### Task 14: Dokumentáció és végső ellenőrzés
 
 **Files:**
-- Modify: `CLAUDE.md`, `README.md`, `TODO.md`
+- Modify: `CLAUDE.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `README.md`, `TODO.md`
 
 A három fájlt a UX-A 11. feladata is átírta. **Olvasd újra őket.** Ahol egy szakasz már tartalmazza az alábbiak egy részét, egészítsd ki, ne ismételd. A kód a mérvadó: ha egy szám vagy név eltér, a kódét írd le.
 
-- [ ] **Step 1: `CLAUDE.md`**
+- [ ] **Step 1: `CLAUDE.md` és a belőle kiköltözött szakaszok új helyei**
 
-- **What this repository is**, a Library mondata végére: „Library posts also carry each reader's private highlights and comments, key insights and a shared glossary (`/glossary`); see Reader tools.”
+- **ARCHITECTURE.md → Bird's eye view** (a régi What this repository is), a Library pontjának végére: „Library posts also carry each reader's private highlights and comments, key insights and a shared glossary (`/glossary`); see CLAUDE.md → Reader tools.”
 - **How content gets in**, a két író leírása után új bekezdés:
   > **On demand, from the post page.** Translation (`translate_post`), key insights (`post_insights`) and the glossary (`post_glossary`) run when a reader presses their button, once per post and for everyone: `POST /api/posts/[id]/translate|insights|glossary`, each through `onDemandRoute` (`lib/api.ts`). `buildInsights` (`lib/post-analysis.ts`) writes `posts.insights` only while it is null; `buildGlossary` saves through `save_post_glossary`, one transaction for the new terms, the post's occurrences and `posts.glossary_done`. A re-extraction leaves both alone (block ids are content-derived). The readers' own notes are the third reader write: `annotations`, through `/api/annotations`.
 - **A feladat-táblázat** két új sora:
@@ -4808,8 +4808,8 @@ A három fájlt a UX-A 11. feladata is átírta. **Olvasd újra őket.** Ahol eg
   > - **"Jegyzeteim"** (`notes-panel.tsx`): beside the text from an `@4xl` article container (`@container` on the `<article>`), below the post otherwise.
   > - **Key insights** (`post-insights.tsx`) replace the key points once made.
   > - **Terms** (`glossary-strip.tsx`) are chips plus native `popover` cards. Each term's first occurrence in running text (never in a link) is a `<button>` underline that opens the same card. In the Hungarian view the underlines mostly vanish, because the source-language term rarely appears in the translation; the chips stay.
-- **Security**, Prompts: „In the summary, notes and cleanup prompts” → „In the summary, notes, cleanup, insights and glossary prompts”. Rendering, új mondat: „Comments, quotes and glossary definitions render as text; a definition card is a native `popover` outside the post text.”
-- **Layout**: az `app/(app)/library/` sorba a `[id]/` alá: `reader-tools, note-bar, note-form, notes-panel, post-notes, post-insights, glossary-strip (each with a test but note-form)`; új sor: `app/(app)/glossary/  the /glossary page (glossary-view + test)`; az `app/api/` sorba: `annotations, posts/[id]/insights, posts/[id]/glossary`. A `lib/` sorai közé:
+- **SECURITY.md** (a régi Security), Prompt injection: „In the summary, notes and cleanup prompts” → „In the summary, notes, cleanup, insights and glossary prompts”. XSS, új pont: „Comments, quotes and glossary definitions render as text; a definition card is a native `popover` outside the post text.”
+- **ARCHITECTURE.md → Codemap** (a régi Layout): az `app/(app)/library/` sorba a `[id]/` alá: `reader-tools, note-bar, note-form, notes-panel, post-notes, post-insights, glossary-strip (each with a test but note-form)`; új sor: `app/(app)/glossary/  the /glossary page (glossary-view + test)`; az `app/api/` sorba: `annotations, posts/[id]/insights, posts/[id]/glossary`. A `lib/` sorai közé:
 
 ```text
 lib/marks.ts             highlight colours, markText, applyMarks, segmentsIn, termMarks (pure)
@@ -4820,7 +4820,7 @@ lib/glossary.ts          glossary terms: cleanTerms, termPopoverId, row mapping,
 lib/post-analysis.ts     buildInsights, buildGlossary: the on-demand model runs
 ```
 
-- **Conventions**, a közös helyek listájába: `lib/marks.ts` (`markText`, `PROSE`, `hasProse`), `lib/annotations.ts`, `lib/api.ts` (`onDemandRoute`), `lib/blocks.ts` (`normalizeText`), `lib/pipeline/util.ts` (`escapeRegExp`), `lib/post-view.ts` (`revealHref`), `lib/test/fixtures.ts` (`testHighlight`). A Tests pontba: „linkedom keeps attribute names as React writes them, so a component test reads `getAttribute("popoverTarget")` / `getAttribute("maxLength")`, and finds those buttons by filtering on the attribute, not with a `[popovertarget]` selector.”
+- **CODE_STYLE.md → No duplication** (a régi Conventions), a közös helyek listájába: `lib/marks.ts` (`markText`, `PROSE`, `hasProse`), `lib/annotations.ts`, `lib/api.ts` (`onDemandRoute`), `lib/blocks.ts` (`normalizeText`), `lib/pipeline/util.ts` (`escapeRegExp`), `lib/post-view.ts` (`revealHref`), `lib/test/fixtures.ts` (`testHighlight`). A TESTING.md → Pitfalls-ba: „linkedom keeps attribute names as React writes them, so a component test reads `getAttribute("popoverTarget")` / `getAttribute("maxLength")`, and finds those buttons by filtering on the attribute, not with a `[popovertarget]` selector.”
 - **Data contract**, új bekezdés: „**Annotations** point at a block by its content-derived id and at text by `exact` + `prefix` / `suffix` (W3C TextQuoteSelector style) into that block's `markText` (`lib/marks.ts`): list items joined with nothing between them, exactly the text of the block's `data-mark-root` element. Changing `markText` or the elements that carry `data-mark-root` orphans every saved highlight; `post-blocks.test.ts` pins the two together.”
 
 - [ ] **Step 2: `README.md`**
@@ -4875,7 +4875,7 @@ A lelet a TODO.md „Halasztott élő próbák” pontjába kerül.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add CLAUDE.md README.md TODO.md
+git add CLAUDE.md ARCHITECTURE.md TESTING.md SECURITY.md CODE_STYLE.md README.md TODO.md
 git commit -m "docs: document the reader tools"
 ```
 

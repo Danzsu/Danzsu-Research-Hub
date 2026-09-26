@@ -125,7 +125,7 @@ RLS is on for every table:
 | `GET /api/cron/daily` | `Authorization: Bearer $CRON_SECRET` | 401 `unauthorized` when the secret is unset or doesn't match; see How content gets in |
 | `GET /media/[...path]` | `getViewer()` | See SECURITY.md → `/media` |
 
-Every JSON error goes through `jsonError` (`lib/api.ts`); `/media` answers plain text. The three `posts/[id]` routes are wrapped in `postRoute` (`lib/api.ts`): 401 `unauthorized` when signed out and 404 `not_found` for an id that isn't a positive integer, the same answer as a missing post; their result maps share `POST_ERRORS`. The cron, sources, translate and reextract routes set `maxDuration = 300`.
+Error bodies follow CODE_STYLE.md → Error handling; `/media` answers plain text. The three `posts/[id]` routes are wrapped in `postRoute` (`lib/api.ts`): 401 `unauthorized` when signed out and 404 `not_found` for an id that isn't a positive integer, the same answer as a missing post; their result maps share `POST_ERRORS`. The cron, sources, translate and reextract routes set `maxDuration = 300`.
 
 **Edit, translate and re-extract** (the submitter's tools on `/library/[id]`):
 
