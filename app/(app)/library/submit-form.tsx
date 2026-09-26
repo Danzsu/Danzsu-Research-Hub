@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { httpTransport } from "@/lib/link-chat";
 
 const copy = {
   hu: {
@@ -35,14 +36,10 @@ const copy = {
 type Status = "ok" | "invalid_url" | "already_submitted" | "error";
 type SubmitResult = { ok: boolean; error?: string };
 
+/** The link chat's own POST /api/sources call: one fetcher per route. */
 async function postSource(url: string, note: string): Promise<SubmitResult> {
-  const response = await fetch("/api/sources", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ url, note }),
-  });
-  const data = (await response.json().catch(() => ({}))) as { error?: string };
-  return { ok: response.ok, error: data.error };
+  const { status, body } = await httpTransport.submit(url, note);
+  return { ok: status === 202, error: typeof body.error === "string" ? body.error : undefined };
 }
 
 /** The offline preview sends nothing: local dev points at the production project. `failWrites` rejects like an offline fetch. */
