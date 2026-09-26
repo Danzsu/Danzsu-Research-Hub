@@ -100,7 +100,7 @@ A forrástípus neve (cikk, YouTube-videó, arXiv-tanulmány, GitHub-repó, X-po
 
 - `getReader()`; 401 kijelentkezve; nem pozitív egész id-re 404 (`parseId`).
 - Olvasás olvasóként: 404, ha nincs ilyen forrás; 403 `forbidden`, ha nem a hívó küldte be; 409 `not_failed`, ha az állapota nem `failed`.
-- Ezután az admin klienssel compare-and-swap: `status = 'pending', error = null`, csak ha `id`, `submitted_by = viewer.id` és `status = 'failed'`. 0 sor → 409 `not_failed` (egy párhuzamos kattintás már elindította).
+- Ezután az admin klienssel compare-and-swap: `status = 'pending', error = null, attempts = 0`, csak ha `id`, `submitted_by = viewer.id` és `status = 'failed'`. 0 sor → 409 `not_failed` (egy párhuzamos kattintás már elindította). Az `attempts` nullázása a tulajdonos döntése (2026-09-26): egy 300 s-nál megölt „Újra”-futás különben 3 vagy több próbával `pending`-ben ragadna, és a napi cron soha nem venné fel újra.
 - Siker: 202 `{ ok: true }`, és `after(() => processSource(createAdminClient(), id))`. `maxDuration = 300`, mint a többi feldolgozó route-nál.
 - Nincs cooldown: az állapot-CAS kizárja az átfedést, és minden futás egy felhasználói kattintás. `ponytail:` megjegyzés a kódban, hogy visszaélés esetén ide kerül egy várakozási idő.
 - A logika egy `lib/`-beli függvényben van (`retrySource`), `fakeDb`-vel tesztelve: 403, 409, a CAS-feltételek és a 202.

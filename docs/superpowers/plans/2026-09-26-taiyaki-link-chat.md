@@ -7,7 +7,7 @@
 **Architecture:**
 - **Két új route, egy bővítés, séma nélkül.**
   - `GET /api/sources/mine`: a saját beküldések, a szűrés a szerveren (`submitted_by = viewer.id`).
-  - `POST /api/sources/[id]/retry`: olvasás olvasóként, majd egy admin-kliens compare-and-swap, amely a tulajdonost és a `failed` állapotot is újra ellenőrzi.
+  - `POST /api/sources/[id]/retry`: olvasás olvasóként, majd egy admin-kliens compare-and-swap, amely a tulajdonost és a `failed` állapotot is újra ellenőrzi, és az `attempts`-et nullázza.
   - A `POST /api/sources` 409-es válasza `postId`-t is visz, ha a linkhez már van poszt.
   - A logika a `lib/my-sources.ts`-ben van, a route-ok vékonyak.
 - **A chat logikája keretrendszer nélkül él** (`lib/link-chat.ts`), ahogy a `reader-store.ts`:
@@ -94,6 +94,7 @@
 
 ## Döntések
 
+- **A tulajdonos döntése (2026-09-26):** az „Újra” CAS-a `status = 'pending'`, `error = null` mellett `attempts = 0`-t is ír — egy „Újra”-futás, amelyet a Vercel a 300 s-os határon megöl, `pending`-ben marad, és `attempts >= 3` mellett a napi cron (`retryPendingSources`: `attempts < 3`) soha nem venné fel, a szál pedig „Újra” gomb nélkül örökké „FELDOLGOZÁS…”-t mutatna — az ára: egy újra elbukó forrás, akárcsak egy friss beküldés, még két napi automatikus próbát kap. A 3. feladat kódja, két tesztje és egy mutációs sora rögzíti.
 - Ruling: a retry route a meglévő `postRoute`-ot használja `{ postId: sourceId }` kibontással — az M2 terv a nevére épít, és a 401/404 viselkedés egyezik — ha téves: egy mechanikus átnevezés `idRoute`-ra, három route-ban.
 - Ruling: a `posts(...)` beágyazás objektum vagy `null`, nem tömb — a `posts.source_id` `unique`, és a PostgREST 11+ az egy-az-egyhez kapcsolatot objektumként adja — ha téves: a kész válaszoknál nem látszik cím; a TODO élő próbája megfogja, és egy sor (`[row.posts].flat()[0]`) javítja.
 - Ruling: egy közös lista (`SOURCE_KIND_LABELS`) a spec neveivel, a poszt-oldal jelvénye `uppercase`-szel mutatja („ARXIV-TANULMÁNY”, „YOUTUBE-VIDEÓ”, „X-POSZT”, „CIKK”) — a spec egy listát kér, és a chat mondata a teljes nevet — ha téves: a jelvény hosszabb lesz; rövid formához egy második mező kellene ugyanabban a listában.
@@ -114,11 +115,7 @@
 
 ## Nyitott kérdések a felhasználónak
 
-1. **Nullázza-e az „Újra” az `attempts`-et?**
-   - A spec CAS-a csak `status = 'pending', error = null`-t ír, a terv így valósítja meg.
-   - A gond: egy „Újra”-futás, amelyet a Vercel az 5 perces határon megöl, `pending`-ben hagyja a forrást. Ha közben `attempts >= 3`, a napi cron (`retryPendingSources`: `attempts < 3`) soha nem veszi fel, és a szál örökké „FELDOLGOZÁS…”-t mutat, „Újra” gomb nélkül.
-   - **Ajánlott válasz: igen.** A 3. feladatban az `update({ status: "pending", error: null })` helyett `update({ status: "pending", error: null, attempts: 0 })`. A `retrySource sends the viewer's failed source…` teszt elvárt sora: `{ id: 5, submitted_by: "owner", status: "pending", error: null, attempts: 0 }`, a route-tesztben pedig `[{ status: "pending", error: null, attempts: 0 }]`.
-   - Az ára: egy újra elbukó forrás, akárcsak egy friss beküldés, még két napi automatikus próbát kap.
+Nincs. Az egyetlen kérdésre (nullázza-e az „Újra” az `attempts`-et) a tulajdonos 2026-09-26-án igennel válaszolt. A döntés a Döntések között áll, a spec 3.2 is így szól.
 
 ## Global Constraints
 
@@ -856,7 +853,7 @@ git commit -m "feat: list the reader's own submissions and point a duplicate at 
 - Consumes: `postRoute`, `jsonError`, `POST_ERRORS`, `ErrorAnswer` (`lib/api.ts`); `processSource` (`lib/pipeline/ingest.ts`); a route-hooks (`scheduledSourceIds`); az 1. feladat átíró `update`-je.
 - Produces:
   - `export type RetryResult = "accepted" | "forbidden" | "not_found" | "not_failed" | "failed"`
-  - `export async function retrySource(db: SupabaseClient, admin: SupabaseClient, viewerId: string, sourceId: number): Promise<RetryResult>`
+  - `export async function retrySource(db: SupabaseClient, admin: SupabaseClient, viewerId: string, sourceId: number): Promise<RetryResult>`. A CAS írása `{ status: "pending", error: null, attempts: 0 }` (a tulajdonos döntése, 2026-09-26).
   - `POST /api/sources/[id]/retry` → 202 `{ ok: true }` és `after(() => processSource(createAdminClient(), sourceId))`; 401 `unauthorized`; 403 `forbidden`; 404 `not_found`; 409 `not_failed`; 500 `db_error`. `maxDuration = 300`.
 
 - [ ] **Step 1: A tesztek**
@@ -884,13 +881,14 @@ function retryDbs(asRead: Record<string, unknown>, asClaimed: Record<string, unk
   return { db: fakeDb(undefined, { sources: [{ id: 5, ...asRead }] }), admin: fakeDb(undefined, tables), tables };
 }
 
-// Kills a claim that writes the wrong values (the old error stays on the row), and one not keyed on
-// the id (source 6 would be sent back too).
-test("retrySource sends the viewer's failed source, and only it, back to pending with no error", async () => {
-  const { db, admin, tables } = retryDbs({ submitted_by: "owner", status: "failed", error: "fetch 404" });
+// Kills a claim that writes the wrong values (the old error stays on the row, or the attempts aren't
+// reset: a retry killed at 300 s would then stay pending at 3+ attempts, which the daily cron never
+// picks up), and one not keyed on the id (source 6 would be sent back too).
+test("retrySource sends the viewer's failed source, and only it, back to pending with no error and its attempts reset", async () => {
+  const { db, admin, tables } = retryDbs({ submitted_by: "owner", status: "failed", error: "fetch 404", attempts: 3 });
   assert.equal(await retrySource(db, admin, "owner", 5), "accepted");
   assert.deepEqual(tables.sources, [
-    { id: 5, submitted_by: "owner", status: "pending", error: null },
+    { id: 5, submitted_by: "owner", status: "pending", error: null, attempts: 0 },
     { id: 6, submitted_by: "owner", status: "failed" },
   ]);
 });
@@ -955,7 +953,7 @@ test("POST /api/sources/[id]/retry answers 202 to the submitter of a failed sour
   const admin = sourceAs("owner");
   const response = await retry();
   assert.deepEqual([response.status, await response.json()], [202, { ok: true }]);
-  assert.deepEqual(admin.sourceUpdates, [{ status: "pending", error: null }]);
+  assert.deepEqual(admin.sourceUpdates, [{ status: "pending", error: null, attempts: 0 }]);
   const run = fakeDb();
   routeStub.admin = run;
   assert.deepEqual(await scheduledSourceIds(run), [5]);
@@ -1022,6 +1020,8 @@ export type RetryResult = "accepted" | "forbidden" | "not_found" | "not_failed" 
  * client (readers can't update `sources`) in one compare-and-swap that repeats both checks: only a
  * row that is still the viewer's and still `failed` goes back to `pending`. Of two overlapping
  * clicks only one can win; the other's update matches 0 rows and answers "not_failed".
+ * The claim also resets `attempts`: a retry run killed at 300 s would otherwise stay `pending` at
+ * 3+ attempts, which `retryPendingSources` never picks up.
  */
 export async function retrySource(db: SupabaseClient, admin: SupabaseClient, viewerId: string, sourceId: number): Promise<RetryResult> {
   const { data: source, error } = await db.from("sources").select("submitted_by, status").eq("id", sourceId).maybeSingle();
@@ -1033,7 +1033,7 @@ export async function retrySource(db: SupabaseClient, admin: SupabaseClient, vie
   // ponytail: no cooldown — the status CAS rules out overlapping runs, and each run is one click; add a wait here if it gets abused.
   const { data: claimed, error: claimError } = await admin
     .from("sources")
-    .update({ status: "pending", error: null })
+    .update({ status: "pending", error: null, attempts: 0 })
     .eq("id", sourceId)
     .eq("submitted_by", viewerId)
     .eq("status", "failed")
@@ -1103,7 +1103,8 @@ Elvárt: `ℹ tests 13`, `ℹ fail 0`.
 | a CAS `.eq("submitted_by", viewerId)` sorának törlése | `retrySource's compare-and-swap repeats the owner and the status check…` |
 | a CAS `.eq("status", "failed")` sorának törlése | ugyanaz, és `…of two overlapping clicks…` |
 | a CAS `.eq("id", sourceId)` sorának törlése | `retrySource sends the viewer's failed source, and only it…` és a CAS-teszt |
-| `.update({ status: "pending", error: null })` → `.update({ status: "pending" })` | `retrySource sends…` és `…answers 202 to the submitter…` |
+| `.update({ status: "pending", error: null, attempts: 0 })` → `.update({ status: "pending", attempts: 0 })` | `retrySource sends…` és `…answers 202 to the submitter…` |
+| `.update({ status: "pending", error: null, attempts: 0 })` → `.update({ status: "pending", error: null })` (a nullázás elmarad) | `retrySource sends…` (a sor `attempts: 3` marad) és `…answers 202 to the submitter…` |
 | `if (source.submitted_by !== viewerId) return "forbidden";` törlése | `retrySource refuses…` és `…answers 403…` |
 | `if (source.status !== "failed") return "not_failed";` törlése | `retrySource refuses…` |
 | a read `.eq("id", sourceId)` → `.eq("submitted_by", viewerId)` | `retrySource refuses…`, `…403…`, `…404…` |
@@ -3355,7 +3356,7 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
 
 - [ ] **Step 1: `CLAUDE.md`** (előbb olvasd újra; ha közben változott, az új szövegbe illeszd)
 
-- **How content gets in, 2. Link submissions:** az első mondat elé: „Two front doors lead to it: the `/library` form and the taiyaki link chat (see App shell).” A felsorolás után új bekezdés: „`POST /api/sources/[id]/retry` sends the submitter's own `failed` source back to `pending` (`retrySource` in `lib/my-sources.ts`) and runs `processSource` in `after()`.”
+- **How content gets in, 2. Link submissions:** az első mondat elé: „Two front doors lead to it: the `/library` form and the taiyaki link chat (see App shell).” A felsorolás után új bekezdés: „`POST /api/sources/[id]/retry` sends the submitter's own `failed` source back to `pending` with `attempts` reset to 0 (`retrySource` in `lib/my-sources.ts`), so a retry killed at 300 s is still picked up by the daily cron, and runs `processSource` in `after()`.”
 - **App shell and navigation:**
   - A „Mobile, below `md`” pont helyett: „**Mobile, below `md`:** the bottom bar in `app-shell.tsx`, five slots: Radar, Library, the taiyaki (raised 18px out of the bar), Search, Több. `lib/nav.ts` says where each item goes: `MOBILE_BAR_NAV` (the three page slots, the taiyaki after `MOBILE_CHAT_SLOT` of them) and `MOBILE_MORE_NAV` (items with `mobileMore`, today Archívum). "Több" opens a bottom Sheet: Archívum, the language toggle, the coming views, sign-out; on an Archívum page its slot carries the active mark (`inMobileMore`, `data-active`), and following the link closes the Sheet (`NavEntry`'s `onClick`).”
   - Új pont a „Search” után: „**Link chat (taiyaki):** `link-chat.tsx`. `TaiyakiButton` is the desktop corner button (`fixed bottom-6 right-6`, `z-40`) and the mobile centre slot; `.lift` in `globals.css` brings it forward on hover and keyboard focus, like the Top 3 cards. `LinkChat` is one Radix Dialog: non-modal on desktop (360px above the button, `max-h-[70dvh]`; only Esc and its close button close it), a modal bottom Sheet on mobile (`max-h-[75dvh]`). Focus goes to the field on open and back to the button that opened it. Enter sends, Shift+Enter is a new line. The logic is `lib/link-chat.ts`: `parseLinkMessage` (the first http(s) word, sentence punctuation stripped; the rest is the note), `toThread`, and `createLinkChat`, which loads `GET /api/sources/mine` on open and polls it every 4 s while the panel is open, the tab is visible and a source is pending (at most `MAX_POLLS`, 150). The thread is `chat-thread.tsx`: the reader's 10 latest submissions (oldest first) with a reply per status, then local replies that live only while the panel is open.”
@@ -3366,7 +3367,7 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
 - **Routes** tábla:
   - a `POST /api/sources` sora: „400 `invalid_url`, 409 `already_submitted` (with `postId` when the link already has a post), 500 `insert_failed`, else 202 `{ ok, id }` and `processSource` in `after()`”;
   - új sor: „| `GET /api/sources/mine` | `getReader()` | the caller's 10 latest sources, newest first, with `post: { id, title }` (the submitter's title override wins, `shownTitle`); 500 `db_error` |”;
-  - új sor: „| `POST /api/sources/[id]/retry` | `getReader()`, then admin | `retrySource`: 404 (also for an id that isn't a positive integer), 403 `forbidden` (not the submitter), 409 `not_failed` (not `failed`, or a concurrent retry won the compare-and-swap on `id` + `submitted_by` + `status = 'failed'`), 500 `db_error`, else 202 and `processSource` in `after()`. No cooldown (a `ponytail:` note) |”.
+  - új sor: „| `POST /api/sources/[id]/retry` | `getReader()`, then admin | `retrySource`: 404 (also for an id that isn't a positive integer), 403 `forbidden` (not the submitter), 409 `not_failed` (not `failed`, or a concurrent retry won the compare-and-swap on `id` + `submitted_by` + `status = 'failed'`, which writes `status = 'pending'`, `error = null`, `attempts = 0`), 500 `db_error`, else 202 and `processSource` in `after()`. No cooldown (a `ponytail:` note) |”.
 
   A tábla alatti mondat: „The three `posts/[id]` routes are wrapped in `postRoute`” → „The three `posts/[id]` routes and `sources/[id]/retry` are wrapped in `postRoute`”. A `maxDuration = 300` listába a retry route.
 - **Security, Rendering:** „in `PostBlocks` and the post page” → „in `PostBlocks`, the post page and the link chat's thread (`toThread`)”.
@@ -3398,16 +3399,15 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
   - az `app/api/` sora: „JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron”.
 - **Recipes → Add a source extractor**, 5. lépés: „Add the kind's name, in both languages, to `SOURCE_KIND_LABELS` in [`lib/source-kinds.ts`](lib/source-kinds.ts) (the post page's badge and the link chat), and its icon to `kindIcons` in the Library page; `tsc` reports a missing entry.”
 - **Conventions → Bilingual:** az angol-only felsorolásból kikerül „the post kind labels (`kindLabel`), ”.
-- **Troubleshooting → Submissions are stuck after three failed attempts:** a „There is no button to reset them yet (the TODO item "Hibás beküldések kezelése" in [TODO.md](TODO.md)).” mondat helyett: „The submitter can send a failed one through again with ÚJRA in the taiyaki link chat; a stuck source of another member, or many at once, still needs the SQL below.”
+- **Troubleshooting → Submissions are stuck after three failed attempts:** a „There is no button to reset them yet (the TODO item "Hibás beküldések kezelése" in [TODO.md](TODO.md)).” mondat helyett: „The submitter can send a failed one through again with ÚJRA in the taiyaki link chat, which also resets its attempts; a stuck source of another member, or many at once, still needs the SQL below.”
 - **Roadmap:** új sor: „- [Taiyaki link chat](docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md) (spec) and its [plan](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md)”.
 
 - [ ] **Step 3: `TODO.md`**
 
 - A „Következő lépések” alól a `- [ ] **Taiyaki link-chat** …` pont átkerül a „Kész” alá, pipálva: `- [x] **Taiyaki link-chat** (2026-09-2x): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).` (A dátum a beolvasztás napja.)
 - A „Hibás beküldések kezelése” alpontja: `  - [x] A saját beküldés „Újra” gombja kész: a taiyaki link-chatben (\`POST /api/sources/[id]/retry\`). A „Törlés” és az admin-rész marad itt.`
-- A „Következő lépések” alá új pont: `- [ ] **Élő próbák a taiyaki link-chat deployja után** (a kontroller futtatja, ha a felhasználó engedélyez egy bejelentkezett munkamenetet): egy valódi link beküldése a chatből, és a szál „FELDOLGOZÁS…” → „KÉSZ · MEGNYITÁS →” váltása a poszt címével (a \`posts(...)\` beágyazás objektumként jön-e); egy hibás beküldés „Újra”-ja; egy már bent lévő link 409-e a „MEGNYITÁS →”-sal; az \`/archive\` oldalon a „Több” aktív jelölése mobilon; a lekérdezés leáll a panel bezárása után (\`browser_network_requests\`).`
+- A „Következő lépések” alá új pont: `- [ ] **Élő próbák a taiyaki link-chat deployja után** (a kontroller futtatja, ha a felhasználó engedélyez egy bejelentkezett munkamenetet): egy valódi link beküldése a chatből, és a szál „FELDOLGOZÁS…” → „KÉSZ · MEGNYITÁS →” váltása a poszt címével (a \`posts(...)\` beágyazás objektumként jön-e); egy hibás beküldés „Újra”-ja (a sor `attempts` értéke 0 lesz, aztán 1); egy már bent lévő link 409-e a „MEGNYITÁS →”-sal; az \`/archive\` oldalon a „Több” aktív jelölése mobilon; a lekérdezés leáll a panel bezárása után (\`browser_network_requests\`).`
 - Az M2 pont alá: `    - A taiyaki link-chat óta a \`post-article.tsx\` \`copy\`-jában nincs \`kind\`: a forrástípus jelvénye a \`SOURCE_KIND_LABELS\`-ből jön (\`lib/source-kinds.ts\`). A \`labels.keyPoints\` megmaradt.`
-- Ha a „Nyitott kérdések” 1. pontjára a válasz „igen” volt, és a változás bekerült, a „Technikai adósság” alá nem kell semmi. Ha „nem”: `- [ ] **Egy megölt „Újra”-futás \`pending\`-ben ragadhat** \`attempts >= 3\` mellett: a cron nem veszi fel, és a chatben nincs rá gomb. Javítás: az „Újra” CAS-a \`attempts: 0\`-t is írjon.`
 
 - [ ] **Step 4: Végső ellenőrzés**
 
@@ -3457,7 +3457,7 @@ A push a tulajdonosé: `! git push origin taiyaki-link-chat`. A `main` ruleset a
   - `parseLinkMessage`: 4. feladat;
   - a küldés a `{ url, note }` törzzsel, és minden válasz a táblázatból (202 + `moreLinks`, 400, 409 + „MEGNYITÁS →”, 401 + `/login?next=`, hálózat/5xx a szöveg megtartásával, link nélküli üzenet kérés nélkül): 5. és 6. feladat;
   - a 409 `postId`: 2. feladat.
-- 3.1: 2. feladat. 3.2: 3. feladat (a `ponytail:` megjegyzéssel). 3.3: 5. feladat (nyitáskor egy lekérés, 4 s csak nyitott panel, látható fül és függő beküldés mellett, azonnali lekérés küldés és „Újra” után, egyszeri „nem érem el”). Séma nincs: Global Constraints.
+- 3.1: 2. feladat. 3.2: 3. feladat (a `ponytail:` megjegyzéssel, és az `attempts = 0` a tulajdonos döntése szerint). 3.3: 5. feladat (nyitáskor egy lekérés, 4 s csak nyitott panel, látható fül és függő beküldés mellett, azonnali lekérés küldés és „Újra” után, egyszeri „nem érem el”). Séma nincs: Global Constraints.
 - Spec 4. (hibakezelés és biztonság): a Global Constraints-ben és az 5., 3., 2. feladatban.
 - Spec 5. (tesztelés):
   - egységtesztek: 4., 5., 2., 3. feladat;
