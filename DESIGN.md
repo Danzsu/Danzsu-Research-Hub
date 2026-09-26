@@ -181,7 +181,7 @@ components:
 NEON NEWS RADAR looks like a hard-cornered broadsheet: ink on paper, one signal orange, and everything drawn with 2px ink rules and flat offset shadows. The type is heavy black display over plain sans body text, with monospace labels. The design language is deliberate, so don't erode it.
 
 - `app/globals.css` is the whole theme: Tailwind 4, CSS-first, with no `tailwind.config`. It imports `tailwindcss`, `tw-animate-css` and the vendored shadcn utility pack in `vendor/`.
-- Five brand tokens (`--ink`, `--paper`, `--cream`, `--signal` and `--cyan`) sit in `:root`, and the full shadcn token set is remapped onto them. `@theme inline` exposes them as Tailwind colours (`bg-ink`, `text-signal`, `border-paper/15`). The front matter above equals `:root` value for value.
+- Five brand tokens (`--ink`, `--paper`, `--cream`, `--signal` and `--cyan`) sit in `:root`, and the full shadcn token set is remapped onto them. `@theme inline` exposes them as Tailwind colours (`bg-ink`, `text-signal`, `border-paper/15`). The front matter above equals `:root` value for value, and `lib/design-tokens.test.ts` fails when the two drift apart.
 - **One fixed theme.** There is no `.dark` block, no `prefers-color-scheme` and no `next-themes`. The contrast is spatial:
   - `html` is ink and `body` is paper;
   - the navigation, the Library and the Archive are ink surfaces;
