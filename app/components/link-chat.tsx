@@ -134,7 +134,7 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
   async function send() {
     if (!(await chat.send(text))) return;
     setText("");
-    // A click on Send leaves the focus there; the next link goes in the field.
+    // Send pressed from the keyboard has the focus; the next link goes in the field.
     input.current?.focus();
   }
 
@@ -200,13 +200,15 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
             placeholder={t.placeholder}
             className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base focus-visible:border-signal"
           />
-          {/* aria-disabled, not disabled, while sending: a disabled button would drop the focus. send() ignores a second press. */}
+          {/* aria-disabled, not disabled, while sending: a disabled button would drop the focus. send() ignores a second press.
+              A tap or click leaves the focus in the field, so a phone keyboard doesn't drop and come back. */}
           <Button
             type="submit"
             variant="signal"
             size="icon-lg"
             aria-disabled={snapshot.sending}
             aria-label={t.send}
+            onMouseDown={(event) => event.preventDefault()}
             className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
           >
             <SendHorizontal />
