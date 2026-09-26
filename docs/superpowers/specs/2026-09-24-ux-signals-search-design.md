@@ -13,7 +13,7 @@ Az oldalt nagyjából fele-fele arányban használjuk telefonon és asztali gép
 
 Emellett hiányzik egy értékelés, amellyel jelölhető, mi volt hasznos és mi nem.
 
-Ez a spec a kinézethez nem nyúl. A `CLAUDE.md` „Design language” szakasza (0-s radius, rendszerbetűk, kemény árnyékok, ink/paper/cream/signal) változatlanul érvényes. Csak azt változtatjuk meg, ami a produktivitást gátolja. Az ergonómiai pontok egy kód alapú átnézésből jönnek (`.superpowers/brainstorm/ux-audit.md`, 16 pont, fájl- és sorhivatkozással).
+Ez a spec a kinézethez nem nyúl. A `DESIGN.md` (0-s radius, rendszerbetűk, kemény árnyékok, ink/paper/cream/signal) változatlanul érvényes. Csak azt változtatjuk meg, ami a produktivitást gátolja. Az ergonómiai pontok egy kód alapú átnézésből jönnek (`.superpowers/brainstorm/ux-audit.md`, 16 pont, fájl- és sorhivatkozással).
 
 ## Döntések (a tervezés során egyeztetve)
 
@@ -183,7 +183,7 @@ create table public.ratings (
 ```
 
 A `target_id` értéke:
-- Radar-hírnél a `digest_items.id`. Ez örökre stabil (lásd `CLAUDE.md`).
+- Radar-hírnél a `digest_items.id`. Ez örökre stabil (lásd `ARCHITECTURE.md` → Invariants).
 - Posztnál a `posts.id` szövegként.
 - Repónál a kisbetűs `owner/repo`. Így egy repó értékelése minden héten érvényes.
 

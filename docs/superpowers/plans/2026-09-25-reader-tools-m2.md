@@ -184,7 +184,7 @@ Az M1 a `main`-ben van, a spec még előtte készült. Az alábbi eltéréseket 
 | `app/(app)/glossary/page.tsx`, `glossary-view.tsx` (+ teszt) | a `/glossary` oldal |
 | `app/(app)/library/library-view.tsx`, `lib/nav.ts` (+ teszt) | link a fogalomtárra; a `/glossary` helyben vált nyelvet |
 | `lib/fixtures.ts` (+ teszt), `app/dev/preview/post/page.tsx`, `app/dev/preview/page.tsx`, `app/dev/preview/preview-nav.tsx` | mintajegyzetek, -insightok, -fogalmak; a `glossary` előnézeti nézet |
-| `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md` | dokumentáció |
+| `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md` | dokumentáció |
 
 **Nem része ennek a tervnek:**
 - a margós kommentek, a bekezdéseken átívelő kiemelés és az X-szálak (spec, „Jövőbeli funkciók”);
@@ -4764,7 +4764,7 @@ git commit -m "feat: add the glossary page"
 ### Task 14: Dokumentáció és végső ellenőrzés
 
 **Files:**
-- Modify: `CLAUDE.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `README.md`, `TODO.md`
+- Modify: `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `README.md`, `TODO.md`
 
 A három fájlt a UX-A 11. feladata is átírta. **Olvasd újra őket.** Ahol egy szakasz már tartalmazza az alábbiak egy részét, egészítsd ki, ne ismételd. A kód a mérvadó: ha egy szám vagy név eltér, a kódét írd le.
 
@@ -4822,6 +4822,8 @@ lib/post-analysis.ts     buildInsights, buildGlossary: the on-demand model runs
 
 - **CODE_STYLE.md → No duplication** (a régi Conventions), a közös helyek listájába: `lib/marks.ts` (`markText`, `PROSE`, `hasProse`), `lib/annotations.ts`, `lib/api.ts` (`onDemandRoute`), `lib/blocks.ts` (`normalizeText`), `lib/pipeline/util.ts` (`escapeRegExp`), `lib/post-view.ts` (`revealHref`), `lib/test/fixtures.ts` (`testHighlight`). A TESTING.md → Pitfalls-ba: „linkedom keeps attribute names as React writes them, so a component test reads `getAttribute("popoverTarget")` / `getAttribute("maxLength")`, and finds those buttons by filtering on the attribute, not with a `[popovertarget]` selector.”
 - **Data contract**, új bekezdés: „**Annotations** point at a block by its content-derived id and at text by `exact` + `prefix` / `suffix` (W3C TextQuoteSelector style) into that block's `markText` (`lib/marks.ts`): list items joined with nothing between them, exactly the text of the block's `data-mark-root` element. Changing `markText` or the elements that carry `data-mark-root` orphans every saved highlight; `post-blocks.test.ts` pins the two together.”
+- **ARCHITECTURE.md → Bird's eye view:** „A reader writes only three things: …” → „A reader writes only four things: …”, a felsorolás végére: „and their own highlights and comments (`annotations`)”.
+- **SECURITY.md → Reader vs admin client:** a „The translate, reextract and `/media` routes may also use it, each after its own check.” mondatba az új route-ok: „The translate, insights, glossary, reextract and `/media` routes…”.
 - re-copy any DESIGN.md excerpt whose source you changed; `design-excerpts.test.ts` fails otherwise.
 
 - [ ] **Step 2: `README.md`**
@@ -4876,7 +4878,7 @@ A lelet a TODO.md „Halasztott élő próbák” pontjába kerül.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add CLAUDE.md ARCHITECTURE.md TESTING.md SECURITY.md CODE_STYLE.md README.md TODO.md
+git add CLAUDE.md ARCHITECTURE.md DESIGN.md TESTING.md SECURITY.md CODE_STYLE.md README.md TODO.md
 git commit -m "docs: document the reader tools"
 ```
 
