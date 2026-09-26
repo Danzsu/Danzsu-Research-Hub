@@ -134,6 +134,11 @@ test("isPrivateAddress and parseSubmittedUrl hold at every range boundary", () =
     // A trailing dot is a valid root-label separator that must not let these slip past the name checks.
     "http://localhost./", "http://printer.local./", "http://metadata.google.internal./",
     "http://app.localhost/", // RFC 6761: .localhost is reserved
+    // Two or more trailing dots defeat the URL parser's own one-dot leniency for "ends in a number":
+    // the host stays a domain string ("127.1..") until our own dot-stripping turns it into shorthand,
+    // octal or hex IPv4 notation ("127.1", "0177.0.0.1", "0x7f.0.0.1") that a private-literal check
+    // running on the pre-setter string wouldn't recognize as an IPv4 address at all.
+    "http://127.1../", "http://0177.0.0.1../", "http://0x7f.0.0.1../", "http://10.1../",
   ]) {
     assert.equal(parseSubmittedUrl(bad), null, bad);
   }
@@ -145,6 +150,18 @@ test("isPrivateAddress and parseSubmittedUrl hold at every range boundary", () =
   }
 });
 
+// However a private IPv4 literal is spelled — shorthand, octal, hex, or hidden behind extra trailing
+// dots — whatever parseSubmittedUrl accepts must never itself resolve to one once returned.
+test("parseSubmittedUrl's returned URL never carries a private-literal hostname, however the private literal was spelled", () => {
+  for (const raw of [
+    "http://127.1../", "http://0177.0.0.1../", "http://0x7f.0.0.1../", "http://10.1../",
+    "http://127.1/", "http://0177.0.0.1/", "http://0x7f.0.0.1/", "http://10.1/",
+  ]) {
+    const url = parseSubmittedUrl(raw);
+    assert.ok(url === null || !isPrivateAddress(url.hostname), raw);
+  }
+});
+
 // A real bug: parseSubmittedUrl stripped the trailing dot only for its own checks, then returned the
 // URL with the dot still in place — bypassing the sources.url unique dedup against the dotless form,
 // and making detectSource's exact hostname matches (youtubeId, githubRepo) miss a trailing-dot link.
@@ -152,6 +169,7 @@ test("parseSubmittedUrl normalizes a trailing-dot hostname on the URL it returns
   assert.equal(parseSubmittedUrl("https://example.com./x")?.toString(), parseSubmittedUrl("https://example.com/x")?.toString());
   assert.equal(detectSource(parseSubmittedUrl("https://youtube.com./watch?v=dQw4w9WgXcQ")!), "youtube");
   assert.equal(detectSource(parseSubmittedUrl("https://github.com./ggml-org/llama.cpp")!), "github");
+  assert.equal(detectSource(parseSubmittedUrl("https://arxiv.org./abs/2401.00001")!), "arxiv");
   for (const bad of ["http://localhost./", "http://printer.local./", "http://10.0.0.1./x"]) {
     assert.equal(parseSubmittedUrl(bad), null, bad);
   }

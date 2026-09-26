@@ -220,10 +220,19 @@ export function parseSubmittedUrl(raw: string): URL | null {
     return null;
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  // Strip a trailing dot (a syntactically valid root-label separator) before the name checks below —
-  // otherwise "localhost.", "printer.local." and "metadata.google.internal." each slip past unmatched.
-  const host = url.hostname.toLowerCase().replace(/\.+$/, "");
+  // Strip a trailing dot (a syntactically valid root-label separator) and assign it back through the
+  // setter *before* checking anything — otherwise "localhost.", "printer.local." and
+  // "metadata.google.internal." each slip past the name checks below unmatched.
+  // Reassigning first also matters for IPv4 literals: the setter re-parses the host itself, so a
+  // private address hidden behind two or more trailing dots ("127.1../", which the URL parser's own
+  // one-dot leniency doesn't catch), shorthand ("127.1"), octal ("0177.0.0.1") or hex ("0x7f.0.0.1")
+  // notation canonicalizes to a plain "127.0.0.1" right here, in a form the regex below recognizes —
+  // instead of reaching the checks in a form it doesn't, and only becoming "127.0.0.1" after we've
+  // already decided to keep it.
+  url.hostname = url.hostname.replace(/\.+$/, "");
+  const host = url.hostname.toLowerCase();
   if (
+    host.endsWith(".") || // the setter silently refuses an invalid value, leaving the old (dotted) host in place
     host === "localhost" ||
     host.endsWith(".localhost") || // RFC 6761: .localhost is reserved, same as .local and .internal
     host.endsWith(".local") ||
@@ -235,10 +244,6 @@ export function parseSubmittedUrl(raw: string): URL | null {
   ) {
     return null;
   }
-  // The returned URL must carry this same normalized host — otherwise "example.com." bypasses the
-  // sources.url unique dedup against "example.com", and detectSource (youtubeId, githubRepo, arxivId,
-  // all exact hostname matches) misclassifies a trailing-dot link as a plain article.
-  url.hostname = host;
   url.hash = "";
   return url;
 }
