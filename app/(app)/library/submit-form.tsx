@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { httpTransport } from "@/lib/link-chat";
+import { httpTransport, memoryTransport } from "@/lib/link-chat";
 
 const copy = {
   hu: {
@@ -42,10 +42,12 @@ async function postSource(url: string, note: string): Promise<SubmitResult> {
   return { ok: status === 202, error: typeof body.error === "string" ? body.error : undefined };
 }
 
-/** The offline preview sends nothing: local dev points at the production project. `failWrites` rejects like an offline fetch. */
-async function previewSubmit(failWrites: boolean): Promise<SubmitResult> {
-  if (failWrites) throw new TypeError("Failed to fetch");
-  return { ok: true };
+/** The offline preview never reaches a real route: local dev points at the production project. Reuses
+ *  `memoryTransport`'s own submit, fresh each call (nothing here tracks a thread yet), so a bad URL
+ *  answers the real 400 and `failWrites` rejects like an offline fetch, same as before. */
+async function previewSubmit(failWrites: boolean, url: string, note: string): Promise<SubmitResult> {
+  const { status, body } = await memoryTransport([], failWrites).submit(url, note || null);
+  return { ok: status === 202, error: typeof body.error === "string" ? body.error : undefined };
 }
 
 export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
@@ -61,7 +63,7 @@ export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
     event.preventDefault();
     setBusy(true);
     try {
-      const result = preview ? await previewSubmit(preview.failWrites) : await postSource(url, note);
+      const result = preview ? await previewSubmit(preview.failWrites, url, note) : await postSource(url, note);
       const known = result.error === "invalid_url" || result.error === "already_submitted" ? result.error : "error";
       setStatus(result.ok ? "ok" : known);
       if (result.ok) {
