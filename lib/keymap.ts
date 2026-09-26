@@ -57,6 +57,12 @@ function keyAction(press: KeyPress): ShortcutAction | null {
   return BY_KEY.get(press.key) ?? null;
 }
 
+/** The link chat's field: Enter sends and Shift+Enter breaks the line. An IME's Enter only confirms the
+ *  word; Safari reports that one as keyCode 229 with isComposing already false. */
+export function isSendKey(event: { key: string; shiftKey: boolean; isComposing: boolean; keyCode?: number }): boolean {
+  return event.key === "Enter" && !event.shiftKey && !event.isComposing && event.keyCode !== 229;
+}
+
 /** The card j/k moves to: the first one while none has focus, clamped at both ends; null when there are none. */
 export function nextCardIndex(current: number, count: number, step: 1 | -1): number | null {
   if (count === 0) return null;

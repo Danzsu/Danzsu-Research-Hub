@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isEditableTarget, nextCardIndex, shortcutFor, type KeyPress, type KeyTarget } from "./keymap.ts";
+import { isEditableTarget, isSendKey, nextCardIndex, shortcutFor, type KeyPress, type KeyTarget } from "./keymap.ts";
 
 const press = (key: string, modifiers: Partial<KeyPress> = {}): KeyPress => ({ key, ctrlKey: false, metaKey: false, altKey: false, ...modifiers });
 const page: KeyTarget = { editable: false, inDialog: false };
@@ -72,4 +72,17 @@ test("nextCardIndex starts at the first card and stops at both ends", () => {
   assert.equal(nextCardIndex(4, 5, 1), 4);
   assert.equal(nextCardIndex(0, 5, -1), 0);
   assert.equal(nextCardIndex(-1, 0, 1), null);
+});
+
+// Kills each of the chat field's Enter guards: another key sending, Shift+Enter sending instead of
+// breaking the line, and an IME's Enter sending mid-word, whether the browser reports it through
+// isComposing or, like Safari, only through keyCode 229.
+test("isSendKey: only a plain Enter sends; Shift+Enter and an IME's Enter don't", () => {
+  const enter = { key: "Enter", shiftKey: false, isComposing: false, keyCode: 13 };
+  assert.equal(isSendKey(enter), true);
+  assert.equal(isSendKey({ key: "Enter", shiftKey: false, isComposing: false }), true);
+  assert.equal(isSendKey({ ...enter, key: "a", keyCode: 65 }), false);
+  assert.equal(isSendKey({ ...enter, shiftKey: true }), false);
+  assert.equal(isSendKey({ ...enter, isComposing: true }), false);
+  assert.equal(isSendKey({ ...enter, keyCode: 229 }), false);
 });
