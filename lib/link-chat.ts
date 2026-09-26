@@ -1,6 +1,6 @@
 import type { Localized } from "../data/digest-types.ts";
 import { safeHref } from "./blocks.ts";
-import type { MySource } from "./my-sources.ts";
+import { MINE_LIMIT, type MySource } from "./my-sources.ts";
 import { detectSource, parseSubmittedUrl, type SourceKind } from "./pipeline/util.ts";
 
 // The taiyaki link chat's logic, framework-free so node --test runs it: a message → a submission,
@@ -98,18 +98,25 @@ export const httpTransport: ChatTransport = {
  * thread, a submission joins it as pending, and "Újra" sends a failed one back to pending. Nothing
  * is ever processed. Answers like the real routes: a URL already in the thread is `already_submitted`
  * (`postId` present only when that source already has a post, same as `existingPostId`), a retry of
- * an id not in the thread is `not_found`, and a retry of a source that isn't `failed` is `not_failed`.
- * `fail` rejects every write the way an offline fetch does; reads still answer.
+ * an id not in the thread is `not_found`, and a retry of a source that isn't `failed` is `not_failed`;
+ * the thread is the latest MINE_LIMIT, newest first. `fail` rejects every write the way an offline
+ * fetch does; reads still answer. `delayMs` (the preview's slow=1) holds every answer that long, so
+ * the in-flight states can be seen.
  */
-export function memoryTransport(seed: MySource[], fail: boolean): ChatTransport {
+export function memoryTransport(seed: MySource[], fail: boolean, delayMs = 0): ChatTransport {
   let sources = seed;
   let nextId = -1000;
+  const latency = () => new Promise((resolve) => setTimeout(resolve, delayMs));
   const write = async (change: () => Answer) => {
+    if (delayMs) await latency();
     if (fail) throw new TypeError("Failed to fetch");
     return change();
   };
   return {
-    mine: async () => ({ status: 200, body: { sources } }),
+    mine: async () => {
+      if (delayMs) await latency();
+      return { status: 200, body: { sources: sources.slice(0, MINE_LIMIT) } };
+    },
     submit: (url, note) =>
       write(() => {
         const parsed = parseSubmittedUrl(url);

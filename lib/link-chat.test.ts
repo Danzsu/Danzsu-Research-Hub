@@ -12,7 +12,7 @@ import {
   type ChatNotice,
   type ChatTransport,
 } from "./link-chat.ts";
-import type { MySource } from "./my-sources.ts";
+import { MINE_LIMIT, type MySource } from "./my-sources.ts";
 import { mockFetch } from "./pipeline/mock-fetch.ts";
 
 const linkOf = (text: string) => {
@@ -630,6 +630,34 @@ test("memoryTransport: a duplicate of a postless source answers already_submitte
   assert.equal(status, 409);
   assert.deepEqual(body, { error: "already_submitted" });
   assert.ok(!("postId" in body));
+});
+
+// Kills a preview thread that answers every source it holds (12 here) while the real route answers
+// only its latest MINE_LIMIT, or the oldest ones: a new submission must land first and push the
+// oldest out, as it does for a reader with MINE_LIMIT or more submissions (I1).
+test("memoryTransport: the thread answers only the latest MINE_LIMIT sources, newest first, like the route", async () => {
+  const seed = Array.from({ length: MINE_LIMIT + 2 }, (_, index) => source(-1 - index, "done"));
+  const preview = memoryTransport(seed, false);
+  const ids = async () => ((await preview.mine()).body.sources as MySource[]).map(({ id }) => id);
+  assert.deepEqual(await ids(), seed.slice(0, MINE_LIMIT).map(({ id }) => id));
+  await preview.submit("https://blog.test/new", null);
+  assert.deepEqual(await ids(), [-1000, ...seed.slice(0, MINE_LIMIT - 1).map(({ id }) => id)]);
+});
+
+// Kills slow=1 doing nothing, or slowing only the reads: every answer, a write included, must wait
+// the whole delay, so the panel's in-flight states can be seen in the preview (I3).
+test("memoryTransport: with a delay, every call answers only once it has passed", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const preview = memoryTransport([], false, 800);
+  const answered: string[] = [];
+  void preview.mine().then(() => answered.push("mine"));
+  void preview.submit("https://blog.test/slow", null).then(({ status }) => answered.push(`submit ${status}`));
+  t.mock.timers.tick(799);
+  await flush();
+  assert.deepEqual(answered, []);
+  t.mock.timers.tick(1);
+  await flush();
+  assert.deepEqual(answered, ["mine", "submit 202"]);
 });
 
 // httpTransport is the only code here that reaches production (Minor 4): pin each call's path,
