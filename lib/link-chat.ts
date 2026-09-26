@@ -188,7 +188,13 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     snapshot = { ...snapshot, ...patch };
     for (const listener of listeners) listener();
   };
-  const say = (notice: ChatNotice) => set({ notices: [...snapshot.notices, notice] });
+  // `signed_out` is deduped here, not just in `load()`'s own 401 branch: a second retry or send can
+  // also land its own 401 straight through `noticeFor`, once the session has actually expired — the
+  // dedupe has to hold for every caller of `say`, not only the polling GET's.
+  const say = (notice: ChatNotice) => {
+    if (notice.kind === "signed_out" && snapshot.notices.some((existing) => existing.kind === "signed_out")) return;
+    set({ notices: [...snapshot.notices, notice] });
+  };
 
   function schedule() {
     clearTimeout(timer);
@@ -208,6 +214,11 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
 
   async function load() {
     const request = ++latest;
+    // A fresh load supersedes whatever was scheduled before it. Cleared here, not left to
+    // `schedule()`'s own `clearTimeout`, because the 401 branch below returns before reaching
+    // `schedule()` — a timer armed before a send's or retry's reload would otherwise survive a 401
+    // untouched and fire one extra GET on its own.
+    clearTimeout(timer);
     let answer: Answer | null = null;
     try {
       answer = await transport.mine();
@@ -218,9 +229,9 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     if (answer?.status === 200 && Array.isArray(answer.body.sources)) {
       set({ sources: answer.body.sources as MySource[], unreachable: false });
     } else if (answer?.status === 401) {
-      // Signed out: say so (once), clear `unreachable` so the two notices never sit side by side,
-      // and stop — reopening (which reloads) is what restarts polling, not another tick.
-      if (!snapshot.notices.some((notice) => notice.kind === "signed_out")) say({ kind: "signed_out" });
+      // Signed out: say so (deduped in `say`), clear `unreachable` so the two notices never sit side
+      // by side, and stop — reopening (which reloads) is what restarts polling, not another tick.
+      say({ kind: "signed_out" });
       set({ unreachable: false });
       return;
     } else {
