@@ -4,13 +4,17 @@
 
 The deep reference. AGENTS.md, imported above, has the overview, the commands and the hard rules.
 
-## What this repository is
+These sections used to live here:
 
-It was reconstructed from a flat archive (see [docs/ARCHIVE-MAP.md](docs/ARCHIVE-MAP.md)) that targeted OpenAI ChatGPT Sites / Cloudflare Workers via `vinext`. It was then moved to Vercel so the site can schedule its own work. The archive map still describes files that no longer exist (`db/`, `drizzle/`, `build/`, and the old shell and `.mjs` scripts under `scripts/`); it is kept as a provenance record.
+- What this repository is: AGENTS.md (the overview) and ARCHITECTURE.md → Bird's eye view. The provenance note is under ARCHITECTURE.md → Codemap, `docs/`.
+- Commands: AGENTS.md → Commands.
+- Layout: ARCHITECTURE.md → Codemap.
+- UI text (HU/EN): the Conventions section below, and ARCHITECTURE.md → Cross-cutting concerns.
+- Content and copyright: ARCHITECTURE.md → Invariants.
 
 ## How content gets in
 
-Nothing runs on a personal machine. Two writers, both server-side; their pipeline work runs with the Supabase **secret key**, and of their writes only the submission's `sources` row is inserted as the reader (the submitter's post edits are the other reader write, see Database):
+These are the two writers from ARCHITECTURE.md → Bird's eye view, step by step:
 
 1. **Daily pipeline** — Vercel Cron (`vercel.json`, `0 5 * * *`, 05:00 UTC) → `app/api/cron/daily` → `runDaily` in `lib/pipeline/daily.ts`:
    - upserts the current ISO-week `issues` row;
@@ -27,7 +31,7 @@ Nothing runs on a personal machine. Two writers, both server-side; their pipelin
       - Only `arxiv` and `github` go own → article → metadata-only. `article` goes own → metadata-only.
       - `metadataOnly` keeps the title and description (`meta.extractionFailed`) and throws `FetchError` itself when the page is unreachable.
    2. Noise layers 1 and 2 run inside the extractors: `cleanDocument` (DOM chrome) and `filterNoise` (blocks) in `html-noise.ts`, called from `htmlToDrafts` in `html-to-blocks.ts`.
-   3. A `noarchive` page (robots meta or `X-Robots-Tag`) gets `writeNotes` instead: AI-written notes in its own words, `meta.mirrored = false`, nothing mirrored. Otherwise: `limitBlocks` (400 blocks / 200,000 chars, `meta.clipped`) → `aiCleanup` (layer 3, `ingest_cleanup`) for `article`, `github` and `arxiv` only, skipped under 4 blocks, and ignored when it would keep fewer than half + 1 of the blocks → `mirrorImages`.
+   3. A `noarchive` page (robots meta or `X-Robots-Tag`, which the extractor records as `meta.noarchive`) gets `writeNotes` (`lib/pipeline/summary.ts`) instead: AI-written notes in its own words, `meta.mirrored = false`, nothing mirrored. Otherwise: `limitBlocks` (400 blocks / 200,000 chars, `meta.clipped`) → `aiCleanup` (layer 3, `ingest_cleanup`) for `article`, `github` and `arxiv` only, skipped under 4 blocks, and ignored when it would keep fewer than half + 1 of the blocks → `mirrorImages`.
    4. `mirrorImages` (`images.ts`) downloads up to 30 images (5 MB each, 4 at a time, a 90 s budget) through `safeFetch`, re-encodes them to AVIF, or animated WebP for animated images, at 640 and 1280 px, drops images under 64 px, and uploads them to the private `media` bucket (see Database → Storage). An image already mirrored for the same `originalUrl` is reused; a failed download, or an image none of whose variants encodes, keeps the block with `path: null`.
    5. `summarize` (`ingest_article`) writes the bilingual title, summary, key points and tags, unless the extractor already did (YouTube).
    6. Upserts `posts` on `source_id` with `blocks_hu: null` and `extracted_at: now`, deletes Storage objects the new blocks no longer reference (`removeUnusedMedia`), and marks the source `done`.
@@ -87,15 +91,11 @@ Every signed-in page lives under `app/(app)/` and gets `app/(app)/layout.tsx` �
 
 ## Offline preview
 
-`npm run dev`, then `/dev/preview?view=radar|radar-empty|library|library-empty|archive|archive-empty` (plus `&fail=1` to make every write fail as if offline) and `/dev/preview/post` (every block type and banner; it is a separate path because it renders in the server's language, so the toggle refreshes it). It renders the real view components on `lib/fixtures.ts`, with no Supabase keys and no sign-in. `proxy.ts` lets `/dev/` through only when `NODE_ENV` is `development`, and both pages call `notFound()` otherwise. Local dev points at the production project, so the preview's own writes send nothing: reader state goes through `memorySend` and the Library form through an in-memory stub (`preview` on `LibraryView`), both failing every write under `fail=1`, and the post page's `MarkPostRead` gets `preview`. `lib/fixtures.ts`'s preview post ids are negative on purpose: `parseId` rejects them, so translate or a Library card link can't reach a real post. Not sandboxed: the app shell's own links and Sign out are the real ones, so with a local session they leave the preview for real pages, real data and a real sign-out. UI changes are checked there with Playwright at 360, 768 and 1280 px. Add a fixture with every new block type, banner or empty state; `lib/fixtures.test.ts` fails for a missing block type.
-
-## UI text (HU/EN)
-
-One colocated `copy` object per component; no inline `language === "hu" ? … : …`, no English-only labels. Client components read `copy[language]` with `useLanguage()`. Server components on pages that switch language in place (Radar, Library list, Archive: `switchesLanguageInPlace()` in `lib/nav.ts`) keep `{ hu, en }` per key and render `<LocalizedText value={…} />`; the toggle refreshes any other page.
+AGENTS.md → Commands lists the URLs. The preview renders the real view components on `lib/fixtures.ts`, with no Supabase keys and no sign-in. `/dev/preview/post` is a separate path because it renders in the server's language, so the language toggle refreshes it. `proxy.ts` lets `/dev/` through only when `NODE_ENV` is `development`, and both pages call `notFound()` otherwise. ARCHITECTURE.md → Invariants covers how the preview stays away from real data, and where it doesn't. UI changes are checked there with Playwright at 360, 768 and 1280 px. Add a fixture with every new block type, banner or empty state. `lib/fixtures.test.ts` fails for a missing block type.
 
 ## Database
 
-The schema lives in `supabase/migrations/`. [README.md → Migrations](README.md#migrations) lists the files and what each one adds. AGENTS.md → Hard rules says how to add and apply one. `20260925000000_drop_post_body.sql` runs only after the block-based code is live.
+The schema lives in `supabase/migrations/`. [README.md → Migrations](README.md#migrations) lists the files and what each one adds. AGENTS.md → Hard rules says how to add and apply one. `20260925000000_drop_post_body.sql` runs only after the block-based code is live. It drops `posts.body`, which the current code no longer reads or writes.
 
 RLS is on for every table:
 
@@ -104,7 +104,7 @@ RLS is on for every table:
 - `item_states`, `todos`: own rows only; `user_id` defaults to `auth.uid()`, so app code never names the user.
 - `model_settings`: RLS on with no policies — only the secret key reads it.
 - `archive_issues`: a `security_invoker` view, one row per issue with its item count, reading minutes and top title.
-- `refresh_must_read(p_issue)`: marks the top 3 scores of an issue `must_read`; executable by `service_role` only.
+- `refresh_must_read(p_issue)`: sets an issue's `must_read` flags (ARCHITECTURE.md → Invariants); executable by `service_role` only.
 
 `lib/supabase/server.ts`: `createClient()` acts as the reader (RLS applies) — use it, through `getReader()`, everywhere except the pipeline; `createAdminClient()` bypasses RLS — the pipeline, plus the translate, reextract and `/media` routes after their own checks.
 
@@ -144,78 +144,12 @@ Every JSON error goes through `jsonError` (`lib/api.ts`); `/media` answers plain
 
 CI (`.github/workflows/ci.yml`) runs the five checks from AGENTS.md → Commands, in the same order, on every push and pull request: Node 24.16.0 on `ubuntu-24.04`, `corepack pnpm@11.25.0 install --frozen-lockfile`, no cache. A superseded run on the same ref is cancelled (`concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`). `next build` needs no environment variables, so the workflow holds no secrets and only `contents: read`.
 
-## Layout
-
-```text
-app/(app)/        the signed-in pages (/, /archive, /archive/[week], /library, /library/[id]) under
-                  one layout, the app shell; the group name is not part of the URL
-app/              /login, auth routes, API routes, /media, error/not-found, manifest
-app/dev/preview/  offline preview on fixtures (development only)
-app/components/   app-shell (+ mobile bottom bar), desktop-nav, nav-parts, shell-dialogs,
-                  language-context, language-toggle, undo-toast, digest-dashboard, story-card,
-                  reader-panel, tag, page-header (PageHero, StatusCard), post-blocks, post-image,
-                  use-reader-state, use-shortcuts, use-model-context-tools
-app/(app)/library/  submit-form, library-view (the list body), refresh-while-processing, opened-posts
-                  (posts opened in this tab, the dimmed card link);
-                  [id]/ post-article (the post body), post-toolbar (translate, edit link), post-editor
-                  (edit, hide, re-extract), post-notices (the notices under the title, the submitter's
-                  last extraction error), mark-post-read; post-toolbar, post-editor and
-                  post-notices each + test
-app/(app)/archive/  archive-view (the archive body)
-app/api/          state, sources, posts/[id] (PATCH), posts/[id]/translate, posts/[id]/reextract, cron/daily;
-                  each route has a `route.test.ts`
-app/auth/         login, callback, signout
-app/media/[...path]/  session-checked mirrored-image serving (+ test)
-lib/pipeline/     daily, collect, feeds, ingest, fetch (safeFetch, apiFetch, ensureOk, readLimited),
-                  html-to-blocks, html-noise (noise layers 1–2), html-images (srcset, icon filter),
-                  cleanup (layer 3), images (mirrorImages), summary (summarize, writeNotes), util
-lib/pipeline/extract/  index (extract, the fallback sets, metadataOnly), types, one file per kind:
-                  article, youtube, arxiv, github, x, pdf
-lib/pipeline/fake-db.ts  test helper: offline Supabase stand-in (fakeDb)
-lib/pipeline/mock-fetch.ts  test helper: fetch, DNS, env and response-body fakes
-lib/test/         render harness for component tests (render, tsx-hooks, next-stub) and the
-                  route-handler stubs (route-hooks), fixtures (testPost, also the base of
-                  lib/fixtures.ts's preview posts)
-lib/blocks.ts     the block schema (`zod/v4`), parseBlocks, assignIds, limitBlocks, safeHref
-lib/post-view.ts  Post, toPost (a posts row → the page's Post), media/video helpers, withQuery
-lib/post-edit.ts  editPayload, savePostEdits, requestReextract
-lib/overrides.ts  overrides / hidden_blocks schemas and tolerant readers
-lib/translate.ts  translatePost — on-demand Hungarian translation
-lib/media.ts      the media bucket name, key format and /media URLs
-lib/public-paths.ts  isPublicPath, isDevPreviewPath — the paths proxy.ts lets through signed out
-                  (/dev/ in development only)
-lib/state.ts      parseStateAction — the /api/state body
-lib/nav.ts        the menu items, the active item, which pages switch language in place
-lib/nav-mode.ts   the `nav` cookie's value: full sidebar or icon rail
-lib/keymap.ts     keyboard shortcuts → actions
-lib/reader-store.ts  optimistic read/later/to-do state; post read state as post:<id>
-lib/feed.ts       feed filter and unread-first order
-lib/undo-queue.ts the one-at-a-time undo toast
-lib/fixtures.ts   preview data
-lib/llm.ts        Gemini + Groq behind generate()
-lib/api.ts        jsonError, postRoute and POST_ERRORS for the posts/[id] routes
-lib/content.ts    DB rows → the Radar and Library content types; getReaderState (GET /api/state, the Radar's seed)
-lib/language.ts   getLanguage(), getNavMode() — the lang (hu | en) and nav (full | rail) cookies
-lib/supabase/server.ts  createClient, createAdminClient, getReader, getViewer, safeNext (re-exported from util)
-lib/utils.ts      cn() for class names
-data/digest-types.ts  the Radar content contract and tag vocabulary
-components/ui/    vendored shadcn components; only a few are reachable from the app, the rest are kept for the UI/UX milestones
-hooks/use-mobile.ts  useIsMobile: the Radar's to-do panel opens from the bottom below md (the sidebar
-                  that also used it is no longer rendered)
-scripts/ingest-url.mts   `npm run ingest`
-.github/                 workflows/ci.yml (the five checks on every push and PR), dependabot.yml (github-actions, 7-day cooldown)
-supabase/migrations/     schema, RLS, RPCs, model_settings seeds, the media bucket
-vendor/                  shadcn Tailwind 4 utility pack, imported by app/globals.css
-```
-
-Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
-
 ## Conventions
 
 - **No duplication.** Search (`grep -rn`) before writing a helper or a class list, and reuse the shared homes: `lib/media.ts` (image paths), `lib/api.ts` (`jsonError`, `postRoute`), `lib/supabase/server.ts` (`getReader` / `getViewer`), `lib/pipeline/util.ts` (`hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…), `lib/pipeline/fetch.ts` (`safeFetch`, `apiFetch`, `ensureOk`, `readText`), `lib/blocks.ts` (`localizedSchema`, `parseBlocks`), `readPageMeta` in `extract/article.ts`, and in the UI the `Button` `ink` / `signal` / `brutal` variants, the `focus-ring` utility, `PageHero`, `StatusCard` and `Tag`. `npm run dup` is the gate: at most 1% duplication, and no new clone.
 - **Relative imports in `lib/`.** Every file under `lib/` uses relative `.ts` imports (no `@/`), so `node --test` loads it without a bundler, and the client editor can import `lib/post-edit.ts` without server-only code. The exceptions are the three Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`. No test loads `lib/supabase/server.ts` or `lib/language.ts` (route tests get `lib/test/route-hooks.ts` in the first one's place); `lib/content.ts` is loaded by the state route's test, with `server-only` mapped to an empty module.
-- **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library. Existing names: `copy` (most components, `digest-dashboard` included), `labels` (`post-blocks`), `notices` (`app/(app)/library/[id]/post-notices.tsx`, also read by `post-article.tsx`). Code identifiers, comments and model prompts are English.
-- **Tests.** `node --test` with type stripping, no framework. Helpers:
+- **HU/EN copy.** Each component keeps its UI strings in one colocated object, `{ hu: {…}, en: {…} }`, indexed by the reader's language (`copy[language]`); no i18n library, no inline `language === "hu" ? … : …`, no English-only labels. Existing names: `copy` (most components, `digest-dashboard` included), `labels` (`post-blocks`), `notices` (`app/(app)/library/[id]/post-notices.tsx`, also read by `post-article.tsx`). Code identifiers, comments and model prompts are English.
+- **Tests.** `node --test` with type stripping, no framework. Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`. Helpers:
   - `lib/pipeline/fake-db.ts`: `fakeDb(route?, tables?)`, an offline Supabase client. `model_settings` answers with `route` and records each task asked for (`.tasks`); `sources` (one `source`, or several `sources`), `posts`, storage and RPCs answer from `tables`. Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows; a column the fixture never set passes every filter, so a test of which row code reads needs a fixture whose `id` and `source_id` differ. A `sources` `single()` that matches no row, or several, answers PGRST116; `pgError(code, message)` builds any other PostgREST-shaped error (`rpcError`, `sourceInsertError`). Every write is recorded (`sourceUpdates`, `sourceInserts`, `postUpserts`, `postUpdates`, `postUpdateFilters`, `rpcCalls`, `upserts`, `writes`, …); storage also answers `download`.
   - `lib/pipeline/mock-fetch.ts`: `mockFetch(t, handler)`, `withGeminiKey(t)` and `withEnv(t, name, value)`, which restore themselves with `t.after`; `mockDns(t, ...addresses)` (default: `TEST_IP`; several addresses come back in one answer) — calling it twice in one test body corrupts the restore (`t.mock.method` restores to the first mock, not the real `dns.lookup`), so nest `t.test()` subtests, one mock each; `endlessBody()` with `reads()` / `cancelled()` to prove a body was released unread; `TEST_IP` / `TEST_HOST`, a public IP literal `safeFetch` resolves offline; `geminiResponse`, `geminiText`, `geminiPrompt`, `geminiSchemaKeys(init)` (which schema a Gemini call asks for: route a fake by it, not by prompt wording).
   - `lib/test/render.ts`: importing it registers `tsx-hooks.ts` with `module.register`; the hooks resolve `@/` and extensionless relative imports (`./x` → `.ts`/`.tsx`/`index`) from a `.ts`/`.tsx` parent, compile `.tsx` with the project's TypeScript (`transpileModule`), and swap `next/link` and `next/navigation` for `next-stub.ts`. `render(element)` runs `renderToStaticMarkup` and returns a linkedom `Document`. Import `render.ts` first, then the component with `await import("./x.tsx")`. Limits: a static render runs hooks once with no effects, so clicks and state changes are invisible (check those in the browser); verified on Node 24.16 only, Node 22.13 is unverified.
@@ -248,14 +182,8 @@ Tests sit next to their module as `*.test.ts`, under `lib/` and `app/`.
 
 ## Data contract
 
-`DigestItem`: `id` (≤120 chars, unique), `category`, `mustRead?`, `score` (0–100), `readMinutes`, `publishedAt`, `publishedLabel`, `source`, `url`, `tags[]`, and `title`/`summary`/`why` each as `{ hu, en }`. Only those three fields are bilingual; `tags`, `source`, `score` are not. Tags come from `digestTags` in `data/digest-types.ts`; the model output schema enforces it.
+`DigestItem`: `id` (≤120 chars, unique, and append-only: ARCHITECTURE.md → Invariants), `category`, `mustRead?`, `score` (0–100), `readMinutes`, `publishedAt`, `publishedLabel`, `source`, `url`, `tags[]`, and `title`/`summary`/`why` each as `{ hu, en }`. Only those three fields are bilingual; `tags`, `source`, `score` are not. Tags come from `digestTags` in `data/digest-types.ts`; the model output schema enforces it.
 
-> ⚠️ **`item.id` is half the composite primary key of `item_states`.** Renaming an id silently orphans every reader's read/saved state. Ids are append-only forever: `itemId()` in `lib/pipeline/util.ts` derives them as `<category>-<yyyy>w<ww>-<slug>-<urlhash>` from the category, the ISO week, the English title and the source URL, and inserts use `ignoreDuplicates` on `url`, so an existing row is never rewritten. `lib/pipeline/daily.test.ts` pins two literal ids.
+`githubTop10` is an array of **positional 3-tuples** `[repo, focus, url]`, not objects. `must_read` is set by `refresh_must_read` (ARCHITECTURE.md → Invariants).
 
-`githubTop10` is an array of **positional 3-tuples** `[repo, focus, url]`, not objects. Exactly 3 items per issue have `must_read` — enforced by `refresh_must_read`.
-
-**Library posts use a separate block model, not `DigestItem`.** `lib/blocks.ts`'s `blockSchema` — a `zod/v4` discriminated union (`heading`, `paragraph`, `list`, `quote`, `code`, `image`, `video`, `chapters`, `repo`, `divider`) — is the one shape every source is converted into and the one shape `app/components/post-blocks.tsx` renders from. Inline text is a list of spans with optional `href`, `bold`, `italic` and `code`. Extractors build `BlockDraft`s and call `assignIds`, which derives each id from the block's type and normalized content (content-addressed, not positional), so it stays stable across re-extraction — `hidden_blocks`, and later annotations, refer to a block by this id. `posts.blocks` holds the original-language blocks, `posts.blocks_hu` the on-demand Hungarian translation; both are read through `parseBlocks`, which drops any individual block that fails validation rather than failing the whole page (an empty or unparseable `blocks_hu` means "not translated"). `overrides` and `hidden_blocks` are read through `readOverrides` / `readHiddenBlocks`, which validate each field on its own. `posts.meta` carries the page's notices: `mirrored`, `noarchive`, `extractionFailed`, `truncated` and `clipped`. `lib/post-view.ts`'s `toPost` turns a row into the page's `Post`, where a submitter's override wins over the model's title and summary, and `lastError` is the `sources.error` of the single-post embed.
-
-## Content and copyright
-
-`robots: noindex` in `app/layout.tsx` and the invite gate are load-bearing, not cosmetic — the Library mirrors article content. A `noarchive` robots signal (robots meta or `X-Robots-Tag`) downgrades a post to AI-written notes in its own words instead of mirrored blocks (`writeNotes` in `lib/pipeline/summary.ts`, `meta.mirrored = false` / `meta.noarchive = true`). `posts.body` is no longer read or written; `20260925000000_drop_post_body.sql` drops it after the M1 deploy. Deleting a `sources` row cascades to its post, but not to its mirrored images; those are removed separately by `removeUnusedMedia` (see Database → Storage).
+**Library posts use a separate block model, not `DigestItem`.** `lib/blocks.ts`'s `blockSchema` — a `zod/v4` discriminated union (`heading`, `paragraph`, `list`, `quote`, `code`, `image`, `video`, `chapters`, `repo`, `divider`) — is the one shape every source is converted into and the one shape `app/components/post-blocks.tsx` renders from. Inline text is a list of spans with optional `href`, `bold`, `italic` and `code`. Extractors build `BlockDraft`s and call `assignIds`, which gives each block its content-addressed id (ARCHITECTURE.md → Invariants). `posts.blocks` holds the original-language blocks, `posts.blocks_hu` the on-demand Hungarian translation; both are read through `parseBlocks`, which drops any individual block that fails validation rather than failing the whole page (an empty or unparseable `blocks_hu` means "not translated"). `overrides` and `hidden_blocks` are read through `readOverrides` / `readHiddenBlocks`, which validate each field on its own. `posts.meta` carries the page's notices: `mirrored`, `noarchive`, `extractionFailed`, `truncated` and `clipped`. `lib/post-view.ts`'s `toPost` turns a row into the page's `Post`, where a submitter's override wins over the model's title and summary, and `lastError` is the `sources.error` of the single-post embed.
