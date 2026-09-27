@@ -85,8 +85,11 @@ function shownOpener(opener: HTMLElement | null): HTMLElement | null {
  * only once the focus has really moved; a target that takes no focus leaves it to Radix, which wraps
  * it inside the panel.
  */
-function tabPastPanel(event: KeyboardEvent<HTMLDivElement>, opener: HTMLElement | null) {
-  if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey || !opener) return;
+function tabPastPanel(event: KeyboardEvent<HTMLDivElement>, openedBy: HTMLElement | null) {
+  if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
+  // Only now, on Tab: shownOpener reads layout, and every key typed in the field passes through here.
+  const opener = shownOpener(openedBy);
+  if (!opener) return;
   const panel = event.currentTarget;
   const stops = tabStops(panel);
   if (event.target !== (event.shiftKey ? stops[0] : stops.at(-1))) return;
@@ -188,7 +191,7 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
         onInteractOutside={(event) => {
           if (!isMobile || isUndoToast(event.target)) event.preventDefault();
         }}
-        onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, shownOpener(opener.current))}
+        onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, opener.current)}
         // The house 160ms, not the stock Sheet's 500ms in and 300ms out.
         className="max-h-[75dvh] gap-0 data-[state=closed]:duration-160 data-[state=open]:duration-160 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
       >
