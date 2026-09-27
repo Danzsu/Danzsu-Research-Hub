@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -114,6 +114,7 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
 }) {
   const { language } = useLanguage();
   const pathname = usePathname();
+  const router = useRouter();
   const isMobile = useIsMobile();
   const [chat] = useState(() =>
     createLinkChat(
@@ -170,6 +171,9 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
     setText("");
     // Send pressed from the keyboard has the focus; the next link goes in the field.
     input.current?.focus();
+    // The Library list shows the new submission too, as it does after its own form's. The preview has one
+    // path for all its views, so there every view refreshes.
+    if (pathname === "/library" || pathname === "/dev/preview") router.refresh();
   }
 
   return (
