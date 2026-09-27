@@ -62,6 +62,19 @@ const bubble = "max-w-[85%] border-2 border-ink px-3 py-2 text-sm leading-6 [ove
 const signalUnderline = "text-ink underline decoration-signal decoration-2 underline-offset-4";
 const microLabel = "font-mono text-[11px] tracking-[0.14em]";
 const action = `focus-ring inline-flex min-h-10 items-center ${microLabel} ${signalUnderline} hover:decoration-ink`;
+/** Send and ÚJRA while their request is on its way: aria-disabled, not disabled, so they keep the focus,
+ *  but dimmed and deaf to the pointer. */
+export const busyClass = "aria-disabled:pointer-events-none aria-disabled:opacity-50";
+
+/** The live dot and a status label: a reply still being processed, or the thread still loading. */
+function InProgress({ label, className = "" }: { label: string; className?: string }) {
+  return (
+    <p className={`flex items-center gap-2 ${microLabel} ${className}`}>
+      <span className="live-pulse shrink-0" />
+      <span className="text-ink/70">{label}</span>
+    </p>
+  );
+}
 
 function Taiyaki({ language, children }: { language: Language; children: ReactNode }) {
   return (
@@ -110,10 +123,7 @@ function Reply({ entry, retrying, language, onRetry, onOpenPost }: ThreadActions
         <p>
           {t.received} <em>{SOURCE_KIND_LABELS[reply.kind][language]}</em>.
         </p>
-        <p className={`mt-1 flex items-center gap-2 ${microLabel}`}>
-          <span className="live-pulse shrink-0" />
-          <span className="text-ink/70">{t.processing}</span>
-        </p>
+        <InProgress label={t.processing} className="mt-1" />
       </>
     );
   }
@@ -133,7 +143,7 @@ function Reply({ entry, retrying, language, onRetry, onOpenPost }: ThreadActions
       {reply.error && <p className="mt-1 font-mono text-[11px] leading-4 text-ink/70">{reply.error}</p>}
       <Button
         variant="signal"
-        className="mt-2 min-h-10 aria-disabled:pointer-events-none aria-disabled:opacity-50"
+        className={`mt-2 min-h-10 ${busyClass}`}
         aria-disabled={retrying}
         onClick={() => onRetry(entry.id)}
       >
@@ -189,10 +199,7 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
       {stillLoading && (
         <li>
           <Taiyaki language={language}>
-            <p className={`flex items-center gap-2 ${microLabel}`}>
-              <span className="live-pulse shrink-0" />
-              <span className="text-ink/70">{t.loading}</span>
-            </p>
+            <InProgress label={t.loading} />
           </Taiyaki>
         </li>
       )}

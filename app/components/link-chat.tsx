@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { isSendKey } from "@/lib/keymap";
 import { createLinkChat, httpTransport, memoryTransport } from "@/lib/link-chat";
 import type { MySource } from "@/lib/my-sources";
-import { ChatThread } from "./chat-thread";
+import { busyClass, ChatThread } from "./chat-thread";
 import { useLanguage } from "./language-context";
 import { TaiyakiIcon } from "./taiyaki-icon";
 import { isUndoToast } from "./undo-toast";
@@ -243,7 +243,7 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
             aria-disabled={snapshot.sending}
             aria-label={t.send}
             onMouseDown={(event) => event.preventDefault()}
-            className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+            className={busyClass}
           >
             <SendHorizontal />
           </Button>
