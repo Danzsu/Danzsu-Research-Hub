@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Localized } from "../data/digest-types.ts";
 import { MINE_LIMIT } from "./link-chat.ts";
+import { readOverrides } from "./overrides.ts";
 import type { SourceKind } from "./pipeline/util.ts";
 import { shownTitle } from "./post-view.ts";
 
@@ -53,7 +54,7 @@ export async function listMySources(db: SupabaseClient, viewerId: string): Promi
       error: row.error,
       note: row.note,
       createdAt: row.created_at,
-      post: post ? { id: post.id, title: shownTitle(post) } : null,
+      post: post ? { id: post.id, title: shownTitle(post.title, readOverrides(post.overrides)) } : null,
     };
   });
 }

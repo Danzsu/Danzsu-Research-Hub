@@ -1,7 +1,7 @@
 import type { Localized } from "../data/digest-types.ts";
 import { parseBlocks, plainText, type Block, type ImageBlock } from "./blocks.ts";
 import { isMediaKey, mediaUrl, variantPath } from "./media.ts";
-import { readHiddenBlocks, readOverrides } from "./overrides.ts";
+import { readHiddenBlocks, readOverrides, type Overrides } from "./overrides.ts";
 import { isValidYoutubeId, type SourceKind } from "./pipeline/util.ts";
 
 // Pure helpers for the post page and its renderer. Kept framework-free (no React, no
@@ -42,9 +42,9 @@ export type Post = {
   createdAt: string;
 };
 
-/** The title readers see: the submitter's override wins over the model's (the post page, the link chat). */
-export const shownTitle = (row: { title?: unknown; overrides?: unknown }): Localized =>
-  readOverrides(row.overrides).title ?? (row.title as Localized);
+/** The title readers see: the submitter's override (already through `readOverrides`) wins over the
+ *  model's `title` (the post page, the link chat). */
+export const shownTitle = (title: unknown, overrides: Overrides): Localized => overrides.title ?? (title as Localized);
 
 /** A `posts` row (optionally with its `sources(submitted_by, error)` embed) as the page's Post. */
 export function toPost(row: Record<string, unknown>): Post {
@@ -59,7 +59,7 @@ export function toPost(row: Record<string, unknown>): Post {
     siteName: row.source_site as string | null,
     publishedAt: row.published_at as string | null,
     // Submitter edits win over the model's text; re-extraction never overwrites them.
-    title: shownTitle(row),
+    title: shownTitle(row.title, overrides),
     summary: overrides.summary ?? (row.summary as Localized),
     generatedTitle: row.title as Localized,
     generatedSummary: row.summary as Localized,
