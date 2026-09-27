@@ -156,7 +156,8 @@
   - egy hibás beküldés „Újra”-ja (a sor `attempts` értéke 0 lesz, aztán 1);
   - egy már bent lévő link 409-e a „MEGNYITÁS →”-sal;
   - az `/archive` oldalon a „Több” aktív jelölése mobilon;
-  - a lekérdezés leáll a panel bezárása után (`browser_network_requests`).
+  - a lekérdezés leáll a panel bezárása után (`browser_network_requests`);
+  - a `/library` oldalon a chatből beküldött link megjelenik a listában (`router.refresh()`; az előnézet listája fixture, ott nem látszik).
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
@@ -170,7 +171,11 @@
     - a `loginHref` elhagyja a query stringet (`/login?next=` csak az útvonalat kapja);
     - iOS safe area: nincs `viewport-fit=cover`, ezért a Safariban minden `env(safe-area-inset-bottom)` 0;
     - az sr-only beszélő-előtag szóköze nem jut el a Chrome akadálymentességi fájába (a csomópontok amúgy is külön vannak);
-    - a chat mezőjén a stock `Textarea` `shadow-xs`-e: a lenti fix(ui) pont része.
+    - a chat mezőjén a stock `Textarea` `shadow-xs`-e: a lenti fix(ui) pont része;
+    - több sikertelen küldés egyforma „Nem ment át, próbáld újra.” buborékokat halmoz a szál végére (csak a `signed_out` van összevonva);
+    - egy másik beküldés sikeres „Újra”-ja nem törli a többi bejegyzés saját `signed_out` válaszát (`retryNotices`), az csak a saját „Újra”-ig vagy a panel bezárásáig marad;
+    - a retry 403-a és 404-e „Nem ment át, próbáld újra.”-ként jelenik meg (ma egyik sem fordulhat elő);
+    - a `/` és az `/archive/[week]` még behúzza a zod-ot: a `reader-store.ts` a `state.ts`-ből importálja a `TODO_TEXT_MAX`-ot (ugyanaz a minta, amit a taiyaki a keretből kivett).
 - [ ] **`/glossary` a főmenübe** (döntve 2026-09-25, az M2 után): egy nem elsődleges tétel a `lib/nav.ts`-ben, a tesztjei bővítésével.
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
@@ -214,7 +219,11 @@
 - [ ] **DNS rebinding** elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.
 - [ ] **Kevesebb getClaims() kérésenként.** A UI/UX A óta kérésenként három fut: a `proxy.ts`-é, az `(app)` layout `getViewer()`-e és az oldal `getReader()`-e. Ha a `getReader`-t és a `getViewer`-t React `cache()`-be csomagoljuk (`lib/supabase/server.ts`), a layout és az oldal egy hívást oszt meg, így kettő marad (a proxy külön fut, azt a `cache()` nem éri el).
 - [ ] **Elvész a fókusz** egy teendő törlése és a „+ teendő” után: a billentyűzettel dolgozó olvasónak újra kell keresnie a helyét.
-- [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, az ikonsáv gombjainak osztálylistái, és az aktív menüpont osztálytöredéke a „Több” panelben (`app-shell.tsx`) és az oldalsávban (`desktop-nav.tsx`).
+- [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, az ikonsáv gombjainak osztálylistái, és az aktív menüpont osztálytöredéke a „Több” panelben (`app-shell.tsx`) és az oldalsávban (`desktop-nav.tsx`). A taiyaki tesztjeiből: a `failedA` / `failedB` fixture és a bejegyzés-kereső kétszer a `chat-thread.test.ts`-ben, a `said` segéd kétszer a `link-chat.test.ts`-ben.
+- [ ] **Apró rendrakás a taiyaki után:**
+  - a `MINE_LIMIT` a `lib/link-chat.ts`-ben él, így a szerveroldali `my-sources.ts` a kliens logikából importál; a helye a függőség nélküli `lib/pipeline/util.ts` (mint a `REEXTRACT_COOLDOWN_MINUTES`);
+  - a `link-chat.tsx` a Library-frissítésnél a `"/dev/preview"` útvonalat írja be a kódba; a `preview` prop ugyanezt mondja;
+  - a CLAUDE.md a Library-frissítést a „Focus and keys” pont alatt írja le, a „The panel” pontba való.
 - [ ] **Közös `createStore`.** A listeners / `subscribe` / `getSnapshot` váz már háromszor van meg (`reader-store`, `undo-queue`, `link-chat`).
 - [ ] **A `submit-form.tsx`-nek nincs komponenstesztje.**
 - [ ] **Zajos tesztkimenet.** Az `npm test` ma kb. 65 sort ír ki régebbi tesztekből (a pipeline, a fordítás és a route-ok hibanaplói). Ezekben is mockolni kell a `console`-t `t.mock.method`-dal, és ellenőrizni a hívásszámot (TESTING.md → Pitfalls, Log noise).
