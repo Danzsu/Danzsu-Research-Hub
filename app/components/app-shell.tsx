@@ -111,6 +111,7 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
   const { language } = useLanguage();
   const active = activeNavId(usePathname());
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreList = useRef<HTMLUListElement>(null);
   const t = copy[language];
   const slot = (item: NavItem) => (
     <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass} iconClass="size-5" />
@@ -132,6 +133,13 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
         <SheetContent
           side="bottom"
           closeLabel={t.close}
+          // Radix skips links when it picks the first control, which would land on the language toggle.
+          onOpenAutoFocus={(event) => {
+            const first = moreList.current?.querySelector("a");
+            if (!first) return;
+            event.preventDefault();
+            first.focus();
+          }}
           className="max-h-[85dvh] gap-5 overflow-y-auto border-t-2 border-ink bg-cream p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] text-ink"
         >
           <SheetHeader className="p-0 pr-12">
@@ -142,7 +150,7 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
           </SheetHeader>
           {/* The active entry is ink with a signal bar and wash, like the sidebar's: small signal text on cream
               is under 3:1 (DESIGN.md → Colors). The bar hangs in the sheet's padding, so the icons stay in line. */}
-          <ul className="border-b-2 border-ink pb-4">
+          <ul ref={moreList} className="border-b-2 border-ink pb-4">
             {MOBILE_MORE_NAV.map((item) => (
               <li key={item.id}>
                 <NavEntry
