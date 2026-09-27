@@ -11,5 +11,8 @@ export default function Link({ href, children, ...rest }: { href: string; childr
 /** `next/navigation`'s router, inert: a static render never navigates. */
 export const useRouter = () => ({ push() {}, refresh() {} });
 
-/** desktop-nav.tsx and language-toggle.tsx read this to highlight the active link; a static render has no real route, so every test sees "/". */
-export const usePathname = () => "/";
+/** What the stubbed `usePathname` answers: "/" unless a test sets it, like `routeStub` in route-hooks.ts. Reset it after. */
+export const navigationStub = { pathname: "/" };
+
+/** The navigations and language-toggle.tsx read this to mark the active link. */
+export const usePathname = () => navigationStub.pathname;

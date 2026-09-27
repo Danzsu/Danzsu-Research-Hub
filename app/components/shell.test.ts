@@ -12,6 +12,7 @@ import {
   previewReadPostIds,
   previewSources,
 } from "../../lib/fixtures.ts";
+import { navigationStub } from "../../lib/test/next-stub.ts";
 import { render } from "../../lib/test/render.ts";
 
 // Static smoke renders: one per app-shell client component, on realistic (mostly preview) fixture
@@ -214,4 +215,23 @@ test("the mobile bar reads Radar, Könyvtár, the taiyaki, Keresés, Több", () 
   );
   const slots = [...doc.querySelectorAll("#mobile-nav > *")].map((slot) => slot.getAttribute("aria-label") ?? slot.textContent);
   assert.deepEqual(slots, ["Radar", "Könyvtár", "Link bedobása", "Keresés", "Több"]);
+});
+
+// Kills a "Több" slot without the active mark on an Archívum page, or with it on another page. The
+// sheet itself (Archívum's aria-current) is portalled, so it never reaches this markup: Playwright checks it.
+test("the Több slot carries the active mark on Archívum's pages only", (t) => {
+  t.after(() => {
+    navigationStub.pathname = "/";
+  });
+  const moreSlot = (pathname: string) => {
+    navigationStub.pathname = pathname;
+    const doc = render(
+      createElement(AppShell, { language: "hu", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>, createElement("p", null, "Child")),
+    );
+    const slot = doc.querySelector("#mobile-nav > :last-child");
+    return [slot?.textContent, slot?.getAttribute("data-active") ?? null];
+  };
+  assert.deepEqual(moreSlot("/archive/2026-W38"), ["Több", "true"]);
+  assert.deepEqual(moreSlot("/archive"), ["Több", "true"]);
+  assert.deepEqual(moreSlot("/library"), ["Több", null]);
 });

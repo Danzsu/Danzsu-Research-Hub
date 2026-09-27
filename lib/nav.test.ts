@@ -34,8 +34,8 @@ test("the toggle switches in place only where both languages are on the page", (
   }
 });
 
-// Kills Archívum left in the bar (four page slots: no room for the taiyaki in grid-cols-5), a primary
-// item in neither place (unreachable on a phone), and a "Több" slot that never shows the active page.
+// Kills wrong list contents (a bar that isn't three page slots, a primary item in neither list or in
+// both) and an inMobileMore that doesn't answer from MOBILE_MORE_NAV.
 test("the mobile bar holds three page slots, Több holds every other primary item, and marks their pages", () => {
   assert.equal(MOBILE_BAR_NAV.length, 3);
   assert.deepEqual([...MOBILE_BAR_NAV, ...MOBILE_MORE_NAV].map(({ id }) => id).sort(), PRIMARY_NAV.map(({ id }) => id).sort());
