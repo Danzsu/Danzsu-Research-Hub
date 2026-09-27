@@ -11,7 +11,7 @@ import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
 import { LinkChat, TaiyakiButton, type ChatPreview } from "./link-chat";
-import { AccountActions, NavEntry, navIcons, SoonList } from "./nav-parts";
+import { AccountActions, NavEntry, SoonList } from "./nav-parts";
 import { SearchSoon, ShortcutHelp } from "./shell-dialogs";
 import { toasts, UndoToast } from "./undo-toast";
 import { useShortcuts } from "./use-shortcuts";
@@ -112,15 +112,9 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
   const active = activeNavId(usePathname());
   const [moreOpen, setMoreOpen] = useState(false);
   const t = copy[language];
-  const slot = (item: NavItem) => {
-    const Icon = navIcons[item.id];
-    return (
-      <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass}>
-        <Icon className="size-5" />
-        <span>{item.label[language]}</span>
-      </NavEntry>
-    );
-  };
+  const slot = (item: NavItem) => (
+    <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass} iconClass="size-5" />
+  );
   return (
     <nav
       id="mobile-nav"
@@ -147,23 +141,18 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
             </SheetTitle>
           </SheetHeader>
           <ul className="border-b-2 border-ink pb-4">
-            {MOBILE_MORE_NAV.map((item) => {
-              const Icon = navIcons[item.id];
-              return (
-                <li key={item.id}>
-                  <NavEntry
-                    item={item}
-                    active={active === item.id}
-                    onSearch={onSearch}
-                    onClick={() => setMoreOpen(false)}
-                    className="focus-ring flex min-h-10 items-center gap-3 font-mono text-sm aria-[current=page]:text-signal"
-                  >
-                    <Icon className="size-4" />
-                    <span>{item.label[language]}</span>
-                  </NavEntry>
-                </li>
-              );
-            })}
+            {MOBILE_MORE_NAV.map((item) => (
+              <li key={item.id}>
+                <NavEntry
+                  item={item}
+                  active={active === item.id}
+                  onSearch={onSearch}
+                  onClick={() => setMoreOpen(false)}
+                  className="focus-ring flex min-h-10 items-center gap-3 font-mono text-sm aria-[current=page]:text-signal"
+                  iconClass="size-4"
+                />
+              </li>
+            ))}
           </ul>
           <div className="flex items-center justify-between border-b-2 border-ink pb-4">
             <span className="font-mono text-xs tracking-[0.14em]">{t.language}</span>

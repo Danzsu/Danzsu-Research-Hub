@@ -8,7 +8,7 @@ import { activeNavId, PRIMARY_NAV } from "@/lib/nav";
 import type { NavMode } from "@/lib/nav-mode";
 import { useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
-import { AccountActions, NavEntry, NavTooltip, navIcons, SoonList } from "./nav-parts";
+import { AccountActions, NavEntry, NavTooltip, SoonList } from "./nav-parts";
 
 // Desktop navigation, variant A: a sidebar, collapsible to a ~56px icon rail (spec 1.2). Variants B
 // (top bar) and C (icon rail as the default) replace this one file: same props, the same items from
@@ -81,11 +81,15 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
         <nav aria-label={t.nav} className={rail ? "flex-1 px-1 py-4" : "flex-1 overflow-y-auto px-3 py-4"}>
           <ul className="space-y-1">
             {PRIMARY_NAV.map((item) => {
-              const Icon = navIcons[item.id];
               const entry = (
-                <NavEntry item={item} active={active === item.id} onSearch={onSearch} className={rail ? itemClassRail : itemClassFull}>
-                  <Icon className="size-4 shrink-0" />
-                  <span className={rail ? "sr-only" : "flex-1 text-left"}>{item.label[language]}</span>
+                <NavEntry
+                  item={item}
+                  active={active === item.id}
+                  onSearch={onSearch}
+                  className={rail ? itemClassRail : itemClassFull}
+                  iconClass="size-4 shrink-0"
+                  labelClass={rail ? "sr-only" : "flex-1 text-left"}
+                >
                   {!rail && !item.href && <kbd className="font-mono text-[10px] text-paper/45">⌘K</kbd>}
                 </NavEntry>
               );

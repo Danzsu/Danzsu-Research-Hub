@@ -25,23 +25,36 @@ export const navIcons: Record<NavId, LucideIcon> = {
   chat: MessageSquare,
 };
 
-/** A page link (aria-current when it is the active one) or, for the search slot, a button. `onClick`
- *  runs when the link is followed: the mobile "Több" sheet closes itself with it. */
-export function NavEntry({ item, active, onSearch, onClick, className, children }: {
+/** A page link (aria-current when it is the active one) or, for the search slot, a button, holding the
+ *  item's icon and label; `children` go after the label (the sidebar's ⌘K hint). `onClick` runs when
+ *  the link is followed: the mobile "Több" sheet closes itself with it. */
+export function NavEntry({ item, active, onSearch, onClick, className, iconClass, labelClass, children }: {
   item: NavItem;
   active: boolean;
   onSearch: () => void;
   onClick?: () => void;
   className: string;
-  children: ReactNode;
+  iconClass: string;
+  /** The rail's is `sr-only`: the icon alone shows, and the entry keeps its name. */
+  labelClass?: string;
+  children?: ReactNode;
 }) {
+  const { language } = useLanguage();
+  const Icon = navIcons[item.id];
+  const content = (
+    <>
+      <Icon className={iconClass} />
+      <span className={labelClass}>{item.label[language]}</span>
+      {children}
+    </>
+  );
   return item.href ? (
     <Link href={item.href} aria-current={active ? "page" : undefined} onClick={onClick} className={className}>
-      {children}
+      {content}
     </Link>
   ) : (
     <button type="button" onClick={onSearch} className={className}>
-      {children}
+      {content}
     </button>
   );
 }
