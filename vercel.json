@@ -1,4 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["dub1"],
+  "fluid": true,
   "crons": [{ "path": "/api/cron/daily", "schedule": "0 5 * * *" }]
 }

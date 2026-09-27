@@ -37,7 +37,7 @@ export function digestItem(id: string, overrides: Partial<DigestItem> = {}): Dig
   };
 }
 
-export const previewIssue: CurrentIssue = { label: "2026 / W39", updated: "09. 24. 07:00", archiveAt: "09. 27." };
+export const previewIssue: CurrentIssue = { id: "2026-W39", label: "2026 / W39", updated: "09. 24. 07:00", archiveAt: "09. 27." };
 
 export const previewItems: DigestItem[] = [
   digestItem("research-2026-W39-long-title", {

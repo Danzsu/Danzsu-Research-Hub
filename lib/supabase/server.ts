@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 export function env(name: string): string {
   const value = process.env[name];
@@ -39,14 +40,19 @@ export function createAdminClient() {
 export { safeNext } from "@/lib/pipeline/util";
 
 export type Viewer = { id: string; email: string };
+export type Reader = { db: Awaited<ReturnType<typeof createClient>>; viewer: Viewer };
 
-/** The signed-in reader's client and identity, or null: the auth check of every page and reader API route (the cron route checks CRON_SECRET instead). */
-export async function getReader(): Promise<{ db: Awaited<ReturnType<typeof createClient>>; viewer: Viewer } | null> {
+/**
+ * The signed-in reader's client and identity, or null: the auth check of every page and reader API
+ * route (the cron route checks CRON_SECRET instead). React's cache() gives one server render one
+ * answer, so the (app) layout's getViewer() and the page share a client and a getClaims() (spec 1.2).
+ */
+export const getReader = cache(async (): Promise<Reader | null> => {
   const db = await createClient();
   const { data } = await db.auth.getClaims();
   const claims = data?.claims;
   return claims?.sub ? { db, viewer: { id: claims.sub, email: String(claims.email ?? "") } } : null;
-}
+});
 
 export async function getViewer(): Promise<Viewer | null> {
   return (await getReader())?.viewer ?? null;

@@ -21,38 +21,38 @@ const budapest = new Intl.DateTimeFormat("hu-HU", {
 
 export type RadarData = { issue: CurrentIssue; items: DigestItem[]; githubTop10: GithubTopEntry[] };
 
+const RADAR_COLUMNS =
+  "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why), github_top(repo, focus, url)";
+
 /**
- * The latest issue, or the archived week named by `issueId` ('2026-W38').
- * Null only when `issueId` names a week that has no issue.
+ * The latest issue, or the one `issueId` names ('2026-W38'), with its items and repos embedded: one
+ * query. Null only when `issueId` names a week that has no issue. A failed query throws rather than
+ * answering an empty week, so no cache ever keeps a failure (spec 1.3, 1.5).
  */
 export async function getRadar(db: SupabaseClient, issueId?: string): Promise<RadarData | null> {
-  const issues = db.from("issues").select("id, updated_at");
-  const { data: latest } = issueId
-    ? await issues.eq("id", issueId).maybeSingle()
-    : await issues.order("id", { ascending: false }).limit(1).maybeSingle();
+  // The Top 3 come first (must_read), then the score; the repos keep their rank.
+  const issues = db
+    .from("issues")
+    .select(RADAR_COLUMNS)
+    .order("must_read", { ascending: false, referencedTable: "digest_items" })
+    .order("score", { ascending: false, referencedTable: "digest_items" })
+    .order("rank", { referencedTable: "github_top" });
+  const { data: latest, error } = await (issueId ? issues.eq("id", issueId) : issues.order("id", { ascending: false }).limit(1)).maybeSingle();
+  if (error) throw new Error(`radar query failed: ${error.message}`, { cause: error });
   if (issueId && !latest) return null;
 
   const weekId = latest?.id ?? isoWeek(new Date()).id;
   const issue: CurrentIssue = {
+    id: weekId,
     label: weekId.replace("-", " / "),
     updated: latest ? budapest.format(new Date(latest.updated_at)) : "—",
     archiveAt: archiveLabel(isoWeekMonday(weekId) ?? isoWeek(new Date()).monday),
   };
   if (!latest) return { issue, items: [], githubTop10: [] };
 
-  const [items, repos] = await Promise.all([
-    db
-      .from("digest_items")
-      .select("id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why")
-      .eq("issue_id", latest.id)
-      .order("must_read", { ascending: false })
-      .order("score", { ascending: false }),
-    db.from("github_top").select("repo, focus, url").eq("issue_id", latest.id).order("rank"),
-  ]);
-
   return {
     issue,
-    items: (items.data ?? []).map((row) => ({
+    items: latest.digest_items.map((row) => ({
       id: row.id,
       category: row.category,
       mustRead: row.must_read,
@@ -67,7 +67,7 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
       summary: row.summary as Localized,
       why: row.why as Localized,
     })),
-    githubTop10: (repos.data ?? []).map((row) => [row.repo, row.focus, row.url] as const),
+    githubTop10: latest.github_top.map((row) => [row.repo, row.focus, row.url] as const),
   };
 }
 

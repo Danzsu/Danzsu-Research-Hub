@@ -87,6 +87,8 @@ export type ArchiveIssue = {
 };
 
 export type CurrentIssue = {
+  /** The week's id, '2026-W38': the issue's, or the current ISO week's before its first issue. */
+  id: string;
   label: string;
   /** Pre-formatted display strings, rendered verbatim. */
   updated: string;
