@@ -27,7 +27,12 @@ A céges blog elsődleges forrás, de érdekelt fél: a saját termékéről ír
 
 ### Hírcsatornák (RSS, Atom)
 
-A csatornák 2026-09-23-án élőben ellenőrizve. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
+A csatornák 2026-09-23-án élőben ellenőrizve, a ByteByteGo és az Anthropic 2026-09-27-én. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
+
+A promóciót két szűrő tartja távol:
+
+- egy csatorna `exclude` mintája a saját hirdetéseit dobja el cím alapján, még a modell előtt (ma a ByteByteGo-é: „LAST CALL FOR ENROLLMENT: …”, „ByteByteGo Live is here”);
+- a válogató prompt minden csatornán kihagyja a tanfolyam-, esemény- és termékhirdetést, a leárazást és a szponzorált posztot.
 
 | Név | Csatorna | Kategória | Limit | Típus |
 | --- | --- | --- | --- | --- |
@@ -44,6 +49,13 @@ A csatornák 2026-09-23-án élőben ellenőrizve. A `limit` a nagy forgalmú cs
 | AWS ML | `https://aws.amazon.com/blogs/machine-learning/feed/` | companies | 10 | elsődleges (céges) |
 | The Decoder | `https://the-decoder.com/feed/` | companies | 20 | másodlagos |
 | Interconnects | `https://www.interconnects.ai/feed` | research | 25 | elsődleges (független szakértő) |
+| ByteByteGo | `https://blog.bytebytego.com/feed` | research | 5 | elsődleges (szakmai blog; promóció szűrve) |
+| Anthropic | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml` | companies | 25 | elsődleges (céges), külső RSS-tükörrel |
+| Anthropic Engineering | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml` | research | 25 | elsődleges (céges), külső RSS-tükörrel |
+
+**ByteByteGo:** rendszertervezés és AI-infrastruktúra. A tételek felében ott a teljes szöveg (`content:encoded`), a poszt-oldalak szerverről letölthetők, `noarchive` nincs rajtuk. A fizetős posztokból csak részlet érhető el (Substack).
+
+**Anthropic:** az anthropic.com nem ad RSS-t (2026-09-27: a szokásos feed-címek 404-et adnak, és az oldal sem hivatkozik feedre). A két csatornát egy közösségi projekt, a [github.com/Olshansk/rss-feeds](https://github.com/Olshansk/rss-feeds) állítja elő az anthropic.com-ról. A tételek linkjei az anthropic.com-ra mutatnak, a tartalom tehát elsődleges, csak a csatorna külső. Harmadik fél tartja karban, ezért bármikor leállhat. Ha elhal, a pipeline csak figyelmeztetést naplóz. Tartalék: az anthropic.com hivatalos `sitemap.xml`-je (`/news/` és `/engineering/` címek `lastmod`-dal), ehhez saját gyűjtő kell.
 
 ### Hacker News
 
@@ -71,9 +83,7 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 
 | Név | Csatorna | Állapot | Megjegyzés |
 | --- | --- | --- | --- |
-| ByteByteGo | https://blog.bytebytego.com/feed | 2026-09-26-án ellenőrizve: 200, 20 tétel | Rendszertervezés és AI-infrastruktúra. A tételek felében ott a teljes szöveg (`content:encoded`), a poszt-oldalak szerverről letölthetők, `noarchive` nincs rajtuk. A „No thanks” feliratkozó ablak csak böngészőben jelenik meg, ezért a Könyvtárba beküldött link is működik. A fizetős posztokból csak részlet érhető el (Substack), és vannak tisztán promóciós posztok (pl. „LAST CALL FOR ENROLLMENT”). Javaslat: `limit: 5`. |
 | Google Research | research.google, a blog és a `research.google/pubs` publikációs oldal | ellenőrizendő | A pontos RSS- vagy API-végpontot a megvalósítás elején kell megkeresni. A felhasználó kérte. |
-| Anthropic | news és engineering posztok | ellenőrizendő | Hivatalos RSS-ről nem tudunk. Ha nincs, oldal-letöltéssel kerülhet be. |
 | Hugging Face Daily Papers | a közösség napi felszavazott cikkei | ellenőrizendő | Közösségi rangsor elsődleges cikkekről. |
 | Semantic Scholar | API | ellenőrizendő | A Google Scholar helyett. |
 | OpenAlex | API | ellenőrizendő | A Google Scholar helyett. |
@@ -98,6 +108,6 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
    - van-e `noarchive` vagy fizetőfal;
    - mennyi a promóció.
    Írd a dátumot az Állapot oszlopba.
-3. **Kód.** Vedd fel a [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts)-be: `{ name, url, hint, limit? }`. A nagy forgalmú csatorna kapjon `limit`-et. Ha a csatorna szerkezete szokatlan, kerüljön egy eset a [`collect.test.ts`](lib/pipeline/collect.test.ts)-be is.
+3. **Kód.** Vedd fel a [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts)-be: `{ name, url, hint, limit?, exclude? }`. A nagy forgalmú csatorna kapjon `limit`-et. Ha a csatorna saját hirdetéseket is küld, azokat egy címre illő `exclude` minta szűrje. Ha a csatorna szerkezete szokatlan, kerüljön egy eset a [`collect.test.ts`](lib/pipeline/collect.test.ts)-be is.
 4. **Lista.** Tedd át a sorát a Jelöltek közül a Bent van táblába, a `feeds.ts` értékeivel.
 5. **Teszt.** Futtasd: `npm test`. A `lib/truthful-sites.test.ts` elbukik, ha a két lista eltér.

@@ -30,6 +30,17 @@ test("parseFeed reads RSS 2.0 items: link, stripped title and snippet, the pubDa
   ]);
 });
 
+// Kills a feed's `exclude` ignored (ByteByteGo's enrollment ads would reach the model) and one matched
+// against anything but the title (a real article that merely mentions a course in its snippet).
+test("parseFeed drops items whose title matches the feed's exclude pattern, and only those", () => {
+  const body = rss(`
+    <item><title>LAST CALL FOR ENROLLMENT: Build with Claude Code</title><link>https://blog.test/ad</link></item>
+    <item><title>How LLMs Find a Needle</title><link>https://blog.test/needle</link><description>Enrollment is open for our course.</description></item>`);
+  const titles = (exclude?: RegExp) => parseFeed(body, { ...feed, exclude }, since).map((c) => c.title);
+  assert.deepEqual(titles(/enrollment/i), ["How LLMs Find a Needle"]);
+  assert.deepEqual(titles(), ["LAST CALL FOR ENROLLMENT: Build with Claude Code", "How LLMs Find a Needle"]);
+});
+
 test("parseFeed drops RSS items older than `since` and items without a link, but keeps undated ones", () => {
   const body = rss(`
     <item><title>Old</title><link>https://blog.test/old</link><pubDate>Sun, 20 Sep 2026 23:59:00 GMT</pubDate></item>

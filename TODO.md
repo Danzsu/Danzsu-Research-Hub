@@ -142,7 +142,7 @@
   - **Nyitott kérdés:** a chat-indexhez a szövegdarabokat is a DB-ben tartjuk-e, vagy a GitHubról olvassuk. Ezt a chat tervezésekor döntjük el.
 - [ ] **Kabala (mascot) az oldalra**, hogy barátságosabb legyen.
 - [ ] **Kutatási források bővítése és priorizálás:**
-  - Új források: a jelöltek, az állapotuk és a felvétel lépései a [truthful_sites.md](truthful_sites.md) → Jelöltek részben. Ide tartozik a research.google (a felhasználó kérésére, közvetlenül az M1 15. feladata után), a ByteByteGo és a DeepMind súlyozása.
+  - Új források: a jelöltek, az állapotuk és a felvétel lépései a [truthful_sites.md](truthful_sites.md) → Jelöltek részben. Ide tartozik a research.google (a felhasználó kérésére, közvetlenül az M1 15. feladata után) és a DeepMind súlyozása. A ByteByteGo és az Anthropic 2026-09-27 óta bent van.
   - Szűrés, hogy ne legyen túl sok (döntés, 2026-09-24):
     - naponta legfeljebb kb. 8 kiemelt tétel, csak 60 pont felett;
     - a 40–59 pontosak egy összecsukott „Többi” szakaszba kerülnek, és a keresésben is megtalálhatók;

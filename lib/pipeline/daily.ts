@@ -70,6 +70,7 @@ PART 1 — news. From the numbered NEWS list, choose at most ${MAX_NEW_ITEMS} it
 - title: short, concrete headline. summary: 2–3 sentences on what it is. why: one sentence on why it matters to the reader.
 - Hungarian must be natural, idiomatic Hungarian — not a literal translation. Keep technical terms (LLM, fine-tuning, GGUF) as Hungarian engineers say them.
 - Use only facts present in the listing. Do not invent numbers or claims.
+- Skip promotions: course, event or product sign-ups, sales and sponsored posts are not news.
 
 PART 2 — repositories. From the numbered REPOS list, choose the 10 most useful (skip awesome-lists and spam) and return them in "github" with a focus line of at most 8 English words.
 

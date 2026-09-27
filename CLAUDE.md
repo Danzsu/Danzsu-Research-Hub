@@ -22,7 +22,7 @@ These are the two writers from ARCHITECTURE.md → Bird's eye view, step by step
 
 1. **Daily pipeline** — Vercel Cron (`vercel.json`, `0 5 * * *`, 05:00 UTC) → `app/api/cron/daily` → `runDaily` in `lib/pipeline/daily.ts`:
    - upserts the current ISO-week `issues` row;
-   - collects candidates from the last 2 days (`collect.ts`, sources in `feeds.ts`): RSS/Atom feeds (25 per feed, `DEFAULT_FEED_LIMIT`, unless the feed sets `limit`), Hacker News via Algolia (stories over 80 points), and GitHub repo search (repos created in the last 7 days, top 25 by stars); URLs already stored in the last 14 days are dropped;
+   - collects candidates from the last 2 days (`collect.ts`, sources in `feeds.ts`): RSS/Atom feeds (25 per feed, `DEFAULT_FEED_LIMIT`, unless the feed sets `limit`; a feed's `exclude` drops its own promotions by title), Hacker News via Algolia (stories over 80 points), and GitHub repo search (repos created in the last 7 days, top 25 by stars); URLs already stored in the last 14 days are dropped;
    - shortlists to 40 with `daily_shortlist`, only when there are more than 40 (if every route fails, it keeps the first 40);
    - curates with `daily_curate`: the prompt asks for at most 25 items (not enforced in code) plus a GitHub top-10, which `toDigestRows` caps at 10 (`curatePrompt`, `toDigestRows`);
    - inserts `digest_items` (`ignoreDuplicates` on `url`), upserts `github_top`, then calls the `refresh_must_read` RPC.

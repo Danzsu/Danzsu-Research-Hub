@@ -5,7 +5,8 @@ import type { DigestCategory } from "../../data/digest-types.ts";
 // `limit` caps high-volume feeds (arXiv publishes hundreds a day).
 /** The items a feed contributes when it sets no `limit`. */
 export const DEFAULT_FEED_LIMIT = 25;
-export const feeds: Array<{ name: string; url: string; hint: DigestCategory; limit?: number }> = [
+// `exclude` drops items by title: a feed's own promotions, which aren't articles.
+export const feeds: Array<{ name: string; url: string; hint: DigestCategory; limit?: number; exclude?: RegExp }> = [
   { name: "arXiv cs.CL", url: "https://rss.arxiv.org/rss/cs.CL", hint: "research", limit: 40 },
   { name: "arXiv cs.AI", url: "https://rss.arxiv.org/rss/cs.AI", hint: "research", limit: 40 },
   { name: "Hugging Face", url: "https://huggingface.co/blog/feed.xml", hint: "local" },
@@ -19,6 +20,11 @@ export const feeds: Array<{ name: string; url: string; hint: DigestCategory; lim
   { name: "AWS ML", url: "https://aws.amazon.com/blogs/machine-learning/feed/", hint: "companies", limit: 10 },
   { name: "The Decoder", url: "https://the-decoder.com/feed/", hint: "companies", limit: 20 },
   { name: "Interconnects", url: "https://www.interconnects.ai/feed", hint: "research" },
+  // Its course and event ads ("LAST CALL FOR ENROLLMENT: …", "ByteByteGo Live is here") share the feed with the articles.
+  { name: "ByteByteGo", url: "https://blog.bytebytego.com/feed", hint: "research", limit: 5, exclude: /enrollment|bytebytego live/i },
+  // Anthropic publishes no RSS; a community mirror (github.com/Olshansk/rss-feeds) builds these from anthropic.com, whose URLs the items keep.
+  { name: "Anthropic", url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml", hint: "companies" },
+  { name: "Anthropic Engineering", url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml", hint: "research" },
 ];
 
 // Hacker News (Algolia) queries; only stories above the points floor.
