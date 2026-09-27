@@ -152,3 +152,19 @@ test("any other table's maybeSingle() answers PGRST116 for two or more matches, 
   assert.equal(data, null);
   assert.equal((error as { code?: string } | null)?.code, "PGRST116");
 });
+
+// Fix round 1: the two embed tests above (this file and lib/content.test.ts) only ever embed a single
+// object (`posts(...)`, `todos(...)`) — project()'s other branch, an embed PostgREST answers as an
+// array (`table(inner)` over a one-to-many relationship, e.g. issues → digest_items(...)), had no
+// test of its own. Kills that branch answering the embedded rows whole instead of projecting each one.
+test("any other table's select projects an array embed's rows too, one per element", async () => {
+  const db = fakeDb(undefined, {
+    rows: {
+      issues: [
+        { id: "2026-W38", digest_items: [{ id: "2609.00001", extra: "not selected" }, { id: "2609.00002", extra: "not selected" }] },
+      ],
+    },
+  });
+  const { data } = await db.from("issues").select("id, digest_items(id)").eq("id", "2026-W38");
+  assert.deepEqual(data, [{ id: "2026-W38", digest_items: [{ id: "2609.00001" }, { id: "2609.00002" }] }]);
+});

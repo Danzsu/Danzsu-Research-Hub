@@ -34,11 +34,9 @@ const issueRow = (id: string, overrides: Record<string, unknown> = {}) => ({
 });
 
 // Kills a mapping that re-sorts or drops the embedded rows (the database orders them: must_read, then
-// score), a tuple with its fields swapped, and an issue id that isn't the row's. `internal_flag` on the
-// first item isn't in RADAR_COLUMNS' digest_items list: the exact-shape assert below also kills a
-// project() regression that stops stripping an embedded array row down to its selected columns.
+// score), a tuple with its fields swapped, and an issue id that isn't the row's.
 test("getRadar maps the one embedded answer: the items in the database's order, the repos as tuples, the week's id", async () => {
-  const items = [{ ...itemRow("2609.00002", 80, true), internal_flag: "not selected" }, itemRow("2609.00001", 95)];
+  const items = [itemRow("2609.00002", 80, true), itemRow("2609.00001", 95)];
   const db = fakeDb(undefined, {
     rows: { issues: [issueRow("2026-W38", { digest_items: items, github_top: [{ repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool" }] })] },
   });
@@ -87,9 +85,13 @@ test("getRadar asks for the named week or the latest issue in one query, with th
 });
 
 // Kills `data ?? []` coming back: a failed query has to throw, or the closed-week cache keeps an
-// empty week for a day and `/` shows an empty Radar as if nothing had been collected.
+// empty week for a day and `/` shows an empty Radar as if nothing had been collected. Also kills the
+// thrown error losing its `cause`, which would strip the original PostgREST error off the one a
+// caller logs.
 test("getRadar throws on a failed query instead of answering an empty week", async () => {
-  const db = fakeDb(undefined, { tableErrors: { issues: pgError("08006", "connection failure") } });
-  await assert.rejects(getRadar(db), /radar query failed: connection failure/);
-  await assert.rejects(getRadar(db, "2026-W38"), /radar query failed: connection failure/);
+  const error = pgError("08006", "connection failure");
+  const db = fakeDb(undefined, { tableErrors: { issues: error } });
+  const failsWithCause = (e: unknown) => e instanceof Error && /radar query failed: connection failure/.test(e.message) && e.cause === error;
+  await assert.rejects(getRadar(db), failsWithCause);
+  await assert.rejects(getRadar(db, "2026-W38"), failsWithCause);
 });
