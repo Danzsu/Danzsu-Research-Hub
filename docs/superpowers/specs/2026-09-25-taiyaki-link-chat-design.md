@@ -50,7 +50,7 @@ A beküldés háttere már kész. A `POST /api/sources` fogad egy linket és egy
   - kivétel az „Újra” elutasítása: az a saját bejegyzésébe kerül, közvetlenül az „ÚJRA” gomb alá, mert aki fentebb görgetve kattintott, a szál végét nem látja; lejárt belépésnél a „Lejárt a belépésed.” a szál végére is kikerül, egyszer;
   - a szál a végét csak annak az olvasónak tartja szem előtt, aki ott van (legfeljebb 40 px-re tőle), vagy aki épp maga küldött; a görgetés mindig azonnali ugrás, csúszás nélkül;
   - a taiyaki-válaszok konténere `aria-live="polite"`.
-- **Beviteli mező:** `Textarea`, legfeljebb `30dvh` magas, utána görget. Enter küld, Shift+Enter új sor. A küldés gomb 40 px, signal háttér. Küldés közben a mező és a gomb le van tiltva.
+- **Beviteli mező:** `Textarea`, legfeljebb `30dvh` magas, utána görget. Enter küld, Shift+Enter új sor. A küldés gomb 40 px, signal háttér. Küldés közben a mező (csak olvasható) és a gomb `aria-disabled`, nem `disabled`, így a fókusz rajtuk marad.
 - **Szélesség:** 360 px-es képernyőn nincs vízszintes görgetés; a hosszú linkek és megjegyzések `[overflow-wrap:anywhere]`-rel törnek.
 
 ### 1.4 Egy beküldés a szálban
@@ -103,7 +103,7 @@ A forrástípus neve (cikk, YouTube-videó, arXiv-tanulmány, GitHub-repó, X-po
 - Olvasás olvasóként: 404, ha nincs ilyen forrás; 403 `forbidden`, ha nem a hívó küldte be; 409 `not_failed`, ha az állapota nem `failed`.
 - Ezután az admin klienssel compare-and-swap: `status = 'pending', error = null, attempts = 0`, csak ha `id`, `submitted_by = viewer.id` és `status = 'failed'`. 0 sor → 409 `not_failed` (egy párhuzamos kattintás már elindította). Az `attempts` nullázása a tulajdonos döntése (2026-09-26): egy 300 s-nál megölt „Újra”-futás különben 3 vagy több próbával `pending`-ben ragadna, és a napi cron soha nem venné fel újra.
 - Siker: 202 `{ ok: true }`, és `after(() => processSource(createAdminClient(), id))`. `maxDuration = 300`, mint a többi feldolgozó route-nál.
-- Nincs cooldown: az állapot-CAS kizárja az átfedést, és minden futás egy felhasználói kattintás. `ponytail:` megjegyzés a kódban, hogy visszaélés esetén ide kerül egy várakozási idő.
+- Nincs cooldown: az állapot-CAS kizárja két kattintás átfedését, és minden futás egy felhasználói kattintás. A `retrySource` `ponytail:` megjegyzése azt nevezi meg, amit a CAS nem zár ki: egy kattintást, miközben a napi cron ugyanezt a hibás forrást dolgozza fel. A továbblépés egy „processing” állapot lenne.
 - A logika egy `lib/`-beli függvényben van (`retrySource`), `fakeDb`-vel tesztelve: 403, 409, a CAS-feltételek és a 202.
 
 ### 3.3 Élő frissítés
