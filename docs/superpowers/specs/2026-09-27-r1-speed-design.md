@@ -59,8 +59,7 @@ Célok:
 - **R3 Elrendezés:** a mobil és a széles képernyős elrendezés.
 - A [TODO.md](../../../TODO.md) „Responzívabb UI/UX” pontja alatt parkolt tételek.
 - **A Next 16 Cache Components** (statikus héj, `use cache`): lehetséges későbbi mérföldkő. Csak az utólagos élő mérés után dönthető el.
-- **A hideg indulás további karjai.** Ezeket csak megnevezzük, terv nélkül, arra az esetre, ha az utólagos mérés még mindig hideg akadást mutat:
-  - a Vercel Fluid compute: a tulajdonos nézze meg a dashboardon, hogy be van-e kapcsolva;
+- **A hideg indulás további karjai.** A Fluid compute-ot az R1 bekapcsolja (1.1). A többit csak megnevezzük, terv nélkül, arra az esetre, ha az utólagos mérés még mindig hideg akadást mutat:
   - „ébren tartó” pingek: nem illenek ide, mert a Hobby cron csak naponta fut;
   - a Cache Components statikus héja.
 
@@ -88,7 +87,11 @@ Célok:
 ### 1.1 Régió
 
 - A `vercel.json` a `crons` mellé kap egy `"regions": ["dub1"]` sort. A függvények (oldalak, API-route-ok, a napi cron) így Dublinban futnak, a Supabase mellett.
-- A beállítás verziózott, és felülírja a dashboard Function Region értékét.
+- Ugyanide kerül a `"fluid": true` is (a tulajdonos döntése, 2026-09-27: a dashboardon ki volt kapcsolva).
+  - A Fluid compute éles deploynál előmelegíti a függvényt, és bájtkód-gyorsítótárat használ, ami a ritkán hívott függvények hidegindulását rövidíti. Egy példány több kérést is kiszolgál.
+  - A Hobby csomagon is elérhető (vercel.com/docs/fluid-compute).
+  - Ez a mért 1–3 mp-es első kérések ellen dolgozik.
+- A beállítások verziózottak, és felülírják a dashboard Function Region és Fluid Compute értékét.
 - Csak új deployjal lép életbe, és a deployt a tulajdonos végzi (7.). Ellenőrzés: a válasz `x-vercel-id` fejléce `…::dub1`-re végződik (előtte `fra1::fra1`).
 
 ### 1.2 Egy auth-ellenőrzés kérésenként
@@ -447,17 +450,17 @@ Minden tény egy helyen szerepel, a többi hely hivatkozik rá.
 - **TODO.md:**
   - **kész:** a „Kevesebb getClaims() kérésenként” pont; a `MINE_LIMIT` sor az „Apró rendrakás” alól; a zod-sor a „Responzívabb UI/UX” parkolt listájából;
   - **a „Lassú archívum” pont** az R1 előtte–utána mérésére mutat;
-  - **új, a tulajdonosé:** a Fluid compute ellenőrzése a Vercel dashboardon; az utólagos élő mérés;
+  - **új, a tulajdonosé:** az utólagos élő mérés;
   - **új, a Technikai adósság alá:** az `unstable_cache` cseréje `use cache`-re, ha jön a Cache Components mérföldkő, és hogy a mérföldkőről a mérés után születik döntés.
 
 ## 7. Élesítés
 
 - **Egy ágon, egy deployjal.** Az ág az `r1-speed`. Séma- és env-változás nincs.
-- **A deploy a tulajdonosé:** push, majd a Vercel buildel. A `regions` csak az új deploytól hat, a régi deploymentek `fra1`-ben maradnak.
+- **A deploy a tulajdonosé:** push, majd a Vercel buildel. A `regions` és a `fluid` csak az új deploytól hat, a régi deploymentek `fra1`-ben és Fluid compute nélkül maradnak.
 - **Deploy után:**
   - az `x-vercel-id` `…::dub1`-re végződik;
   - a napi cron lefut (Vercel → Cron Jobs);
-  - a projekt beállításaiban a Fluid compute be van kapcsolva;
+  - a deployment adatlapján a függvények Fluid compute-tal futnak;
   - aztán jön az utólagos élő mérés (3.3).
 - **Visszaállítás:** Vercel Instant Rollback az előző deploymentre. Visszahozza a `fra1`-et és a régi kódot, séma nem változott. Az R1 gyorsítótár-bejegyzéseit a régi kód nem olvassa, és egy nap alatt lejárnak.
 
