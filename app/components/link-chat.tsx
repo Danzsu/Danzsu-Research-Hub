@@ -70,13 +70,20 @@ function tabStops(root: ParentNode): HTMLElement[] {
   );
 }
 
+/** The button that opened the panel or, once it is hidden (the mobile slot, after the window widened
+ *  past md), the taiyaki that is showing now: the one the focus can go back to. */
+function shownOpener(opener: HTMLElement | null): HTMLElement | null {
+  if (!opener || opener.getClientRects().length > 0) return opener;
+  return [...document.querySelectorAll<HTMLElement>(`button[aria-controls="${CHAT_PANEL_ID}"]`)].find((button) => button.getClientRects().length > 0) ?? opener;
+}
+
 /**
  * Desktop: Radix's FocusScope loops Tab inside the panel even when it isn't modal, which would keep a
  * keyboard reader from the page behind it. Instead the panel sits right after its opener in tab order:
  * Shift+Tab off its first stop goes back to the opener, and Tab off its last goes on to the first stop
  * after the opener outside the panel, or back to the opener when there is none. The key is cancelled
- * only once the focus has really moved: an opener hidden since (the mobile slot, after the window
- * widened past md) takes no focus, and the key is then left to Radix, which wraps it inside the panel.
+ * only once the focus has really moved; a target that takes no focus leaves it to Radix, which wraps
+ * it inside the panel.
  */
 function tabPastPanel(event: KeyboardEvent<HTMLDivElement>, opener: HTMLElement | null) {
   if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey || !opener) return;
@@ -166,12 +173,14 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          opener.current?.focus();
+          // Radix also runs this when the window crosses md with the panel open (the Dialog remounts, modal
+          // or not): the panel keeps the focus then, and only a real close hands it back.
+          if (!open) shownOpener(opener.current)?.focus();
         }}
         onInteractOutside={(event) => {
           if (!isMobile || isUndoToast(event.target)) event.preventDefault();
         }}
-        onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, opener.current)}
+        onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, shownOpener(opener.current))}
         // The house 160ms, not the stock Sheet's 500ms in and 300ms out.
         className="max-h-[75dvh] gap-0 data-[state=closed]:duration-160 data-[state=open]:duration-160 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
       >
