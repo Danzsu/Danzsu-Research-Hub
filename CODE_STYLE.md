@@ -42,7 +42,7 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
 
 - **Components are server components by default,** and `"use client"` goes only on an interactive leaf. ARCHITECTURE.md → Boundaries shows where that line runs today.
 - **Never call `setState` during render without a guard that makes it converge.** `undo-toast.tsx` does it safely, by comparing `prevToastId` first. Without a guard, the render loops ("Too many re-renders"), which `app/components/shell.test.ts` catches.
-- **External stores go through `useSyncExternalStore`:** the toast queue, the reader store and the opened posts. An event handler that an effect needs, but shouldn't re-subscribe for, goes through `useEffectEvent` (`use-shortcuts.ts`).
+- **External stores go through `useSyncExternalStore`:** the toast queue, the reader store, the opened posts and the link chat. An event handler that an effect needs, but shouldn't re-subscribe for, goes through `useEffectEvent` (`use-shortcuts.ts`).
 - **Never `eslint-disable` a `react-hooks` rule.** Fix the code. The one disable in app code is `@next/next/no-img-element` in `post-image.tsx`, and it states its reason. `eslint.config.mjs` turns two `react-hooks` rules and `@typescript-eslint/no-unused-vars` off for the vendored `components/ui/` files and `hooks/use-mobile.ts` only.
 
 ## HU/EN copy
@@ -51,7 +51,7 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
 - **Every string in both languages.** No English-only labels, no inline `language === "hu" ? … : …`, and no i18n library.
 - **The names in use:** `copy` in most components (`digest-dashboard` included), `labels` in `post-blocks`, and `notices` in `app/(app)/library/[id]/post-notices.tsx`, which `post-article.tsx` also reads.
 - **Server components on pages that switch language in place** keep `{ hu, en }` per key instead (`library-view.tsx`, `archive-view.tsx`), and render it through `<LocalizedText>` (ARCHITECTURE.md → Cross-cutting concerns).
-- **Data lists that several components share** keep `Localized` values in `lib/` (`NAV_ITEMS` in `lib/nav.ts`, `SHORTCUTS` in `lib/keymap.ts`).
+- **Data lists that several components share** keep `Localized` values in `lib/` (`NAV_ITEMS` in `lib/nav.ts`, `SHORTCUTS` in `lib/keymap.ts`, `SOURCE_KIND_LABELS` in `lib/source-kinds.ts` for the post page's kind badge and the link chat).
 
 ## Comments
 
@@ -83,6 +83,9 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
   - `lib/pipeline/util.ts`: `hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…;
   - `lib/pipeline/fetch.ts`: `safeFetch`, `apiFetch`, `ensureOk`, `readText`;
   - `lib/blocks.ts`: `localizedSchema`, `parseBlocks`;
+  - `lib/post-view.ts`: `shownTitle`, the title readers see;
+  - `lib/source-kinds.ts`: `SOURCE_KIND_LABELS`;
+  - `lib/link-chat.ts`: `httpTransport`, the one fetcher for the `/api/sources` routes, and `memoryTransport`, its offline stand-in;
   - `readPageMeta` in `extract/article.ts`;
   - in the UI, the shared controls in DESIGN.md → Components.
 

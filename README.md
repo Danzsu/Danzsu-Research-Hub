@@ -6,7 +6,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON N
 
 **Radar** is the weekly digest. Every morning a cron job collects AI news from RSS feeds, Hacker News and GitHub, lets a model pick and score what matters, and writes it into the current ISO week's issue. Readers see a top-3 must-read, a scored feed in four categories (local models, research, companies, GitHub), a GitHub top-10 and an archive of past weeks. Each reader's read, saved and to-do state is their own.
 
-**Library** is where members save links: articles, YouTube videos, arXiv papers, PDFs, GitHub repositories and X posts. Each link becomes a post. Its content is converted into typed blocks and its images are mirrored, so the post survives the original going dead. A model writes the title, summary and key points in both languages. The submitter can edit the title and summary, hide blocks, and re-extract the post; any reader can ask for a Hungarian translation of the body. The canonical source link is always shown.
+**Library** is where members save links: articles, YouTube videos, arXiv papers, PDFs, GitHub repositories and X posts. Each link becomes a post. Its content is converted into typed blocks and its images are mirrored, so the post survives the original going dead. A model writes the title, summary and key points in both languages. The submitter can edit the title and summary, hide blocks, and re-extract the post; any reader can ask for a Hungarian translation of the body. The canonical source link is always shown. A taiyaki button on every page (the bottom-right corner on desktop, the middle of the bottom bar on phones) opens a small chat: drop a link with a note, watch it go from processing to done, and retry it if it failed.
 
 | Layer | Choice |
 | --- | --- |
@@ -31,6 +31,9 @@ flowchart TD
   end
   subgraph submit["Writer 2: a link submission"]
     form["/library form"] --> sourcesRoute["POST /api/sources"]
+    chat["taiyaki link chat"] --> sourcesRoute
+    chat -->|"polls every 4 s"| mineRoute["GET /api/sources/mine"]
+    chat --> retryRoute["POST /api/sources/[id]/retry"]
     sourcesRoute -->|"as the reader"| sources[("sources")]
   end
   subgraph postPage["The post page, /library/[id]"]
@@ -39,6 +42,7 @@ flowchart TD
     editRoute["PATCH /api/posts/[id]"]
   end
   sourcesRoute -.->|"after()"| ingest["processSource"]
+  retryRoute -.->|"after()"| ingest
   reextractRoute -.->|"after()"| ingest
   retry --> ingest
   ingest --> extract["extract: the kind's extractor, with noise layers 1 and 2"]
@@ -159,7 +163,7 @@ The shared project is already deployed. These steps are for a deployment of your
 
 1. **Vercel:** *Add New → Project*, import the repository. Next.js and pnpm are detected automatically.
 2. **Environment variables:** everything from the [Environment](#environment) table, with your own project's values, for Production and Preview. Tick Development too if you want a plain `vercel env pull` to work; otherwise pull with `--environment=production`. Environment changes take effect on the next deploy.
-3. **Cron:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 5 * * *` (05:00 UTC). With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, translation and re-extraction routes may run for up to 300 s.
+3. **Cron:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 5 * * *` (05:00 UTC). With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry, translation and re-extraction routes may run for up to 300 s.
 4. **Install command:** check that Vercel installs from `pnpm-lock.yaml` in frozen mode with pnpm 11, so the 7-day age gate applies. This is an open item in [TODO.md](TODO.md).
 5. **Supabase:** set your project's Site URL to the deployment's domain, add that domain to the Redirect URLs, and send new invites. On the shared project, the Site URL is the production domain and changes only when that domain does (for example after renaming the Vercel project). Only the owner changes it, and never to localhost or a preview URL, because every member's magic link follows it.
 6. **First run:** the same `curl` against `https://<domain>/api/cron/daily`. The next morning, check *Vercel → Logs* and *Cron Jobs*.
@@ -168,21 +172,21 @@ Schema changes go in before the code that needs them, and a migration may only a
 
 ## Project tour
 
-Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (collapsible to an icon rail), a five-slot bottom bar on phones. Desktop shortcuts: `j`/`k` move between cards, `o` opens (and marks read), `r` read, `l` later, `[` collapses the sidebar, `?` lists them.
+Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (collapsible to an icon rail), a five-slot bottom bar on phones. Desktop shortcuts: `j`/`k` move between cards, `o` opens (and marks read), `r` read, `l` later, `[` collapses the sidebar, `?` lists them. The taiyaki button opens the link chat.
 
 | Path | What is there |
 | --- | --- |
 | [`app/`](app/) | `/login`, the error and 404 pages, the manifest, and the route group below |
 | [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, plus their loading page |
-| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast), the Radar dashboard and its cards, the title band, the language toggle, and `post-blocks`, the block renderer |
+| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the title band, the language toggle, and `post-blocks`, the block renderer |
 | [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
-| [`app/api/`](app/api/) | JSON routes: reader state, link submission, post edit, translate, re-extract, and the daily cron |
+| [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron |
 | [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link login, callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login` |
 | [`app/media/`](app/media/) | Serves mirrored images to signed-in readers |
 | [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the feed list, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
-| [`lib/`](lib/) | The block model, the post view, post edits, translation, the model client, content queries, the language cookie, Supabase clients |
+| [`lib/`](lib/) | The block model, the post view, post edits, translation, the model client, content queries, the link chat's logic and your own submissions, the language cookie, Supabase clients |
 | [`lib/test/`](lib/test/) | The offline render harness for component tests, the route-handler stubs (`route-hooks.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [DESIGN.md](DESIGN.md#dos-and-donts)) |
@@ -223,7 +227,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 2. Write `lib/pipeline/extract/<kind>.ts`, exporting an `Extractor`: `(db, url, note) => Promise<Extracted>`. Build `BlockDraft`s, give them ids with `assignIds`, and fill `text` for the summarizer. Fetch the user's URL with `safeFetch`, and a fixed API host with `apiFetch`.
 3. Register it in `extractors` in [`extract/index.ts`](lib/pipeline/extract/index.ts), and decide whether the kind belongs in `RETHROW_FETCH_ERROR` and `NO_ARTICLE_FALLBACK`, and in `AI_CLEANUP_KINDS` in `ingest.ts`.
 4. Add a migration that widens `sources_kind_check` and `posts_kind_check`.
-5. Add the kind's label and icon on the post page and the Library page; `tsc` reports the missing entry.
+5. Add the kind's name, in both languages, to `SOURCE_KIND_LABELS` in [`lib/source-kinds.ts`](lib/source-kinds.ts) (the post page's badge and the link chat), and its icon to `kindIcons` in the Library page; `tsc` reports a missing entry.
 6. Test it offline with the fetch and DNS fakes (see [Testing](#testing)).
 
 **Change a model, or add a model task.** To change a model, edit the task's row in `model_settings` in the Supabase Table Editor. Pin an exact version, not a `*-latest` alias. To add a task:
@@ -334,7 +338,7 @@ Mirroring other people's articles is a managed risk, not a solved problem. What 
 
 **The GitHub token expired.** GitHub answers 401 to every request carrying an expired token. The daily run then gets no repositories: the log shows `github topic failed: <topic>: https://api.github.com/… 401` once per topic, the cron answer shows `"repos": 0`, and the GitHub top-10 stops updating. It keeps whatever an earlier run that week wrote, so it goes stale; a new week starts without one. GitHub links in the Library fall back to the article extractor (`github extractor failed for <url>: github 401`). Create a new fine-grained token and update `GITHUB_TOKEN`, or remove the variable: GitHub still answers without it, at a lower rate limit. An expiry warning is planned in [TODO.md](TODO.md).
 
-**Submissions are stuck after three failed attempts.** A source gets 3 attempts, counting the one right after submission; the daily cron retries the rest. During an outage that hits every source (a bad key, a used-up quota), each daily run spends one attempt, so after about three days those sources are no longer retried. There is no button to reset them yet (the TODO item "Hibás beküldések kezelése" in [TODO.md](TODO.md)). Once the cause is fixed, reset them in the SQL Editor, and the next cron run picks them up, 10 at a time:
+**Submissions are stuck after three failed attempts.** A source gets 3 attempts, counting the one right after submission; the daily cron retries the rest. During an outage that hits every source (a bad key, a used-up quota), each daily run spends one attempt, so after about three days those sources are no longer retried. The submitter can send a failed one through again with ÚJRA in the taiyaki link chat, which also resets its attempts; one still `pending`, another member's, or many at once still need the SQL below. Once the cause is fixed, reset them in the SQL Editor, and the next cron run picks them up, 10 at a time:
 
 ```sql
 update public.sources set attempts = 0 where status <> 'done' and attempts >= 3;
@@ -346,3 +350,4 @@ update public.sources set attempts = 0 where status <> 'done' and attempts >= 3;
 
 - [Unified post template and reading tools](docs/superpowers/specs/2026-09-24-unified-post-template-design.md) (spec) and its [M1 plan](docs/superpowers/plans/2026-09-24-unified-post-template-m1.md)
 - [UI/UX, reading signals and search](docs/superpowers/specs/2026-09-24-ux-signals-search-design.md) (spec) and its [milestone A plan](docs/superpowers/plans/2026-09-24-ux-a-app-shell.md)
+- [Taiyaki link chat](docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md) (spec) and its [plan](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md)

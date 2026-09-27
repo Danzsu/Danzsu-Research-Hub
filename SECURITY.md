@@ -46,7 +46,7 @@ Every environment variable is server-only, and none is `NEXT_PUBLIC_` (`.env.exa
 `lib/supabase/server.ts` creates both clients.
 
 - **`createClient()`** acts as the reader, so RLS applies. Use it, through `getReader()`, everywhere except the pipeline.
-- **`createAdminClient()`** bypasses RLS. It is for the pipeline: the cron route, and the `processSource` runs that the sources and reextract routes schedule in `after()`. The translate, reextract and `/media` routes may also use it, each after its own check. Never pass its results to a reader unfiltered.
+- **`createAdminClient()`** bypasses RLS. It is for the pipeline: the cron route, and the `processSource` runs that the sources, reextract and `sources/[id]/retry` routes schedule in `after()`. The translate, reextract, `sources/[id]/retry` (its compare-and-swap, after the reader-side read) and `/media` routes may also use it, each after its own check. Never pass its results to a reader unfiltered.
 - **`scripts/ingest-url.mts`** is a dev tool, and it builds its own secret-key client.
 
 The reader's one write to `posts` is in CLAUDE.md → Database.
@@ -83,7 +83,7 @@ The reader's one write to `posts` is in CLAUDE.md → Database.
 ### XSS: rendering untrusted content
 
 - **No raw HTML reaches a page.** Every source becomes typed blocks (CLAUDE.md → Data contract), and nothing in `app/` uses `dangerouslySetInnerHTML`. The vendored `components/ui/chart.tsx` does, and no page renders it.
-- **Links.** Every href passes `safeHref` (http and https only) again at render time, in `PostBlocks` and on the post page, even though extraction already ran it.
+- **Links.** Every href passes `safeHref` (http and https only) at render time: in `PostBlocks` and on the post page, even though extraction already ran it, and in the link chat's thread (`toThread`).
 - **Embeds and images.** `videoEmbedSrc` renders an embed only for a valid video id. `mediaSources` re-checks image keys with `isMediaKey`. A placeholder must match `isValidPlaceholder`: a `data:image/(avif|webp|png|jpeg);base64` URL.
 
 ### `/media`

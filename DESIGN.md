@@ -246,7 +246,7 @@ Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-pape
 | `text-ink/55` on paper | 3.9 | 10px meta labels, empty notes |
 | signal on paper / cream | 2.86 / 2.69 | large text / non-text only: the `//`, the rank numerals, rules, the focus outline. Today it also sets eyebrows, source labels and inline post links, which is the known gap |
 
-WCAG AA asks 4.5:1 of small text, and 3:1 of large text and of non-text UI. The last three rows miss the first bar. `text-paper/45` and `text-ink/55` still clear 3:1, so they suit large or incidental text. Signal on a light surface sits just under 3:1 as well, so it is meant for large text and non-text marks only. Its small-text uses are the gap tracked in TODO.md (a brand decision: a darker signal for small text, or large and decorative use only). An inline link at least carries an underline, but a label does not.
+WCAG AA asks 4.5:1 of small text, and 3:1 of large text and of non-text UI. The last three rows miss the first bar. `text-paper/45` and `text-ink/55` still clear 3:1, so they suit large or incidental text. Signal on a light surface sits just under 3:1 as well, so it is meant for large text and non-text marks only. Its small-text uses are the gap tracked in TODO.md (a brand decision: a darker signal for small text, or large and decorative use only). An inline link at least carries an underline, but a label does not. The link chat (`chat-thread.tsx`) adds no new case: its action links are ink with a signal underline instead, and its status labels are `text-ink/70`.
 
 ## Typography
 
@@ -286,7 +286,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 - **Display sizes are fluid.** Headings use `clamp(2.6rem, 11vw, …)` or a smaller floor (the scale above). Only the Radar hero scales with its container (`cqi`); moving `PageHero` to `cqi` too is tracked in TODO.md.
 - **Container queries, not `vw`.** Layout widths inside the main column use container queries (`@container`, `cqi`, `@3xl:`), because the desktop nav and the panel make that column far narrower than the viewport. `PageHero` switches to two columns at `@4xl`, the must-read grid at `@3xl`, and the GitHub list at `@2xl`.
 - **Navigation by width.**
-  - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, and the content column has matching bottom padding.
+  - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, with the taiyaki raised 16px out of its centre slot; the content column's bottom padding clears both (Components → Page shell).
   - From `md` up, the desktop nav takes its place: a 256px sidebar (`w-64`) or a 56px icon rail (`w-14`).
   - The Radar's categories are a sticky chip bar at every width.
 - **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md` to `2xl`, and a 330px column from `2xl`. It is non-modal, so the undo toast stays usable while it is open.
@@ -341,7 +341,7 @@ In the rail, the ink column shrinks to `w-14`: only the icons stay, each with it
 |                              |
 |   [ Marked read    UNDO ]    |  toast lane, above the bar
 +------------------------------+
-| Radar Libr. Search Arch. More|  bottom bar, 5 x 64px, ink
+| Radar Libr. [TY] Search More |  bottom bar, 5 x 64px, ink; [TY] the taiyaki, raised 16px
 +------------------------------+
 ```
 
@@ -358,14 +358,19 @@ Shadows are hard offsets with zero blur:
 | undo toast | `5px 5px 0 var(--signal)` (failed: `var(--ink)`) | none |
 | image frame | `4px 4px 0 var(--ink)` | none |
 | nav tooltip | `3px 3px 0 var(--ink)` | none |
+| taiyaki button | `4px 4px 0 var(--ink)`; in the mobile bar `3px 3px 0 var(--signal)` | `8px 8px 0 var(--signal)`, also on keyboard focus (`.lift`) |
+| link chat panel, from `md` | `6px 6px 0 var(--ink)` | none |
+| link chat bubbles | the taiyaki's `3px 3px 0 var(--ink)`, the reader's `3px 3px 0 var(--signal)` | none |
 
-- **Motion.** The transitions in `globals.css` (the must-card and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. The `.live-pulse` dot (9px, signal) pulses a ring every 2s.
+`.lift` (`globals.css`) gives the taiyaki the Top 3 cards' "come forward" state, whose rules `.must-card` shares, on hover and also on keyboard focus. Under `prefers-reduced-motion` its shadow still lifts, without the translate.
+
+- **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. The link chat's Sheet opens and closes in 160ms, not the stock Sheet's 500ms and 300ms. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. The `.live-pulse` dot (9px, signal) pulses a ring every 2s.
 - **Layering.** From bottom to top:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
   - the desktop aside, `z-30`, so the rail's tooltips paint over both of those;
-  - the mobile bottom bar, `z-40`;
-  - sheets, dialogs and their `bg-black/50` overlays, `z-50`;
+  - the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel from `md` to `2xl`, covers the button until it closes);
+  - sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;
   - the undo toast lane, `z-[60]`.
 - **Known exceptions:** the vendored Sheet keeps shadcn's blurred `shadow-lg`. `Input`, `Textarea` and `Checkbox` keep `shadow-xs`, and so does the `outline` Button variant, which the Radar's progress pill uses. House components never add a blurred shadow. The fix for these, and for the checkbox corners (Shapes), is tracked in TODO.md.
 
@@ -383,7 +388,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
 
 ### Page shell
 
-`app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar, and the dialogs and the toast are mounted once:
+`app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar and the taiyaki, and the two taiyaki buttons, the link chat, the dialogs and the toast are mounted once:
 
 ```tsx app/components/app-shell.tsx
     <LanguageProvider initial={language}>
@@ -417,6 +422,8 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
     </LanguageProvider>
 ```
 
+Below `md` the room is the wrapper's own bottom padding, `5.25rem` plus the safe area. From `md` up it goes into the page's last child, the view root (`md:[&>:last-child]:pb-24`), so the page's surface runs on under the corner taiyaki. It replaces that element's own bottom padding, and a page must end with its view root: a sibling after the root would take the room instead.
+
 Each page then sets its own surface. The Radar uses `<div className="min-w-0 bg-cream text-ink">` (`digest-dashboard.tsx`), and the Library and Archive use `<main className="min-h-dvh bg-ink text-paper">`.
 
 ### Sidebar and rail
@@ -444,7 +451,7 @@ className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y
 
 ### Bottom bar and the "Több" sheet
 
-Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots. The active slot, or the open "Több", turns signal:
+Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The active slot, the open "Több", or "Több" on an Archívum page (`data-active`) turns signal:
 
 ```tsx app/components/app-shell.tsx
 className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
@@ -455,7 +462,7 @@ const slotClass =
   "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 ```
 
-"Több" is a cream bottom Sheet holding a display title with its `//`, the language row, the coming views and the account row:
+"Több" is a cream bottom Sheet holding a display title with its `//`, Archívum (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on Archívum. The active Archívum is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
 
 ```tsx app/components/app-shell.tsx
         <SheetContent
@@ -473,6 +480,14 @@ const slotClass =
 ```
 
 The Sheet's close button, and the one in dialogs, is a 40px square with a 2px ink border, paper turning signal on hover (`components/ui/sheet.tsx`, `dialog.tsx`). Shell dialogs are cream, with a signal shadow: `className="border-2 border-ink bg-cream text-ink shadow-[8px_8px_0_var(--signal)]"` (`shell-dialogs.tsx`).
+
+### Link chat
+
+`app/components/link-chat.tsx` and `chat-thread.tsx`; how it behaves is in CLAUDE.md → App shell and navigation.
+
+- **The taiyaki button** is a 56px paper square with a 2px ink border around the 40px `TaiyakiIcon`: in the bottom-right corner from `md` up, and below `md` raised 16px out of the bottom bar's centre slot (the Page shell excerpt places both). Its shadows are in Elevation & Depth.
+- **The panel** is cream: an ink header with a small taiyaki, the mono title and the 40px close button, then the thread, then a paper footer with a cream field and a 40px `signal` Send. The empty field is one line tall and grows to `30dvh`. Below `md` it is a bottom Sheet with a 2px ink top rule, at most `75dvh` tall; from `md` up, a 360px card with a 2px ink frame above the corner button, at most `70dvh` tall.
+- **The bubbles** are at most 85% wide and break anywhere (`[overflow-wrap:anywhere]`): the taiyaki's are paper, beside a small taiyaki, and the reader's are ink with paper text, on the right. Status and action labels are 11px mono (Colors covers their colour), a pending reply carries the live dot, and a failed one ends in a 40px `signal` ÚJRA.
 
 ### `PageHero` and `StatusCard`
 
@@ -630,7 +645,7 @@ className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain
 
 ### Undo toast
 
-`app/components/undo-toast.tsx`. There is one fixed lane, above the bottom bar below `md` and 1.5rem from the bottom from `md` up. It is `z-[60]`, so it sits over open sheets. A failed write turns the toast signal:
+`app/components/undo-toast.tsx`. There is one fixed lane. Below `md` it sits above the bottom bar and the raised taiyaki (`bottom: 5.75rem` plus the safe area); from `md` up it is 1.5rem from the bottom and stops short of the taiyaki's corner (`md:right-24`). It is `z-[60]`, so it sits over open sheets. A failed write turns the toast signal:
 
 ```tsx app/components/undo-toast.tsx
 className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"

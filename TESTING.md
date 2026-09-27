@@ -13,7 +13,7 @@ Every test runs offline under plain `node --test` (README.md → Testing). This 
    - No response may contain "Too many re-renders", "Unhandled Runtime Error" or "Application error".
    - Then check the change in a browser with Playwright at 360, 768 and 1280px: the interaction itself, the console, and no horizontal scroll.
    - Add a fixture to `lib/fixtures.ts` with every new block type, banner or empty state. `lib/fixtures.test.ts` fails for a missing block type.
-5. **The manual checklist against a deployment.** README.md → Testing lists what a person checks by hand in a browser (with Playwright) after a deploy. The live checks that are still pending are in TODO.md ("Halasztott élő próbák", "Élő próbák a UI/UX A deploy után").
+5. **The manual checklist against a deployment.** README.md → Testing lists what a person checks by hand in a browser (with Playwright) after a deploy. The live checks that are still pending are in TODO.md ("Halasztott élő próbák", "Élő próbák a UI/UX A deploy után", "Élő próbák a taiyaki link-chat deployja után").
 6. **Mutation probes as proof.** A test that pins a security rule or a subtle behaviour is proven by breaking the code on purpose:
    - Apply a named mutation temporarily.
    - Run the named test file and see it FAIL.
@@ -54,16 +54,19 @@ node --experimental-strip-types --no-warnings --test "app/media/[[]...path]/rout
 - **`model_settings`** answers with `route` and records each task asked for (`.tasks`).
 - **`sources`** (one `source`, or several `sources`), `posts`, storage and the RPCs answer from `tables`. Any other table only upserts, recorded on `.upserts`, and answers `select().gte()` from `tables.rows`.
 - **Filters.** Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows, as PostgREST would. A column the fixture never set passes every filter, so a test of which row the code reads needs a fixture whose `id` and `source_id` differ. A null filter value, or a null row value, never passes, as in SQL: only the `posts` update chain's `.is(...)` matches null.
-- **Errors.** A `sources` `single()` that matches no row, or several, answers PGRST116. `pgError(code, message)` builds any other PostgREST-shaped error.
+- **`sources` selects** are projected to their column list, one level into an embed (`posts(id, title, overrides)`; `table(*)` keeps the embed whole), so a column the select drops reads `undefined`, as with PostgREST. A listing applies `order(column, { ascending })` before `limit(n)`, over `pending` when a test sets it and over `sources` / `source` otherwise. `!inner` and `alias:col` aren't parsed yet.
+- **Errors.** A `sources` `single()` that matches no row, or several, answers PGRST116; `maybeSingle()` answers null for none and PGRST116 for several. `pgError(code, message)` builds any other PostgREST-shaped error.
 - **The error knobs:**
   - `postError` makes every `posts` lookup fail, or only the Nth with `postErrorOnCall`;
   - `postUpsertError` and `postUpdateError` fail the `posts` writes;
   - `sourceInsertError` takes a `pgError`, such as `"23505"`;
+  - `sourceSelectError` fails every `sources` select;
+  - `sourceUpdateError` fails the `sources` update, which still records its payload on `sourceUpdates`;
   - `rpcError` takes a `pgError`, such as `"42501"`;
   - `storageError: true` makes every `list`, `upload` and `remove` reject.
 - **Recording.** Every write is recorded: `sourceUpdates`, `sourceInserts`, `postUpserts`, `postUpsertOptions`, `postUpdates`, `postUpdateFilters`, `eqCalls`, `rpcCalls`, `upserts`, `removedMedia`, and `writes`, the cross-table order.
 - **Storage** keeps its own object set, seeded from `tables.media`. It answers `list`, `upload`, `remove` and `download`, and throws for any bucket other than `MEDIA_BUCKET`.
-- **Not written through.** A `sources` `insert` is recorded but not written through, so a later select still sees only the fixture.
+- **Written through, or not.** A `sources` update chains `.eq` filters and writes through to the rows they match, so a second compare-and-swap sees the first. A `sources` `insert` is recorded but not written through, so a later select still sees only the fixture.
 
 ### Fetch, DNS and the environment, `lib/pipeline/mock-fetch.ts`
 
@@ -84,7 +87,7 @@ Importing `render.ts` registers `tsx-hooks.ts` with `module.register`. The hooks
 
 - they resolve `@/` and extensionless relative imports (`./x` → `.ts`, `.tsx` or `index`);
 - they compile `.tsx` with the project's own TypeScript (`transpileModule`);
-- they swap `next/link` and `next/navigation` for `next-stub.ts`.
+- they swap `next/link` and `next/navigation` for `next-stub.ts`. Its `usePathname` answers `navigationStub.pathname` (`"/"` by default); a test that sets it resets it afterwards.
 
 `render(element)` returns a linkedom `Document`. Import `render.ts` first, then the component with `await import("./x.tsx")`.
 
@@ -104,7 +107,7 @@ No test loads `lib/supabase/server.ts` or `lib/language.ts`: the route tests get
 ### Fixtures
 
 - **`lib/test/fixtures.ts`** has `testPost(overrides)`: a minimal `Post` with no blocks, submitted by `"owner"`. Unit and component tests override just the fields they are about.
-- **`lib/fixtures.ts`** is the offline preview's data, built on `testPost`. `shell.test.ts` renders the shell on it. `lib/fixtures.test.ts` guards it: every block type, all four banners, exactly three must-reads, unique ids, and negative post ids.
+- **`lib/fixtures.ts`** is the offline preview's data, built on `testPost`. `shell.test.ts` renders the shell on it. `lib/fixtures.test.ts` guards it: every block type, all four banners, exactly three must-reads, unique ids, and negative post and chat-source ids (`previewMySources`, which shows all three states).
 
 ## Conventions
 
@@ -120,6 +123,9 @@ No test loads `lib/supabase/server.ts` or `lib/language.ts`: the route tests get
 - **A linkedom node inside `assert`.** On failure, Node formats the whole document, which takes about 25s and then throws `RangeError: Array buffer allocation failed`. Compare an attribute, `textContent` or a count instead.
 - **An unescaped `[` in a test path** runs 0 tests and exits 0 (How to run).
 - **Import order.** Import `render.ts` or `route-hooks.ts` before the module under test, and load that module with a dynamic `import()`. Otherwise the loader hooks aren't registered yet.
+- **`t.mock.timers.enable()` twice in one test** throws `ERR_INVALID_STATE`, so a helper must not enable it for a test that already has.
+- **A polling store left open.** A test that opens one (`createLinkChat(…).open()`) closes it in `t.after`. Otherwise a failing assertion leaves it polling on real timers, and `node --test` never exits.
+- **Log noise.** In every test whose path logs, mock the `console` method with `t.mock.method` and assert its call count, so the run's output stays free of stderr noise.
 
 ## What isn't automated, and why
 

@@ -91,6 +91,7 @@
 - [x] **Márkanév:** NEON NEWS RADAR
 - [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon összecsukható oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (`/dev/preview`).
 - [x] **Teszt-keményítés és CI** (2026-09-25): route-tesztek a route-teszt réteggel, a `safeFetch` minden hívóhelye, a `fakeDb` szűrői, rögzített blokk-id-k, a `Progress` értéke a képernyőolvasónak, GitHub Actions CI az öt ellenőrzéssel. Terv: [docs/superpowers/plans/2026-09-25-test-hardening.md](docs/superpowers/plans/2026-09-25-test-hardening.md).
+- [x] **Taiyaki link-chat** (2026-09-27): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
@@ -98,6 +99,8 @@
   - [ ] **M2 olvasóeszközök** — terv szükséges. Kiemelés és komment, Key insights, Fogalmak.
     - A teszt-keményítés törölte a `post-article.test.ts`-t (osztálynév-tesztek voltak). Az M2 terv 7. és 10. feladata ezt a fájlt bővíti, ezért ott a fájl újra létrejön a fejlécével: a `testPost` és a `render` importja, és a `renderArticle` segéd.
     - A teszt-keményítés óta a `fakeDb` `rpcError` mezője `PostgrestErrorShape` típusú, ezért az M2 `rpcError`-fixture-jei a `pgError(...)`-t használják. Az M2 terv `rpcError: { code: "XX000", message: "boom" }` sora (`reader-tools-m2.md:4043`) így `rpcError: pgError("XX000", "boom")` lesz, különben a `tsc` TS2739-cel bukik.
+    - A taiyaki link-chat óta a `post-article.tsx` `copy`-jában nincs `kind`: a forrástípus jelvénye a `SOURCE_KIND_LABELS`-ből jön (`lib/source-kinds.ts`). A `labels.keyPoints` megmaradt.
+    - A poszt-oldal forrástípus-jelvényének tesztje az újra létrejövő `post-article.test.ts`-be kerül: ma egyetlen automata teszt sem rögzíti, hogy a jelvény a `SOURCE_KIND_LABELS[post.kind][language]`.
 - [ ] **2. Privát gyűjtemény:** linkek, idézetek (a kiemelésekből is), toolok, jegyzetek; címkék, Inbox / Később / Archív, keresés, export.
 - [ ] **3. Statisztika oldal:** heti mentések, hőtérkép, top források, címkézetlen és halott linkek.
 - [ ] **4. Discord-bemenet:** slash-parancs és üzenet-menü, ugyanarra a mentési útvonalra.
@@ -148,15 +151,30 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
-- [ ] **Taiyaki link-chat** (döntve 2026-09-25, az UX-A után, az M2 előtt). Egy taiyaki-ikonos buborék: asztalon a jobb alsó sarokban lebeg, mobilon az alsó sáv kiemelt középső gombja, az Archívum pedig átkerül a „Több” panelbe. Megnyitva mini chat nyílik: egy link és egy opcionális megjegyzés, a válasz élő állapottal. A specifikáció: `docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md`.
+- [ ] **Élő próbák a taiyaki link-chat deployja után** (a kontroller futtatja, ha a felhasználó engedélyez egy bejelentkezett munkamenetet):
+  - egy valódi link beküldése a chatből, és a szál „FELDOLGOZÁS…” → „KÉSZ · MEGNYITÁS →” váltása a poszt címével (a `posts(...)` beágyazás objektumként jön-e);
+  - egy hibás beküldés „Újra”-ja (a sor `attempts` értéke 0 lesz, aztán 1);
+  - egy már bent lévő link 409-e a „MEGNYITÁS →”-sal;
+  - az `/archive` oldalon a „Több” aktív jelölése mobilon;
+  - a lekérdezés leáll a panel bezárása után (`browser_network_requests`).
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
   Emellett jobb visszajelző effektek és további javítások. Előbb egy átvilágítás az egész appon: Playwright-mérések 360/768/1280 px-en és a lassú pontok felmérése. Ebből lesz egy jóváhagyandó terv.
+  - A taiyaki link-chatből ide parkolt tételek:
+    - lassú küldésnél azonnal jelenjen meg egy „küldés…” buborék (optimista);
+    - ink oldalon (Library, Archívum) a sarokgomb ink kerete és árnyéka eltűnik;
+    - ha a gomb után semmi nem kapható fókuszba, az előre Tab a gomb és a panel között körbejár;
+    - a Radar olvasópanelje saját Tab-hurkot tart; ha ezt javítjuk, a `tabPastPanel` közös helyre költözik;
+    - `md` és `2xl` között a Radar olvasópanelje eltakarja a chat panelt és a sarokgombot;
+    - a `loginHref` elhagyja a query stringet (`/login?next=` csak az útvonalat kapja);
+    - iOS safe area: nincs `viewport-fit=cover`, ezért a Safariban minden `env(safe-area-inset-bottom)` 0;
+    - az sr-only beszélő-előtag szóköze nem jut el a Chrome akadálymentességi fájába (a csomópontok amúgy is külön vannak);
+    - a chat mezőjén a stock `Textarea` `shadow-xs`-e: a lenti fix(ui) pont része.
 - [ ] **`/glossary` a főmenübe** (döntve 2026-09-25, az M2 után): egy nem elsődleges tétel a `lib/nav.ts`-ben, a tesztjei bővítésével.
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
-  - A saját beküldés „Újra” gombja a taiyaki link-chattel érkezik. A „Törlés” és az admin-rész marad itt.
+  - [x] A saját beküldés „Újra” gombja kész: a taiyaki link-chatben (`POST /api/sources/[id]/retry`). A „Törlés” és az admin-rész marad itt.
 - [ ] **Lassú archívum** (a felhasználó jelezte 2026-09-25-én): a „Heti archívum” sokáig tölt. Kijelentkezve a szerver gyors (0,13–0,7 mp), ezért az ok a bejelentkezett úton vagy a route hideg indulásában lehet. A kivizsgáláshoz bejelentkezett mérés kell: engedély egy egyszeri teszt-munkamenetre, vagy a megfigyelésed (minden kattintásnál lassú-e, hány másodperc, mi látszik közben).
 - [ ] **Hibajelzés.** Ha a napi futás elbukik (Gemini-limit, lejárt kulcs), senki nem kap értesítést. Telegram-bot vagy email kellene. Addig a hiba a Vercel cron-logjában látszik.
 - [ ] **GitHub-token lejárat-figyelmeztető** (a GitHub-archívumhoz és a `GITHUB_TOKEN`-hez).
@@ -196,9 +214,13 @@
 - [ ] **DNS rebinding** elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.
 - [ ] **Kevesebb getClaims() kérésenként.** A UI/UX A óta kérésenként három fut: a `proxy.ts`-é, az `(app)` layout `getViewer()`-e és az oldal `getReader()`-e. Ha a `getReader`-t és a `getViewer`-t React `cache()`-be csomagoljuk (`lib/supabase/server.ts`), a layout és az oldal egy hívást oszt meg, így kettő marad (a proxy külön fut, azt a `cache()` nem éri el).
 - [ ] **Elvész a fókusz** egy teendő törlése és a „+ teendő” után: a billentyűzettel dolgozó olvasónak újra kell keresnie a helyét.
-- [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, és az ikonsáv gombjainak osztálylistái.
+- [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, az ikonsáv gombjainak osztálylistái, és az aktív menüpont osztálytöredéke a „Több” panelben (`app-shell.tsx`) és az oldalsávban (`desktop-nav.tsx`).
+- [ ] **Közös `createStore`.** A listeners / `subscribe` / `getSnapshot` váz már háromszor van meg (`reader-store`, `undo-queue`, `link-chat`).
+- [ ] **A `submit-form.tsx`-nek nincs komponenstesztje.**
+- [ ] **Ismétlődő route-farok a jscpd küszöbe alatt:** az elfogad-és-ütemez vég (`after(() => processSource(…))` + 202) háromszor, a `MAP[result] → jsonError` négyszer.
+- [ ] **A `fakeDb` `splitColumns`-a nem érti a `!inner`-t** (és az `alias:col` formát sem); az M2-nek kell.
 - [ ] Signal-narancs szöveg paper/cream háttéren 2,7–2,9:1, kis szövegnél WCAG AA alatt; márka-döntés kell: sötétebb árnyalat kis szövegre vagy csak nagy/díszítő használat.
-- [ ] fix(ui): a DESIGN.md-ben felsorolt eltérések: checkbox `rounded-none shadow-none` (`reader-panel.tsx:104`), Sheet/Input/Checkbox/pill homályos árnyéka, `PageHero` címe `cqi`-re (a szakasz már `@container`).
+- [ ] fix(ui): a DESIGN.md-ben felsorolt eltérések: checkbox `rounded-none shadow-none` (`reader-panel.tsx:104`), Sheet/Input/Textarea/Checkbox/pill homályos árnyéka, `PageHero` címe `cqi`-re (a szakasz már `@container`).
 - [ ] **Playwright e2e a CI-ban** — opció, nincs jóváhagyva (2026-09-25).
   - Ára: új devDependency (`@playwright/test`, pontos és legalább 7 napos verzió, a lockfile-lal együtt), egy Chromium-letöltés a lockfile-on kívül (a csomag verziója rögzíti, CI-cache kell hozzá), `next dev` a CI-ban (a `/dev/preview` csak fejlesztői módban él), és a flaky tesztek kockázata.
   - Haszna: a billentyűparancsok, a visszavonás-csík szünete és 5 s-os véglegesítése, a dupla kattintásos törlés, a panel fókusza, a `&fail=1` visszaállás, a konzol- és hidratációs hibák, és a 360 / 768 / 1280 px-es vízszintes görgetés automatikus ellenőrzése (`.superpowers/sdd/test-audit.md`, 4. és 5. fejezet).

@@ -9,7 +9,7 @@ NEON NEWS RADAR is a private, invite-only AI-research hub in Hungarian and Engli
 Each job has its own view, and each view is fed by a writer that runs on the server. Nothing runs on a personal machine. Vercel hosts the app and schedules its work, and Supabase holds the data, the auth and the mirrored images.
 
 - **The Radar** is the weekly digest. Every morning Vercel Cron calls `GET /api/cron/daily`. `runDaily` collects candidates from RSS/Atom feeds, Hacker News and GitHub. A cheap model cuts a long list down, a stronger one scores the candidates and writes them up in both languages, and the result goes into the current ISO week's issue.
-- **The Library** holds the members' links. A reader submits a URL on `/library`, and `POST /api/sources` stores it. After the response, `processSource` turns it into a post. A kind-specific extractor reads it, noise filtering cleans it, its images are mirrored, and a model writes a bilingual summary. A page that asks not to be archived gets notes in the model's own words instead. Every source becomes the same typed block model (`lib/blocks.ts`), and the post page renders nothing else.
+- **The Library** holds the members' links. A reader submits a URL on `/library` or in the taiyaki link chat on any page, and `POST /api/sources` stores it. After the response, `processSource` turns it into a post. A kind-specific extractor reads it, noise filtering cleans it, its images are mirrored, and a model writes a bilingual summary. A page that asks not to be archived gets notes in the model's own words instead. Every source becomes the same typed block model (`lib/blocks.ts`), and the post page renders nothing else.
 
 Two Supabase keys split the trust. Pages and reader API routes act as the signed-in reader: they use the publishable key, so row-level security applies. The pipeline writes content with the secret key, which bypasses RLS. A reader writes only three things: their own read, saved and to-do rows, the `sources` row of a submission, and, as the submitter, a post's title, summary and hidden blocks, which go through one checked RPC. Models (Gemini and Groq) are plain `fetch` calls behind `generate()`. Which model runs which task is data in the `model_settings` table, not code.
 
@@ -20,20 +20,20 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 - `app/(app)/` holds the signed-in pages (`/`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list.
 - The rest of `app/`, outside the group:
   - `login/` and `auth/` (login, callback, signout);
-  - `api/`: state, sources, `posts/[id]` (PATCH, translate, reextract) and `cron/daily`;
+  - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract) and `cron/daily`;
   - `media/[...path]/`, which serves the mirrored images to signed-in readers;
   - `dev/preview/`, the offline preview on fixtures;
   - the error, not-found and manifest files;
   - `layout.tsx`, which sets `robots: noindex`;
   - `globals.css`, the theme (DESIGN.md).
 - `app/components/` has the shared UI:
-  - the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts`, `shell-dialogs`, `undo-toast`;
+  - the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts`, `shell-dialogs`, `undo-toast`, and the link chat: `link-chat` (the taiyaki button and panel), `chat-thread`, `taiyaki-icon`;
   - the language: `language-context`, `language-toggle`;
   - the Radar: `digest-dashboard`, `story-card`, `reader-panel`, `tag`;
   - the title bands: `page-header` (`PageHero`, `StatusCard`);
   - the post renderer: `post-blocks`, `post-image`;
   - the hooks: `use-reader-state`, `use-shortcuts`, `use-model-context-tools`.
-- `components/ui/` holds vendored shadcn components on the unified `radix-ui` package. A few are hand-patched (CLAUDE.md → Hand-authored components). Most aren't used yet and are kept for the UI/UX milestones. `hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel still uses it.
+- `components/ui/` holds vendored shadcn components on the unified `radix-ui` package. A few are hand-patched (CLAUDE.md → Hand-authored components). Most aren't used yet and are kept for the UI/UX milestones. `hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel and the link chat use it.
 - `lib/pipeline/` holds the two writers:
   - the Radar: `daily.ts`, `collect.ts`, `feeds.ts`;
   - the Library: `ingest.ts` (`processSource`, `retryPendingSources`), and `extract/` with one extractor per source kind, where `index.ts` holds the fallback chain;
@@ -43,11 +43,12 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `fetch.ts` (`safeFetch`, `apiFetch`) and `util.ts` (ids, URL parsing and small shared helpers).
 - The rest of `lib/`:
   - the block model, `blocks.ts`;
-  - `post-view.ts`, which turns a post row into the page's `Post`;
+  - `post-view.ts`, which turns a post row into the page's `Post` (`shownTitle` is the title readers see);
   - the submitter's edits: `post-edit.ts`, `overrides.ts`;
   - `translate.ts` and the model client, `llm.ts`;
   - `content.ts`, which turns DB rows into content types;
   - reader state: `reader-store.ts`, `state.ts`, `feed.ts`;
+  - the link chat: `link-chat.ts` (the message parser, the thread and its store, the HTTP and in-memory transports), `my-sources.ts` (the reader's own submissions and their retry), `source-kinds.ts` (the kind names, `SOURCE_KIND_LABELS`);
   - the shell's data: `nav.ts`, `nav-mode.ts`, `keymap.ts`, `undo-queue.ts`;
   - `media.ts` (the bucket and its key format), `public-paths.ts`, `api.ts` (`jsonError`, `postRoute`), `language.ts`;
   - `supabase/server.ts`, the Supabase clients;
@@ -74,11 +75,12 @@ Breaking one of these is a bug even when every test passes.
 - **Every user-supplied or page-derived URL is fetched through `safeFetch`** (SECURITY.md → SSRF).
 - **The offline preview never reaches real data.** Local dev points at the production project, so preview writes send nothing:
   - reader state goes through `memorySend`;
-  - the Library form goes through an in-memory stub (`preview` on `LibraryView`);
+  - the Library form goes through `memoryTransport` with no seed (`preview` on `LibraryView`);
+  - the link chat goes through `memoryTransport` (`chatPreview` on `AppShell`, seeded from `previewMySources`);
   - the post page's `MarkPostRead` gets `preview`;
   - under `fail=1`, every write fails.
 
-  The preview post ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Translate or a Library card link can't reach a real post. The preview isn't a sandbox, though: the app shell's own links and Sign out are the real ones, so with a local session they leave the preview for real pages, real data and a real sign-out.
+  The preview post and chat-source ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Translate, Retry or a Library card link can't reach a real row. The preview isn't a sandbox, though: the app shell's own links and Sign out are the real ones, so with a local session they leave the preview for real pages, real data and a real sign-out.
 - **`robots: noindex` and the invite gate are load-bearing, not cosmetic.** The Library mirrors other people's articles, and those two are what keep that defensible (README.md → Content and copyright). SECURITY.md covers how the gate is enforced. A `noarchive` page is never mirrored (CLAUDE.md → How content gets in, step 3).
 
 ## Boundaries
@@ -86,7 +88,7 @@ Breaking one of these is a bug even when every test passes.
 - **`lib/` and `app/`.** `lib/` never imports from `app/`, and it loads without Next.js, except for the three Next-only server modules named in CODE_STYLE.md → Imports. `app/` is routes and components. It keeps its logic thin, so that the logic sits in a `lib/` function that a unit test can reach.
 - **Server and client components.** Pages, the post article and the Library and Archive lists are server components. `"use client"` marks the interactive leaves, such as the shell, the Radar dashboard, the language toggle, the submit form, the editor and the toolbar. A presentational component that both sides render stays hook-free (`post-blocks.tsx`, `page-header.tsx`), and its one stateful piece is split out (`post-image.tsx`).
 - **Reader and admin client.** `lib/supabase/server.ts` creates both, and SECURITY.md → Reader vs admin client says which code may use which.
-- **Pipeline and routes.** A route authenticates, parses, calls `lib/` and maps the result to JSON. Ingest (`processSource`, from the sources and reextract routes) runs in `after()`, once the response has been sent. The cron and translate routes do their work inside the request, because the result is their answer.
+- **Pipeline and routes.** A route authenticates, parses, calls `lib/` and maps the result to JSON. Ingest (`processSource`, from the sources, reextract and `sources/[id]/retry` routes) runs in `after()`, once the response has been sent. The cron and translate routes do their work inside the request, because the result is their answer.
 
 ## Cross-cutting concerns
 
