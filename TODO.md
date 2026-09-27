@@ -217,6 +217,7 @@
 - [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, az ikonsáv gombjainak osztálylistái, és az aktív menüpont osztálytöredéke a „Több” panelben (`app-shell.tsx`) és az oldalsávban (`desktop-nav.tsx`).
 - [ ] **Közös `createStore`.** A listeners / `subscribe` / `getSnapshot` váz már háromszor van meg (`reader-store`, `undo-queue`, `link-chat`).
 - [ ] **A `submit-form.tsx`-nek nincs komponenstesztje.**
+- [ ] **Zajos tesztkimenet.** Az `npm test` ma kb. 65 sort ír ki régebbi tesztekből (a pipeline, a fordítás és a route-ok hibanaplói). Ezekben is mockolni kell a `console`-t `t.mock.method`-dal, és ellenőrizni a hívásszámot (TESTING.md → Pitfalls, Log noise).
 - [ ] **Ismétlődő route-farok a jscpd küszöbe alatt:** az elfogad-és-ütemez vég (`after(() => processSource(…))` + 202) háromszor, a `MAP[result] → jsonError` négyszer.
 - [ ] **A `fakeDb` `splitColumns`-a nem érti a `!inner`-t** (és az `alias:col` formát sem); az M2-nek kell.
 - [ ] Signal-narancs szöveg paper/cream háttéren 2,7–2,9:1, kis szövegnél WCAG AA alatt; márka-döntés kell: sötétebb árnyalat kis szövegre vagy csak nagy/díszítő használat.

@@ -125,7 +125,8 @@ No test loads `lib/supabase/server.ts` or `lib/language.ts`: the route tests get
 - **Import order.** Import `render.ts` or `route-hooks.ts` before the module under test, and load that module with a dynamic `import()`. Otherwise the loader hooks aren't registered yet.
 - **`t.mock.timers.enable()` twice in one test** throws `ERR_INVALID_STATE`, so a helper must not enable it for a test that already has.
 - **A polling store left open.** A test that opens one (`createLinkChat(…).open()`) closes it in `t.after`. Otherwise a failing assertion leaves it polling on real timers, and `node --test` never exits.
-- **Log noise.** In every test whose path logs, mock the `console` method with `t.mock.method` and assert its call count, so the run's output stays free of stderr noise.
+- **Log noise.** A new or changed test whose path logs mocks the `console` method with `t.mock.method` and asserts its call count, so it adds nothing to the run's output. Older tests still print about 65 stray lines (TODO.md → Technikai adósság).
+- **An occluded Playwright window.** A browser window behind others throttles `requestAnimationFrame` to about 1 fps and delays `ResizeObserver`, so scroll and resize measurements come out wrong. Call `page.bringToFront()` first, or check that `requestAnimationFrame` runs at full rate.
 
 ## What isn't automated, and why
 
