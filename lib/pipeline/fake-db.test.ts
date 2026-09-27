@@ -98,3 +98,36 @@ test("sourceUpdateError makes a sources update fail without touching the row, bu
   assert.deepEqual(tables.sources, [{ id: 5, status: "failed" }]);
   assert.deepEqual(db.sourceUpdates, [{ status: "pending" }]);
 });
+
+// Kills a select chain that ignores its filters (every row answers), a `like` read as equality, and one
+// that records nothing: the loaders' tests read the query they sent from `queries`.
+test("any other table's select filters its rows by eq and like, and records every call in order", async () => {
+  const rows = [
+    { item_id: "local-2026w39-a-1", is_read: true },
+    { item_id: "local-2026w39-b-2", is_read: false },
+    { item_id: "local-2026w38-c-3", is_read: true },
+    { item_id: "post:12", is_read: true },
+  ];
+  const db = fakeDb(undefined, { rows: { item_states: rows } });
+  const { data } = await db.from("item_states").select("item_id, is_read").like("item_id", "%-2026w39-%").eq("is_read", true).order("item_id", { ascending: false });
+  assert.deepEqual(data, [rows[0]]);
+  assert.deepEqual(db.queries, [
+    { table: "item_states", calls: [["select", "item_id, is_read"], ["like", "item_id", "%-2026w39-%"], ["eq", "is_read", true], ["order", "item_id", { ascending: false }]] },
+  ]);
+});
+
+// Kills maybeSingle() answering the whole list, or no row as `undefined` instead of null.
+test("any other table's maybeSingle() answers the first matching row, or null", async () => {
+  const db = fakeDb(undefined, { rows: { issues: [{ id: "2026-W38" }, { id: "2026-W39" }] } });
+  assert.deepEqual((await db.from("issues").select("id").eq("id", "2026-W39").maybeSingle()).data, { id: "2026-W39" });
+  assert.deepEqual(await db.from("issues").select("id").eq("id", "2026-W40").maybeSingle(), { data: null, error: null });
+});
+
+// Kills a tableErrors knob that only one of the two endings honours, or that leaks into another table.
+test("tableErrors fails that table's select, awaited or through maybeSingle(), and no other table's", async () => {
+  const error = pgError("08006", "connection failure");
+  const db = fakeDb(undefined, { rows: { todos: [{ id: 1 }] }, tableErrors: { issues: error } });
+  assert.deepEqual(await db.from("issues").select("id").order("id"), { data: null, error });
+  assert.deepEqual(await db.from("issues").select("id").limit(1).maybeSingle(), { data: null, error });
+  assert.deepEqual(await db.from("todos").select("id"), { data: [{ id: 1 }], error: null });
+});

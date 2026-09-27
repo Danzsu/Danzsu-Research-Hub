@@ -40,8 +40,11 @@ export type FakeIngestTables = {
   /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g.
    *  `pgError("42501", …)` for the `update_post_overrides` "not the submitter" case. */
   rpcError?: PostgrestErrorShape;
-  /** Rows any other table's `select().gte()` resolves to, by table name (runDaily's recent-items lookup). */
+  /** Rows any other table's select chain answers from, by table name: `issues`, `item_states`, `todos`,
+   *  `archive_issues`, runDaily's recent-items lookup on `digest_items` (see `tableQuery`). */
   rows?: Record<string, Record<string, unknown>[]>;
+  /** Forces any other table's select, by table name, to resolve with this error instead of its rows. */
+  tableErrors?: Record<string, PostgrestErrorShape>;
 };
 
 export type FakeIngestDb = SupabaseClient & {
@@ -75,6 +78,9 @@ export type FakeIngestDb = SupabaseClient & {
   upserts: { table: string; values: unknown; options: Record<string, unknown> }[];
   /** Every `select().gte(column, value)` against a table other than `posts`/`sources`, in call order. */
   gteCalls: { table: string; column: string; value: unknown }[];
+  /** Every select chain against a table other than `model_settings`/`sources`/`posts`, in call order:
+   *  each method with its arguments, from `["select", columns]` to the last one. */
+  queries: { table: string; calls: ChainCall[] }[];
   /** Every write across every table/bucket above, plus any `"fetch"` entries a test's own mockFetch
    *  handler chooses to push (same array — `db.writes`), in the single order it actually happened.
    *  For cross-operation ordering assertions, e.g. "attempts is bumped before the first fetch". */
@@ -87,6 +93,9 @@ export type PostgrestErrorShape = { code: string; message: string; details: stri
 export const pgError = (code: string, message: string, details: string | null = null): PostgrestErrorShape => ({ code, message, details, hint: null });
 
 type Filter = { column: string; op: "eq" | "neq" | "lt"; value: unknown };
+
+/** One call on a select chain, as `queries` records it: the method, then its arguments. */
+type ChainCall = [method: string, ...args: unknown[]];
 
 /** Whether `row` passes `filter` as PostgREST compares it. A column the fixture never set passes every
  *  filter, so a sparse fixture (`{ id: 1 }`) still stands in for whichever row a test needs. SQL's
@@ -154,6 +163,52 @@ function sourcesQuery(
     },
   };
   return query;
+}
+
+/** SQL `LIKE`, as PostgREST's `like` applies it: `%` is any run of characters, `_` any one. */
+export function likes(value: string, pattern: string): boolean {
+  const regex = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replaceAll("%", ".*").replaceAll("_", ".");
+  return new RegExp(`^${regex}$`, "s").test(value);
+}
+
+/** Any other table's select chain, over `rows`. `eq`/`neq`/`lt` (see `passes`) and `like` filter them;
+ *  `order`, `limit` and embeds are only recorded, because what they do is the database's job. Awaited it
+ *  answers the matching rows, `maybeSingle()` the first or null, and `error` answers both. Every call
+ *  lands in `calls`, in order. */
+function tableQuery(rows: Record<string, unknown>[], error: PostgrestErrorShape | undefined, calls: ChainCall[], onGte: (column: string, value: unknown) => void) {
+  const kept: ((row: Record<string, unknown>) => boolean)[] = [];
+  const answer = (pick: (rows: Record<string, unknown>[]) => unknown) =>
+    error ? { data: null, error } : { data: pick(rows.filter((row) => kept.every((keep) => keep(row)))), error: null };
+  const record = (method: string, ...args: unknown[]) => {
+    calls.push([method, ...args]);
+    return chain;
+  };
+  const filter = (op: Filter["op"]) => (column: string, value: unknown) => {
+    kept.push((row) => passes(row, { column, op, value }));
+    return record(op, column, value);
+  };
+  const chain = {
+    eq: filter("eq"),
+    neq: filter("neq"),
+    lt: filter("lt"),
+    like: (column: string, pattern: string) => {
+      kept.push((row) => !(column in row) || likes(String(row[column]), pattern));
+      return record("like", column, pattern);
+    },
+    gte: (column: string, value: unknown) => {
+      onGte(column, value);
+      return record("gte", column, value);
+    },
+    order: (...args: unknown[]) => record("order", ...args),
+    limit: (...args: unknown[]) => record("limit", ...args),
+    maybeSingle: async () => {
+      calls.push(["maybeSingle"]);
+      return answer((matched) => matched[0] ?? null);
+    },
+    then: (onFulfilled: (result: UpdateResult) => unknown, onRejected?: (reason: unknown) => unknown) =>
+      Promise.resolve(answer((matched) => matched)).then(onFulfilled, onRejected),
+  };
+  return chain;
 }
 
 type UpdateResult = { data: unknown; error: unknown };
@@ -241,7 +296,8 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * caught the same way a real PostgREST query would catch it. A `sources` update applies its `.eq`
  * filters and writes through, so a later select sees it — unless `sourceUpdateError` is set, when it
  * fails instead and the row is left untouched; the attempted payload is still recorded either way.
- * Any other table only upserts (recorded on `.upserts`) and answers `select().gte()` from `tables.rows`.
+ * Any other table upserts (recorded on `.upserts`), and its select chain answers from `tables.rows`, or
+ * fails with `tables.tableErrors`, recording every call on `.queries` (`tableQuery`).
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it,
  * `list` reflects it, and `download` answers an object it holds with the object's own path as its
  * bytes, so a test can mirror an image and then see it (or its absence) in a later list.
@@ -269,6 +325,7 @@ export function fakeDb(
   const rpcCalls: FakeIngestDb["rpcCalls"] = [];
   const upserts: FakeIngestDb["upserts"] = [];
   const gteCalls: FakeIngestDb["gteCalls"] = [];
+  const queries: FakeIngestDb["queries"] = [];
   const objects = new Set(tables.media ?? []);
   let postSelectCalls = 0;
 
@@ -380,12 +437,11 @@ export function fakeDb(
         upserts.push({ table, values, options: options ?? {} });
         return { data: null, error: null };
       },
-      select: () => ({
-        gte: async (column: string, value: unknown) => {
-          gteCalls.push({ table, column, value });
-          return { data: tables.rows?.[table] ?? [], error: null };
-        },
-      }),
+      select: (columns = "*") => {
+        const calls: ChainCall[] = [["select", columns]];
+        queries.push({ table, calls });
+        return tableQuery(tables.rows?.[table] ?? [], tables.tableErrors?.[table], calls, (column, value) => gteCalls.push({ table, column, value }));
+      },
     };
   };
 
@@ -445,5 +501,6 @@ export function fakeDb(
     rpcCalls,
     upserts,
     gteCalls,
+    queries,
   } as unknown as FakeIngestDb;
 }
