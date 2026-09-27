@@ -140,6 +140,8 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
               <span className="text-signal">{"//"}</span>
             </SheetTitle>
           </SheetHeader>
+          {/* The active entry is ink with a signal bar and wash, like the sidebar's: small signal text on cream
+              is under 3:1 (DESIGN.md → Colors). The bar hangs in the sheet's padding, so the icons stay in line. */}
           <ul className="border-b-2 border-ink pb-4">
             {MOBILE_MORE_NAV.map((item) => (
               <li key={item.id}>
@@ -148,7 +150,7 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
                   active={active === item.id}
                   onSearch={onSearch}
                   onClick={() => setMoreOpen(false)}
-                  className="focus-ring flex min-h-10 items-center gap-3 font-mono text-sm aria-[current=page]:text-signal"
+                  className="focus-ring -ml-3.5 flex min-h-10 items-center gap-3 border-l-2 border-transparent pl-3 font-mono text-sm aria-[current=page]:border-signal aria-[current=page]:bg-signal/10"
                   iconClass="size-4"
                 />
               </li>
