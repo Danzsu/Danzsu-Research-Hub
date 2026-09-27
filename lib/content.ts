@@ -37,7 +37,8 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
     .order("must_read", { ascending: false, referencedTable: "digest_items" })
     .order("score", { ascending: false, referencedTable: "digest_items" })
     .order("rank", { referencedTable: "github_top" });
-  const { data: latest, error } = await (issueId ? issues.eq("id", issueId) : issues.order("id", { ascending: false }).limit(1)).maybeSingle();
+  const query = issueId ? issues.eq("id", issueId) : issues.order("id", { ascending: false }).limit(1);
+  const { data: latest, error } = await query.maybeSingle();
   if (error) throw new Error(`radar query failed: ${error.message}`, { cause: error });
   if (issueId && !latest) return null;
 
