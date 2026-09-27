@@ -115,13 +115,12 @@ test("the thread is a polite live region, and the taiyaki inside it is decorativ
   assert.deepEqual([icon?.getAttribute("aria-hidden"), icon?.getAttribute("viewBox")], ["true", "0 0 64 64"]);
 });
 
-// I1: "FELDOLGOZÁS…" reads as plain status text, not a link — DESIGN.md → Colors reserves the
-// underline for something clickable, and this label opens nothing.
-test("the processing label isn't styled like a link", () => {
-  const doc = thread();
-  const label = [...doc.querySelectorAll("p")].find((p) => (p.textContent ?? "").includes("FELDOLGOZÁS"))?.querySelector("span:last-child");
-  assert.equal(label?.classList.contains("underline"), false);
-  assert.equal(label?.classList.contains("text-ink/70"), true);
+// I1: "FELDOLGOZÁS…" is a status, not an action: it opens nothing. Kills the label wrapped in a link
+// or a button. That it isn't underlined like one is CSS, which Playwright checks (TESTING.md → Conventions).
+test("the processing label is plain status text, not a link or a button", () => {
+  const labels = [...thread().querySelectorAll("span")].filter((span) => span.textContent === "FELDOLGOZÁS…");
+  assert.equal(labels.length, 1);
+  assert.equal(labels[0].closest("a, button")?.tagName, undefined);
 });
 
 // M3: while nothing has loaded yet, exactly one "loading" taiyaki shows, and it never sits beside a
