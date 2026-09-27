@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -114,17 +114,13 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
   const snapshot = useSyncExternalStore(chat.subscribe, chat.getSnapshot, chat.getSnapshot);
   const [text, setText] = useState("");
   const input = useRef<HTMLTextAreaElement>(null);
-  const scroller = useRef<HTMLDivElement>(null);
-  // The thread follows a change only for a reader at its end (within 40px, as of their last scroll) or
-  // one whose own send or retry is on its way: someone who scrolled up to read stays where they are.
+  // The reader is at the thread's end (within 40px, as of their last scroll): only then does it follow
+  // what grows, so someone who scrolled up to read stays where they are.
   const nearEnd = useRef(true);
-  const ownActions = useRef(0);
-  // Until the first list lands, a change jumps like the open does; after it, a new message glides.
-  const glides = useRef(false);
+  // Set by the reader's own send and used up by the next change the thread follows: a flag the observer
+  // consumes, not a count of sends in flight, so nothing hangs on when React flushes the store's updates.
+  const pinNext = useRef(false);
   const t = copy[language];
-  // The newest id, not the count: the thread is capped at MINE_LIMIT, so a new send can leave the count as it was.
-  const newest = snapshot.sources?.[0]?.id;
-  const loaded = snapshot.sources !== null;
 
   useEffect(() => {
     if (!open) return;
@@ -132,26 +128,27 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
     return () => chat.close();
   }, [open, chat]);
 
-  useEffect(() => {
-    const thread = scroller.current;
-    if (thread && (nearEnd.current || ownActions.current > 0)) {
-      // "auto" follows `scroll-smooth`, which globals.css turns into a jump under prefers-reduced-motion.
-      thread.scrollTo({ top: thread.scrollHeight, behavior: glides.current ? "auto" : "instant" });
-    }
-    glides.current = loaded;
-  }, [newest, snapshot.notices.length, snapshot.unreachable, loaded]);
-
-  async function byReader<T>(action: () => Promise<T>): Promise<T> {
-    ownActions.current++;
-    try {
-      return await action();
-    } finally {
-      ownActions.current--;
-    }
-  }
+  // Every size change keeps the end in view for a reader who is there: a new reply, one that grows in
+  // place (pending → done), the field growing, the keyboard or the window shrinking the panel. The scroll
+  // is instant, because a glide's own scroll events would read as the reader leaving the end.
+  const followThread = useCallback((thread: HTMLDivElement | null) => {
+    if (!thread) return;
+    // Each open mounts a fresh thread, and it opens at the latest message.
+    nearEnd.current = true;
+    const observer = new ResizeObserver(() => {
+      if (!nearEnd.current && !pinNext.current) return;
+      pinNext.current = false;
+      thread.scrollTop = thread.scrollHeight;
+    });
+    observer.observe(thread);
+    // The wrapper, not the list: ChatThread's list is keyed on its first load, so it is replaced then.
+    if (thread.firstElementChild) observer.observe(thread.firstElementChild);
+    return () => observer.disconnect();
+  }, []);
 
   async function send() {
-    if (!(await byReader(() => chat.send(text)))) return;
+    pinNext.current = true;
+    if (!(await chat.send(text))) return;
     setText("");
     // Send pressed from the keyboard has the focus; the next link goes in the field.
     input.current?.focus();
@@ -166,9 +163,6 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           input.current?.focus();
-          // The portalled thread only mounts now, after the effect above ran: open at the latest message.
-          nearEnd.current = true;
-          scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "instant" });
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
@@ -186,20 +180,22 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
           <SheetTitle className="font-mono text-xs tracking-[0.14em] text-paper">{t.title}</SheetTitle>
         </SheetHeader>
         <div
-          ref={scroller}
+          ref={followThread}
           onScroll={(event) => {
             const thread = event.currentTarget;
             nearEnd.current = thread.scrollHeight - thread.scrollTop - thread.clientHeight <= 40;
           }}
-          className="min-h-0 flex-1 overflow-y-auto scroll-smooth p-4"
+          className="min-h-0 flex-1 overflow-y-auto"
         >
-          <ChatThread
-            language={language}
-            snapshot={snapshot}
-            loginHref={`/login?next=${encodeURIComponent(pathname)}`}
-            onRetry={(sourceId) => void byReader(() => chat.retry(sourceId))}
-            onOpenPost={isMobile ? () => onOpenChange(false) : undefined}
-          />
+          <div className="p-4">
+            <ChatThread
+              language={language}
+              snapshot={snapshot}
+              loginHref={`/login?next=${encodeURIComponent(pathname)}`}
+              onRetry={(sourceId) => void chat.retry(sourceId)}
+              onOpenPost={isMobile ? () => onOpenChange(false) : undefined}
+            />
+          </div>
         </div>
         <form
           onSubmit={(event) => {
