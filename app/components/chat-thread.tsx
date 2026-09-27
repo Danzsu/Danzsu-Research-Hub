@@ -114,7 +114,12 @@ type ThreadActions = {
   onOpenPost?: () => void;
 };
 
-function Reply({ entry, retrying, language, onRetry, onOpenPost }: ThreadActions & { entry: ChatEntry; retrying: boolean }) {
+/** A refused ÚJRA's reply scrolls just far enough to show when it lands out of view (ÚJRA clicked at the
+ *  scroller's edge). Module-level, so React calls it once, when the reply mounts, not on every render. */
+const revealRefusal = (reply: HTMLDivElement | null) => reply?.scrollIntoView({ block: "nearest" });
+
+function Reply({ entry, retrying, refusal, ...actions }: ThreadActions & { entry: ChatEntry; retrying: boolean; refusal?: ChatNotice }) {
+  const { language, onRetry, onOpenPost } = actions;
   const t = copy[language];
   const { reply } = entry;
   if (reply.state === "pending") {
@@ -149,6 +154,12 @@ function Reply({ entry, retrying, language, onRetry, onOpenPost }: ThreadActions
       >
         {retrying ? t.retrying : t.retry}
       </Button>
+      {/* Right under the button the reader clicked, in the thread's live region (spec 4). */}
+      {refusal && (
+        <div ref={revealRefusal} className="mt-2">
+          <NoticeText notice={refusal} {...actions} />
+        </div>
+      )}
     </>
   );
 }
@@ -181,7 +192,7 @@ function NoticeText({ notice, language, loginHref, onOpenPost }: ThreadActions &
 }
 
 /** The thread: the greeting, the reader's own submissions (oldest first) with the taiyaki's replies, then the local replies. */
-export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "retrying"> }) {
+export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "retrying" | "retryNotices"> }) {
   const { language } = actions;
   const t = copy[language];
   // Nothing has answered yet, and no local reply or the unreachable line already covers it: one
@@ -207,7 +218,7 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
         <li key={entry.id} className="space-y-2">
           <Mine entry={entry} language={language} />
           <Taiyaki language={language}>
-            <Reply entry={entry} retrying={snapshot.retrying.includes(entry.id)} {...actions} />
+            <Reply entry={entry} retrying={snapshot.retrying.includes(entry.id)} refusal={snapshot.retryNotices[entry.id]} {...actions} />
           </Taiyaki>
         </li>
       ))}

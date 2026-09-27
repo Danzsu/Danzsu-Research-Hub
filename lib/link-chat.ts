@@ -69,7 +69,8 @@ export function toThread(sources: MySource[]): ChatEntry[] {
   }));
 }
 
-/** A local reply: it goes to the end of the thread, lives as long as the panel stays open, and is never saved. */
+/** A local reply: it goes to the end of the thread (a refused "Újra" into its own entry), lives as long as
+ *  the panel stays open, and is never saved. */
 export type ChatNotice =
   | { kind: "no_link" | "more_links" | "invalid_url" | "network" | "signed_out" }
   | { kind: "already_submitted"; postId: number | null };
@@ -164,9 +165,12 @@ export type ChatSnapshot = {
   sending: boolean;
   /** Sources whose "Újra" is on its way. */
   retrying: number[];
+  /** Each source's refused "Újra", shown in its own entry under the button: the reader who clicked it may
+   *  be scrolled far from the thread's end (spec 4). Its next "Újra" clears it. */
+  retryNotices: Record<number, ChatNotice>;
 };
 
-const INITIAL: ChatSnapshot = { sources: null, notices: [], unreachable: false, sending: false, retrying: [] };
+const INITIAL: ChatSnapshot = { sources: null, notices: [], unreachable: false, sending: false, retrying: [], retryNotices: {} };
 
 /** A refused submission or retry, as the reply the thread shows. */
 function noticeFor({ status, body }: Answer): ChatNotice {
@@ -267,14 +271,14 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
       open = true;
       // A local reply lives only while the panel stays open (spec 1.3): a send or retry that lands
       // after `close()` must not leak its reply into the next `open()`.
-      set({ notices: [], unreachable: false });
+      set({ notices: [], retryNotices: {}, unreachable: false });
       void reload();
     },
     close() {
       open = false;
       clearTimeout(timer);
       latest++;
-      set({ notices: [], unreachable: false });
+      set({ notices: [], retryNotices: {}, unreachable: false });
     },
     /** True when the link went in, so the panel clears the field; on every other answer the text stays. */
     async send(text: string): Promise<boolean> {
@@ -305,23 +309,30 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         set({ sending: false });
       }
     },
-    /** "Újra": one request per source at a time. A 409 means another click already started it. */
+    /** "Újra": one request per source at a time. A 409 means another click already started it. A refusal
+     *  goes into that source's `retryNotices`, not to the thread's end, which may be out of view. */
     async retry(sourceId: number): Promise<void> {
       if (snapshot.retrying.includes(sourceId)) return;
-      set({ retrying: [...snapshot.retrying, sourceId] });
+      const retryNotices = { ...snapshot.retryNotices };
+      delete retryNotices[sourceId];
+      set({ retrying: [...snapshot.retrying, sourceId], retryNotices });
+      let refusal: ChatNotice | null = null;
       try {
         const answer = await transport.retry(sourceId);
         if (answer.status === 202 || answer.status === 409) {
-          // Same reasoning as send's own clear above: a prior failed retry's reply must not outlive
-          // this one's success.
+          // Same reasoning as send's own clear above: an earlier refusal (a signed_out, say) must not
+          // outlive this one's success.
           set({ notices: [] });
           await reload();
-        } else say(noticeFor(answer));
+        } else refusal = noticeFor(answer);
       } catch {
-        say({ kind: "network" });
-      } finally {
-        set({ retrying: snapshot.retrying.filter((id) => id !== sourceId) });
+        refusal = { kind: "network" };
       }
+      const retrying = snapshot.retrying.filter((id) => id !== sourceId);
+      if (refusal) set({ retrying, retryNotices: { ...snapshot.retryNotices, [sourceId]: refusal } });
+      else set({ retrying });
+      // Nothing else works until the reader signs in again, so that one also goes to the thread's end.
+      if (refusal?.kind === "signed_out") say(refusal);
     },
   };
 }

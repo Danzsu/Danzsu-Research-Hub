@@ -47,6 +47,7 @@ A beküldés háttere már kész. A `POST /api/sources` fogad egy linket és egy
   - első sor mindig a taiyaki köszönése: „Dobj be egy linket! Ha akarod, írd mellé, mire figyeljek.”;
   - utána a saját 10 legutóbbi beküldésed, a legrégebbi felül, mindegyik egy üzenetpár (1.4);
   - a helyi válaszok (link nélküli üzenet, hibás link, hálózati hiba) a szál végére kerülnek, és csak a panel életéig élnek, nem mentődnek;
+  - kivétel az „Újra” elutasítása: az a saját bejegyzésébe kerül, közvetlenül az „ÚJRA” gomb alá, mert aki fentebb görgetve kattintott, a szál végét nem látja; lejárt belépésnél a „Lejárt a belépésed.” a szál végére is kikerül, egyszer;
   - a szál a végét csak annak az olvasónak tartja szem előtt, aki ott van (legfeljebb 40 px-re tőle), vagy aki épp maga küldött; a görgetés mindig azonnali ugrás, csúszás nélkül;
   - a taiyaki-válaszok konténere `aria-live="polite"`.
 - **Beviteli mező:** `Textarea`, legfeljebb `30dvh` magas, utána görget. Enter küld, Shift+Enter új sor. A küldés gomb 40 px, signal háttér. Küldés közben a mező és a gomb le van tiltva.

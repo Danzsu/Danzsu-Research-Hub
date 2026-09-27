@@ -17,7 +17,7 @@ const thread = (snapshot: Partial<Snapshot> = {}, language: "hu" | "en" = "hu") 
       language,
       loginHref: "/login?next=%2Flibrary",
       onRetry: () => {},
-      snapshot: { sources: previewMySources, notices: [], unreachable: false, retrying: [], ...snapshot },
+      snapshot: { sources: previewMySources, notices: [], unreachable: false, retrying: [], retryNotices: {}, ...snapshot },
     }),
   );
 
@@ -66,6 +66,19 @@ test("only the retrying source's ÚJRA button is in-flight; a different id's but
   };
   assert.equal(buttonNear("https://a.test/fail")?.getAttribute("aria-disabled"), "true");
   assert.equal(buttonNear("https://b.test/fail")?.getAttribute("aria-disabled"), "false");
+});
+
+// Final review A1. Kills a refused ÚJRA whose reply is rendered nowhere (a reader who scrolled up to
+// click it would see nothing change), in another source's entry, or outside the live region.
+test("a refused ÚJRA says why right under its own button, inside the live region", () => {
+  const failedA = { ...previewMySources[1], id: -21, url: "https://a.test/fail" };
+  const failedB = { ...previewMySources[1], id: -22, url: "https://b.test/fail" };
+  const doc = thread({ sources: [failedA, failedB], retryNotices: { [-21]: { kind: "network" }, [-22]: { kind: "signed_out" } } });
+  const entry = (url: string) => [...doc.querySelectorAll("ol[aria-live] > li")].find((item) => (item.textContent ?? "").includes(url));
+  assert.match(entry("https://a.test/fail")?.textContent ?? "", /ÚJRANem ment át, próbáld újra\.$/);
+  assert.match(entry("https://b.test/fail")?.textContent ?? "", /ÚJRALejárt a belépésed\.BELÉPÉS →$/);
+  assert.equal(entry("https://b.test/fail")?.querySelector('a[href="/login?next=%2Flibrary"]')?.textContent, "BELÉPÉS →");
+  assert.equal((doc.body.textContent ?? "").split("Nem ment át").length - 1, 1);
 });
 
 // Kills the reader's link rendered from the raw URL (a javascript: link would become clickable), and

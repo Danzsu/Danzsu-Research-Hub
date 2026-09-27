@@ -262,13 +262,15 @@ test("a send's 401 refusal and the next poll's 401 say signed_out once", async (
 });
 
 // The same guard, proven through two retries that each answer 401 directly (a scenario that also
-// really happens: two "Újra" clicks after the session already expired).
-test("two retries that each answer 401 say signed_out once", async () => {
-  const chat = createLinkChat(fakeTransport([], { retry: () => answer(401, { error: "unauthorized" })() }).transport, () => true);
+// really happens: two "Újra" clicks after the session already expired). A 401 is the one retry
+// refusal that also goes to the thread's end, besides its own entry: every request needs a new sign-in.
+test("two retries that each answer 401 say signed_out once at the thread's end, and in their entry", async () => {
+  const chat = createLinkChat(fakeTransport([], { retry: answer(401, { error: "unauthorized" }) }).transport, () => true);
+  const said = () => [chat.getSnapshot().notices, chat.getSnapshot().retryNotices];
   await chat.retry(1);
-  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "signed_out" }]);
+  assert.deepEqual(said(), [[{ kind: "signed_out" }], { 1: { kind: "signed_out" } }]);
   await chat.retry(1);
-  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "signed_out" }]);
+  assert.deepEqual(said(), [[{ kind: "signed_out" }], { 1: { kind: "signed_out" } }]);
 });
 
 // Kills the `pending` fallback losing `unreachable` once a list has ever loaded (Important 1): a
@@ -559,33 +561,69 @@ test("retry: retrying stays true until the reload lands, not just until retry an
   assert.deepEqual(chat.getSnapshot().retrying, []);
 });
 
-// Kills an offline or refused retry that rejects instead of saying so, or that keeps its button disabled.
-test("retry: offline or refused, it says so and frees the button", async () => {
-  for (const retry of [offline, answer(500, { error: "db_error" })]) {
+// Final review A1. Kills an offline or refused retry that rejects instead of saying so, one that keeps
+// its button disabled, and a refusal said only at the thread's end, which a reader who scrolled up to
+// click ÚJRA never sees: it goes into that source's own entry.
+test("retry: offline or refused, it says so in that source's entry, not at the thread's end, and frees the button", async () => {
+  for (const [name, retry] of [["offline", offline], ["500", answer(500, { error: "db_error" })]] as const) {
     const chat = createLinkChat(fakeTransport([], { retry }).transport, () => true);
     await chat.retry(1);
-    assert.deepEqual([chat.getSnapshot().notices, chat.getSnapshot().retrying], [[{ kind: "network" }], []]);
+    const { notices, retryNotices, retrying } = chat.getSnapshot();
+    assert.deepEqual([notices, retryNotices, retrying], [[], { 1: { kind: "network" } }, []], name);
   }
 });
 
-// Important 3: a successful retry, same as a successful send, must not leave an earlier failed
-// retry's "Nem ment át…" reply behind.
-test("a successful retry clears the notices a previous failed retry left behind", async () => {
-  const chat = createLinkChat(fakeTransport([], { retry: inTurn(offline, answer(202, { ok: true })) }).transport, () => true);
+// Kills a refusal that outlives the next click on its own ÚJRA (it would sit under a retry that is on
+// its way, then under one that went through), and a click that clears another source's refusal.
+test("retry: starting it again clears that source's refusal, and only that one", async (t) => {
+  let answerRetry: (value: Answer) => void = () => {};
+  const retry = inTurn(offline, offline, () => new Promise((resolve) => (answerRetry = resolve)));
+  const chat = createLinkChat(fakeTransport([], { retry }).transport, () => true);
+  t.after(() => chat.close());
   await chat.retry(1);
-  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "network" }]);
-  await chat.retry(1);
-  assert.deepEqual(chat.getSnapshot().notices, []);
+  await chat.retry(2);
+  const again = chat.retry(1);
+  assert.deepEqual(chat.getSnapshot().retryNotices, { 2: { kind: "network" } });
+  answerRetry({ status: 202, body: { ok: true } });
+  await again;
+  assert.deepEqual(chat.getSnapshot().retryNotices, { 2: { kind: "network" } });
 });
 
-// Kills local replies that outlive the panel: they live only while it stays open.
+// Important 3: a successful retry, same as a successful send, leaves no earlier refusal behind: not
+// its entry's own, and not the signed_out a 401 put at the thread's end.
+test("a successful retry clears the refusals a previous failed retry left behind", async () => {
+  const chat = createLinkChat(fakeTransport([], { retry: inTurn(answer(401, { error: "unauthorized" }), answer(202, { ok: true })) }).transport, () => true);
+  const said = () => [chat.getSnapshot().notices, chat.getSnapshot().retryNotices];
+  await chat.retry(1);
+  assert.deepEqual(said(), [[{ kind: "signed_out" }], { 1: { kind: "signed_out" } }]);
+  await chat.retry(1);
+  assert.deepEqual(said(), [[], {}]);
+});
+
+// Kills local replies that outlive the panel: they live only while it stays open, a retry's included.
 test("closing the panel drops the local replies", async (t) => {
-  const chat = createLinkChat(fakeTransport([]).transport, () => true);
+  const chat = createLinkChat(fakeTransport([], { retry: offline }).transport, () => true);
   t.after(() => chat.close());
   chat.open();
   await chat.send("nincs link");
+  await chat.retry(1);
   chat.close();
-  assert.deepEqual(chat.getSnapshot().notices, []);
+  assert.deepEqual([chat.getSnapshot().notices, chat.getSnapshot().retryNotices], [[], {}]);
+});
+
+// Kills `open()` keeping a retry refusal that landed after `close()` (spec 1.3), like a send's.
+test("a retry refused after the panel closed leaves nothing in the next open()", async (t) => {
+  let refuse: (error: unknown) => void = () => {};
+  const chat = createLinkChat(fakeTransport([], { retry: () => new Promise((_, reject) => (refuse = reject)) }).transport, () => true);
+  t.after(() => chat.close());
+  chat.open();
+  const retried = chat.retry(1);
+  chat.close();
+  refuse(new TypeError("Failed to fetch"));
+  await retried;
+  assert.deepEqual(chat.getSnapshot().retryNotices, { 1: { kind: "network" } });
+  chat.open();
+  assert.deepEqual(chat.getSnapshot().retryNotices, {});
 });
 
 // Kills a preview that still accepts writes under fail=1, a preview submission missing from the
