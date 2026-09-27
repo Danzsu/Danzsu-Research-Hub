@@ -6,14 +6,12 @@ import assert from "node:assert/strict";
 import { register } from "node:module";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FakeIngestDb } from "../pipeline/fake-db.ts";
-import type { Viewer } from "../supabase/server.ts";
+import type { Reader } from "../supabase/server.ts";
 
 register("./tsx-hooks.ts", import.meta.url);
 
 export { NextResponse } from "next/server.js";
 export { safeNext } from "../pipeline/util.ts";
-
-type Reader = { db: SupabaseClient; viewer: Viewer };
 
 /** What the stubbed modules answer. `resetRoute()` at the start of every test. */
 export const routeStub = {
