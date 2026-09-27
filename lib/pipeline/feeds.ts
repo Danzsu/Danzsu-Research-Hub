@@ -5,7 +5,7 @@ import type { DigestCategory } from "../../data/digest-types.ts";
 // `limit` caps high-volume feeds (arXiv publishes hundreds a day).
 /** The items a feed contributes when it sets no `limit`. */
 export const DEFAULT_FEED_LIMIT = 25;
-// `exclude` drops items by title: a feed's own promotions, which aren't articles.
+// `exclude` drops items by title or link: a feed's own promotions, or pages that repeat its articles.
 export const feeds: Array<{ name: string; url: string; hint: DigestCategory; limit?: number; exclude?: RegExp }> = [
   { name: "arXiv cs.CL", url: "https://rss.arxiv.org/rss/cs.CL", hint: "research", limit: 40 },
   { name: "arXiv cs.AI", url: "https://rss.arxiv.org/rss/cs.AI", hint: "research", limit: 40 },
@@ -25,6 +25,8 @@ export const feeds: Array<{ name: string; url: string; hint: DigestCategory; lim
   // Anthropic publishes no RSS; a community mirror (github.com/Olshansk/rss-feeds) builds these from anthropic.com, whose URLs the items keep.
   { name: "Anthropic", url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml", hint: "companies" },
   { name: "Anthropic Engineering", url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml", hint: "research" },
+  // DeepLearning.AI's own feed for The Batch, on its CMS host. A whole weekly issue (`/issue-372/`) repeats its articles.
+  { name: "The Batch", url: "https://charonhub.deeplearning.ai/rss/", hint: "research", exclude: /\/issue-\d+\/?$/ },
 ];
 
 // Hacker News (Algolia) queries; only stories above the points floor.

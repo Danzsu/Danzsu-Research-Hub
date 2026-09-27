@@ -27,11 +27,11 @@ A céges blog elsődleges forrás, de érdekelt fél: a saját termékéről ír
 
 ### Hírcsatornák (RSS, Atom)
 
-A csatornák 2026-09-23-án élőben ellenőrizve, a ByteByteGo és az Anthropic 2026-09-27-én. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
+A csatornák 2026-09-23-án élőben ellenőrizve, a ByteByteGo, az Anthropic és a The Batch 2026-09-27-én. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
 
-A promóciót két szűrő tartja távol:
+A promóciót és az ismétlést két szűrő tartja távol:
 
-- egy csatorna `exclude` mintája a saját hirdetéseit dobja el cím alapján, még a modell előtt (ma a ByteByteGo-é: „LAST CALL FOR ENROLLMENT: …”, „ByteByteGo Live is here”);
+- egy csatorna `exclude` mintája cím vagy link alapján dobja el a saját hirdetéseit, vagy azokat a lapokat, amelyek a cikkeit ismétlik, még a modell előtt. Ma kettőnek van ilyen mintája: a ByteByteGo-nak („LAST CALL FOR ENROLLMENT: …”, „ByteByteGo Live is here”) és a The Batch-nek (a teljes heti szám, `/issue-372/`);
 - a válogató prompt minden csatornán kihagyja a tanfolyam-, esemény- és termékhirdetést, a leárazást és a szponzorált posztot.
 
 | Név | Csatorna | Kategória | Limit | Típus |
@@ -52,10 +52,17 @@ A promóciót két szűrő tartja távol:
 | ByteByteGo | `https://blog.bytebytego.com/feed` | research | 5 | elsődleges (szakmai blog; promóció szűrve) |
 | Anthropic | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml` | companies | 25 | elsődleges (céges), külső RSS-tükörrel |
 | Anthropic Engineering | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml` | research | 25 | elsődleges (céges), külső RSS-tükörrel |
+| The Batch | `https://charonhub.deeplearning.ai/rss/` | research | 25 | másodlagos (szerkesztett heti hírlevél, DeepLearning.AI) |
 
 **ByteByteGo:** rendszertervezés és AI-infrastruktúra. A tételek felében ott a teljes szöveg (`content:encoded`), a poszt-oldalak szerverről letölthetők, `noarchive` nincs rajtuk. A fizetős posztokból csak részlet érhető el (Substack).
 
 **Anthropic:** az anthropic.com nem ad RSS-t (2026-09-27: a szokásos feed-címek 404-et adnak, és az oldal sem hivatkozik feedre). A két csatornát egy közösségi projekt, a [github.com/Olshansk/rss-feeds](https://github.com/Olshansk/rss-feeds) állítja elő az anthropic.com-ról. A tételek linkjei az anthropic.com-ra mutatnak, a tartalom tehát elsődleges, csak a csatorna külső. Harmadik fél tartja karban, ezért bármikor leállhat. Ha elhal, a pipeline csak figyelmeztetést naplóz. Tartalék: az anthropic.com hivatalos `sitemap.xml`-je (`/news/` és `/engineering/` címek `lastmod`-dal), ehhez saját gyűjtő kell.
+
+**The Batch:** a DeepLearning.AI heti hírlevele (Andrew Ng levele, kutatási és céges hírek, „Data Points” rövidhírek).
+
+- **A csatorna:** a `www.deeplearning.ai` nem ad RSS-t, a hivatalos csatorna a tartalomkezelőjük aldomainjén van (`charonhub.deeplearning.ai`). Nagyjából heti 15 tételt ad.
+- **A linkek** is a charonhub.deeplearning.ai-ra mutatnak. Élőben működnek, `noarchive` nincs rajtuk, és ugyanaz a cikk a `www.deeplearning.ai/the-batch/<slug>` címen is elérhető.
+- **Szűrés:** a teljes heti számot (`/issue-372/`) a szűrő kihagyja, mert a cikkei külön tételként is jönnek.
 
 ### Hacker News
 
@@ -108,6 +115,6 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
    - van-e `noarchive` vagy fizetőfal;
    - mennyi a promóció.
    Írd a dátumot az Állapot oszlopba.
-3. **Kód.** Vedd fel a [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts)-be: `{ name, url, hint, limit?, exclude? }`. A nagy forgalmú csatorna kapjon `limit`-et. Ha a csatorna saját hirdetéseket is küld, azokat egy címre illő `exclude` minta szűrje. Ha a csatorna szerkezete szokatlan, kerüljön egy eset a [`collect.test.ts`](lib/pipeline/collect.test.ts)-be is.
+3. **Kód.** Vedd fel a [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts)-be: `{ name, url, hint, limit?, exclude? }`. A nagy forgalmú csatorna kapjon `limit`-et. Ha a csatorna saját hirdetéseket vagy a cikkeit ismétlő lapokat is küld, azokat egy címre vagy linkre illő `exclude` minta szűrje. Ha a csatorna szerkezete szokatlan, kerüljön egy eset a [`collect.test.ts`](lib/pipeline/collect.test.ts)-be is.
 4. **Lista.** Tedd át a sorát a Jelöltek közül a Bent van táblába, a `feeds.ts` értékeivel.
 5. **Teszt.** Futtasd: `npm test`. A `lib/truthful-sites.test.ts` elbukik, ha a két lista eltér.

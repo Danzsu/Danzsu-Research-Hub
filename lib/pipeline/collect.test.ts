@@ -30,15 +30,17 @@ test("parseFeed reads RSS 2.0 items: link, stripped title and snippet, the pubDa
   ]);
 });
 
-// Kills a feed's `exclude` ignored (ByteByteGo's enrollment ads would reach the model) and one matched
-// against anything but the title (a real article that merely mentions a course in its snippet).
-test("parseFeed drops items whose title matches the feed's exclude pattern, and only those", () => {
+// Kills a feed's `exclude` ignored (ByteByteGo's enrollment ads, or The Batch's whole-issue pages that
+// repeat its articles, would reach the model), and one matched against the snippet (a real article that
+// merely mentions a course).
+test("parseFeed drops items whose title or link matches the feed's exclude pattern, and only those", () => {
   const body = rss(`
     <item><title>LAST CALL FOR ENROLLMENT: Build with Claude Code</title><link>https://blog.test/ad</link></item>
+    <item><title>Opus Stalks the Frontier, Jev Classifies Everything</title><link>https://blog.test/issue-372/</link></item>
     <item><title>How LLMs Find a Needle</title><link>https://blog.test/needle</link><description>Enrollment is open for our course.</description></item>`);
   const titles = (exclude?: RegExp) => parseFeed(body, { ...feed, exclude }, since).map((c) => c.title);
-  assert.deepEqual(titles(/enrollment/i), ["How LLMs Find a Needle"]);
-  assert.deepEqual(titles(), ["LAST CALL FOR ENROLLMENT: Build with Claude Code", "How LLMs Find a Needle"]);
+  assert.deepEqual(titles(/enrollment|\/issue-\d+\/?$/i), ["How LLMs Find a Needle"]);
+  assert.equal(titles().length, 3);
 });
 
 test("parseFeed drops RSS items older than `since` and items without a link, but keeps undated ones", () => {

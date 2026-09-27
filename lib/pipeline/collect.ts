@@ -26,7 +26,7 @@ const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" }
 
 type FeedEntry = Record<string, unknown>;
 
-/** RSS 2.0 and Atom, the two shapes the feed list uses. An item whose title matches `exclude` is dropped. */
+/** RSS 2.0 and Atom, the two shapes the feed list uses. An item whose title or link matches `exclude` is dropped. */
 export function parseFeed(body: string, feed: { name: string; hint: DigestCategory; exclude?: RegExp }, since: Date): Candidate[] {
   const doc = xml.parse(body) as { rss?: { channel?: { item?: FeedEntry | FeedEntry[] } }; feed?: { entry?: FeedEntry | FeedEntry[] } };
   const entries = doc.rss ? list(doc.rss.channel?.item) : list(doc.feed?.entry);
@@ -39,7 +39,7 @@ export function parseFeed(body: string, feed: { name: string; hint: DigestCatego
     const published = entry.pubDate ?? entry.published ?? entry.updated ?? entry["dc:date"];
     const date = new Date(xmlText(published));
     const title = stripHtml(xmlText(entry.title));
-    if (!link || (!Number.isNaN(date.getTime()) && date < since) || feed.exclude?.test(title)) return [];
+    if (!link || (!Number.isNaN(date.getTime()) && date < since) || feed.exclude?.test(title) || feed.exclude?.test(link)) return [];
     return [{
       url: link.trim(),
       title,
