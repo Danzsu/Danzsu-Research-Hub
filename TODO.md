@@ -158,6 +158,15 @@
   - az `/archive` oldalon a „Több” aktív jelölése mobilon;
   - a lekérdezés leáll a panel bezárása után (`browser_network_requests`);
   - a `/library` oldalon a chatből beküldött link megjelenik a listában (`router.refresh()`; az előnézet listája fixture, ott nem látszik).
+- [ ] **Olvasás a saját oldalunkon a Radarból is** (döntve 2026-09-27, az R1 „Gyors” után, az R2 előtt; saját rövid tervezés kell). A Library már most a saját felületén mutatja a beküldött cikkeket, tükrözött ábrákkal (M1), a Radar-kártyák viszont az eredeti oldalra visznek. Két rész:
+  - **„Olvasd itt” gomb minden Radar-kártyán:** a cikk bemegy a Library-pipeline-ba, és amint kész, a saját oldalunkon nyílik meg. Ha már bent van, azonnal nyílik.
+  - **Automatikus tükör a legjobbakról:** a napi futás a legjobb híreket magától beteszi a Library-be.
+  - Eldöntendő a tervezéskor:
+    - mi számít „legjobbnak” (a Top 3, vagy egy pontszám felett minden);
+    - kinek a nevén fut az automatikus beküldés (`sources.submitted_by`);
+    - a cron 300 mp-es kerete: a cron csak sorba állít, a feldolgozás külön fut;
+    - a Radar kétnyelvű összefoglalója újrahasznosítható-e, hogy ne fizessünk kétszer a modellért;
+    - a `noarchive` oldalak továbbra is csak AI-jegyzetet kapnak.
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
