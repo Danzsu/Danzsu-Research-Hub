@@ -38,15 +38,18 @@ const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop };
 /** Wraps a component that reads useLanguage() (LocalizedText, SubmitForm, DigestDashboard) in its provider. */
 const withLanguage = <P extends object>(Component: ComponentType<P>, props: P) =>
   render(createElement(LanguageProvider, { initial: "en" } as ComponentProps<typeof LanguageProvider>, createElement(Component, props)));
-
-test("AppShell renders both nav landmarks and its child", () => {
-  const doc = render(
+/** The whole shell around one child, as the (app) layout renders it. */
+const shell = (language: "hu" | "en" = "hu") =>
+  render(
     createElement(
       AppShell,
-      { language: "en", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>,
+      { language, email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>,
       createElement("p", { "data-testid": "child" }, "Child content"),
     ),
   );
+
+test("AppShell renders both nav landmarks and its child", () => {
+  const doc = shell("en");
   assert.ok(doc.querySelector('aside nav[aria-label="Main navigation"]'), "desktop nav landmark");
   assert.ok(doc.querySelector('nav#mobile-nav[aria-label="Menu"]'), "mobile bottom bar landmark");
   assert.equal(doc.querySelector('[data-testid="child"]')?.textContent, "Child content");
@@ -201,18 +204,14 @@ test("TaiyakiButton names itself in the reader's language, and says which panel 
 // the LinkChat render proves only that its top level (the chat store, the transport, the hooks) runs
 // without a crash or a render loop.
 test("AppShell carries the taiyaki, and LinkChat's top level renders without a render loop", () => {
-  const doc = render(
-    createElement(AppShell, { language: "hu", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>, createElement("p", null, "Child")),
-  );
+  const doc = shell();
   assert.equal(doc.querySelectorAll(`button[aria-controls="${CHAT_PANEL_ID}"]`).length, 2);
   withLanguage(LinkChat, { open: true, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
 });
 
 // Kills the bar's old order: Archívum in the bar, and no taiyaki between Könyvtár and Keresés.
 test("the mobile bar reads Radar, Könyvtár, the taiyaki, Keresés, Több", () => {
-  const doc = render(
-    createElement(AppShell, { language: "hu", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>, createElement("p", null, "Child")),
-  );
+  const doc = shell();
   const slots = [...doc.querySelectorAll("#mobile-nav > *")].map((slot) => slot.getAttribute("aria-label") ?? slot.textContent);
   assert.deepEqual(slots, ["Radar", "Könyvtár", "Link bedobása", "Keresés", "Több"]);
 });
@@ -225,9 +224,7 @@ test("the Több slot carries the active mark on Archívum's pages only", (t) => 
   });
   const moreSlot = (pathname: string) => {
     navigationStub.pathname = pathname;
-    const doc = render(
-      createElement(AppShell, { language: "hu", email: "reader@example.test", initialNavMode: "full" } as ComponentProps<typeof AppShell>, createElement("p", null, "Child")),
-    );
+    const doc = shell();
     const slot = doc.querySelector("#mobile-nav > :last-child");
     return [slot?.textContent, slot?.getAttribute("data-active") ?? null];
   };

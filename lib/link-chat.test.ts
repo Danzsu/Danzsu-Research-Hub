@@ -97,6 +97,11 @@ const answer = (status: number, body: Record<string, unknown> = {}) => async ():
 const offline = async (): Promise<Answer> => {
   throw new TypeError("Failed to fetch");
 };
+/** Answers each call with the next of `answers`, and every call after the last with the last. */
+const inTurn = (...answers: (() => Promise<Answer>)[]) => {
+  let call = 0;
+  return () => answers[Math.min(call++, answers.length - 1)]();
+};
 
 /** GET /api/sources/mine answers `sources` and the writes answer 202, unless `answers` says otherwise; every call is counted. */
 function fakeTransport(sources: MySource[], answers: { [K in keyof ChatTransport]?: () => Promise<Answer> } = {}) {
@@ -203,14 +208,11 @@ test("polling stops after MAX_POLLS, and opening the panel again restarts it", a
 // pending, and, being the last word, keep showing it as processing.
 test("an older load that answers late never overwrites a newer one", async (t) => {
   let answerFirst: (value: Answer) => void = () => {};
-  const loads: Promise<Answer>[] = [
-    new Promise((resolve) => {
-      answerFirst = resolve;
-    }),
-    answer(200, { sources: [source(1, "done", { post: { id: 9, title: { hu: "Kész", en: "Done" } } })] })(),
-  ];
-  let call = 0;
-  const chat = createLinkChat(fakeTransport([], { mine: () => loads[call++] }).transport, () => true);
+  const first = new Promise<Answer>((resolve) => {
+    answerFirst = resolve;
+  });
+  const mine = inTurn(() => first, answer(200, { sources: [source(1, "done", { post: { id: 9, title: { hu: "Kész", en: "Done" } } })] }));
+  const chat = createLinkChat(fakeTransport([], { mine }).transport, () => true);
   t.after(() => chat.close());
   chat.open();
   assert.equal(await chat.send("https://blog.test/1"), true);
@@ -225,9 +227,7 @@ test("an older load that answers late never overwrites a newer one", async (t) =
 // since `open()` now clears notices (Important 2), so repeating `open()` no longer proves the guard.
 test("a failed load says the list is out of reach and polls again until a good one", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const loads = [offline, answer(200, { sources: [] })];
-  let call = 0;
-  const chat = createLinkChat(fakeTransport([], { mine: () => loads[Math.min(call++, loads.length - 1)]() }).transport, () => true);
+  const chat = createLinkChat(fakeTransport([], { mine: inTurn(offline, answer(200, { sources: [] })) }).transport, () => true);
   t.after(() => chat.close());
   chat.open();
   await flush();
@@ -244,11 +244,11 @@ test("a failed load says the list is out of reach and polls again until a good o
 // (the old re-pin) can't actually happen, so it isn't a fair proof of the guard.
 test("a send's 401 refusal and the next poll's 401 say signed_out once", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const mineLoads = [answer(200, { sources: [source(1, "pending")] }), answer(401, { error: "unauthorized" })];
-  let call = 0;
   const chat = createLinkChat(
-    fakeTransport([], { mine: () => mineLoads[Math.min(call++, mineLoads.length - 1)](), submit: () => answer(401, { error: "unauthorized" })() })
-      .transport,
+    fakeTransport([], {
+      mine: inTurn(answer(200, { sources: [source(1, "pending")] }), answer(401, { error: "unauthorized" })),
+      submit: answer(401, { error: "unauthorized" }),
+    }).transport,
     () => true,
   );
   t.after(() => chat.close());
@@ -276,10 +276,11 @@ test("two retries that each answer 401 say signed_out once", async () => {
 test("after a finished thread's load blips once, the new submission still lands", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const finished = source(1, "done", { post: { id: 9, title: { hu: "Kész", en: "Done" } } });
-  const mineLoads = [answer(200, { sources: [finished] }), answer(500, { error: "db_error" }), answer(200, { sources: [source(2, "pending"), finished] })];
-  let call = 0;
   const chat = createLinkChat(
-    fakeTransport([], { mine: () => mineLoads[Math.min(call++, mineLoads.length - 1)](), submit: () => answer(202, { ok: true, id: 2 })() }).transport,
+    fakeTransport([], {
+      mine: inTurn(answer(200, { sources: [finished] }), answer(500, { error: "db_error" }), answer(200, { sources: [source(2, "pending"), finished] })),
+      submit: answer(202, { ok: true, id: 2 }),
+    }).transport,
     () => true,
   );
   t.after(() => chat.close());
@@ -315,11 +316,9 @@ test("closing the panel while a send is in flight drops that send's reply on reo
 // reload's own good answer would clear it a moment later regardless.
 test("reopening clears a stale unreachable synchronously, not just once its own reload lands", async (t) => {
   let answerSubmit: (value: Answer) => void = () => {};
-  const mineLoads = [answer(200, { sources: [] }), offline, answer(200, { sources: [] })];
-  let call = 0;
   const chat = createLinkChat(
     fakeTransport([], {
-      mine: () => mineLoads[Math.min(call++, mineLoads.length - 1)](),
+      mine: inTurn(answer(200, { sources: [] }), offline, answer(200, { sources: [] })),
       submit: () => new Promise((resolve) => (answerSubmit = resolve)),
     }).transport,
     () => true,
@@ -354,9 +353,7 @@ test("a hidden tab's ticks don't count against MAX_POLLS; it still fetches once 
 // load would make that assertion true either way, since nothing had set it otherwise.
 test("a 401 right after a failed load clears unreachable and stops polling on its own", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const loads = [offline, answer(401, { error: "unauthorized" })];
-  let call = 0;
-  const { transport, calls } = fakeTransport([], { mine: () => loads[Math.min(call++, loads.length - 1)]() });
+  const { transport, calls } = fakeTransport([], { mine: inTurn(offline, answer(401, { error: "unauthorized" })) });
   const chat = createLinkChat(transport, () => true);
   t.after(() => chat.close());
   chat.open();
@@ -373,11 +370,9 @@ test("a 401 right after a failed load clears unreachable and stops polling on it
 // otherwise survive a 401 untouched and fire one extra GET on its own, well after the panel stopped.
 test("a retry's reload that lands a 401 leaves no old poll timer armed", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const mineLoads = [answer(200, { sources: [source(1, "pending"), source(2, "failed")] }), answer(401, { error: "unauthorized" })];
-  let call = 0;
   const { transport, calls } = fakeTransport([], {
-    mine: () => mineLoads[Math.min(call++, mineLoads.length - 1)](),
-    retry: () => answer(202, { ok: true })(),
+    mine: inTurn(answer(200, { sources: [source(1, "pending"), source(2, "failed")] }), answer(401, { error: "unauthorized" })),
+    retry: answer(202, { ok: true }),
   });
   const chat = createLinkChat(transport, () => true);
   t.after(() => chat.close());
@@ -467,9 +462,8 @@ test("send: no link, no request; a sent link reloads the thread at once and says
 // itself instead of the fresh submission) — cleared before this send's own more_links notice (order
 // matters: the clear must happen first, or a resend with more than one link would also wipe its own).
 test("a successful send clears the notices a previous failed send left behind, but not its own more_links", async () => {
-  const submits = [answer(500, { error: "insert_failed" }), answer(202, { ok: true, id: 2 }), answer(500, { error: "insert_failed" }), answer(202, { ok: true, id: 3 })];
-  let call = 0;
-  const chat = createLinkChat(fakeTransport([], { submit: () => submits[Math.min(call++, submits.length - 1)]() }).transport, () => true);
+  const submit = inTurn(answer(500, { error: "insert_failed" }), answer(202, { ok: true, id: 2 }), answer(500, { error: "insert_failed" }), answer(202, { ok: true, id: 3 }));
+  const chat = createLinkChat(fakeTransport([], { submit }).transport, () => true);
   assert.equal(await chat.send("https://blog.test/a"), false);
   assert.deepEqual(chat.getSnapshot().notices, [{ kind: "network" }]);
   assert.equal(await chat.send("https://blog.test/a"), true);
@@ -576,9 +570,7 @@ test("retry: offline or refused, it says so and frees the button", async () => {
 // Important 3: a successful retry, same as a successful send, must not leave an earlier failed
 // retry's "Nem ment át…" reply behind.
 test("a successful retry clears the notices a previous failed retry left behind", async () => {
-  const retries = [offline, answer(202, { ok: true })];
-  let call = 0;
-  const chat = createLinkChat(fakeTransport([], { retry: () => retries[Math.min(call++, retries.length - 1)]() }).transport, () => true);
+  const chat = createLinkChat(fakeTransport([], { retry: inTurn(offline, answer(202, { ok: true })) }).transport, () => true);
   await chat.retry(1);
   assert.deepEqual(chat.getSnapshot().notices, [{ kind: "network" }]);
   await chat.retry(1);
