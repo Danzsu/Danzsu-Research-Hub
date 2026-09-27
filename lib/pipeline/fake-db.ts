@@ -172,13 +172,16 @@ export function likes(value: string, pattern: string): boolean {
 }
 
 /** Any other table's select chain, over `rows`. `eq`/`neq`/`lt` (see `passes`) and `like` filter them;
- *  `order`, `limit` and embeds are only recorded, because what they do is the database's job. Awaited it
- *  answers the matching rows, `maybeSingle()` the first or null, and `error` answers both. Every call
- *  lands in `calls`, in order. */
-function tableQuery(rows: Record<string, unknown>[], error: PostgrestErrorShape | undefined, calls: ChainCall[], onGte: (column: string, value: unknown) => void) {
+ *  `order` and `limit` are only recorded, because sorting/limiting is the database's job, not the
+ *  fake's. Every answer is projected down to `columns`, one level into a `table(inner)` embed too —
+ *  the same `project` that `sourcesQuery` uses, so a select that drops a column, or narrows an embed,
+ *  is caught here exactly as it would be for `sources`. Awaited it answers every matching row;
+ *  `maybeSingle()` answers the one match, `null` for none, and PostgREST's PGRST116 for two or
+ *  more — same as `sourcesQuery.maybeSingle`. `error` answers both endings. Every call lands in
+ *  `calls`, in order. */
+function tableQuery(rows: Record<string, unknown>[], error: PostgrestErrorShape | undefined, calls: ChainCall[], onGte: (column: string, value: unknown) => void, columns: string) {
   const kept: ((row: Record<string, unknown>) => boolean)[] = [];
-  const answer = (pick: (rows: Record<string, unknown>[]) => unknown) =>
-    error ? { data: null, error } : { data: pick(rows.filter((row) => kept.every((keep) => keep(row)))), error: null };
+  const matching = () => rows.filter((row) => kept.every((keep) => keep(row)));
   const record = (method: string, ...args: unknown[]) => {
     calls.push([method, ...args]);
     return chain;
@@ -203,10 +206,12 @@ function tableQuery(rows: Record<string, unknown>[], error: PostgrestErrorShape 
     limit: (...args: unknown[]) => record("limit", ...args),
     maybeSingle: async () => {
       calls.push(["maybeSingle"]);
-      return answer((matched) => matched[0] ?? null);
+      if (error) return { data: null, error };
+      const matched = matching();
+      return matched.length > 1 ? { data: null, error: notOneRow(matched.length) } : { data: project(matched[0] ?? null, columns), error: null };
     },
     then: (onFulfilled: (result: UpdateResult) => unknown, onRejected?: (reason: unknown) => unknown) =>
-      Promise.resolve(answer((matched) => matched)).then(onFulfilled, onRejected),
+      Promise.resolve(error ? { data: null, error } : { data: matching().map((row) => project(row, columns)), error: null }).then(onFulfilled, onRejected),
   };
   return chain;
 }
@@ -296,8 +301,9 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * caught the same way a real PostgREST query would catch it. A `sources` update applies its `.eq`
  * filters and writes through, so a later select sees it — unless `sourceUpdateError` is set, when it
  * fails instead and the row is left untouched; the attempted payload is still recorded either way.
- * Any other table upserts (recorded on `.upserts`), and its select chain answers from `tables.rows`, or
- * fails with `tables.tableErrors`, recording every call on `.queries` (`tableQuery`).
+ * Any other table upserts (recorded on `.upserts`), and its select chain answers from `tables.rows`,
+ * projected down to the `.select(...)` columns exactly as `sources` is, or fails with
+ * `tables.tableErrors`, recording every call on `.queries` (`tableQuery`).
  * Storage keeps its own in-memory object set, seeded from `tables.media`: `upload` adds to it,
  * `list` reflects it, and `download` answers an object it holds with the object's own path as its
  * bytes, so a test can mirror an image and then see it (or its absence) in a later list.
@@ -440,7 +446,7 @@ export function fakeDb(
       select: (columns = "*") => {
         const calls: ChainCall[] = [["select", columns]];
         queries.push({ table, calls });
-        return tableQuery(tables.rows?.[table] ?? [], tables.tableErrors?.[table], calls, (column, value) => gteCalls.push({ table, column, value }));
+        return tableQuery(tables.rows?.[table] ?? [], tables.tableErrors?.[table], calls, (column, value) => gteCalls.push({ table, column, value }), columns);
       },
     };
   };

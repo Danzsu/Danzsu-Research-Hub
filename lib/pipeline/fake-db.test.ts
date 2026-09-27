@@ -131,3 +131,24 @@ test("tableErrors fails that table's select, awaited or through maybeSingle(), a
   assert.deepEqual(await db.from("issues").select("id").limit(1).maybeSingle(), { data: null, error });
   assert.deepEqual(await db.from("todos").select("id"), { data: [{ id: 1 }], error: null });
 });
+
+// Fix round 1: tableQuery skipped `project` entirely — a select naming fewer columns than the fixture
+// still leaked the whole row through. Kills the projection dropped (both the unselected `is_read` and
+// the embed's own `done` field would leak), and the embed's inner columns ignored.
+test("any other table's select projects the row to its columns, one level into a table(...) embed", async () => {
+  const db = fakeDb(undefined, {
+    rows: { item_states: [{ item_id: "local-2026w39-a-1", is_read: true, todos: { id: 9, text: "Read up", done: false } }] },
+  });
+  const { data } = await db.from("item_states").select("item_id, todos(id, text)").eq("item_id", "local-2026w39-a-1");
+  assert.deepEqual(data, [{ item_id: "local-2026w39-a-1", todos: { id: 9, text: "Read up" } }]);
+  assert.equal((data?.[0] as Record<string, unknown> | undefined)?.is_read, undefined);
+});
+
+// Fix round 1: maybeSingle() answered the first of several matches instead of PostgREST's PGRST116,
+// unlike `sourcesQuery.maybeSingle`. Kills that regression.
+test("any other table's maybeSingle() answers PGRST116 for two or more matches, like sources does", async () => {
+  const db = fakeDb(undefined, { rows: { issues: [{ id: "2026-W38", status: "open" }, { id: "2026-W39", status: "open" }] } });
+  const { data, error } = await db.from("issues").select("id").eq("status", "open").maybeSingle();
+  assert.equal(data, null);
+  assert.equal((error as { code?: string } | null)?.code, "PGRST116");
+});
