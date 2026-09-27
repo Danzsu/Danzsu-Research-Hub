@@ -267,6 +267,18 @@ export function safeNext(value: unknown): string {
   }
 }
 
+/** `raw` resolved against `base`, kept only when it is an http(s) URL: the gate every rendered href
+ *  passes. Here, zod-free, so the link chat can use it without pulling blocks.ts into the shell. */
+export function safeHref(raw: string | null | undefined, base: string): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw, base);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * A raw date as YYYY-MM-DD, or null. An ISO-looking prefix is kept as written (its own calendar
  * day, whatever the offset) only if it is a real date: `published_at` is a Postgres `date`, and JS's

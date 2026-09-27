@@ -80,7 +80,7 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
   - `lib/media.ts`: image paths;
   - `lib/api.ts`: `jsonError`, `postRoute`;
   - `lib/supabase/server.ts`: `getReader` / `getViewer`;
-  - `lib/pipeline/util.ts`: `hostOf`, `parseId`, `detectSource`, `errorMessage`, `settledValues`, `publishedDate`…;
+  - `lib/pipeline/util.ts`: `hostOf`, `parseId`, `detectSource`, `safeHref`, `errorMessage`, `settledValues`, `publishedDate`…;
   - `lib/pipeline/fetch.ts`: `safeFetch`, `apiFetch`, `ensureOk`, `readText`;
   - `lib/blocks.ts`: `localizedSchema`, `parseBlocks`;
   - `lib/post-view.ts`: `shownTitle`, the title readers see;

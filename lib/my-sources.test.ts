@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existingPostId, listMySources, MINE_LIMIT, retrySource } from "./my-sources.ts";
+import { MINE_LIMIT } from "./link-chat.ts";
+import { existingPostId, listMySources, retrySource } from "./my-sources.ts";
 import { fakeDb, pgError } from "./pipeline/fake-db.ts";
 
 /** A `sources` row as the listing selects it, submitted by "owner" on 2026-09-(10 + id). */

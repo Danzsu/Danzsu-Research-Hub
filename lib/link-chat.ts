@@ -1,11 +1,14 @@
 import type { Localized } from "../data/digest-types.ts";
-import { safeHref } from "./blocks.ts";
-import { MINE_LIMIT, type MySource } from "./my-sources.ts";
-import { detectSource, parseSubmittedUrl, type SourceKind } from "./pipeline/util.ts";
+import type { MySource } from "./my-sources.ts";
+import { detectSource, parseSubmittedUrl, safeHref, type SourceKind } from "./pipeline/util.ts";
 
 // The taiyaki link chat's logic, framework-free so node --test runs it: a message → a submission,
 // the reader's own sources → the thread, and the live thread's polling rules. The panel
 // (app/components/link-chat.tsx) binds it to React.
+
+/** The thread shows this many of the reader's latest submissions. Here, not in my-sources.ts, so the app
+ *  shell, which loads this module, doesn't pull in the post view and its zod schemas for one number. */
+export const MINE_LIMIT = 10;
 
 export type LinkMessage = { url: string; note: string | null; moreLinks: boolean } | { error: "no_link" };
 

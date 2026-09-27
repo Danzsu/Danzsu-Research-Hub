@@ -1,6 +1,8 @@
 import { z } from "zod/v4";
 import { fnv1a } from "./pipeline/util.ts";
 
+export { safeHref } from "./pipeline/util.ts";
+
 // The one content model every source is converted into and every post is rendered from.
 
 export const inlineSchema = z.object({
@@ -65,16 +67,6 @@ export function parseBlocks(value: unknown): Block[] {
     const parsed = blockSchema.safeParse(block);
     return parsed.success ? [parsed.data] : [];
   });
-}
-
-export function safeHref(raw: string | null | undefined, base: string): string | undefined {
-  if (!raw) return undefined;
-  try {
-    const url = new URL(raw, base);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export const inlineText = (spans: Inline[]) => spans.map((span) => span.text).join("");

@@ -1,13 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Localized } from "../data/digest-types.ts";
+import { MINE_LIMIT } from "./link-chat.ts";
 import type { SourceKind } from "./pipeline/util.ts";
 import { shownTitle } from "./post-view.ts";
 
 // The reader's own submissions, for the taiyaki link chat: GET /api/sources/mine lists them, and
 // POST /api/sources/[id]/retry sends a failed one through the pipeline again. Both routes stay thin.
-
-/** The thread shows this many of the reader's latest submissions. */
-export const MINE_LIMIT = 10;
 
 /** One of the reader's own submissions, as GET /api/sources/mine answers it (newest first). */
 export type MySource = {
