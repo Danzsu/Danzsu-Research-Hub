@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
 import { apiFetch, ensureOk, githubHeaders } from "./fetch.ts";
-import { feeds, githubTopics, hnQueries } from "./feeds.ts";
+import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnQueries } from "./feeds.ts";
 import { list, publishedDate, settledValues, xmlText } from "./util.ts";
 
 export type Candidate = {
@@ -52,7 +52,7 @@ export function parseFeed(body: string, feed: { name: string; hint: DigestCatego
 
 async function fromFeeds(since: Date): Promise<Candidate[]> {
   const results = await Promise.allSettled(
-    feeds.map(async (feed) => parseFeed(await (await get(feed.url)).text(), feed, since).slice(0, feed.limit ?? 25)),
+    feeds.map(async (feed) => parseFeed(await (await get(feed.url)).text(), feed, since).slice(0, feed.limit ?? DEFAULT_FEED_LIMIT)),
   );
   return settledValues(results, (i) => `feed failed: ${feeds[i].name}`).flat();
 }

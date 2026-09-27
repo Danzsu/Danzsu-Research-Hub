@@ -27,7 +27,7 @@ A céges blog elsődleges forrás, de érdekelt fél: a saját termékéről ír
 
 ### Hírcsatornák (RSS, Atom)
 
-A csatornák 2026-09-23-án élőben ellenőrizve. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel. A kategória (`hint`) az, amiből a modell kiindul.
+A csatornák 2026-09-23-án élőben ellenőrizve. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
 
 | Név | Csatorna | Kategória | Limit | Típus |
 | --- | --- | --- | --- | --- |
