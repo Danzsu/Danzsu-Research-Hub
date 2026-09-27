@@ -24,10 +24,13 @@ import {
   settledValues,
   slugify,
   videoFromUrl,
+  weekItemPattern,
   xmlText,
   xStatusId,
   youtubeId,
 } from "./util.ts";
+import { digestCategories } from "../../data/digest-types.ts";
+import { likes } from "./fake-db.ts";
 
 test("safeNext keeps same-site paths", () => {
   assert.equal(safeNext("/library"), "/library");
@@ -75,6 +78,23 @@ test("itemId is stable, bounded, and URL-unique", () => {
   assert.notEqual(a, itemId("research", week, "Árvíztűrő Tükörfúrógép: New LLM!", "https://a.example/2"));
   assert.ok(itemId("local", week, "x".repeat(500), "u").length <= 120);
   assert.equal(slugify("---"), "");
+});
+
+// Spec 8: the reader state's week filter leans on itemId()'s form, so this binds the two. Kills a
+// pattern without its dashes (a slug that merely contains "2026w38" would match), one built from the
+// id as written ('2026-W38' is never in an item id), and a malformed id let through to the query.
+test("weekItemPattern matches itemId's ids of that week in every category, and nothing else", () => {
+  const w38 = isoWeek(new Date("2026-09-16T00:00:00Z"));
+  const pattern = weekItemPattern("2026-W38")!;
+  for (const category of digestCategories) {
+    assert.ok(likes(itemId(category, w38, "Some title", "https://a.example/1"), pattern), category);
+  }
+  const w39 = isoWeek(new Date("2026-09-23T00:00:00Z"));
+  assert.equal(likes(itemId("local", w39, "Recap2026w38 notes", "https://a.example/2"), pattern), false);
+  assert.equal(likes("post:12", pattern), false);
+  const w53 = isoWeek(new Date("2026-12-31T00:00:00Z"));
+  assert.ok(likes(itemId("local", w53, "Year end", "https://a.example/3"), weekItemPattern("2026-W53")!));
+  for (const bad of ["2026-W54", "2027-W53", "2026-38", "2026w38", "", "%"]) assert.equal(weekItemPattern(bad), null, bad);
 });
 
 test("parseSubmittedUrl rejects internal and non-http targets", () => {

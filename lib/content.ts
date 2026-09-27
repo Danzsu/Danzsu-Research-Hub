@@ -8,8 +8,8 @@ import type {
   Localized,
 } from "@/data/digest-types";
 import { toPost, type Post } from "@/lib/post-view";
-import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel } from "@/lib/pipeline/util";
-import { POST_STATE_PREFIX, readPostIds, type ReaderData } from "@/lib/reader-store";
+import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
+import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 
 const budapest = new Intl.DateTimeFormat("hu-HU", {
   timeZone: "Europe/Budapest",
@@ -98,10 +98,16 @@ export async function getPosts(db: SupabaseClient): Promise<Post[]> {
   return (data ?? []).map(toPost);
 }
 
-/** The caller's flags and to-dos (RLS: own rows only): GET /api/state, and the Radar's server-rendered seed. Null when a query fails. */
-export async function getReaderState(db: SupabaseClient): Promise<ReaderData | null> {
+/**
+ * The caller's flags on week `issueId`'s items, and every to-do (RLS: own rows only): GET /api/state and
+ * the Radar pages' seed. The flags narrow to the week by the item id's fixed form (weekItemPattern); the
+ * to-dos stay whole, because the panel lists them all. Null when a query fails or the id is malformed.
+ */
+export async function getReaderState(db: SupabaseClient, issueId: string): Promise<ReaderData | null> {
+  const pattern = weekItemPattern(issueId);
+  if (!pattern) return null;
   const [stateResult, todoResult] = await Promise.all([
-    db.from("item_states").select("item_id, is_read, is_saved"),
+    db.from("item_states").select("item_id, is_read, is_saved").like("item_id", pattern),
     db.from("todos").select("id, item_id, text, is_done").order("is_done").order("created_at", { ascending: false }),
   ]);
   if (stateResult.error || todoResult.error) {
@@ -112,6 +118,11 @@ export async function getReaderState(db: SupabaseClient): Promise<ReaderData | n
     states: Object.fromEntries(stateResult.data.map((row) => [row.item_id, { read: row.is_read, saved: row.is_saved }])),
     todos: todoResult.data.map((row) => ({ id: row.id, itemId: row.item_id, text: row.text, done: row.is_done })),
   };
+}
+
+/** A Radar page's seed: the reader's state for `issueId`, stamped with this render (spec 1.4, seedNeedsLoad). */
+export async function getReaderSeed(db: SupabaseClient, issueId: string): Promise<ReaderSeed> {
+  return { issueId, seededAt: Date.now(), data: await getReaderState(db, issueId) };
 }
 
 /** The reader's opened posts (item_states `post:<id>`, RLS: own rows only); the Library list dims them. */

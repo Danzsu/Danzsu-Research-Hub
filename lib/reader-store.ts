@@ -9,6 +9,9 @@ export type Flag = keyof ItemState;
 export type Todo = { id: number; itemId: string | null; text: string; done: boolean };
 /** GET /api/state. */
 export type ReaderData = { states: Record<string, ItemState>; todos: Todo[] };
+/** A Radar page's server seed (getReaderSeed, lib/content.ts): the week, the render's time, and the
+ *  reader's state for that week, null when the server's query failed. */
+export type ReaderSeed = { issueId: string; seededAt: number; data: ReaderData | null };
 export type ReaderSnapshot = ReaderData & {
   /** The states as first loaded. The feed sorts by these, so a card marked read now stays in place until the next visit. */
   loadedStates: Record<string, ItemState>;
@@ -52,10 +55,49 @@ export async function postState(write: StateWrite): Promise<{ id?: number }> {
   return (await response.json()) as { id?: number };
 }
 
-export async function loadState(): Promise<ReaderData> {
-  const response = await fetch("/api/state", { cache: "no-store" });
+export async function loadState(issueId: string): Promise<ReaderData> {
+  const response = await fetch(`/api/state?issue=${encodeURIComponent(issueId)}`, { cache: "no-store" });
   if (!response.ok) throw new Error(`state read ${response.status}`);
   return (await response.json()) as ReaderData;
+}
+
+/** `<issue id>:<seededAt>` of every seed this tab has mounted. Only `revalidateSeed` adds to it, from an
+ *  effect, so a server render never does. */
+const mountedSeeds = new Set<string>();
+const seedKey = (seed: ReaderSeed) => `${seed.issueId}:${seed.seededAt}`;
+
+/**
+ * Whether the store a seed starts must wait for GET /api/state (spec 1.4). A failed seed (null) always
+ * does. A seed's first mount in this tab comes from a fresh server render, so it doesn't. A seed this tab
+ * has mounted before is the router cache restoring the page (Back), so it does. No clock: the server's
+ * and the phone's can disagree by minutes.
+ */
+export function seedNeedsLoad(seed: ReaderSeed, mounted: ReadonlySet<string> = mountedSeeds): boolean {
+  return seed.data === null || mounted.has(seedKey(seed));
+}
+
+/** The mount's half of it: records the seed as mounted, and loads the week's state when the store waits
+ *  for it (`seedNeedsLoad` started it syncing). Returns the cleanup, which drops a late answer. */
+export function revalidateSeed(
+  store: ReaderStore,
+  seed: ReaderSeed,
+  load: (issueId: string) => Promise<ReaderData> = loadState,
+  mounted: Set<string> = mountedSeeds,
+): () => void {
+  mounted.add(seedKey(seed));
+  if (!store.getSnapshot().syncing) return () => {};
+  let live = true;
+  load(seed.issueId).then(
+    (data) => {
+      if (live) store.hydrate(data);
+    },
+    () => {
+      if (live) store.hydrateFailed();
+    },
+  );
+  return () => {
+    live = false;
+  };
 }
 
 /** No network, for the offline preview and tests. `fail` rejects every write the way an offline fetch does. */

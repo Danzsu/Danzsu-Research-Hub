@@ -63,6 +63,16 @@ export function itemId(category: string, week: Week, title: string, url: string)
   return `${category}-${week.compact}-${slugify(title) || "item"}-${shortHash(url)}`.slice(0, 120);
 }
 
+/**
+ * The `like` pattern of week `weekId`'s Radar item ids, from itemId()'s fixed form: '2026-W38' →
+ * '%-2026w38-%'. Null for a malformed id. `item_states` has no issue column, so this is how the reader
+ * state narrows to one week (spec 1.3); `post:<id>` keys and other weeks' items don't match.
+ */
+export function weekItemPattern(weekId: string): string | null {
+  const monday = isoWeekMonday(weekId);
+  return monday ? `%-${isoWeek(monday).compact}-%` : null;
+}
+
 export type SourceKind = "article" | "youtube" | "arxiv" | "github" | "x" | "pdf";
 
 export const isValidYoutubeId = (id: string): boolean => /^[A-Za-z0-9_-]{11}$/.test(id);

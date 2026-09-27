@@ -8,7 +8,10 @@ import {
   postState,
   postStateKey,
   readPostIds,
+  revalidateSeed,
+  seedNeedsLoad,
   type ReaderData,
+  type ReaderSeed,
   type SendState,
   type StateWrite,
   type Todo,
@@ -285,6 +288,65 @@ test("postState sends keepalive JSON and throws on a non-2xx answer; loadState r
   assert.deepEqual(JSON.parse(String(seen[0].init?.body)), { action: "add_todo", text: "x" });
   status = 500;
   await assert.rejects(() => postState({ action: "delete_todo", id: 1 }), /state write 500/);
-  await assert.rejects(() => loadState(), /state read 500/);
+  await assert.rejects(() => loadState("2026-W39"), /state read 500/);
+  assert.equal(seen.at(-1)?.url, "/api/state?issue=2026-W39");
   assert.equal(seen.at(-1)?.init?.cache, "no-store");
+});
+
+const seed = (overrides: Partial<ReaderSeed> = {}): ReaderSeed => ({
+  issueId: "2026-W39",
+  seededAt: 1_000,
+  data: { states: { a: { read: true, saved: false } }, todos: [] },
+  ...overrides,
+});
+/** The store a Radar page starts from its seed, as useReaderState does. */
+const seededStore = (from: ReaderSeed, mounted: Set<string>) => createReaderStore(recording().send, noop, from.data ?? undefined, seedNeedsLoad(from, mounted));
+
+// Review Focus 2. Kills a GET on every mount (the pre-R1 behaviour, the extra round trip after every
+// hydration), a remount that skips it (Back would keep a stale seed), and a key without the render's
+// time (a fresh render of a week seen before would GET again).
+test("a seed's first mount skips GET /api/state; the same seed mounted again (Back) GETs its week, once", async () => {
+  const mounted = new Set<string>();
+  const loads: string[] = [];
+  const load = async (issueId: string) => {
+    loads.push(issueId);
+    return { states: { a: { read: false, saved: true } }, todos: [] };
+  };
+  const fresh = seededStore(seed(), mounted);
+  assert.equal(fresh.getSnapshot().syncing, false);
+  revalidateSeed(fresh, seed(), load, mounted);
+  const restored = seededStore(seed(), mounted);
+  assert.equal(restored.getSnapshot().syncing, true);
+  revalidateSeed(restored, seed(), load, mounted);
+  await tick();
+  assert.deepEqual(loads, ["2026-W39"]);
+  assert.deepEqual(restored.getSnapshot().states, { a: { read: false, saved: true } });
+  assert.equal(restored.getSnapshot().syncing, false);
+  assert.equal(seedNeedsLoad(seed({ seededAt: 2_000 }), mounted), false);
+});
+
+// Kills a failed seed treated as fresh: the reader would see a week with nothing read and no to-dos.
+test("a failed seed (null) always GETs, and an answer that lands after unmount is dropped", async () => {
+  const mounted = new Set<string>();
+  let answer: (data: ReaderData) => void = noop;
+  const load = () => new Promise<ReaderData>((resolve) => (answer = resolve));
+  const failed = seed({ data: null });
+  const store = seededStore(failed, mounted);
+  assert.equal(store.getSnapshot().syncing, true);
+  const unmount = revalidateSeed(store, failed, load, mounted);
+  unmount();
+  answer({ states: { a: { read: true, saved: false } }, todos: [] });
+  await tick();
+  assert.deepEqual(store.getSnapshot().states, {});
+  assert.equal(seedNeedsLoad(failed, new Set()), true);
+});
+
+// Kills a restored seed whose failed GET leaves the panel on "SZINKRON…" for good, or wipes the seed.
+test("a restored seed whose GET fails stops syncing and keeps what the seed showed", async () => {
+  const mounted = new Set([`2026-W39:1000`]);
+  const store = seededStore(seed(), mounted);
+  revalidateSeed(store, seed(), () => Promise.reject(new TypeError("Failed to fetch")), mounted);
+  await tick();
+  assert.equal(store.getSnapshot().syncing, false);
+  assert.deepEqual(store.getSnapshot().states, { a: { read: true, saved: false } });
 });

@@ -6,7 +6,7 @@ import "./test/route-hooks.ts";
 
 // lib/content.ts is a Next-only server module (`@/` imports, `server-only`): route-hooks.ts registers
 // the loader that resolves both, and stands in for lib/supabase/server.ts.
-const { getRadar } = await import("./content.ts");
+const { getRadar, getReaderState } = await import("./content.ts");
 
 const text = (en: string) => ({ hu: `${en} (hu)`, en });
 /** A digest_items row as the embed selects it. */
@@ -94,4 +94,36 @@ test("getRadar throws on a failed query instead of answering an empty week", asy
   const failsWithCause = (e: unknown) => e instanceof Error && /radar query failed: connection failure/.test(e.message) && e.cause === error;
   await assert.rejects(getRadar(db), failsWithCause);
   await assert.rejects(getRadar(db, "2026-W38"), failsWithCause);
+});
+
+// Spec 1.3. Kills the week filter dropped (every week's flags and every `post:<id>` key would ride
+// along), aimed at the to-dos (the panel lists them all), or built from the id as written.
+test("getReaderState narrows the flags to the week's items, and keeps every to-do", async () => {
+  const db = fakeDb(undefined, {
+    rows: {
+      item_states: [
+        { item_id: "local-2026w38-a-1a2b3c", is_read: true, is_saved: false },
+        { item_id: "local-2026w39-b-4d5e6f", is_read: true, is_saved: true },
+        { item_id: "post:12", is_read: true, is_saved: false },
+      ],
+      todos: [
+        { id: 1, item_id: "local-2026w37-c-7a8b9c", text: "Old week", is_done: false },
+        { id: 2, item_id: null, text: "Loose", is_done: true },
+      ],
+    },
+  });
+  assert.deepEqual(await getReaderState(db, "2026-W38"), {
+    states: { "local-2026w38-a-1a2b3c": { read: true, saved: false } },
+    todos: [
+      { id: 1, itemId: "local-2026w37-c-7a8b9c", text: "Old week", done: false },
+      { id: 2, itemId: null, text: "Loose", done: true },
+    ],
+  });
+  assert.deepEqual(
+    db.queries.map(({ table, calls }) => [table, calls.slice(1)]),
+    [
+      ["item_states", [["like", "item_id", "%-2026w38-%"]]],
+      ["todos", [["order", "is_done"], ["order", "created_at", { ascending: false }]]],
+    ],
+  );
 });

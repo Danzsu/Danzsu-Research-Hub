@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
 import { getReaderState } from "@/lib/content";
+import { isoWeekMonday } from "@/lib/pipeline/util";
 import { parseStateAction } from "@/lib/state";
 import { getReader } from "@/lib/supabase/server";
 
@@ -12,10 +13,13 @@ function failed(error: unknown) {
   return jsonError(500, "db_error");
 }
 
-export async function GET() {
+/** `?issue=<week id>`: the flags on that week's items, and every to-do. */
+export async function GET(request: Request) {
   const reader = await getReader();
   if (!reader) return jsonError(401, "unauthorized");
-  const data = await getReaderState(reader.db);
+  const issue = new URL(request.url).searchParams.get("issue");
+  if (!issue || !isoWeekMonday(issue)) return jsonError(400, "invalid_issue");
+  const data = await getReaderState(reader.db, issue);
   return data ? NextResponse.json(data) : jsonError(500, "db_error");
 }
 
