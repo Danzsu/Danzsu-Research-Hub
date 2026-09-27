@@ -124,9 +124,8 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
   // The reader is at the thread's end (within 40px, as of their last scroll): only then does it follow
   // what grows, so someone who scrolled up to read stays where they are.
   const nearEnd = useRef(true);
-  // Set by the reader's own send and used up by the next change the thread follows: a flag the observer
-  // consumes, not a count of sends in flight, so nothing hangs on when React flushes the store's updates.
-  const pinNext = useRef(false);
+  // The thread's scroller, for the pin after the reader's own send.
+  const threadRef = useRef<HTMLDivElement | null>(null);
   const t = copy[language];
 
   useEffect(() => {
@@ -140,22 +139,31 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
   // is instant, because a glide's own scroll events would read as the reader leaving the end.
   const followThread = useCallback((thread: HTMLDivElement | null) => {
     if (!thread) return;
+    threadRef.current = thread;
     // Each open mounts a fresh thread, and it opens at the latest message.
     nearEnd.current = true;
     const observer = new ResizeObserver(() => {
-      if (!nearEnd.current && !pinNext.current) return;
-      pinNext.current = false;
-      thread.scrollTop = thread.scrollHeight;
+      if (nearEnd.current) thread.scrollTop = thread.scrollHeight;
     });
     observer.observe(thread);
     // The wrapper, not the list: ChatThread's list is keyed on its first load, so it is replaced then.
     if (thread.firstElementChild) observer.observe(thread.firstElementChild);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      threadRef.current = null;
+    };
   }, []);
 
   async function send() {
-    pinNext.current = true;
-    if (!(await chat.send(text))) return;
+    const sent = await chat.send(text);
+    // The reader's own send ends at its answer, even for a reader who scrolled up. Pinned directly once it
+    // has settled, in the next frame, after React has committed it, rather than armed for the observer: a
+    // send that changes no size (a deduped signed_out, a full thread whose dropped entry was as tall) would
+    // leave that armed, and the next unrelated resize would pull the reader down.
+    requestAnimationFrame(() => {
+      if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
+    });
+    if (!sent) return;
     setText("");
     // Send pressed from the keyboard has the focus; the next link goes in the field.
     input.current?.focus();
