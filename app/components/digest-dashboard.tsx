@@ -109,7 +109,7 @@ export function DigestDashboard({
   /** A closed week opened from /archive: same reading UI, no "live" framing. */
   archived?: boolean;
   /** The reader's flags and to-dos from the server render (getReaderSeed). */
-  seed?: ReaderSeed;
+  seed: ReaderSeed;
   /** The offline preview (app/dev/preview): seeded reader state, no network. */
   preview?: ReaderPreview;
 }) {
