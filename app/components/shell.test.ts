@@ -112,11 +112,7 @@ test("DigestDashboard renders the Top 3, the feed and the to-do panel from the p
   assert.equal(doc.querySelectorAll("aside li").length, previewReader.todos.length);
 });
 
-// Pre-flight ruling M-3, fix round 1. Pins DigestDashboard's seed wiring (`seed ? seedNeedsLoad(seed) :
-// false` in useReaderState): the static harness never runs revalidateSeed's effect, so only this initial
-// value decides whether the panel opens synced. A fresh seed (this tab's first mount of that week) must
-// not start syncing, and a failed one (the server's own query came back null) always must — either
-// direction of a wiring regressed to a fixed value would still pass every other test and the preview.
+// Kills createSeededStore's syncing decision hardcoded to one value: a fresh seed must start synced, a failed (null) one must start syncing.
 test("DigestDashboard starts synced from a fresh seed, not the syncing state", () => {
   const seed = { issueId: "2026-W39", seededAt: 424_242, data: previewReader };
   const text = withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed }).body.textContent ?? "";
