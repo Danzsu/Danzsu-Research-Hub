@@ -327,14 +327,21 @@ test("a seed's first mount skips GET /api/state; the same seed mounted again (Ba
 });
 
 // Kills a failed seed treated as fresh: the reader would see a week with nothing read and no to-dos.
+// Also kills revalidateSeed never actually calling `load` for it: the old assertions below (the states
+// stay empty, seedNeedsLoad still says true) would hold even if load() were never invoked at all.
 test("a failed seed (null) always GETs, and an answer that lands after unmount is dropped", async () => {
   const mounted = new Set<string>();
   let answer: (data: ReaderData) => void = noop;
-  const load = () => new Promise<ReaderData>((resolve) => (answer = resolve));
+  let loadCalls = 0;
+  const load = () => {
+    loadCalls++;
+    return new Promise<ReaderData>((resolve) => (answer = resolve));
+  };
   const failed = seed({ data: null });
   const store = seededStore(failed, mounted);
   assert.equal(store.getSnapshot().syncing, true);
   const unmount = revalidateSeed(store, failed, load, mounted);
+  assert.equal(loadCalls, 1, "revalidateSeed must call load for a store that started syncing");
   unmount();
   answer({ states: { a: { read: true, saved: false } }, todos: [] });
   await tick();
@@ -343,11 +350,20 @@ test("a failed seed (null) always GETs, and an answer that lands after unmount i
 });
 
 // Kills a restored seed whose failed GET leaves the panel on "SZINKRON…" for good, or wipes the seed.
+// The "seen" mark comes from a real first revalidateSeed call, not a hardcoded key: a test that bakes
+// in "2026-W39:1000" stays green even if seedKey's own format drifts, and — worse — the restored
+// store then never actually starts syncing, which makes the final `syncing === false` check true no
+// matter what (it started false too), so it stops proving hydrateFailed ran at all. Asserting
+// `syncing === true` right after the restored mount closes that gap.
 test("a restored seed whose GET fails stops syncing and keeps what the seed showed", async () => {
-  const mounted = new Set([`2026-W39:1000`]);
-  const store = seededStore(seed(), mounted);
-  revalidateSeed(store, seed(), () => Promise.reject(new TypeError("Failed to fetch")), mounted);
+  const mounted = new Set<string>();
+  const firstMount = seededStore(seed(), mounted); // a fresh render: not syncing, but marks the seed as seen
+  revalidateSeed(firstMount, seed(), async () => ({ states: {}, todos: [] }), mounted);
+
+  const restored = seededStore(seed(), mounted); // Back: the same seed, now already in `mounted`
+  assert.equal(restored.getSnapshot().syncing, true, "a seed this tab has seen before must start syncing");
+  revalidateSeed(restored, seed(), () => Promise.reject(new TypeError("Failed to fetch")), mounted);
   await tick();
-  assert.equal(store.getSnapshot().syncing, false);
-  assert.deepEqual(store.getSnapshot().states, { a: { read: true, saved: false } });
+  assert.equal(restored.getSnapshot().syncing, false);
+  assert.deepEqual(restored.getSnapshot().states, { a: { read: true, saved: false } });
 });
