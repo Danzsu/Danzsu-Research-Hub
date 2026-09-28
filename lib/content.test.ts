@@ -6,7 +6,7 @@ import "./test/route-hooks.ts";
 
 // lib/content.ts is a Next-only server module (`@/` imports, `server-only`): route-hooks.ts registers
 // the loader that resolves both, and stands in for lib/supabase/server.ts.
-const { getRadar, getReaderState } = await import("./content.ts");
+const { getRadar, getReaderState, getReaderSeed } = await import("./content.ts");
 
 const text = (en: string) => ({ hu: `${en} (hu)`, en });
 /** A digest_items row as the embed selects it. */
@@ -125,5 +125,20 @@ test("getReaderState narrows the flags to the week's items, and keeps every to-d
       ["item_states", [["like", "item_id", "%-2026w38-%"]]],
       ["todos", [["order", "is_done"], ["order", "created_at", { ascending: false }]]],
     ],
+  );
+});
+
+// Kills seededAt frozen (e.g. a hardcoded 0 or the issue's own updated_at): the seed's stamp is this
+// render's own moment, which is what seedNeedsLoad keys a "seen before in this tab" mount on.
+test("getReaderSeed stamps seededAt with the render's own moment, not a fixed value", async (t) => {
+  const db = fakeDb(undefined, { rows: { item_states: [], todos: [] } });
+  t.mock.timers.enable({ apis: ["Date"] });
+  const first = await getReaderSeed(db, "2026-W38");
+  t.mock.timers.tick(5_000);
+  const second = await getReaderSeed(db, "2026-W38");
+  assert.equal(second.seededAt - first.seededAt, 5_000);
+  assert.deepEqual(
+    [first.issueId, first.data],
+    ["2026-W38", { states: {}, todos: [] }],
   );
 });
