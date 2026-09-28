@@ -12,7 +12,7 @@ import {
   previewReadPostIds,
   previewSources,
 } from "../../lib/fixtures.ts";
-import { createSeededStore, memorySend, revalidateSeed } from "../../lib/reader-store.ts";
+import { createSeededStore, memorySend, revalidateSeed, type ReaderSeed } from "../../lib/reader-store.ts";
 import { navigationStub } from "../../lib/test/next-stub.ts";
 import { render } from "../../lib/test/render.ts";
 
@@ -39,6 +39,9 @@ const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop };
 /** Wraps a component that reads useLanguage() (LocalizedText, SubmitForm, DigestDashboard) in its provider. */
 const withLanguage = <P extends object>(Component: ComponentType<P>, props: P) =>
   render(createElement(LanguageProvider, { initial: "en" } as ComponentProps<typeof LanguageProvider>, createElement(Component, props)));
+/** Renders DigestDashboard from a real seed (never preview) and returns its body text. */
+const dashboardText = (seed: ReaderSeed) =>
+  withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed }).body.textContent ?? "";
 /** The whole shell around one child, as the (app) layout renders it. */
 const shell = (language: "hu" | "en" = "hu") =>
   render(
@@ -115,8 +118,7 @@ test("DigestDashboard renders the Top 3, the feed and the to-do panel from the p
 
 // Kills createSeededStore's syncing decision hardcoded to one value: a fresh seed must start synced, a failed (null) one must start syncing.
 test("DigestDashboard starts synced from a fresh seed, not the syncing state", () => {
-  const seed = { issueId: "2026-W39", seededAt: 424_242, data: previewReader };
-  const text = withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed }).body.textContent ?? "";
+  const text = dashboardText({ issueId: "2026-W39", seededAt: 424_242, data: previewReader });
   // Asserted positively first, so the negative check below can't pass vacuously (e.g. a harness that
   // renders neither copy at all).
   assert.ok(text.includes("SYNCED"), "a fresh seed must show the synced state");
@@ -124,20 +126,18 @@ test("DigestDashboard starts synced from a fresh seed, not the syncing state", (
 });
 
 test("DigestDashboard starts syncing from a failed (null) seed", () => {
-  const seed = { issueId: "2026-W39", seededAt: 424_242, data: null };
-  const text = withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed }).body.textContent ?? "";
+  const text = dashboardText({ issueId: "2026-W39", seededAt: 424_242, data: null });
   assert.ok(text.includes("SYNC…"), "a failed seed must start in the syncing state");
 });
 
-// O1. Kills the hook passing its own isolated Set instead of relying on createSeededStore's and
-// revalidateSeed's shared mountedSeeds default, which is what actually remembers a seed across a Back restore.
+// Kills the hook passing createSeededStore its own isolated Set instead of the shared mountedSeeds
+// default (revalidateSeed's own half of this is checked in the browser, TESTING.md).
 test("a seed already marked as seen through the shared defaults starts DigestDashboard syncing again (Back)", () => {
   const backSeed = { issueId: "2026-W39", seededAt: 987_654, data: previewReader };
   // Marks it seen the way a real first mount's revalidateSeed() would, through the module's own default
   // mountedSeeds — no explicit `mounted` argument on either call.
   revalidateSeed(createSeededStore(memorySend(), noop, backSeed), backSeed, async () => previewReader);
-  const text = withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed: backSeed }).body.textContent ?? "";
-  assert.ok(text.includes("SYNC…"), "a seed this tab has already mounted must start syncing again");
+  assert.ok(dashboardText(backSeed).includes("SYNC…"), "a seed this tab has already mounted must start syncing again");
 });
 
 test("StoryCard renders an unread feed card with its full action row", () => {
