@@ -2,7 +2,19 @@ import Link from "next/link";
 
 // The preview's own view switcher (development only, English on purpose: it is a tool, not app UI).
 
-export const PREVIEW_VIEWS = ["radar", "radar-empty", "library", "library-empty", "archive", "archive-empty"] as const;
+export const PREVIEW_VIEWS = [
+  "radar",
+  "radar-empty",
+  "library",
+  "library-empty",
+  "archive",
+  "archive-empty",
+  // The (app) pages' loading skeletons: /dev has no loading.tsx, so offline this is the only way to see them.
+  "radar-loading",
+  "library-loading",
+  "archive-loading",
+  "post-loading",
+] as const;
 export type PreviewView = (typeof PREVIEW_VIEWS)[number];
 
 /** `&slow=1`: the link chat's in-memory transport holds every answer this long, so its in-flight states show. */

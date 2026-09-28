@@ -149,6 +149,11 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .lift:focus-visible { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
 .story-read { opacity: 0.58; }
 
+/* The loading skeletons' placeholders (page-skeletons.tsx): in after 150ms, in the house 160ms, so a fast
+   load flashes none. Reduced motion (below) keeps the wait and drops the fade. */
+.skeleton-fill { animation: skeleton-in 160ms ease 150ms both; }
+@keyframes skeleton-in { from { opacity: 0; } }
+
 @keyframes pulse-ring {
   70% { box-shadow: 0 0 0 8px rgb(241 95 34 / 0%); }
   100% { box-shadow: 0 0 0 0 rgb(241 95 34 / 0%); }

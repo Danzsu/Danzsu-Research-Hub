@@ -3,24 +3,32 @@ import { Radar } from "lucide-react";
 
 // Hook-free, so server pages and the client error boundary can both use these.
 
-/** The cream title band of the secondary pages: eyebrow, `TITLE//`, lead text, optional side panel. */
-export function PageHero({ eyebrow, title, lead, aside }: { eyebrow: string; title: string; lead: ReactNode; aside?: ReactNode }) {
+/** PageHero's band: the cream box and its two-column switch, shared with the list pages' loading
+ *  skeleton (page-skeletons.tsx), so the two line up. */
+export function HeroBand({ aside, children }: { aside?: ReactNode; children: ReactNode }) {
   return (
     // @container: the sidebar (256px full, 56px rail) makes this section's own width, not the
     // viewport, the thing the two-column switch below has to key off (spec: Design language → Responsive rules).
     <section className="@container border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
       <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
-        <div className="min-w-0">
-          <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
-          <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em] [overflow-wrap:anywhere]">
-            {title}
-            <span className="text-signal">{"//"}</span>
-          </h1>
-          <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
-        </div>
+        <div className="min-w-0">{children}</div>
         {aside}
       </div>
     </section>
+  );
+}
+
+/** The cream title band of the secondary pages: eyebrow, `TITLE//`, lead text, optional side panel. */
+export function PageHero({ eyebrow, title, lead, aside }: { eyebrow: string; title: string; lead: ReactNode; aside?: ReactNode }) {
+  return (
+    <HeroBand aside={aside}>
+      <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
+      <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em] [overflow-wrap:anywhere]">
+        {title}
+        <span className="text-signal">{"//"}</span>
+      </h1>
+      <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
+    </HeroBand>
   );
 }
 

@@ -3,6 +3,7 @@ import { ArchiveView } from "@/app/(app)/archive/archive-view";
 import { LibraryView } from "@/app/(app)/library/library-view";
 import { AppShell } from "@/app/components/app-shell";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
+import { ListSkeleton, PostSkeleton, RadarSkeleton } from "@/app/components/page-skeletons";
 import {
   previewArchive,
   previewEmail,
@@ -41,6 +42,10 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
       {view === "library-empty" && <LibraryView posts={[]} open={[]} readIds={new Set()} preview={{ failWrites }} />}
       {view === "archive" && <ArchiveView issues={previewArchive} />}
       {view === "archive-empty" && <ArchiveView issues={[]} />}
+      {view === "radar-loading" && <RadarSkeleton />}
+      {view === "library-loading" && <ListSkeleton form />}
+      {view === "archive-loading" && <ListSkeleton />}
+      {view === "post-loading" && <PostSkeleton />}
     </AppShell>
   );
 }
