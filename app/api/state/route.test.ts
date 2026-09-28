@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fakeDb } from "../../../lib/pipeline/fake-db.ts";
+import { fakeDb, pgError } from "../../../lib/pipeline/fake-db.ts";
 import { resetRoute, routeStub, signedIn } from "../../../lib/test/route-hooks.ts";
 
 const { GET, POST } = await import("./route.ts");
@@ -66,4 +66,21 @@ test("POST /api/state answers 401 when signed out", async () => {
   resetRoute();
   const response = await write({ action: "set_read", itemId: "local-a", value: true });
   assert.deepEqual([response.status, await response.json()], [401, { error: "unauthorized" }]);
+});
+
+test("GET /api/state answers 401 when signed out", async () => {
+  resetRoute();
+  const response = await GET(new Request("http://localhost/api/state?issue=2026-W39"));
+  assert.deepEqual([response.status, await response.json()], [401, { error: "unauthorized" }]);
+});
+
+// Kills getReaderState's failure swallowed silently: a failed query must both surface as 500 and be
+// logged exactly once (console.error is mocked, not left to print into the test's own output).
+test("GET /api/state answers 500 db_error when the underlying query fails, and logs it once", async (t) => {
+  resetRoute();
+  const error = t.mock.method(console, "error", () => {});
+  routeStub.reader = signedIn(fakeDb(undefined, { tableErrors: { item_states: pgError("08006", "connection failure") } }));
+  const response = await GET(new Request("http://localhost/api/state?issue=2026-W39"));
+  assert.deepEqual([response.status, await response.json()], [500, { error: "db_error" }]);
+  assert.equal(error.mock.calls.length, 1);
 });
