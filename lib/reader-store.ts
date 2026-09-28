@@ -12,6 +12,11 @@ export type ReaderData = { states: Record<string, ItemState>; todos: Todo[] };
 /** A Radar page's server seed (getReaderSeed, lib/content.ts): the week, the render's time, and the
  *  reader's state for that week, null when the server's query failed. */
 export type ReaderSeed = { issueId: string; seededAt: number; data: ReaderData | null };
+/** The offline preview (app/dev/preview): seeded state and no network; `failWrites` acts like being offline. */
+type ReaderPreview = { data: ReaderData; failWrites: boolean };
+/** How a Radar page's reader state starts: a real page always has a seed; the offline preview always
+ *  has its own data instead, and never a seed — never both, never neither. */
+export type ReaderSource = { seed: ReaderSeed; preview?: never } | { preview: ReaderPreview; seed?: never };
 export type ReaderSnapshot = ReaderData & {
   /** The states as first loaded. The feed sorts by these, so a card marked read now stays in place until the next visit. */
   loadedStates: Record<string, ItemState>;
@@ -105,6 +110,14 @@ export function revalidateSeed(
  *  useReaderState and the reader-store tests can't drift apart. */
 export function createSeededStore(send: SendState, onError: () => void, seed: ReaderSeed, mounted?: ReadonlySet<string>): ReaderStore {
   return createReaderStore(send, onError, seed.data ?? undefined, seedNeedsLoad(seed, mounted));
+}
+
+/** The store a Radar page's client starts with, chosen once from how its reader state starts: the
+ *  preview always writes through its own in-memory sender (never real `fetch`, whatever `failWrites`
+ *  says), and a real page always writes through `postState`. The one place that makes that choice, so
+ *  a regression that quietly routes a preview write to the real API has exactly one line to break. */
+export function createSourceStore(source: ReaderSource, onError: () => void): ReaderStore {
+  return source.preview ? createReaderStore(memorySend(source.preview.failWrites), onError, source.preview.data) : createSeededStore(postState, onError, source.seed);
 }
 
 /** No network, for the offline preview and tests. `fail` rejects every write the way an offline fetch does. */

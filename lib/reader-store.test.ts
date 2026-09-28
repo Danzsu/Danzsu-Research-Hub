@@ -4,6 +4,7 @@ import { mockFetch } from "./pipeline/mock-fetch.ts";
 import {
   createReaderStore,
   createSeededStore,
+  createSourceStore,
   loadState,
   memorySend,
   postState,
@@ -292,6 +293,53 @@ test("postState sends keepalive JSON and throws on a non-2xx answer; loadState r
   await assert.rejects(() => loadState("2026-W39"), /state read 500/);
   assert.equal(seen.at(-1)?.url, "/api/state?issue=2026-W39");
   assert.equal(seen.at(-1)?.init?.cache, "no-store");
+});
+
+// N4. The hard rule "the preview never touches real data" depends on createSourceStore always routing a
+// preview source to its own memory sender, never postState (real `fetch`) — however identically a
+// misrouted preview might otherwise render or behave.
+test("createSourceStore's preview source writes only to its own memory sender, never fetch", async (t) => {
+  let fetchCalls = 0;
+  mockFetch(t, async () => {
+    fetchCalls++;
+    return Response.json({ id: 1 });
+  });
+  let errors = 0;
+  const store = createSourceStore({ preview: { data: empty, failWrites: false } }, () => errors++);
+  store.setFlag("a", "read", true);
+  store.addTodo("later");
+  await store.settled();
+  assert.equal(fetchCalls, 0);
+  assert.equal(errors, 0);
+});
+
+test("createSourceStore's preview source with failWrites rolls back and reports the error, still with no fetch", async (t) => {
+  let fetchCalls = 0;
+  mockFetch(t, async () => {
+    fetchCalls++;
+    return Response.json({ id: 1 });
+  });
+  let errors = 0;
+  const store = createSourceStore({ preview: { data: empty, failWrites: true } }, () => errors++);
+  store.setFlag("a", "read", true);
+  await store.settled();
+  assert.equal(store.getSnapshot().states.a?.read, false, "rolled back to the pre-write default");
+  assert.equal(errors, 1);
+  assert.equal(fetchCalls, 0);
+});
+
+// Proves the two tests above aren't vacuous: a seed source's write does reach fetch, through postState.
+test("createSourceStore's seed source writes through postState, reaching fetch", async (t) => {
+  let fetchCalls = 0;
+  mockFetch(t, async () => {
+    fetchCalls++;
+    return Response.json({ ok: true });
+  });
+  const seed: ReaderSeed = { issueId: "2026-W39", seededAt: 1, data: { states: {}, todos: [] } };
+  const store = createSourceStore({ seed }, noop);
+  store.setFlag("a", "read", true);
+  await store.settled();
+  assert.equal(fetchCalls, 1);
 });
 
 const seed = (overrides: Partial<ReaderSeed> = {}): ReaderSeed => ({
