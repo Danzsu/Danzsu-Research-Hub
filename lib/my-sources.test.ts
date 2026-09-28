@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MINE_LIMIT } from "./link-chat.ts";
 import { existingPostId, listMySources, retrySource } from "./my-sources.ts";
 import { fakeDb, pgError } from "./pipeline/fake-db.ts";
+import { MINE_LIMIT } from "./pipeline/util.ts";
 
 /** A `sources` row as the listing selects it, submitted by "owner" on 2026-09-(10 + id). */
 const row = (id: number, overrides: Record<string, unknown> = {}) => ({

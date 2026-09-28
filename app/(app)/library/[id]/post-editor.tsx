@@ -9,9 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Language } from "@/data/digest-types";
-import { SUMMARY_MAX, TITLE_MAX } from "@/lib/overrides";
-import { editPayload } from "@/lib/post-edit";
-import type { Post, PostQuery } from "@/lib/post-view";
+import { SUMMARY_MAX, TITLE_MAX } from "@/lib/pipeline/util";
+import { editPayload, type Post, type PostQuery } from "@/lib/post-view";
 
 const copy = {
   hu: {

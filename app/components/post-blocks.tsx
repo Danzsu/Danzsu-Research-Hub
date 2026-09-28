@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import type { Language } from "@/data/digest-types";
-import { safeHref, type Block, type ImageBlock, type Inline } from "@/lib/blocks";
+import type { Block, ImageBlock, Inline } from "@/lib/blocks";
 import { isBlockVisible, isValidPlaceholder, mediaSources, primaryVideoId, videoEmbedSrc, withQuery, type PostQuery } from "@/lib/post-view";
-import { formatTimestamp } from "@/lib/pipeline/util";
+import { formatTimestamp, safeHref } from "@/lib/pipeline/util";
 import { PostImage } from "./post-image";
 import { Tag } from "./tag";
 

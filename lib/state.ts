@@ -1,11 +1,10 @@
 import { z } from "zod/v4";
+import { TODO_TEXT_MAX } from "./pipeline/util.ts";
 
 // The /api/state POST body. RLS already scopes every write to the caller; this only gets the shape right.
 // Each field's schema carries the error code the route answers 400 with as its message.
 
 const ITEM_ID_MAX = 120;
-/** Also the reader store's own cap (lib/reader-store.ts): one limit, trimmed the same way client and server. */
-export const TODO_TEXT_MAX = 180;
 
 const ERRORS = ["missing_item", "invalid_item", "missing_text", "invalid_id"] as const;
 export type StateActionError = (typeof ERRORS)[number] | "unknown_action";

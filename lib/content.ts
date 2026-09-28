@@ -8,7 +8,8 @@ import type {
   GithubTopEntry,
   Localized,
 } from "@/data/digest-types";
-import { toPost, type Post } from "@/lib/post-view";
+import { toPost } from "@/lib/post-row";
+import type { Post } from "@/lib/post-view";
 import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 import { createAdminClient, type Reader } from "@/lib/supabase/server";

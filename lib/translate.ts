@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { inlineText, parseBlocks, type Block, type Inline } from "./blocks.ts";
 import { generate } from "./llm.ts";
 import { errorMessage, mapLimited } from "./pipeline/util.ts";
-import { parseTranslatedBlocks } from "./post-view.ts";
+import { parseTranslatedBlocks } from "./post-row.ts";
 
 // Only text goes to the model and only text comes back; structure, links and
 // image data are copied from the original, so a translation cannot corrupt them.

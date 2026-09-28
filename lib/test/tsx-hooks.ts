@@ -24,14 +24,15 @@ const STUBS = new Map([
 
 const isFile = (url: string) => statSync(fileURLToPath(url), { throwIfNoEntry: false })?.isFile() ?? false;
 
-/** A base URL → the file it names, trying the extensions an extensionless import can mean. */
-const withExtension = (base: string) => ["", ".ts", ".tsx", "/index.ts", "/index.tsx"].map((suffix) => base + suffix).find(isFile);
+/** A base URL → the file it names, trying the extensions an extensionless import can mean. Also the
+ *  resolution lib/client-bundle.test.ts walks the client graph with. */
+export const withExtension = (base: string) => ["", ".ts", ".tsx", "/index.ts", "/index.tsx"].map((suffix) => base + suffix).find(isFile);
 
 /** `@/lib/blocks` → the file it names. */
-const aliasedFile = (specifier: string) => withExtension(new URL(specifier.slice(2), root).href);
+export const aliasedFile = (specifier: string) => withExtension(new URL(specifier.slice(2), root).href);
 
 /** `./tag` or `../foo`, no extension → the file it names, resolved against the importing module. */
-const relativeFile = (specifier: string, parentURL: string) => withExtension(new URL(specifier, parentURL).href);
+export const relativeFile = (specifier: string, parentURL: string) => withExtension(new URL(specifier, parentURL).href);
 
 export async function resolve(specifier: string, context: unknown, nextResolve: (specifier: string, context: unknown) => Promise<Resolved>): Promise<Resolved> {
   const stub = STUBS.get(specifier);

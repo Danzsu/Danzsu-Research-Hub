@@ -1,11 +1,13 @@
 import type { Localized } from "../data/digest-types.ts";
-import { parseBlocks, plainText, type Block, type ImageBlock } from "./blocks.ts";
+import type { Block, ImageBlock } from "./blocks.ts";
 import { isMediaKey, mediaUrl, variantPath } from "./media.ts";
-import { readHiddenBlocks, readOverrides, type Overrides } from "./overrides.ts";
+import type { Overrides } from "./overrides.ts";
 import { isValidYoutubeId, type SourceKind } from "./pipeline/util.ts";
 
 // Pure helpers for the post page and its renderer. Kept framework-free (no React, no
-// server-only imports) so `node --test` can load them directly and post-blocks.tsx stays thin.
+// server-only imports) so `node --test` can load them directly and post-blocks.tsx stays thin, and
+// zod-free, because the editor and post-blocks.tsx bring it into the browser (lib/client-bundle.test.ts):
+// blocks.ts and overrides.ts come in as types only. Parsing a posts row is lib/post-row.ts's job.
 
 export type PostMeta = {
   mirrored?: boolean;
@@ -26,7 +28,7 @@ export type Post = {
   title: Localized;
   summary: Localized;
   /** The model's own text, before any submitter override — the editor's "reset" target and the
-   *  baseline `editPayload` (lib/post-edit.ts) diffs a draft against to decide what to save. */
+   *  baseline `editPayload` (below) diffs a draft against to decide what to save. */
   generatedTitle: Localized;
   generatedSummary: Localized;
   keyPoints: Record<"hu" | "en", string[]>;
@@ -46,53 +48,23 @@ export type Post = {
  *  model's `title` (the post page, the link chat). */
 export const shownTitle = (title: unknown, overrides: Overrides): Localized => overrides.title ?? (title as Localized);
 
-/** A `posts` row (optionally with its `sources(submitted_by, error)` embed) as the page's Post. */
-export function toPost(row: Record<string, unknown>): Post {
-  const overrides = readOverrides(row.overrides);
-  const source = row.sources as { submitted_by: string; error?: string | null } | null | undefined;
-  return {
-    id: row.id as number,
-    sourceId: row.source_id as number,
-    kind: row.kind as SourceKind,
-    url: row.url as string,
-    author: row.author as string | null,
-    siteName: row.source_site as string | null,
-    publishedAt: row.published_at as string | null,
-    // Submitter edits win over the model's text; re-extraction never overwrites them.
-    title: shownTitle(row.title, overrides),
-    summary: overrides.summary ?? (row.summary as Localized),
-    generatedTitle: row.title as Localized,
-    generatedSummary: row.summary as Localized,
-    keyPoints: row.key_points as Post["keyPoints"],
-    tags: row.tags as string[],
-    blocks: parseBlocks(row.blocks),
-    blocksHu: parseTranslatedBlocks(row.blocks_hu),
-    meta: (row.meta ?? {}) as PostMeta,
-    hiddenBlocks: readHiddenBlocks(row.hidden_blocks),
-    submittedBy: source?.submitted_by ?? null,
-    lastError: source?.error ?? null,
-    extractedAt: row.extracted_at as string | null,
-    createdAt: row.created_at as string,
-  };
-}
-
-const WORDS_PER_MINUTE = 220;
-/** Below this word count there isn't enough real text for a read-time estimate to mean anything
- * (an extraction failure or a title-only fallback can leave a handful of stray words). */
-const MIN_WORDS_FOR_READ_TIME = 10;
-
-/** Null for kinds with no reading body (youtube) and for posts with ~no extracted text. */
-export function readMinutes(blocks: Block[], kind: SourceKind): number | null {
-  if (kind === "youtube") return null;
-  const words = plainText(blocks).trim().split(/\s+/).filter(Boolean);
-  if (words.length < MIN_WORDS_FOR_READ_TIME) return null;
-  return Math.max(1, Math.round(words.length / WORDS_PER_MINUTE));
-}
-
-/** `blocks_hu` as `[]` or unparseable jsonb both mean "not translated yet", not "translated to nothing". */
-export function parseTranslatedBlocks(raw: unknown): Block[] | null {
-  const parsed = parseBlocks(raw);
-  return parsed.length > 0 ? parsed : null;
+/**
+ * The PATCH body for a save: `title`/`summary` are included only when `draft` differs from the
+ * model's own text (`post.generatedTitle`/`generatedSummary`) — an unchanged or reset field must
+ * not freeze the model's text as a permanent override, and omitting a field that currently has one
+ * clears it (the RPC replaces `overrides` wholesale, it doesn't merge). Compared trimmed: the
+ * server trims on save (`localizedField` in overrides.ts), so an untrimmed comparison here would
+ * treat "Model " as a real edit and send a same-content override just for the trailing space.
+ */
+export function editPayload(
+  post: { generatedTitle: Localized; generatedSummary: Localized },
+  draft: { title: Localized; summary: Localized },
+  hidden: string[],
+): { title?: Localized; summary?: Localized; hidden: string[] } {
+  const sameAs = (a: Localized, b: Localized) => a.hu.trim() === b.hu.trim() && a.en.trim() === b.en.trim();
+  const title = sameAs(draft.title, post.generatedTitle) ? undefined : draft.title;
+  const summary = sameAs(draft.summary, post.generatedSummary) ? undefined : draft.summary;
+  return { ...(title && { title }), ...(summary && { summary }), hidden };
 }
 
 export const isValidVimeoId = (id: string): boolean => /^\d+$/.test(id);

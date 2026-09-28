@@ -2,14 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft, type ImageBlock } from "./blocks.ts";
 import {
+  editPayload,
   isBlockVisible,
   isValidPlaceholder,
   isValidVimeoId,
   mediaSources,
-  parseTranslatedBlocks,
   primaryVideoId,
-  readMinutes,
-  toPost,
   videoEmbedSrc,
   withQuery,
   type PostQuery,
@@ -17,40 +15,6 @@ import {
 import { isValidYoutubeId } from "./pipeline/util.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
-const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
-
-test("readMinutes is null for youtube regardless of block content", () => {
-  const blocks = assignIds([p(words(1000))]);
-  assert.equal(readMinutes(blocks, "youtube"), null);
-});
-
-test("readMinutes is null for empty or near-empty extractions, not '1 min'", () => {
-  assert.equal(readMinutes([], "article"), null); // extractionFailed / 0 blocks
-  assert.equal(readMinutes(assignIds([p("")]), "article"), null); // "".split(/\s+/) is [""], one empty "word"
-  assert.equal(readMinutes(assignIds([p("only three words")]), "article"), null);
-});
-
-test("readMinutes floors at 1 and rounds by word count for real text", () => {
-  assert.equal(readMinutes(assignIds([p(words(20))]), "article"), 1);
-  assert.equal(readMinutes(assignIds([p(words(440))]), "article"), 2);
-});
-
-test("readMinutes boundary: 9 words is too few, 10 is enough", () => {
-  assert.equal(readMinutes(assignIds([p(words(9))]), "article"), null);
-  assert.equal(readMinutes(assignIds([p(words(10))]), "article"), 1);
-});
-
-test("parseTranslatedBlocks treats [] and unparseable jsonb as no translation", () => {
-  assert.equal(parseTranslatedBlocks([]), null);
-  assert.equal(parseTranslatedBlocks(null), null);
-  assert.equal(parseTranslatedBlocks("garbage"), null);
-  assert.equal(parseTranslatedBlocks([{ id: "x", type: "nope" }]), null);
-});
-
-test("parseTranslatedBlocks keeps a real translated body", () => {
-  const valid = assignIds([p("fordítás")]);
-  assert.deepEqual(parseTranslatedBlocks(valid), valid);
-});
 
 test("isValidYoutubeId and isValidVimeoId reject anything that isn't the expected id shape", () => {
   assert.equal(isValidYoutubeId("dQw4w9WgXcQ"), true);
@@ -172,54 +136,41 @@ test("isBlockVisible: a hidden block only renders with showHidden or controls mo
   assert.equal(isBlockVisible("other", hidden, false, false), true);
 });
 
-const postRow = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
-  id: 7,
-  source_id: 3,
-  kind: "article",
-  url: "https://blog.test/a",
-  author: null,
-  source_site: "Blog",
-  published_at: "2026-09-22",
-  title: { hu: "Gépi cím", en: "Model title" },
-  summary: { hu: "Gépi összefoglaló", en: "Model summary" },
-  key_points: { hu: [], en: [] },
-  tags: ["llm"],
-  meta: { mirrored: true },
-  overrides: {},
-  hidden_blocks: [],
-  extracted_at: null,
-  created_at: "2026-09-22T10:00:00Z",
-  ...overrides,
+const generated = { generatedTitle: { hu: "gépi cím", en: "model title" }, generatedSummary: { hu: "gépi összefoglaló", en: "model summary" } };
+
+test("editPayload: hide-only (title/summary unchanged from the model) sends only hidden", () => {
+  const draft = { title: generated.generatedTitle, summary: generated.generatedSummary };
+  assert.deepEqual(editPayload(generated, draft, ["b1"]), { hidden: ["b1"] });
 });
 
-test("toPost lets the submitter's title and summary win, keeping the model's text as the reset target", () => {
-  const post = toPost(postRow({ overrides: { title: { hu: "Saját cím", en: "Own title" } } }));
-  assert.deepEqual(post.title, { hu: "Saját cím", en: "Own title" });
-  assert.deepEqual(post.generatedTitle, { hu: "Gépi cím", en: "Model title" });
-  assert.deepEqual(post.summary, { hu: "Gépi összefoglaló", en: "Model summary" }); // no summary override
-  assert.deepEqual(post.generatedSummary, post.summary);
+test("editPayload: an unchanged title is omitted, a changed summary is sent", () => {
+  const draft = { title: generated.generatedTitle, summary: { hu: "új összefoglaló", en: generated.generatedSummary.en } };
+  const payload = editPayload(generated, draft, []);
+  assert.equal("title" in payload, false);
+  assert.deepEqual(payload.summary, draft.summary);
 });
 
-test("toPost ignores a malformed override field instead of showing it", () => {
-  const post = toPost(postRow({ overrides: { title: { hu: "", en: "x" }, summary: { hu: "Saját", en: "Own" } } }));
-  assert.deepEqual(post.title, { hu: "Gépi cím", en: "Model title" });
-  assert.deepEqual(post.summary, { hu: "Saját", en: "Own" });
+test("editPayload: a changed HU title only sends the title, not the unchanged summary", () => {
+  const draft = { title: { hu: "új cím", en: generated.generatedTitle.en }, summary: generated.generatedSummary };
+  assert.deepEqual(editPayload(generated, draft, []), { title: draft.title, hidden: [] });
 });
 
-test("toPost reads the submitter from the sources embed and defaults the optional columns", () => {
-  const listed = toPost(postRow({ meta: null, hidden_blocks: "garbage" })); // the list query has no embed
-  assert.equal(listed.submittedBy, null);
-  assert.deepEqual(listed.meta, {});
-  assert.deepEqual(listed.hiddenBlocks, []);
-  assert.deepEqual(listed.blocks, []);
-  assert.equal(listed.blocksHu, null);
-  const full = toPost(postRow({ sources: { submitted_by: "user-1" }, hidden_blocks: ["b1", 5] }));
-  assert.equal(full.submittedBy, "user-1");
-  assert.deepEqual(full.hiddenBlocks, ["b1"]);
+test("editPayload: a changed EN-only title also sends the title, not only a changed HU one", () => {
+  const draft = { title: { hu: generated.generatedTitle.hu, en: "a new EN title" }, summary: generated.generatedSummary };
+  assert.deepEqual(editPayload(generated, draft, []), { title: draft.title, hidden: [] });
 });
 
-test("toPost carries the source's last extraction error, and null when there is none", () => {
-  assert.equal(toPost(postRow({ sources: { submitted_by: "user-1", error: "fetch 404" } })).lastError, "fetch 404");
-  assert.equal(toPost(postRow({ sources: { submitted_by: "user-1", error: null } })).lastError, null);
-  assert.equal(toPost(postRow()).lastError, null); // the list query has no embed
+test("editPayload: trailing/leading whitespace alone doesn't count as a change, since the server trims on save", () => {
+  const draft = {
+    title: { hu: `${generated.generatedTitle.hu} `, en: generated.generatedTitle.en },
+    summary: { hu: generated.generatedSummary.hu, en: `  ${generated.generatedSummary.en}` },
+  };
+  assert.deepEqual(editPayload(generated, draft, ["b1"]), { hidden: ["b1"] });
+});
+
+test("editPayload: a field reset back to the model text is omitted, clearing any existing override", () => {
+  const edited = { title: { hu: "ideiglenes cím", en: generated.generatedTitle.en }, summary: generated.generatedSummary };
+  assert.deepEqual(editPayload(generated, edited, []).title, edited.title);
+  const reset = { title: generated.generatedTitle, summary: generated.generatedSummary }; // "Original" clicked
+  assert.equal("title" in editPayload(generated, reset, []), false);
 });

@@ -1,8 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Localized } from "../data/digest-types.ts";
-import { MINE_LIMIT } from "./link-chat.ts";
 import { readOverrides } from "./overrides.ts";
-import type { SourceKind } from "./pipeline/util.ts";
+import { MINE_LIMIT, type SourceKind } from "./pipeline/util.ts";
 import { shownTitle } from "./post-view.ts";
 
 // The reader's own submissions, for the taiyaki link chat: GET /api/sources/mine lists them, and

@@ -1,5 +1,4 @@
-import { parseId } from "./pipeline/util.ts";
-import { TODO_TEXT_MAX } from "./state.ts";
+import { parseId, TODO_TEXT_MAX } from "./pipeline/util.ts";
 
 // The reader's own state (read / later flags, to-dos) with optimistic writes. Framework-free, so the
 // ordering and rollback rules run under node --test; app/components/use-reader-state.ts binds it to React.

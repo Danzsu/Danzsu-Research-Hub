@@ -1,50 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft } from "./blocks.ts";
-import { TITLE_MAX } from "./overrides.ts";
 import { fakeDb, pgError } from "./pipeline/fake-db.ts";
-import { editPayload, requestReextract, savePostEdits } from "./post-edit.ts";
+import { TITLE_MAX } from "./pipeline/util.ts";
+import { requestReextract, savePostEdits } from "./post-edit.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
-
-const generated = { generatedTitle: { hu: "gépi cím", en: "model title" }, generatedSummary: { hu: "gépi összefoglaló", en: "model summary" } };
-
-test("editPayload: hide-only (title/summary unchanged from the model) sends only hidden", () => {
-  const draft = { title: generated.generatedTitle, summary: generated.generatedSummary };
-  assert.deepEqual(editPayload(generated, draft, ["b1"]), { hidden: ["b1"] });
-});
-
-test("editPayload: an unchanged title is omitted, a changed summary is sent", () => {
-  const draft = { title: generated.generatedTitle, summary: { hu: "új összefoglaló", en: generated.generatedSummary.en } };
-  const payload = editPayload(generated, draft, []);
-  assert.equal("title" in payload, false);
-  assert.deepEqual(payload.summary, draft.summary);
-});
-
-test("editPayload: a changed HU title only sends the title, not the unchanged summary", () => {
-  const draft = { title: { hu: "új cím", en: generated.generatedTitle.en }, summary: generated.generatedSummary };
-  assert.deepEqual(editPayload(generated, draft, []), { title: draft.title, hidden: [] });
-});
-
-test("editPayload: a changed EN-only title also sends the title, not only a changed HU one", () => {
-  const draft = { title: { hu: generated.generatedTitle.hu, en: "a new EN title" }, summary: generated.generatedSummary };
-  assert.deepEqual(editPayload(generated, draft, []), { title: draft.title, hidden: [] });
-});
-
-test("editPayload: trailing/leading whitespace alone doesn't count as a change, since the server trims on save", () => {
-  const draft = {
-    title: { hu: `${generated.generatedTitle.hu} `, en: generated.generatedTitle.en },
-    summary: { hu: generated.generatedSummary.hu, en: `  ${generated.generatedSummary.en}` },
-  };
-  assert.deepEqual(editPayload(generated, draft, ["b1"]), { hidden: ["b1"] });
-});
-
-test("editPayload: a field reset back to the model text is omitted, clearing any existing override", () => {
-  const edited = { title: { hu: "ideiglenes cím", en: generated.generatedTitle.en }, summary: generated.generatedSummary };
-  assert.deepEqual(editPayload(generated, edited, []).title, edited.title);
-  const reset = { title: generated.generatedTitle, summary: generated.generatedSummary }; // "Original" clicked
-  assert.equal("title" in editPayload(generated, reset, []), false);
-});
 
 test("savePostEdits calls the RPC with filtered hidden ids, dropping unknown ones", async () => {
   const blocks = assignIds([p("a"), p("b")]);

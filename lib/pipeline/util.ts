@@ -144,6 +144,16 @@ export function cooldownRemaining(extractedAt: string | null, now: Date, minutes
   return Math.max(0, Math.ceil((ready - now.getTime()) / 1000));
 }
 
+// Limits the client and the server share. Here, in the dependency-free module, so a client component
+// reads them without the zod schemas that enforce them (spec 3.1, lib/client-bundle.test.ts).
+/** A to-do's text: the reader store cuts to it, and so does parseStateAction (lib/state.ts). */
+export const TODO_TEXT_MAX = 180;
+/** A submitter's title and summary: the editor's `maxLength`, and overridesSchema (lib/overrides.ts). */
+export const TITLE_MAX = 300;
+export const SUMMARY_MAX = 2000;
+/** The link chat's thread shows this many of the reader's latest submissions (listMySources, memoryTransport). */
+export const MINE_LIMIT = 10;
+
 export function formatTimestamp(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);

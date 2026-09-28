@@ -4,7 +4,6 @@ import {
   createLinkChat,
   httpTransport,
   MAX_POLLS,
-  MINE_LIMIT,
   memoryTransport,
   parseLinkMessage,
   POLL_MS,
@@ -15,6 +14,7 @@ import {
 } from "./link-chat.ts";
 import type { MySource } from "./my-sources.ts";
 import { mockFetch } from "./pipeline/mock-fetch.ts";
+import { MINE_LIMIT } from "./pipeline/util.ts";
 
 const linkOf = (text: string) => {
   const message = parseLinkMessage(text);
