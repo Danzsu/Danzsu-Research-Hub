@@ -112,14 +112,24 @@ test("DigestDashboard renders the Top 3, the feed and the to-do panel from the p
   assert.equal(doc.querySelectorAll("aside li").length, previewReader.todos.length);
 });
 
-// Pre-flight ruling M-3. Pins DigestDashboard's seed wiring (`seed ? seedNeedsLoad(seed) : false` in
-// useReaderState): the static harness never runs revalidateSeed's effect, so only this initial value
-// decides whether the panel opens synced. A fresh seed (this tab's first mount of that week) must not
-// start syncing — a wiring regressed to always loading would still pass every other test and the preview.
+// Pre-flight ruling M-3, fix round 1. Pins DigestDashboard's seed wiring (`seed ? seedNeedsLoad(seed) :
+// false` in useReaderState): the static harness never runs revalidateSeed's effect, so only this initial
+// value decides whether the panel opens synced. A fresh seed (this tab's first mount of that week) must
+// not start syncing, and a failed one (the server's own query came back null) always must — either
+// direction of a wiring regressed to a fixed value would still pass every other test and the preview.
 test("DigestDashboard starts synced from a fresh seed, not the syncing state", () => {
   const seed = { issueId: "2026-W39", seededAt: 424_242, data: previewReader };
-  const doc = withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed });
-  assert.ok(!(doc.body.textContent ?? "").includes("SYNC…"), "a fresh seed's first mount must not show the syncing state");
+  const text = withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed }).body.textContent ?? "";
+  // Asserted positively first, so the negative check below can't pass vacuously (e.g. a harness that
+  // renders neither copy at all).
+  assert.ok(text.includes("SYNCED"), "a fresh seed must show the synced state");
+  assert.ok(!text.includes("SYNC…"), "a fresh seed's first mount must not show the syncing state");
+});
+
+test("DigestDashboard starts syncing from a failed (null) seed", () => {
+  const seed = { issueId: "2026-W39", seededAt: 424_242, data: null };
+  const text = withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed }).body.textContent ?? "";
+  assert.ok(text.includes("SYNC…"), "a failed seed must start in the syncing state");
 });
 
 test("StoryCard renders an unread feed card with its full action row", () => {

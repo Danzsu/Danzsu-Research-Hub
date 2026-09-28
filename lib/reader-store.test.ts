@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { mockFetch } from "./pipeline/mock-fetch.ts";
 import {
   createReaderStore,
+  createSeededStore,
   loadState,
   memorySend,
   postState,
@@ -299,8 +300,8 @@ const seed = (overrides: Partial<ReaderSeed> = {}): ReaderSeed => ({
   data: { states: { a: { read: true, saved: false } }, todos: [] },
   ...overrides,
 });
-/** The store a Radar page starts from its seed, as useReaderState does. */
-const seededStore = (from: ReaderSeed, mounted: Set<string>) => createReaderStore(recording().send, noop, from.data ?? undefined, seedNeedsLoad(from, mounted));
+/** The store a Radar page starts from its seed, as useReaderState does (createSeededStore itself). */
+const seededStore = (from: ReaderSeed, mounted: Set<string>) => createSeededStore(recording().send, noop, from, mounted);
 
 // Review Focus 2. Kills a GET on every mount (the pre-R1 behaviour, the extra round trip after every
 // hydration), a remount that skips it (Back would keep a stale seed), and a key without the render's

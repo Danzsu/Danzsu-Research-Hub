@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { createReaderStore, memorySend, postState, revalidateSeed, seedNeedsLoad, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
+import { createReaderStore, createSeededStore, memorySend, postState, revalidateSeed, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 import { toasts } from "./undo-toast";
 
 /** The offline preview (app/dev/preview): seeded state and no network; `failWrites` acts like being offline. */
@@ -16,9 +16,7 @@ const showFailed = () => toasts.show({ kind: "failed" });
  */
 export function useReaderState(seed: ReaderSeed | undefined, preview?: ReaderPreview) {
   const [store] = useState(() =>
-    preview
-      ? createReaderStore(memorySend(preview.failWrites), showFailed, preview.data)
-      : createReaderStore(postState, showFailed, seed?.data ?? undefined, seed ? seedNeedsLoad(seed) : false),
+    preview ? createReaderStore(memorySend(preview.failWrites), showFailed, preview.data) : createSeededStore(postState, showFailed, seed),
   );
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const offline = preview !== undefined;
