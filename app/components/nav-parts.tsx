@@ -65,7 +65,7 @@ export function NavEntry({ item, active, onSearch, onClick, className, iconClass
   }
   return (
     <Link href={item.href} aria-current={active ? "page" : undefined} onClick={onClick} className={className}>
-      <span className="relative flex">
+      <span className="relative flex shrink-0">
         <Icon className={iconClass} />
         {dotOnIcon && <PendingDot className="absolute -top-1 -right-1.5" />}
       </span>
