@@ -114,7 +114,7 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
   const moreList = useRef<HTMLUListElement>(null);
   const t = copy[language];
   const slot = (item: NavItem) => (
-    <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass} iconClass="size-5" />
+    <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass} iconClass="size-5" dotOnIcon />
   );
   return (
     <nav

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import type { ReactNode } from "react";
 import { Archive, BookOpen, ChartColumn, FolderOpen, LogOut, MessageSquare, Radar, Search, UserRound, type LucideIcon } from "lucide-react";
 import { SOON_NAV, type NavId, type NavItem } from "@/lib/nav";
@@ -25,10 +25,21 @@ export const navIcons: Record<NavId, LucideIcon> = {
   chat: MessageSquare,
 };
 
+/**
+ * A Link's pending navigation (spec 2.1): the live dot, always laid out at its 9px so nothing shifts,
+ * visible only while this Link's navigation waits, and only from 100ms on (`.pending-dot`, globals.css).
+ * It must sit inside the Link, whose status useLinkStatus reads.
+ */
+export function PendingDot({ className = "" }: { className?: string }) {
+  const { pending } = useLinkStatus();
+  return <span aria-hidden="true" data-pending={pending || undefined} className={`pending-dot live-pulse shrink-0 text-signal ${className}`} />;
+}
+
 /** A page link (aria-current when it is the active one) or, for the search slot, a button, holding the
  *  item's icon and label; `children` go after the label (the sidebar's ⌘K hint). `onClick` runs when
- *  the link is followed: the mobile "Több" sheet closes itself with it. */
-export function NavEntry({ item, active, onSearch, onClick, className, iconClass, labelClass, children }: {
+ *  the link is followed: the mobile "Több" sheet closes itself with it. A link carries the PendingDot:
+ *  at the row's end, or with `dotOnIcon` (the rail, the bottom bar) on its icon's top-right corner. */
+export function NavEntry({ item, active, onSearch, onClick, className, iconClass, labelClass, dotOnIcon = false, children }: {
   item: NavItem;
   active: boolean;
   onSearch: () => void;
@@ -37,25 +48,31 @@ export function NavEntry({ item, active, onSearch, onClick, className, iconClass
   iconClass: string;
   /** The rail's is `sr-only`: the icon alone shows, and the entry keeps its name. */
   labelClass?: string;
+  dotOnIcon?: boolean;
   children?: ReactNode;
 }) {
   const { language } = useLanguage();
   const Icon = navIcons[item.id];
-  const content = (
-    <>
-      <Icon className={iconClass} />
-      <span className={labelClass}>{item.label[language]}</span>
-      {children}
-    </>
-  );
-  return item.href ? (
+  const label = <span className={labelClass}>{item.label[language]}</span>;
+  if (!item.href) {
+    return (
+      <button type="button" onClick={onSearch} className={className}>
+        <Icon className={iconClass} />
+        {label}
+        {children}
+      </button>
+    );
+  }
+  return (
     <Link href={item.href} aria-current={active ? "page" : undefined} onClick={onClick} className={className}>
-      {content}
+      <span className="relative flex">
+        <Icon className={iconClass} />
+        {dotOnIcon && <PendingDot className="absolute -top-1 -right-1.5" />}
+      </span>
+      {label}
+      {children}
+      {!dotOnIcon && <PendingDot className="ml-auto" />}
     </Link>
-  ) : (
-    <button type="button" onClick={onSearch} className={className}>
-      {content}
-    </button>
   );
 }
 

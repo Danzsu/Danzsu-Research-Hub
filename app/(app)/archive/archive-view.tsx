@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Archive, CalendarDays, Clock3 } from "lucide-react";
 import { LocalizedText } from "@/app/components/language-context";
+import { PendingDot } from "@/app/components/nav-parts";
 import { PageHero } from "@/app/components/page-header";
 import type { ArchiveIssue } from "@/data/digest-types";
 
@@ -40,7 +41,10 @@ export function ArchiveView({ issues }: { issues: ArchiveIssue[] }) {
             className="focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-6 transition hover:border-signal hover:bg-signal hover:text-ink"
           >
             <div className="flex items-start justify-between">
-              <Archive className="size-7 text-signal group-hover:text-ink" />
+              <span className="flex items-center gap-2">
+                <Archive className="size-7 text-signal group-hover:text-ink" />
+                <PendingDot className="group-hover:text-ink" />
+              </span>
               <span className="font-display text-5xl text-paper/15 group-hover:text-ink/20">
                 {String(index + 1).padStart(2, "0")}
               </span>

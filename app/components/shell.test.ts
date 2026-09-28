@@ -260,3 +260,28 @@ test("the Több slot carries the active mark on Archívum's pages only", (t) => 
   assert.deepEqual(moreSlot("/archive"), ["Több", "true"]);
   assert.deepEqual(moreSlot("/library"), ["Több", null]);
 });
+
+// Spec 2.1. Kills the dot left out of a nav link (a slow tap would show nothing again), put in the
+// search button (no navigation to wait for), exposed to assistive tech, or cut off from useLinkStatus.
+test("every nav link carries one hidden pending dot, the search button none, and it marks a waiting navigation", (t) => {
+  t.after(() => {
+    navigationStub.linkPending = false;
+  });
+  const dots = (entries: Element[]) => entries.map((entry) => entry.querySelectorAll('span[aria-hidden="true"]').length);
+  const doc = shell("en");
+  assert.deepEqual(dots([...doc.querySelectorAll("aside nav a")]), [1, 1, 1]); // Radar, Library, Archive
+  assert.deepEqual(dots([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
+  const searchButtons = [...doc.querySelectorAll("aside nav button, #mobile-nav > button")].filter((button) => button.textContent?.startsWith("Search"));
+  assert.deepEqual(dots(searchButtons), [0, 0]);
+  assert.equal(doc.querySelectorAll("[data-pending]").length, 0);
+  navigationStub.linkPending = true;
+  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 5);
+});
+
+// Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.
+test("every archive week card and Library post card carries one hidden pending dot", () => {
+  const perCard = (doc: Document, selector: string) => [...doc.querySelectorAll(selector)].map((card) => card.querySelectorAll('span[aria-hidden="true"]').length);
+  assert.deepEqual(perCard(withLanguage(ArchiveView, { issues: previewArchive }), 'a[href^="/archive/"]'), previewArchive.map(() => 1));
+  const library = withLanguage(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, preview: { failWrites: false } });
+  assert.deepEqual(perCard(library, 'a[href^="/library/"]'), previewPosts.map(() => 1));
+});

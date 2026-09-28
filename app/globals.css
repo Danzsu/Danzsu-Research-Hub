@@ -130,6 +130,11 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   box-shadow: 0 0 0 0 rgb(241 95 34 / 60%);
   animation: pulse-ring 2s infinite;
 }
+/* The pending dot (PendingDot, nav-parts.tsx): the live dot in its text colour, so a card that turns
+   signal on hover keeps it in sight. Hidden until its link's navigation has waited 100ms, then shown
+   at once; it leaves at once, and its ring runs only while it shows. */
+.pending-dot { background: currentColor; opacity: 0; animation-play-state: paused; }
+.pending-dot[data-pending] { opacity: 1; animation-play-state: running; transition: opacity 0s 100ms; }
 /* .lift: the Top 3 cards' "come forward" state, shared with the taiyaki button (link-chat.tsx), which
    also lifts on keyboard focus. Each keeps its own resting shadow. */
 .must-card, .lift { transition: transform 160ms ease, box-shadow 160ms ease; }

@@ -1,5 +1,6 @@
 import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
 import { LocalizedText } from "@/app/components/language-context";
+import { PendingDot } from "@/app/components/nav-parts";
 import { PageHero } from "@/app/components/page-header";
 import { Tag } from "@/app/components/tag";
 import type { SubmittedSource } from "@/lib/content";
@@ -75,7 +76,10 @@ export function LibraryView({
                 className="focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6"
               >
                 <div className="flex items-start justify-between">
-                  <Icon className="size-7 text-signal group-hover:text-ink" />
+                  <span className="flex items-center gap-2">
+                    <Icon className="size-7 text-signal group-hover:text-ink" />
+                    <PendingDot className="group-hover:text-ink" />
+                  </span>
                   <span className="font-mono text-[10px] opacity-60">{post.createdAt.slice(0, 10)}</span>
                 </div>
                 <p className="mt-6 font-mono text-xs tracking-[0.15em] opacity-60">{post.author ?? hostOf(post.url)}</p>
