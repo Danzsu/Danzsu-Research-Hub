@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "vendor/**",
+    // Git-ignored Playwright scratch (TESTING.md), not source.
+    ".playwright-mcp/**",
   ]),
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
