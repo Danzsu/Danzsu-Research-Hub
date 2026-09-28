@@ -1,5 +1,7 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { jsonError } from "@/lib/api";
+import { ARCHIVE_TAG } from "@/lib/content";
 import { runDaily } from "@/lib/pipeline/daily";
 import { retryPendingSources } from "@/lib/pipeline/ingest";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -21,6 +23,9 @@ export async function GET(request: NextRequest) {
     console.error("daily digest failed", error);
     return null;
   });
+  // A week closes at Monday 00:00 UTC, and the upsert can't say whether this run opened a new one, so
+  // every run drops the archive list (spec 1.5). { expire: 0 }: the next /archive refills it at once.
+  revalidateTag(ARCHIVE_TAG, { expire: 0 });
   const retried = await retryPendingSources(db, start + maxDuration * 1000);
   if (!digest) return jsonError(500, "daily_failed", { retriedSources: retried });
   return NextResponse.json({ ...digest, retriedSources: retried });

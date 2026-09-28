@@ -17,6 +17,7 @@ const STUBS = new Map([
   ["next/link", here("./next-stub.ts")],
   ["next/navigation", here("./next-stub.ts")],
   ["next/server", here("./route-hooks.ts")],
+  ["next/cache", here("./route-hooks.ts")],
   ["@/lib/supabase/server", here("./route-hooks.ts")],
   ["server-only", "data:text/javascript,"],
 ]);

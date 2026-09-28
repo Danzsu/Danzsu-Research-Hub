@@ -29,7 +29,8 @@ export async function createClient() {
 
 /**
  * Bypasses RLS. For the pipeline (cron, ingest) and, each after its own auth check, the translate,
- * reextract and /media routes — never pass its results to a reader unfiltered.
+ * reextract and /media routes and the content caches (lib/content.ts: closed weeks, the archive list)
+ * — never pass its results to a reader unfiltered.
  */
 export function createAdminClient() {
   return createSupabaseClient(env("SUPABASE_URL"), env("SUPABASE_SECRET_KEY"), {

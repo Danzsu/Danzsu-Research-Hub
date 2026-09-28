@@ -1,6 +1,6 @@
 // Route-handler tests with no running Next.js app: importing this registers tsx-hooks.ts, which
-// resolves `@/lib/supabase/server` and `next/server` to this file and `server-only` to an empty
-// module. Import it before the route, which is why route tests load theirs with a dynamic import.
+// resolves `@/lib/supabase/server`, `next/server` and `next/cache` to this file and `server-only` to an
+// empty module. Import it before the route, which is why route tests load theirs with a dynamic import.
 
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -23,10 +23,14 @@ export const routeStub = {
   adminCalls: 0,
   /** Every task the route handed to `after()`, not yet run. */
   scheduled: [] as (() => unknown)[],
+  /** Every call of an `unstable_cache` function: its key parts, its options, and the arguments. */
+  cached: [] as { keyParts: string[]; options: unknown; args: unknown[] }[],
+  /** Every `revalidateTag(tag, profile)` call. */
+  revalidated: [] as [tag: string, profile: unknown][],
 };
 
 export function resetRoute(): void {
-  Object.assign(routeStub, { reader: null, admin: null, adminCalls: 0, scheduled: [] });
+  Object.assign(routeStub, { reader: null, admin: null, adminCalls: 0, scheduled: [], cached: [], revalidated: [] });
 }
 
 /** A signed-in reader whose RLS-scoped client is `db`. */
@@ -48,6 +52,20 @@ export function createAdminClient(): SupabaseClient {
 /** `next/server`'s `after()`: the task is queued, so a test can see it was scheduled and run it. */
 export function after(task: () => unknown): void {
   routeStub.scheduled.push(task);
+}
+
+/** `next/cache`'s `unstable_cache`, passing every call straight through (nothing is kept, so a test sees
+ *  each query) and recording it on `routeStub.cached`. */
+export function unstable_cache<Args extends unknown[], Result>(fetchData: (...args: Args) => Promise<Result>, keyParts: string[] = [], options: unknown = {}) {
+  return (...args: Args): Promise<Result> => {
+    routeStub.cached.push({ keyParts, options, args });
+    return fetchData(...args);
+  };
+}
+
+/** `next/cache`'s `revalidateTag`, recorded on `routeStub.revalidated`. */
+export function revalidateTag(tag: string, profile: unknown): void {
+  routeStub.revalidated.push([tag, profile]);
 }
 
 /**

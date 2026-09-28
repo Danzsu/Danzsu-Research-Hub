@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import type {
   ArchiveIssue,
   CurrentIssue,
@@ -10,6 +11,7 @@ import type {
 import { toPost, type Post } from "@/lib/post-view";
 import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
+import { createAdminClient, type Reader } from "@/lib/supabase/server";
 
 const budapest = new Intl.DateTimeFormat("hu-HU", {
   timeZone: "Europe/Budapest",
@@ -72,15 +74,17 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
   };
 }
 
-export async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
+/** Every issue but the current week's, newest first. Throws on a failed query, like getRadar. */
+async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
   const current = isoWeek(new Date()).id;
-  const { data } = await db
+  const { data, error } = await db
     .from("archive_issues")
     .select("id, period, item_count, read_minutes, top_title")
     .neq("id", current)
     .order("id", { ascending: false });
+  if (error) throw new Error(`archive query failed: ${error.message}`, { cause: error });
 
-  return (data ?? []).map((row) => ({
+  return data.map((row) => ({
     id: row.id,
     period: row.period,
     week: row.id.slice(5), // '2026-W38' → 'W38'
@@ -88,6 +92,42 @@ export async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
     itemCount: row.item_count,
     readMinutes: row.read_minutes,
   }));
+}
+
+// The two caches (spec 1.5; the rules are in ARCHITECTURE.md → Invariants). A cached function may not
+// read cookies, so both read with the admin client: only the content tables and the archive_issues view,
+// which every member may read through RLS anyway. They hold content only, never the viewer, and are
+// reachable only through archivedWeek and archiveList, which take a signed-in Reader.
+// ⚠️ Next's data cache outlives a deploy (unstable_cache.md): bump "v1" whenever RadarData or
+// ArchiveIssue changes shape, or a deploy serves the old shape for up to a day.
+const ONE_DAY = 86_400;
+/** The daily cron's revalidateTag drops the archive list with this tag. */
+export const ARCHIVE_TAG = "archive";
+
+// A closed week never changes, so it needs no tag: a day later Next refills it in the background.
+const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v1"], { revalidate: ONE_DAY });
+const cachedArchive = unstable_cache(() => getArchive(createAdminClient()), ["archive-list", "v1"], { revalidate: ONE_DAY, tags: [ARCHIVE_TAG] });
+
+/** The type keeps a signed-out caller away from the caches; this keeps one whose types were cast. */
+function assertSignedIn(reader: Reader | null) {
+  if (!reader?.viewer.id) throw new Error("the content caches need a signed-in reader");
+}
+
+/**
+ * `week`'s Radar (an id isoWeekMonday accepted). A closed week, `week < isoWeek(now).id`, comes from the
+ * one-day cache: zero-padded ids sort as strings, across a year boundary too. The current week and a
+ * future one are read live, as the reader. Null when the week has no issue.
+ */
+export async function archivedWeek(reader: Reader, week: string, now = new Date()): Promise<RadarData | null> {
+  if (!isoWeekMonday(week)) return null;
+  assertSignedIn(reader);
+  return week < isoWeek(now).id ? closedWeek(week) : getRadar(reader.db, week);
+}
+
+/** The /archive list, from its cache until the daily cron drops it. */
+export async function archiveList(reader: Reader): Promise<ArchiveIssue[]> {
+  assertSignedIn(reader);
+  return cachedArchive();
 }
 
 const LIST_COLUMNS = "id, source_id, kind, url, author, source_site, published_at, title, summary, key_points, tags, meta, overrides, hidden_blocks, extracted_at, created_at";

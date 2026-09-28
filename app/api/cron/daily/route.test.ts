@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { fakeDb } from "../../../../lib/pipeline/fake-db.ts";
-import { mockFetch, TEST_HOST, withEnv } from "../../../../lib/pipeline/mock-fetch.ts";
+import { feeds } from "../../../../lib/pipeline/feeds.ts";
+import { geminiResponse, mockFetch, TEST_HOST, withEnv, withGeminiKey } from "../../../../lib/pipeline/mock-fetch.ts";
+import { isoWeek } from "../../../../lib/pipeline/util.ts";
 import { resetRoute, routeStub } from "../../../../lib/test/route-hooks.ts";
 
 const { GET } = await import("./route.ts");
@@ -50,6 +52,29 @@ test("a failed digest still retries the pending sources, and answers 500 with th
   const response = await GET(cronRequest("Bearer s3cret"));
 
   assert.deepEqual([response.status, await response.json()], [500, { error: "daily_failed", retriedSources: 1 }]);
+  assert.deepEqual(routeStub.revalidated, [["archive", { expire: 0 }]]);
+});
+
+// Spec 1.5. Kills the revalidateTag call dropped, given the deprecated one-argument form (or "max",
+// which serves the old list once more), or moved into one branch: every run drops the list, good or not.
+test("a good cron run answers the digest and drops the archive list's cache at once", async (t) => {
+  resetRoute();
+  withEnv(t, "CRON_SECRET", "s3cret");
+  withGeminiKey(t);
+  const warn = t.mock.method(console, "warn", () => {});
+  mockFetch(t, async (url) => {
+    if (url.startsWith("https://generativelanguage.googleapis.com/")) return geminiResponse({ items: [], github: [] });
+    if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits: [] });
+    if (url.startsWith("https://api.github.com/")) return Response.json({ items: [] });
+    return new Response("", { status: 404 }); // every feed
+  });
+  routeStub.admin = fakeDb(undefined, { pending: [] });
+
+  const response = await GET(cronRequest("Bearer s3cret"));
+
+  assert.deepEqual([response.status, await response.json()], [200, { issue: isoWeek(new Date()).id, candidates: 0, shortlisted: 0, inserted: 0, repos: 0, retriedSources: 0 }]);
+  assert.deepEqual(routeStub.revalidated, [["archive", { expire: 0 }]]);
+  assert.equal(warn.mock.callCount(), feeds.length); // each feed's 404
 });
 
 // M2: the route must forward its own deadline (start + maxDuration), not let retryPendingSources run
