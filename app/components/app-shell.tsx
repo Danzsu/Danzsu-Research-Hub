@@ -1,10 +1,11 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
+import { prefetchWhenIdle } from "@/lib/idle-prefetch";
 import { activeNavId, inMobileMore, MOBILE_BAR_NAV, MOBILE_CHAT_SLOT, MOBILE_MORE_NAV, type NavItem } from "@/lib/nav";
 import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
@@ -105,6 +106,9 @@ export function AppShell({
   );
 }
 
+/** The "Több" sheet's pages: the sheet is closed, so Next's viewport prefetch never sees their links. */
+const MORE_HREFS = MOBILE_MORE_NAV.flatMap((item) => (item.href ? [item.href] : []));
+
 const slotClass =
   "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 
@@ -115,7 +119,16 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
   const active = activeNavId(usePathname());
   const [moreOpen, setMoreOpen] = useState(false);
   const moreList = useRef<HTMLUListElement>(null);
+  const router = useRouter();
   const t = copy[language];
+  // Production only, like Next's own prefetch: in development it would fetch the real pages from the
+  // offline preview, which must never reach real data (ARCHITECTURE.md → Invariants).
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
+    // Next 16.3.4 types `kind` as required, but the router defaults it to "auto" (app-router-instance.js),
+    // which the docs' `{ onInvalidate }` form relies on.
+    return prefetchWhenIdle(MORE_HREFS, (href, options) => router.prefetch(href, options as Parameters<typeof router.prefetch>[1]));
+  }, [router]);
   const slot = (item: NavItem) => (
     <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass} iconClass="size-5" dotOnIcon />
   );

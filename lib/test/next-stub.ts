@@ -8,8 +8,8 @@ export default function Link({ href, children, ...rest }: { href: string; childr
   return createElement("a", { href, ...rest }, children);
 }
 
-/** `next/navigation`'s router, inert: a static render never navigates. */
-export const useRouter = () => ({ push() {}, refresh() {} });
+/** `next/navigation`'s router, inert: a static render never navigates (nor runs the effect that prefetches). */
+export const useRouter = () => ({ push() {}, refresh() {}, prefetch() {} });
 
 /** What the stubs answer: `usePathname` "/" and `useLinkStatus` not pending, unless a test sets them,
  *  like `routeStub` in route-hooks.ts. Reset them after. */
