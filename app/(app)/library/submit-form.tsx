@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useLanguage } from "@/app/components/language-context";
+import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { httpTransport, memoryTransport, type ChatTransport } from "@/lib/link-chat";
@@ -46,7 +46,7 @@ async function submitVia(transport: ChatTransport, url: string, note: string): P
 
 export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
   const { language } = useLanguage();
-  const router = useRouter();
+  const refresh = useRefresh();
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<Status | null>(null);
@@ -63,7 +63,7 @@ export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
       if (result.ok) {
         setUrl("");
         setNote("");
-        router.refresh();
+        refresh();
       }
     } catch {
       setStatus("error");

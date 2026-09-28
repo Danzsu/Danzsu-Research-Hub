@@ -4,19 +4,25 @@ import { createElement } from "react";
 import { render } from "../../../../lib/test/render.ts";
 
 const { PostToolbar } = await import("./post-toolbar.tsx");
+const { RefreshProvider } = await import("../../../components/refresh-bar.tsx");
 
 type Props = Parameters<typeof PostToolbar>[0];
+// In the provider the app shell gives it: Translate refreshes through useRefresh.
 const renderToolbar = (props: Partial<Props>) =>
   render(
-    createElement(PostToolbar, {
-      postId: 7,
-      language: "en",
-      hasTranslation: false,
-      showingTranslation: false,
-      canEdit: false,
-      hasTranslatable: true,
-      ...props,
-    }),
+    createElement(
+      RefreshProvider,
+      null,
+      createElement(PostToolbar, {
+        postId: 7,
+        language: "en",
+        hasTranslation: false,
+        showingTranslation: false,
+        canEdit: false,
+        hasTranslatable: true,
+        ...props,
+      }),
+    ),
   );
 const translateButton = (doc: Document) => [...doc.querySelectorAll("button")].find((button) => button.textContent?.includes("Translate to Hungarian"));
 

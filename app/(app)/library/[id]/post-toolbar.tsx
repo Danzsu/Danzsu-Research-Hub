@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Languages, PenLine } from "lucide-react";
+import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
 import type { Language } from "@/data/digest-types";
 
@@ -21,7 +21,7 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
   /** No translatable text (extraction failed / a bare video / an all-code or all-repo post) — nothing to translate. */
   hasTranslatable: boolean;
 }) {
-  const router = useRouter();
+  const refresh = useRefresh();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const t = copy[language];
@@ -32,8 +32,7 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
     try {
       const response = await fetch(`/api/posts/${postId}/translate`, { method: "POST" });
       if (!response.ok) throw new Error(String(response.status));
-      router.push(`/library/${postId}?text=hu`);
-      router.refresh();
+      refresh(`/library/${postId}?text=hu`);
     } catch {
       setFailed(true);
     } finally {

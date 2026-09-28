@@ -12,6 +12,7 @@ import { LanguageProvider, useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
 import { LinkChat, TaiyakiButton, type ChatPreview } from "./link-chat";
 import { AccountActions, NavEntry, SoonList } from "./nav-parts";
+import { RefreshProvider } from "./refresh-bar";
 import { SearchSoon, ShortcutHelp } from "./shell-dialogs";
 import { toasts, UndoToast } from "./undo-toast";
 import { useShortcuts } from "./use-shortcuts";
@@ -71,33 +72,35 @@ export function AppShell({
   });
   return (
     <LanguageProvider initial={language}>
-      <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
-        {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
-            so none of them covers the end of the page. The corner one's goes inside the page's own last element,
-            so that page's surface runs on under it. */}
-        <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
-      </DesktopNav>
-      <MobileNav
-        email={email}
-        onSearch={openSearch}
-        chat={
-          <TaiyakiButton
-            open={chatOpen}
-            onClick={toggleChat}
-            className="-mt-[18px] grid size-14 self-start justify-self-center shadow-[3px_3px_0_var(--signal)]"
-          />
-        }
-      />
-      <TaiyakiButton
-        open={chatOpen}
-        onClick={toggleChat}
-        className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
-      />
-      {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
-      <LinkChat key={`${chatPreview?.failWrites}:${chatPreview?.delayMs}`} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
-      <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
-      <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
-      <UndoToast />
+      <RefreshProvider>
+        <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
+          {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
+              so none of them covers the end of the page. The corner one's goes inside the page's own last element,
+              so that page's surface runs on under it. */}
+          <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
+        </DesktopNav>
+        <MobileNav
+          email={email}
+          onSearch={openSearch}
+          chat={
+            <TaiyakiButton
+              open={chatOpen}
+              onClick={toggleChat}
+              className="-mt-[18px] grid size-14 self-start justify-self-center shadow-[3px_3px_0_var(--signal)]"
+            />
+          }
+        />
+        <TaiyakiButton
+          open={chatOpen}
+          onClick={toggleChat}
+          className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+        />
+        {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
+        <LinkChat key={`${chatPreview?.failWrites}:${chatPreview?.delayMs}`} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
+        <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+        <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
+        <UndoToast />
+      </RefreshProvider>
     </LanguageProvider>
   );
 }

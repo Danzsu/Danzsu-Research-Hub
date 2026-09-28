@@ -33,15 +33,24 @@ const { Progress } = await import("../../components/ui/progress.tsx");
 const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
 const { CHAT_PANEL_ID, LinkChat, TaiyakiButton } = await import("./link-chat.tsx");
+const { RefreshBar, RefreshProvider } = await import("./refresh-bar.tsx");
+const { PostToolbar } = await import("../(app)/library/[id]/post-toolbar.tsx");
 
 const noop = () => {};
 const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop };
-/** Wraps a component that reads useLanguage() (LocalizedText, SubmitForm, DigestDashboard) in its provider. */
-const withLanguage = <P extends object>(Component: ComponentType<P>, props: P) =>
-  render(createElement(LanguageProvider, { initial: "en" } as ComponentProps<typeof LanguageProvider>, createElement(Component, props)));
+/** Wraps a component in the two providers the shell gives it: the language (LocalizedText, SubmitForm,
+ *  DigestDashboard) and the refresh bar (SubmitForm, LinkChat). */
+const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P) =>
+  render(
+    createElement(
+      LanguageProvider,
+      { initial: "en" } as ComponentProps<typeof LanguageProvider>,
+      createElement(RefreshProvider, null, createElement(Component, props)),
+    ),
+  );
 /** Renders DigestDashboard from a real seed (never preview) and returns its body text. */
 const dashboardText = (seed: ReaderSeed) =>
-  withLanguage(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed }).body.textContent ?? "";
+  withShellProviders(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, seed }).body.textContent ?? "";
 /** The whole shell around one child, as the (app) layout renders it. */
 const shell = (language: "hu" | "en" = "hu") =>
   render(
@@ -62,7 +71,7 @@ test("AppShell renders both nav landmarks and its child", () => {
 test("UndoToast mounts its live region and survives an active toast with no render loop", () => {
   const id = toasts.show({ kind: "markedRead", undo: noop });
   try {
-    const doc = withLanguage(UndoToast, {});
+    const doc = withShellProviders(UndoToast, {});
     const status = doc.querySelector('[role="status"]');
     assert.ok(status, "the toast's live region is always mounted");
     assert.equal(status.getAttribute("aria-live"), "polite");
@@ -102,7 +111,7 @@ test("ReaderPanel renders the progress bar and every to-do row", () => {
 });
 
 test("DigestDashboard renders the Top 3, the feed and the to-do panel from the preview reader data", () => {
-  const doc = withLanguage(DigestDashboard, {
+  const doc = withShellProviders(DigestDashboard, {
     issue: previewIssue,
     items: previewItems,
     githubTop10: previewGithub,
@@ -163,7 +172,7 @@ test("MustReadCard dims once read and shows its rank", () => {
 });
 
 test("LibraryView lists every preview post, its mirrored badge and the pending/failed sources", () => {
-  const doc = withLanguage(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, preview: { failWrites: false } });
+  const doc = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, preview: { failWrites: false } });
   assert.equal(doc.querySelectorAll('a[href^="/library/"]').length, previewPosts.length);
   assert.ok(doc.querySelector("form#submit"), "the submit form renders in preview mode");
   assert.equal(doc.querySelectorAll('input[type="url"]').length, 1);
@@ -174,7 +183,7 @@ test("LibraryView lists every preview post, its mirrored badge and the pending/f
 });
 
 test("ArchiveView lists every preview issue", () => {
-  const doc = withLanguage(ArchiveView, { issues: previewArchive });
+  const doc = withShellProviders(ArchiveView, { issues: previewArchive });
   const headings = [...doc.querySelectorAll("h2")].map((heading) => heading.textContent);
   assert.deepEqual(
     headings,
@@ -234,7 +243,7 @@ test("TaiyakiButton names itself in the reader's language, and says which panel 
 test("AppShell carries the taiyaki, and LinkChat's top level renders without a render loop", () => {
   const doc = shell();
   assert.equal(doc.querySelectorAll(`button[aria-controls="${CHAT_PANEL_ID}"]`).length, 2);
-  withLanguage(LinkChat, { open: true, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
+  withShellProviders(LinkChat, { open: true, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
 });
 
 // Kills the bar's old order: Archívum in the bar, and no taiyaki between Könyvtár and Keresés.
@@ -281,7 +290,24 @@ test("every nav link carries one hidden pending dot, the search button none, and
 // Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.
 test("every archive week card and Library post card carries one hidden pending dot", () => {
   const perCard = (doc: Document, selector: string) => [...doc.querySelectorAll(selector)].map((card) => card.querySelectorAll('span[aria-hidden="true"]').length);
-  assert.deepEqual(perCard(withLanguage(ArchiveView, { issues: previewArchive }), 'a[href^="/archive/"]'), previewArchive.map(() => 1));
-  const library = withLanguage(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, preview: { failWrites: false } });
+  assert.deepEqual(perCard(withShellProviders(ArchiveView, { issues: previewArchive }), 'a[href^="/archive/"]'), previewArchive.map(() => 1));
+  const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, preview: { failWrites: false } });
   assert.deepEqual(perCard(library, 'a[href^="/library/"]'), previewPosts.map(() => 1));
+});
+
+// Spec 2.3. Kills a bar that shows at rest (it would sit over every page), one exposed to assistive tech,
+// and a shell without the provider (every refresh would throw).
+test("the refresh bar is absent at rest, in the shell too, and hidden from assistive tech while a refresh runs", () => {
+  const bars = (doc: Document) => doc.querySelectorAll('div[aria-hidden="true"]').length;
+  assert.equal(render(createElement(RefreshBar, { pending: false })).body.children.length, 0);
+  const running = render(createElement(RefreshBar, { pending: true }));
+  assert.deepEqual([running.body.children.length, bars(running), running.body.textContent], [1, 1, ""]);
+  assert.equal(bars(shell("en")), 0);
+});
+
+// Spec 2.3, like useLanguage. Kills a useRefresh that quietly does nothing without its provider: the
+// refresh would be lost, and the bar with it.
+test("useRefresh outside RefreshProvider throws, naming where the provider lives", () => {
+  const props = { postId: 7, language: "en", hasTranslation: false, showingTranslation: false, canEdit: false, hasTranslatable: true } as const;
+  assert.throws(() => render(createElement(PostToolbar, props)), /RefreshProvider \(app\/components\/app-shell\.tsx\)/);
 });

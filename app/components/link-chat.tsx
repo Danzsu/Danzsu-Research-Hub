@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { createLinkChat, httpTransport, memoryTransport } from "@/lib/link-chat"
 import type { MySource } from "@/lib/my-sources";
 import { busyClass, ChatThread } from "./chat-thread";
 import { useLanguage } from "./language-context";
+import { useRefresh } from "./refresh-bar";
 import { TaiyakiIcon } from "./taiyaki-icon";
 import { isUndoToast } from "./undo-toast";
 
@@ -114,7 +115,7 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
 }) {
   const { language } = useLanguage();
   const pathname = usePathname();
-  const router = useRouter();
+  const refresh = useRefresh();
   const isMobile = useIsMobile();
   const [chat] = useState(() =>
     createLinkChat(
@@ -173,7 +174,7 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
     input.current?.focus();
     // The Library list shows the new submission too, as it does after its own form's. The preview has one
     // path for all its views, so there every view refreshes.
-    if (pathname === "/library" || pathname === "/dev/preview") router.refresh();
+    if (pathname === "/library" || pathname === "/dev/preview") refresh();
   }
 
   return (

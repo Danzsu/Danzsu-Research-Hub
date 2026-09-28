@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useId, useState, type ReactNode } from "react";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { PostBlocks } from "@/app/components/post-blocks";
+import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -71,7 +71,7 @@ function FieldRow({ htmlFor, label, resetLabel, resetText, onReset, children }: 
 }
 
 export function PostEditor({ post, language, query, videoStart }: { post: Post; language: Language; query: PostQuery; videoStart?: number }) {
-  const router = useRouter();
+  const refresh = useRefresh();
   const t = copy[language];
   const fieldId = useId();
   const titleId = (lang: "hu" | "en") => `${fieldId}-title-${lang}`;
@@ -100,8 +100,7 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
     }).catch(() => null);
     setBusy(false);
     if (!response?.ok) return setStatus({ text: response?.status === 400 ? t.invalid : t.failed, failed: true });
-    router.push(`/library/${post.id}`);
-    router.refresh();
+    refresh(`/library/${post.id}`);
   }
 
   async function reextract() {

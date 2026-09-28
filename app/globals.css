@@ -135,6 +135,12 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
    at once; it leaves at once, and its ring runs only while it shows. */
 .pending-dot { background: currentColor; opacity: 0; animation-play-state: paused; }
 .pending-dot[data-pending] { opacity: 1; animation-play-state: running; transition: opacity 0s 100ms; }
+/* The refresh bar (refresh-bar.tsx): in 100ms after a refresh starts, like the pending dot, so a quick one
+   never flashes it; then a segment runs across it until the refreshed page is in. */
+.refresh-bar { animation: refresh-bar-in 0s 100ms both; }
+.refresh-bar > span { animation: refresh-bar-run 1.2s ease-in-out infinite; }
+@keyframes refresh-bar-in { from { opacity: 0; } }
+@keyframes refresh-bar-run { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 /* .lift: the Top 3 cards' "come forward" state, shared with the taiyaki button (link-chat.tsx), which
    also lifts on keyboard focus. Each keeps its own resting shadow. */
 .must-card, .lift { transition: transform 160ms ease, box-shadow 160ms ease; }
@@ -163,6 +169,8 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
   /* The taiyaki's shadow still lifts; it just doesn't move. */
   .lift:focus-visible { transform: none; }
+  /* The bar stands still, the whole width: the rule above would stop its segment at the end, off screen. */
+  .refresh-bar > span { width: 100%; animation: none; }
 }
 
 /* The same for hover, which stays pointer-only like every custom :hover here. */

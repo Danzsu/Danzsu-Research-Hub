@@ -6,6 +6,7 @@ import { testPost } from "../../../../lib/test/fixtures.ts";
 import { render } from "../../../../lib/test/render.ts";
 
 const { PostEditor } = await import("./post-editor.tsx");
+const { RefreshProvider } = await import("../../../components/refresh-bar.tsx");
 
 const blocks = assignIds([
   { type: "video", provider: "youtube", videoId: "dQw4w9WgXcQ" },
@@ -15,8 +16,9 @@ const blocks = assignIds([
 const [video] = blocks;
 const post = testPost({ kind: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", siteName: "YouTube", blocks, hiddenBlocks: [video.id] });
 
-// What page.tsx passes in its edit branch: the page's own query, which always has edit=1 there.
-const renderEditor = () => render(createElement(PostEditor, { post, language: "en", query: { edit: "1" } }));
+// What page.tsx passes in its edit branch: the page's own query, which always has edit=1 there. In the
+// provider the app shell gives it: Save refreshes through useRefresh.
+const renderEditor = () => render(createElement(RefreshProvider, null, createElement(PostEditor, { post, language: "en", query: { edit: "1" } })));
 
 test("PostEditor's hide toggles keep one constant label and report their state through aria-pressed", () => {
   const toggles = [...renderEditor().querySelectorAll("button[aria-pressed]")];
