@@ -25,7 +25,9 @@ function failedDigestWithOnePendingSource(t: TestContext): void {
   routeStub.admin = fakeDb(undefined, { source, post: null, pending: [source] });
 }
 
-// X1: with CRON_SECRET unset, no header can be right, so the route never runs (model spend, DoS).
+// X1: with CRON_SECRET unset, no header can be right, so the route never runs (model spend, DoS). Also
+// pins revalidateTag behind the same check: moved above the secret check, it would drop the archive
+// list's cache on every guess a scraper throws at the route, for free.
 test("the cron answers 401 without a CRON_SECRET or with a wrong bearer, and never opens the admin client", async (t) => {
   resetRoute();
   for (const [secret, header] of [
@@ -43,6 +45,7 @@ test("the cron answers 401 without a CRON_SECRET or with a wrong bearer, and nev
     assert.deepEqual([response.status, await response.json()], [401, { error: "unauthorized" }], `${secret} / ${header}`);
   }
   assert.equal(routeStub.adminCalls, 0);
+  assert.equal(routeStub.revalidated.length, 0);
 });
 
 // N1: a failed digest (model outage, bad key) must not also stall the pending link submissions.

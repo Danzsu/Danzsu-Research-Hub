@@ -147,14 +147,19 @@ test("getReaderSeed stamps seededAt with the render's own moment, not a fixed va
 const untouchable = () => fakeDb(undefined, { tableErrors: { issues: pgError("42501", "read the wrong client"), archive_issues: pgError("42501", "read the wrong client") } });
 const wednesdayW39 = new Date("2026-09-23T12:00:00Z");
 
-// Spec 1.5, security invariants 1 and 3. Kills the closed week read through the reader's client, the
-// cache keyed on anything but the week (the viewer, a cookie), and `createAdminClient()` swapped for the
-// reader's cookie client inside the cached scope (the stub refuses cookies there, as Next does).
+// Spec 1.5, security invariants 1 and 3. `routeStub.reader` is set to the same reader passed in,
+// mirroring production's React-memoized `getReader()`: a second call inside the cached scope answers
+// with this same Reader, not null, so a leak (the cache spreading the viewer into its value) shows up in
+// the deepEqual against getRadar's own clean answer, not just as an untouched extra field. Kills the
+// closed week read through the reader's client, the cache keyed on anything but the week (the viewer, a
+// cookie), and `createAdminClient()` swapped for the reader's cookie client inside the cached scope.
 test("archivedWeek reads a closed week through the one-day cache and the admin client, keyed by the week alone", async () => {
   resetRoute();
   routeStub.admin = fakeDb(undefined, { rows: { issues: [issueRow("2026-W38")] } });
-  const radar = await archivedWeek(signedIn(untouchable()), "2026-W38", wednesdayW39);
-  assert.equal(radar?.issue.id, "2026-W38");
+  const reader = signedIn(untouchable());
+  routeStub.reader = reader;
+  const radar = await archivedWeek(reader, "2026-W38", wednesdayW39);
+  assert.deepEqual(radar, await getRadar(fakeDb(undefined, { rows: { issues: [issueRow("2026-W38")] } }), "2026-W38"));
   assert.equal(routeStub.adminCalls, 1);
   assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v1"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
 });
@@ -185,11 +190,14 @@ test("archivedWeek decides closed by the whole week id, across the year boundary
 
 // M-2. Kills the isoWeekMonday guard dropped from archivedWeek's very first line: a malformed week id
 // would otherwise reach the cache keyed on it, or the reader's own query, instead of being refused first.
+// Two ids, because they sort on opposite sides of the current week: "not-a-week" sorts above it (the
+// live reader-query path, if unguarded) and "2026-W00" sorts below it (the cache-key path) — the guard
+// has to catch both, not just the one that happens to avoid the cache.
 test("archivedWeek returns null for a malformed week id, before the cache or the admin client", async () => {
   resetRoute();
   routeStub.admin = untouchable();
-  const radar = await archivedWeek(signedIn(untouchable()), "not-a-week", wednesdayW39);
-  assert.equal(radar, null);
+  assert.equal(await archivedWeek(signedIn(untouchable()), "not-a-week", wednesdayW39), null);
+  assert.equal(await archivedWeek(signedIn(untouchable()), "2026-W00", wednesdayW39), null);
   assert.deepEqual([routeStub.adminCalls, routeStub.cached.length], [0, 0]);
 });
 
@@ -207,12 +215,16 @@ test("archivedWeek and archiveList refuse to run without a signed-in reader, bef
 // Spec 1.5. Kills the list read as the reader, a key or revalidate other than the spec's, and a missing
 // tag (the cron's revalidateTag would drop nothing, and a closed week would stay off the list for a day).
 // M-4: a current-week row sits in the fixture too, so dropping `.neq("id", current)` in getArchive fails
-// this test (the list would carry two rows) instead of passing unnoticed.
+// this test (the list would carry two rows) instead of passing unnoticed. `routeStub.reader` mirrors
+// production's memoized `getReader()` (see the closed-week test above), so a leak (the cache adding the
+// viewer's email to each row) would show up against the exact expected rows below, not go unnoticed.
 test("archiveList reads every issue but the current week's through its tagged cache and the admin client", async () => {
   resetRoute();
   const row = { id: "2026-W38", period: "2026 / 09", item_count: 24, read_minutes: 96, top_title: text("Top") };
   routeStub.admin = fakeDb(undefined, { rows: { archive_issues: [row, { ...row, id: isoWeek(new Date()).id }] } });
-  assert.deepEqual(await archiveList(signedIn(untouchable())), [
+  const reader = signedIn(untouchable());
+  routeStub.reader = reader;
+  assert.deepEqual(await archiveList(reader), [
     { id: "2026-W38", period: "2026 / 09", week: "W38", top: text("Top"), itemCount: 24, readMinutes: 96 },
   ]);
   assert.deepEqual(routeStub.cached, [{ keyParts: ["archive-list", "v1"], options: { revalidate: 86400, tags: ["archive"] }, args: [] }]);
@@ -221,7 +233,9 @@ test("archiveList reads every issue but the current week's through its tagged ca
 
 // Review Focus 3, security invariant 4. unstable_cache stores what its function resolves (Next's
 // unstable-cache.js keeps `await cb()`), so a failed query has to reject. Kills `data ?? []` in either
-// loader: the Radar would show an empty week, or /archive "no closed week yet", for a day.
+// loader: the Radar would show an empty week, or /archive "no closed week yet", for a day. (The stub
+// always calls straight through, so this doesn't and can't prove "a rejection isn't cached, so the next
+// call retries" — that's store-on-success, Next's own behaviour in unstable-cache.js.)
 test("a failed query in either cached loader rejects, so the cache keeps nothing", async () => {
   resetRoute();
   routeStub.admin = fakeDb(undefined, { tableErrors: { issues: pgError("08006", "connection failure"), archive_issues: pgError("08006", "connection failure") } });
