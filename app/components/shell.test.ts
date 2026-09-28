@@ -102,7 +102,6 @@ test("DigestDashboard renders the Top 3, the feed and the to-do panel from the p
     issue: previewIssue,
     items: previewItems,
     githubTop10: previewGithub,
-    seed: { issueId: previewIssue.id, seededAt: 0, data: previewReader },
     preview: { data: previewReader, failWrites: false },
   });
   const topThree = previewItems.filter((item) => item.mustRead);

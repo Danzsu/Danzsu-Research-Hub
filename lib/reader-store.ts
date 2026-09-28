@@ -100,16 +100,11 @@ export function revalidateSeed(
   };
 }
 
-/** The store a Radar page's client starts with: initialized from `seed`'s data (or empty, with no
- *  seed), syncing exactly when `seedNeedsLoad` says it must wait for GET /api/state. The one place
- *  that combines the two, so useReaderState and the reader-store tests can't drift apart. */
-export function createSeededStore(
-  send: SendState,
-  onError: () => void,
-  seed: ReaderSeed | undefined,
-  mounted?: ReadonlySet<string>,
-): ReaderStore {
-  return createReaderStore(send, onError, seed?.data ?? undefined, seed ? seedNeedsLoad(seed, mounted) : false);
+/** The store a Radar page's client starts with: initialized from `seed`'s data, syncing exactly when
+ *  `seedNeedsLoad` says it must wait for GET /api/state. The one place that combines the two, so
+ *  useReaderState and the reader-store tests can't drift apart. */
+export function createSeededStore(send: SendState, onError: () => void, seed: ReaderSeed, mounted?: ReadonlySet<string>): ReaderStore {
+  return createReaderStore(send, onError, seed.data ?? undefined, seedNeedsLoad(seed, mounted));
 }
 
 /** No network, for the offline preview and tests. `fail` rejects every write the way an offline fetch does. */

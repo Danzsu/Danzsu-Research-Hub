@@ -32,26 +32,10 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites, delayMs }}>
       <PreviewNav current={view} failWrites={failWrites} slow={delayMs > 0} />
       {view === "radar" && (
-        <DigestDashboard
-          key={String(failWrites)}
-          issue={previewIssue}
-          items={previewItems}
-          githubTop10={previewGithub}
-          // The preview branch of useReaderState ignores `seed` entirely; this is here only because
-          // DigestDashboard requires one. seededAt: 0 is fine — the preview never revalidates it.
-          seed={{ issueId: previewIssue.id, seededAt: 0, data: previewReader }}
-          preview={{ data: previewReader, failWrites }}
-        />
+        <DigestDashboard key={String(failWrites)} issue={previewIssue} items={previewItems} githubTop10={previewGithub} preview={{ data: previewReader, failWrites }} />
       )}
       {view === "radar-empty" && (
-        <DigestDashboard
-          key={String(failWrites)}
-          issue={previewIssue}
-          items={[]}
-          githubTop10={[]}
-          seed={{ issueId: previewIssue.id, seededAt: 0, data: { states: {}, todos: [] } }}
-          preview={{ data: { states: {}, todos: [] }, failWrites }}
-        />
+        <DigestDashboard key={String(failWrites)} issue={previewIssue} items={[]} githubTop10={[]} preview={{ data: { states: {}, todos: [] }, failWrites }} />
       )}
       {view === "library" && <LibraryView posts={previewPosts} open={previewSources} readIds={previewReadPostIds} preview={{ failWrites }} />}
       {view === "library-empty" && <LibraryView posts={[]} open={[]} readIds={new Set()} preview={{ failWrites }} />}
