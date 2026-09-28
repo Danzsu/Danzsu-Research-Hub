@@ -10,7 +10,24 @@ type ModelContext = {
   registerTool: (tool: Record<string, unknown>, options?: { signal?: AbortSignal }) => void | Promise<void>;
 };
 
-export function useModelContextTools(store: ReaderStore) {
+type MarkReadInput = { itemId: string; value: boolean };
+export type MarkReadResult = { itemId: string; read: boolean } | { itemId: string; error: "not_on_this_page" };
+
+/**
+ * `mark_digest_item_read`'s own logic, pulled out so a test can call it without a DOM or an effect. The
+ * reader store is scoped to the page's own items (spec: a Radar week, or a Library post), so an id
+ * outside `itemIds` — another week's, or a `post:<id>` key — must not silently no-op and report success.
+ */
+export async function markItemRead(store: ReaderStore, itemIds: readonly string[], input: MarkReadInput): Promise<MarkReadResult> {
+  const { itemId, value } = input;
+  if (!itemIds.includes(itemId)) return { itemId, error: "not_on_this_page" };
+  store.setFlag(itemId, "read", value);
+  await store.settled();
+  // After a failed write this is the rolled-back value, not the requested one.
+  return { itemId, read: store.getSnapshot().states[itemId]?.read ?? false };
+}
+
+export function useModelContextTools(store: ReaderStore, itemIds: readonly string[]) {
   useEffect(() => {
     const context = (document as Document & { modelContext?: ModelContext }).modelContext;
     if (!context?.registerTool) return;
@@ -21,7 +38,7 @@ export function useModelContextTools(store: ReaderStore) {
     register({
       name: "mark_digest_item_read",
       title: "Mark digest item read",
-      description: "Mark one visible AI digest item as read for the signed-in reader.",
+      description: "Mark one visible AI digest item as read for the signed-in reader. Only an item on the current page can be marked; any other id answers with a not_on_this_page error.",
       inputSchema: {
         type: "object",
         properties: { itemId: { type: "string" }, value: { type: "boolean" } },
@@ -29,13 +46,7 @@ export function useModelContextTools(store: ReaderStore) {
         additionalProperties: false,
       },
       annotations: { readOnlyHint: false, untrustedContentHint: false },
-      execute: async (input: unknown) => {
-        const { itemId, value } = input as { itemId: string; value: boolean };
-        store.setFlag(itemId, "read", value);
-        await store.settled();
-        // After a failed write this is the rolled-back value, not the requested one.
-        return { itemId, read: store.getSnapshot().states[itemId]?.read ?? false };
-      },
+      execute: (input: unknown) => markItemRead(store, itemIds, input as MarkReadInput),
     });
     register({
       name: "add_digest_todo",
@@ -55,5 +66,5 @@ export function useModelContextTools(store: ReaderStore) {
       },
     });
     return () => lifecycle.abort();
-  }, [store]);
+  }, [store, itemIds]);
 }

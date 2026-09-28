@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Bookmark,
   Building2,
@@ -108,7 +108,8 @@ export function DigestDashboard(
   const { language } = useLanguage();
   const [filter, setFilter] = useState<Filter>("all");
   const { store, states, loadedStates, todos, syncing } = useReaderState(props);
-  useModelContextTools(store);
+  const itemIds = useMemo(() => items.map((item) => item.id), [items]);
+  useModelContextTools(store, itemIds);
   const isMobile = useIsMobile();
   const t = copy[language];
 
