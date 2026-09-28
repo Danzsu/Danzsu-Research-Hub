@@ -149,17 +149,18 @@ const wednesdayW39 = new Date("2026-09-23T12:00:00Z");
 
 // Spec 1.5, security invariants 1 and 3. `routeStub.reader` is set to the same reader passed in,
 // mirroring production's React-memoized `getReader()`: a second call inside the cached scope answers
-// with this same Reader, not null, so a leak (the cache spreading the viewer into its value) shows up in
-// the deepEqual against getRadar's own clean answer, not just as an untouched extra field. Kills the
-// closed week read through the reader's client, the cache keyed on anything but the week (the viewer, a
-// cookie), and `createAdminClient()` swapped for the reader's cookie client inside the cached scope.
+// with this same Reader, not null, so a leak shows up against this literal. Deliberately not a
+// comparison against getRadar's own output: getRadar is the loader the cache wraps, so anything it
+// itself added would appear on both sides and cancel out. Kills the closed week read through the
+// reader's client, the cache keyed on anything but the week (the viewer, a cookie), and
+// `createAdminClient()` swapped for the reader's cookie client inside the cached scope.
 test("archivedWeek reads a closed week through the one-day cache and the admin client, keyed by the week alone", async () => {
   resetRoute();
   routeStub.admin = fakeDb(undefined, { rows: { issues: [issueRow("2026-W38")] } });
   const reader = signedIn(untouchable());
   routeStub.reader = reader;
   const radar = await archivedWeek(reader, "2026-W38", wednesdayW39);
-  assert.deepEqual(radar, await getRadar(fakeDb(undefined, { rows: { issues: [issueRow("2026-W38")] } }), "2026-W38"));
+  assert.deepEqual(radar, { issue: { id: "2026-W38", label: "2026 / W38", updated: "09. 20. 07:00", archiveAt: "09. 20." }, items: [], githubTop10: [] });
   assert.equal(routeStub.adminCalls, 1);
   assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v1"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
 });
