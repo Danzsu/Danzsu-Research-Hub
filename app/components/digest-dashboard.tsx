@@ -18,13 +18,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import type { CurrentIssue, DigestItem, GithubTopEntry } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { feedItems, type Filter } from "@/lib/feed";
-import { EMPTY_ITEM_STATE, type Flag } from "@/lib/reader-store";
+import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
 import { useLanguage } from "./language-context";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
 import { isUndoToast, toasts } from "./undo-toast";
 import { useModelContextTools } from "./use-model-context-tools";
-import { useReaderState, type ReaderSource } from "./use-reader-state";
+import { useReaderState } from "./use-reader-state";
 import { useShortcuts } from "./use-shortcuts";
 
 const copy = {
@@ -102,13 +102,12 @@ export function DigestDashboard(
     githubTop10: GithubTopEntry[];
     /** A closed week opened from /archive: same reading UI, no "live" framing. */
     archived?: boolean;
-    // seed (getReaderSeed) for a real page, or preview (app/dev/preview) for the offline preview — never both.
   } & ReaderSource,
 ) {
   const { issue, items, githubTop10, archived = false } = props;
   const { language } = useLanguage();
   const [filter, setFilter] = useState<Filter>("all");
-  const { store, states, loadedStates, todos, syncing } = useReaderState(props.preview ? { preview: props.preview } : { seed: props.seed });
+  const { store, states, loadedStates, todos, syncing } = useReaderState(props);
   useModelContextTools(store);
   const isMobile = useIsMobile();
   const t = copy[language];
