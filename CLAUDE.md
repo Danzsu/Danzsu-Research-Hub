@@ -155,7 +155,7 @@ RLS is on for every table:
 | `PATCH /api/posts/[id]` | `getReader()` | `savePostEdits`: 400 `invalid` (the body), 403 `forbidden` (not the submitter), 404, 500 `db_error` |
 | `POST /api/posts/[id]/translate` | `getReader()`, then admin | 404, 409 `translation_stale`, 502 `translation_shape` / `translation_failed`, else `{ ok: true }` |
 | `POST /api/posts/[id]/reextract` | `getReader()`, then admin | 403 unless the submitter, 429 `cooldown` with `retryAfter` (seconds), 404, 500 `db_error`, else 202 and `processSource` in `after()` |
-| `GET /api/cron/daily` | `Authorization: Bearer $CRON_SECRET` | 401 `unauthorized` when the secret is unset or doesn't match; see How content gets in. After every run it drops the archive list's cache (Server path) |
+| `GET /api/cron/daily` | `Authorization: Bearer $CRON_SECRET` | 401 `unauthorized` when the secret is unset or doesn't match; see How content gets in. After each run it tries to drop the archive list's cache, best-effort (Server path) |
 | `GET /media/[...path]` | `getViewer()` | See SECURITY.md → `/media` |
 
 Error bodies follow CODE_STYLE.md → Error handling; `/media` answers plain text. The three `posts/[id]` routes and `sources/[id]/retry` are wrapped in `postRoute` (`lib/api.ts`): 401 `unauthorized` when signed out and 404 `not_found` for an id that isn't a positive integer, the same answer as a missing row; their result maps share `POST_ERRORS`. The cron, sources, `sources/[id]/retry`, translate and reextract routes set `maxDuration = 300`.
