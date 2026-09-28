@@ -295,24 +295,9 @@ test("postState sends keepalive JSON and throws on a non-2xx answer; loadState r
   assert.equal(seen.at(-1)?.init?.cache, "no-store");
 });
 
-// N4. The hard rule "the preview never touches real data" depends on createSourceStore always routing a
-// preview source to its own memory sender, never postState (real `fetch`) — however identically a
-// misrouted preview might otherwise render or behave.
-test("createSourceStore's preview source writes only to its own memory sender, never fetch", async (t) => {
-  let fetchCalls = 0;
-  mockFetch(t, async () => {
-    fetchCalls++;
-    return Response.json({ id: 1 });
-  });
-  let errors = 0;
-  const store = createSourceStore({ preview: { data: empty, failWrites: false } }, () => errors++);
-  store.setFlag("a", "read", true);
-  store.addTodo("later");
-  await store.settled();
-  assert.equal(fetchCalls, 0);
-  assert.equal(errors, 0);
-});
-
+// app/components/shell.test.ts's hook-level test now covers this file's own createSourceStore(preview)
+// routing to memorySend, one layer up (through useReaderState); this file keeps the failWrites variant,
+// which also pins the rollback and the error report, not just the absence of a fetch call.
 test("createSourceStore's preview source with failWrites rolls back and reports the error, still with no fetch", async (t) => {
   let fetchCalls = 0;
   mockFetch(t, async () => {
@@ -328,7 +313,7 @@ test("createSourceStore's preview source with failWrites rolls back and reports 
   assert.equal(fetchCalls, 0);
 });
 
-// Proves the two tests above aren't vacuous: a seed source's write does reach fetch, through postState.
+// Proves the test above isn't vacuous: a seed source's write does reach fetch, through postState.
 test("createSourceStore's seed source writes through postState, reaching fetch", async (t) => {
   let fetchCalls = 0;
   mockFetch(t, async () => {

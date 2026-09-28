@@ -12,7 +12,8 @@ import {
   previewReadPostIds,
   previewSources,
 } from "../../lib/fixtures.ts";
-import { createSeededStore, memorySend, revalidateSeed, type ReaderSeed } from "../../lib/reader-store.ts";
+import { mockFetch } from "../../lib/pipeline/mock-fetch.ts";
+import { createSeededStore, memorySend, revalidateSeed, type ReaderSeed, type ReaderStore } from "../../lib/reader-store.ts";
 import { navigationStub } from "../../lib/test/next-stub.ts";
 import { render } from "../../lib/test/render.ts";
 
@@ -35,6 +36,7 @@ const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
 const { CHAT_PANEL_ID, LinkChat, TaiyakiButton } = await import("./link-chat.tsx");
 const { RefreshBar, RefreshProvider } = await import("./refresh-bar.tsx");
 const { PostToolbar } = await import("../(app)/library/[id]/post-toolbar.tsx");
+const { useReaderState } = await import("./use-reader-state.ts");
 
 const noop = () => {};
 const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop };
@@ -147,6 +149,31 @@ test("a seed already marked as seen through the shared defaults starts DigestDas
   // mountedSeeds — no explicit `mounted` argument on either call.
   revalidateSeed(createSeededStore(memorySend(), noop, backSeed), backSeed, async () => previewReader);
   assert.ok(dashboardText(backSeed).includes("SYNC…"), "a seed this tab has already mounted must start syncing again");
+});
+
+// A2: nothing proves useReaderState (not just createSourceStore in isolation) actually routes a preview
+// source's writes to its in-memory sender rather than real fetch — a hook that built its own seeded or
+// real store here instead would still pass every lib/reader-store.ts test. Replaces that file's first
+// preview test (createSourceStore's own routing), which this fully subsumes: any misrouting it caught,
+// this catches too, one layer up.
+test("useReaderState routes a preview source's writes through createSourceStore, never fetch", async (t) => {
+  let fetchCalls = 0;
+  mockFetch(t, async () => {
+    fetchCalls++;
+    return Response.json({ id: 1 });
+  });
+  for (const failWrites of [false, true]) {
+    let store: ReaderStore | undefined;
+    function Probe() {
+      ({ store } = useReaderState({ preview: { data: { states: {}, todos: [] }, failWrites } }));
+      return null;
+    }
+    render(createElement(Probe));
+    store!.setFlag("a", "read", true);
+    store!.addTodo("x");
+    await store!.settled();
+  }
+  assert.equal(fetchCalls, 0);
 });
 
 test("StoryCard renders an unread feed card with its full action row", () => {
