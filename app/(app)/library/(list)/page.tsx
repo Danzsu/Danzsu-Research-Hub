@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getOpenSources, getPosts, getReadPostIds } from "@/lib/content";
 import { getReader } from "@/lib/supabase/server";
-import { LibraryView } from "./library-view";
+import { LibraryView } from "../library-view";
 
 export const dynamic = "force-dynamic";
 

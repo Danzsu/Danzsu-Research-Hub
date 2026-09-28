@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { archiveList } from "@/lib/content";
 import { getReader } from "@/lib/supabase/server";
-import { ArchiveView } from "./archive-view";
+import { ArchiveView } from "../archive-view";
 
 export const dynamic = "force-dynamic";
 
