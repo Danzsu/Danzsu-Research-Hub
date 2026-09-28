@@ -4,11 +4,11 @@ import { test } from "node:test";
 import ts from "typescript";
 import { aliasedFile, relativeFile } from "./test/tsx-hooks.ts";
 
-// zod stays out of the browser bundle (spec 3.1–3.2). The walk starts at every file under app/ whose
-// first statement is "use client", and follows each import that survives compilation (a type-only one
-// doesn't) through app/ and lib/ alike: a server file that a client file imports ships to the browser
-// too, as post-blocks.tsx does. It doesn't enter packages; a zod import anywhere on the way fails, and
-// the message names the whole chain from its root.
+// zod stays out of the browser bundle (spec 3.1–3.2). The walk starts at every file under app/,
+// components/ and hooks/ whose first statement is "use client", and follows each import that survives
+// compilation (a type-only one doesn't) through app/ and lib/ alike: a server file that a client file
+// imports ships to the browser too, as post-blocks.tsx does. It doesn't enter packages; a zod import
+// anywhere on the way fails, and the message names the whole chain from its root.
 
 const repoRoot = new URL("../", import.meta.url);
 
@@ -33,7 +33,7 @@ function dynamicImports(file: ts.SourceFile): string[] {
   const specifiers: string[] = [];
   const visitNode = (node: ts.Node): void => {
     const arg = ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword ? node.arguments[0] : undefined;
-    if (arg && ts.isStringLiteral(arg)) specifiers.push(arg.text);
+    if (arg && ts.isStringLiteralLike(arg)) specifiers.push(arg.text);
     ts.forEachChild(node, visitNode);
   };
   visitNode(file);
@@ -68,7 +68,8 @@ function resolveImport(specifier: string, from: string): string | undefined {
 }
 
 const shown = (href: string) => decodeURIComponent(href.slice(repoRoot.href.length));
-const roots = sourceFiles(new URL("app/", repoRoot)).filter((href) => isClientRoot(parse(href)));
+const rootDirs = ["app/", "components/", "hooks/"].flatMap((dir) => sourceFiles(new URL(dir, repoRoot)));
+const roots = rootDirs.filter((href) => isClientRoot(parse(href)));
 const reached = new Set<string>();
 const zodChains: string[] = [];
 
@@ -85,7 +86,7 @@ for (const root of roots) visit(root, []);
 
 // Not vacuous: a walk that resolved nothing (a broken alias, say) would find no zod and pass.
 test("the client walk starts at every use-client file and reaches the modules zod came in through", () => {
-  assert.ok(roots.length >= 15, `only ${roots.length} "use client" roots under app/`);
+  assert.ok(roots.length >= 15, `only ${roots.length} "use client" roots under app/, components/ and hooks/`);
   for (const file of ["lib/reader-store.ts", "lib/post-view.ts", "app/components/post-blocks.tsx"]) {
     assert.ok(reached.has(new URL(file, repoRoot).href), `the walk never reached ${file}`);
   }

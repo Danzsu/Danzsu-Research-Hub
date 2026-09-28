@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { mockFetch } from "./pipeline/mock-fetch.ts";
 import {
   createReaderStore,
@@ -46,6 +46,17 @@ function manual() {
       calls.push({ write, resolve, reject });
     });
   return { calls, send };
+}
+
+/** Mocks fetch for the rest of `t` and returns how many times it's been called so far — for tests that
+ *  must prove a write never (or exactly once) reaches it. */
+function countedFetch(t: TestContext): () => number {
+  let calls = 0;
+  mockFetch(t, async () => {
+    calls++;
+    return Response.json({ ok: true });
+  });
+  return () => calls;
 }
 
 test("setting a flag to its current value sends nothing", async () => {
@@ -299,32 +310,24 @@ test("postState sends keepalive JSON and throws on a non-2xx answer; loadState r
 // routing to memorySend, one layer up (through useReaderState); this file keeps the failWrites variant,
 // which also pins the rollback and the error report, not just the absence of a fetch call.
 test("createSourceStore's preview source with failWrites rolls back and reports the error, still with no fetch", async (t) => {
-  let fetchCalls = 0;
-  mockFetch(t, async () => {
-    fetchCalls++;
-    return Response.json({ id: 1 });
-  });
+  const fetchCalls = countedFetch(t);
   let errors = 0;
   const store = createSourceStore({ preview: { data: empty, failWrites: true } }, () => errors++);
   store.setFlag("a", "read", true);
   await store.settled();
   assert.equal(store.getSnapshot().states.a?.read, false, "rolled back to the pre-write default");
   assert.equal(errors, 1);
-  assert.equal(fetchCalls, 0);
+  assert.equal(fetchCalls(), 0);
 });
 
 // Proves the test above isn't vacuous: a seed source's write does reach fetch, through postState.
 test("createSourceStore's seed source writes through postState, reaching fetch", async (t) => {
-  let fetchCalls = 0;
-  mockFetch(t, async () => {
-    fetchCalls++;
-    return Response.json({ ok: true });
-  });
+  const fetchCalls = countedFetch(t);
   const seed: ReaderSeed = { issueId: "2026-W39", seededAt: 1, data: { states: {}, todos: [] } };
   const store = createSourceStore({ seed }, noop);
   store.setFlag("a", "read", true);
   await store.settled();
-  assert.equal(fetchCalls, 1);
+  assert.equal(fetchCalls(), 1);
 });
 
 const seed = (overrides: Partial<ReaderSeed> = {}): ReaderSeed => ({

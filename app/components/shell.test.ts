@@ -40,6 +40,8 @@ const { useReaderState } = await import("./use-reader-state.ts");
 
 const noop = () => {};
 const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop };
+/** Each element's own count of `span[aria-hidden="true"]` descendants (the pending dot). */
+const hiddenSpanCounts = (elements: Element[]) => elements.map((element) => element.querySelectorAll('span[aria-hidden="true"]').length);
 /** Wraps a component in the two providers the shell gives it: the language (LocalizedText, SubmitForm,
  *  DigestDashboard) and the refresh bar (SubmitForm, LinkChat). */
 const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P) =>
@@ -303,12 +305,11 @@ test("every nav link carries one hidden pending dot, the search button none, and
   t.after(() => {
     navigationStub.linkPending = false;
   });
-  const dots = (entries: Element[]) => entries.map((entry) => entry.querySelectorAll('span[aria-hidden="true"]').length);
   const doc = shell("en");
-  assert.deepEqual(dots([...doc.querySelectorAll("aside nav a")]), [1, 1, 1]); // Radar, Library, Archive
-  assert.deepEqual(dots([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1]); // Radar, Library, Archive
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
   const searchButtons = [...doc.querySelectorAll("aside nav button, #mobile-nav > button")].filter((button) => button.textContent?.startsWith("Search"));
-  assert.deepEqual(dots(searchButtons), [0, 0]);
+  assert.deepEqual(hiddenSpanCounts(searchButtons), [0, 0]);
   assert.equal(doc.querySelectorAll("[data-pending]").length, 0);
   navigationStub.linkPending = true;
   assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 5);
@@ -316,7 +317,7 @@ test("every nav link carries one hidden pending dot, the search button none, and
 
 // Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.
 test("every archive week card and Library post card carries one hidden pending dot", () => {
-  const perCard = (doc: Document, selector: string) => [...doc.querySelectorAll(selector)].map((card) => card.querySelectorAll('span[aria-hidden="true"]').length);
+  const perCard = (doc: Document, selector: string) => hiddenSpanCounts([...doc.querySelectorAll(selector)]);
   assert.deepEqual(perCard(withShellProviders(ArchiveView, { issues: previewArchive }), 'a[href^="/archive/"]'), previewArchive.map(() => 1));
   const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, preview: { failWrites: false } });
   assert.deepEqual(perCard(library, 'a[href^="/library/"]'), previewPosts.map(() => 1));
