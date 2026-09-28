@@ -47,6 +47,7 @@ Every environment variable is server-only, and none is `NEXT_PUBLIC_` (`.env.exa
 
 - **`createClient()`** acts as the reader, so RLS applies. Use it, through `getReader()`, everywhere except the pipeline.
 - **`createAdminClient()`** bypasses RLS. It is for the pipeline: the cron route, and the `processSource` runs that the sources, reextract and `sources/[id]/retry` routes schedule in `after()`. The translate, reextract, `sources/[id]/retry` (its compare-and-swap, after the reader-side read) and `/media` routes may also use it, each after its own check. Never pass its results to a reader unfiltered.
+- **The content caches** in `lib/content.ts` use it too, because a cached function can't read the reader's cookies: a closed week's Radar and the `/archive` list. They read only the three content tables (`issues`, `digest_items`, `github_top`) and the `archive_issues` view, which every member may read through RLS anyway. They run only after a successful `getReader()` (`archivedWeek` and `archiveList` take its `Reader`), and what they return is cached. The rules are in ARCHITECTURE.md → Invariants.
 - **`scripts/ingest-url.mts`** is a dev tool, and it builds its own secret-key client.
 
 The reader's one write to `posts` is in CLAUDE.md → Database.

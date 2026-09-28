@@ -30,7 +30,7 @@ npm run dup        # jscpd app lib proxy.ts scripts --min-lines 6 --min-tokens 6
 
 Before every commit, all five checks must pass, in this order: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`.
 
-- **Offline preview** (run `npm run dev` first): `/dev/preview?view=radar|radar-empty|library|library-empty|archive|archive-empty`, plus `&fail=1` to make every write fail as if offline and `&slow=1` to slow the link chat's answers. `/dev/preview/post` shows every block type and banner (CLAUDE.md → Offline preview).
+- **Offline preview** (run `npm run dev` first): `/dev/preview?view=radar|radar-empty|library|library-empty|archive|archive-empty`, the four loading skeletons `radar-loading|library-loading|archive-loading|post-loading`, plus `&fail=1` to make every write fail as if offline and `&slow=1` to slow the link chat's answers. `/dev/preview/post` shows every block type and banner (CLAUDE.md → Offline preview).
 - **One cron run:** `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/daily`.
 - **One link without the UI:** `npm run ingest -- <url>`. It and the cron curl write real rows to production (README.md → Sign in and fill it).
 - **Node 24 LTS, with pnpm run only as `corepack pnpm@11.25.0`** (README.md → Prerequisites, Install).

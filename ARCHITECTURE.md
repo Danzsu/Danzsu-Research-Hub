@@ -17,7 +17,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 
 `app/` is Next.js routing and UI. `lib/` is the logic, and it runs under plain `node --test`.
 
-- `app/(app)/` holds the signed-in pages (`/`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list.
+- `app/(app)/` holds the signed-in pages (`/`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list. Three more route groups hold one page each, `(radar)/` (`/`), `library/(list)/` and `archive/(list)/`, so that each page's `loading.tsx` wraps that page alone (CLAUDE.md → App shell and navigation).
 - The rest of `app/`, outside the group:
   - `login/` and `auth/` (login, callback, signout);
   - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract) and `cron/daily`;
@@ -27,7 +27,8 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `layout.tsx`, which sets `robots: noindex`;
   - `globals.css`, the theme (DESIGN.md).
 - `app/components/` has the shared UI:
-  - the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts`, `shell-dialogs`, `undo-toast`, and the link chat: `link-chat` (the taiyaki button and panel), `chat-thread`, `taiyaki-icon`;
+  - the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts` (with the pending dot), `shell-dialogs`, `undo-toast`, `refresh-bar` (the refresh transition and its bar), and the link chat: `link-chat` (the taiyaki button and panel), `chat-thread`, `taiyaki-icon`;
+  - `page-skeletons`, the loading skeletons the `loading.tsx` files render;
   - the language: `language-context`, `language-toggle`;
   - the Radar: `digest-dashboard`, `story-card`, `reader-panel`, `tag`;
   - the title bands: `page-header` (`PageHero`, `StatusCard`);
@@ -43,13 +44,14 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `fetch.ts` (`safeFetch`, `apiFetch`) and `util.ts` (ids, URL parsing and small shared helpers).
 - The rest of `lib/`:
   - the block model, `blocks.ts`;
-  - `post-view.ts`, which turns a post row into the page's `Post` (`shownTitle` is the title readers see);
+  - `post-view.ts`, the page's `Post` and the renderer's helpers, zod-free because the browser gets it (`shownTitle` is the title readers see, `editPayload` the editor's save);
+  - `post-row.ts`, server-only, which turns a post row into that `Post`;
   - the submitter's edits: `post-edit.ts`, `overrides.ts`;
   - `translate.ts` and the model client, `llm.ts`;
-  - `content.ts`, which turns DB rows into content types;
+  - `content.ts`, which turns DB rows into content types, and holds the two content caches;
   - reader state: `reader-store.ts`, `state.ts`, `feed.ts`;
   - the link chat: `link-chat.ts` (the message parser, the thread and its store, the HTTP and in-memory transports), `my-sources.ts` (the reader's own submissions and their retry), `source-kinds.ts` (the kind names, `SOURCE_KIND_LABELS`);
-  - the shell's data: `nav.ts`, `nav-mode.ts`, `keymap.ts`, `undo-queue.ts`;
+  - the shell's data: `nav.ts`, `nav-mode.ts`, `keymap.ts`, `undo-queue.ts`, `idle-prefetch.ts` (the "Több" sheet's prefetch);
   - `media.ts` (the bucket and its key format), `public-paths.ts`, `api.ts` (`jsonError`, `postRoute`), `language.ts`;
   - `supabase/server.ts`, the Supabase clients;
   - `fixtures.ts`, the preview's data.
@@ -66,12 +68,19 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 
 Breaking one of these is a bug even when every test passes.
 
-- **A Radar item's id never changes.** `item.id` is half the composite primary key of `item_states`, so renaming one silently orphans every reader's read and saved state. `itemId()` in `lib/pipeline/util.ts` derives it once, as `<category>-<yyyy>w<ww>-<slug>-<urlhash>`, from the category, the ISO week, the English title and the source URL. Inserts use `ignoreDuplicates` on `url`, so an existing row is never rewritten. `lib/pipeline/daily.test.ts` pins two literal ids.
+- **A Radar item's id never changes.** `item.id` is half the composite primary key of `item_states`, so renaming one silently orphans every reader's read and saved state. `itemId()` in `lib/pipeline/util.ts` derives it once, as `<category>-<yyyy>w<ww>-<slug>-<urlhash>`, from the category, the ISO week, the English title and the source URL. Inserts use `ignoreDuplicates` on `url`, so an existing row is never rewritten. `lib/pipeline/daily.test.ts` pins two literal ids. The reader state's week filter leans on the same form: `weekItemPattern` matches `%-<yyyy>w<ww>-%`, so a changed `itemId()` would silently drop reader rows (`lib/pipeline/util.test.ts` binds the two).
 - **An issue has three must-reads.** After every daily run, `refresh_must_read` marks the three highest scores of the issue (ties go to the earlier row). An issue with fewer than three items has fewer. The Top 3 grid is built for exactly three.
 - **Block ids are content-addressed.** `assignIds` (`lib/blocks.ts`) derives each id from the block's type and normalized content, never from its position. That's why `hidden_blocks`, and later annotations, still point at the same block after a re-extraction.
 - **No raw HTML reaches a page** (SECURITY.md → XSS).
 - **No secret reaches the browser** (SECURITY.md → Secrets).
 - **The admin client runs only in the pipeline, or after a route has made its own check** (SECURITY.md → Reader vs admin client).
+- **The content caches hold content that no longer changes, and nothing else.** `lib/content.ts` caches two things for a day: a closed week's Radar (`week < isoWeek(now).id`) and the `/archive` list, which the daily cron drops at once after every run.
+  - The current week, the reader's own state (read, later, to-dos), a cookie or anything computed from one, and a viewer's id never go in. Only content does, keyed by the week's id or by a fixed key.
+  - Sign-in comes first: the caches are reached only through `archivedWeek` and `archiveList`, which take a signed-in `Reader`, and nothing inside them reads cookies.
+  - A failed query throws, so no failure is ever cached.
+  - Next's data cache outlives a deploy, so the key's version (`v1`) goes up whenever `RadarData` or `ArchiveIssue` changes shape.
+
+  The mechanics are in CLAUDE.md → Server path.
 - **Every user-supplied or page-derived URL is fetched through `safeFetch`** (SECURITY.md → SSRF).
 - **The offline preview never reaches real data.** Local dev points at the production project, so preview writes send nothing:
   - reader state goes through `memorySend`;
@@ -86,7 +95,7 @@ Breaking one of these is a bug even when every test passes.
 ## Boundaries
 
 - **`lib/` and `app/`.** `lib/` never imports from `app/`, and it loads without Next.js, except for the three Next-only server modules named in CODE_STYLE.md → Imports. `app/` is routes and components. It keeps its logic thin, so that the logic sits in a `lib/` function that a unit test can reach.
-- **Server and client components.** Pages, the post article and the Library and Archive lists are server components. `"use client"` marks the interactive leaves, such as the shell, the Radar dashboard, the language toggle, the submit form, the editor and the toolbar. A presentational component that both sides render stays hook-free (`post-blocks.tsx`, `page-header.tsx`), and its one stateful piece is split out (`post-image.tsx`).
+- **Server and client components.** Pages, the post article and the Library and Archive lists are server components. `"use client"` marks the interactive leaves, such as the shell, the Radar dashboard, the language toggle, the submit form, the editor and the toolbar. A presentational component that both sides render stays hook-free (`post-blocks.tsx`, `page-header.tsx`), and its one stateful piece is split out (`post-image.tsx`). No module a client component reaches imports zod: the limits both sides share live in `lib/pipeline/util.ts`, and the schemas stay with the server code that parses. `lib/client-bundle.test.ts` walks the client import graph and fails on a zod import.
 - **Reader and admin client.** `lib/supabase/server.ts` creates both, and SECURITY.md → Reader vs admin client says which code may use which.
 - **Pipeline and routes.** A route authenticates, parses, calls `lib/` and maps the result to JSON. Ingest (`processSource`, from the sources, reextract and `sources/[id]/retry` routes) runs in `after()`, once the response has been sent. The cron and translate routes do their work inside the request, because the result is their answer.
 

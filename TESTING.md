@@ -12,6 +12,7 @@ Every test runs offline under plain `node --test` (README.md → Testing). This 
    - Every preview view (AGENTS.md → Commands), including with `&fail=1`, and `/dev/preview/post` must answer 200.
    - No response may contain "Too many re-renders", "Unhandled Runtime Error" or "Application error".
    - Then check the change in a browser with Playwright at 360, 768 and 1280px: the interaction itself, the console, and no horizontal scroll.
+   - The preview can't wait on a real server, so a Playwright round makes it wait: `page.route` holds the real `(app)` routes' requests unanswered (the pending dot), or delays the `/dev/preview/post` refresh (a request with an `rsc` header) by 800ms (the refresh bar). `page.emulateMedia({ reducedMotion: "reduce" })` checks the reduced-motion states.
    - Add a fixture to `lib/fixtures.ts` with every new block type, banner or empty state. `lib/fixtures.test.ts` fails for a missing block type.
 5. **The manual checklist against a deployment.** README.md → Testing lists what a person checks by hand in a browser (with Playwright) after a deploy. The live checks that are still pending are in TODO.md ("Halasztott élő próbák", "Élő próbák a UI/UX A deploy után", "Élő próbák a taiyaki link-chat deployja után").
 6. **Mutation probes as proof.** A test that pins a security rule or a subtle behaviour is proven by breaking the code on purpose:
@@ -20,7 +21,8 @@ Every test runs offline under plain `node --test` (README.md → Testing). This 
    - Revert, and check that `git diff --stat` shows only your intended change.
 
    The test's comment names the mutation it kills, as in `// X1: with CRON_SECRET unset, no header can be right…` in `app/api/cron/daily/route.test.ts`.
-7. **CI** (`.github/workflows/ci.yml`) runs the five checks from AGENTS.md → Commands, in the same order, on every push and pull request:
+7. **The client-bundle guard** (`lib/client-bundle.test.ts`). It parses every `"use client"` file under `app/` with the TypeScript compiler API and follows each import that compilation keeps (not `import type`, nor an import whose names are all `type`) through `app/` and `lib/`, resolving `@/`, `./` and `../` the way `tsx-hooks.ts` does, but never into a package. It fails with the whole chain when a reached module imports zod, and it checks that it reaches `lib/reader-store.ts`, `lib/post-view.ts` and `app/components/post-blocks.tsx` at all. Its mutation probe: put `import { TODO_TEXT_MAX } from "./state.ts"` back into `reader-store.ts`.
+8. **CI** (`.github/workflows/ci.yml`) runs the five checks from AGENTS.md → Commands, in the same order, on every push and pull request:
    - Node 24.16.0 on `ubuntu-24.04`, with a 20-minute timeout;
    - `corepack pnpm@11.25.0 install --frozen-lockfile`, with no package-manager cache;
    - a superseded run on the same ref is cancelled (`concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`).
@@ -52,7 +54,7 @@ node --experimental-strip-types --no-warnings --test "app/media/[[]...path]/rout
 `fakeDb` is an offline Supabase client for tests that exercise real pipeline wiring.
 
 - **`model_settings`** answers with `route` and records each task asked for (`.tasks`).
-- **`sources`** (one `source`, or several `sources`), `posts`, storage and the RPCs answer from `tables`. Any other table only upserts, recorded on `.upserts`, and answers `select().gte()` from `tables.rows`.
+- **`sources`** (one `source`, or several `sources`), `posts`, storage and the RPCs answer from `tables`. Any other table upserts, recorded on `.upserts`, and its select chain answers from `tables.rows`: `eq`, `neq`, `lt` and `like` (`likes`, SQL's `%` and `_`) filter the rows, `order`, `limit` and `gte` are only recorded (`gte` also lands on `.gteCalls`), and it answers awaited or through `maybeSingle()`. Every call of that chain lands on `.queries`, so a test can check the query a loader sent. `tableErrors` fails a table's select.
 - **Filters.** Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows, as PostgREST would. A column the fixture never set passes every filter, so a test of which row the code reads needs a fixture whose `id` and `source_id` differ. A null filter value, or a null row value, never passes, as in SQL: only the `posts` update chain's `.is(...)` matches null.
 - **`sources` selects** are projected to their column list, one level into an embed (`posts(id, title, overrides)`; `table(*)` keeps the embed whole), so a column the select drops reads `undefined`, as with PostgREST. A listing applies `order(column, { ascending })` before `limit(n)`, over `pending` when a test sets it and over `sources` / `source` otherwise. `!inner` and `alias:col` aren't parsed yet.
 - **Errors.** A `sources` `single()` that matches no row, or several, answers PGRST116; `maybeSingle()` answers null for none and PGRST116 for several. `pgError(code, message)` builds any other PostgREST-shaped error.
@@ -87,22 +89,23 @@ Importing `render.ts` registers `tsx-hooks.ts` with `module.register`. The hooks
 
 - they resolve `@/` and extensionless relative imports (`./x` → `.ts`, `.tsx` or `index`);
 - they compile `.tsx` with the project's own TypeScript (`transpileModule`);
-- they swap `next/link` and `next/navigation` for `next-stub.ts`. Its `usePathname` answers `navigationStub.pathname` (`"/"` by default); a test that sets it resets it afterwards.
+- they swap `next/link` and `next/navigation` for `next-stub.ts`. Its `usePathname` answers `navigationStub.pathname` (`"/"` by default) and its `useLinkStatus` answers `navigationStub.linkPending` (`false`); a test that sets either resets it afterwards. Its `useRouter` has `push`, `refresh` and `prefetch`, all inert.
 
 `render(element)` returns a linkedom `Document`. Import `render.ts` first, then the component with `await import("./x.tsx")`.
 
 ### Route handlers, `lib/test/route-hooks.ts`
 
-Importing it registers `tsx-hooks.ts`, whose `STUBS` map resolves `@/lib/supabase/server` and `next/server` to `route-hooks.ts`, and `server-only` to an empty module. It stands in for both:
+Importing it registers `tsx-hooks.ts`, whose `STUBS` map resolves `@/lib/supabase/server`, `next/server` and `next/cache` to `route-hooks.ts`, and `server-only` to an empty module. It stands in for both:
 
 - `getReader`, `getViewer` and `createClient` answer `routeStub.reader`, which you set with `signedIn(db, id?)`;
 - `createAdminClient` answers `routeStub.admin` and counts `adminCalls`;
 - `after(task)` queues the task on `routeStub.scheduled`, and `scheduledSourceIds(admin)` runs the queue;
+- `unstable_cache` passes every call straight through and records it on `routeStub.cached` (key parts, options, arguments); `revalidateTag` records on `routeStub.revalidated`;
 - `NextResponse` is the real one.
 
 Call `resetRoute()` first in every test, and import this file by its relative path, because a second path would load a second instance. Then import the route with `await import("./route.ts")`.
 
-No test loads `lib/supabase/server.ts` or `lib/language.ts`: the route tests get `route-hooks.ts` in the first one's place. `lib/content.ts` is loaded by the state route's test, with `server-only` mapped to the empty module.
+No test loads `lib/supabase/server.ts` or `lib/language.ts`: the route tests get `route-hooks.ts` in the first one's place. `lib/content.ts` is loaded by `lib/content.test.ts` and by the state and cron routes' tests, with `server-only` mapped to the empty module.
 
 ### Fixtures
 

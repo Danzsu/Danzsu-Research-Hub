@@ -163,7 +163,7 @@ The shared project is already deployed. These steps are for a deployment of your
 
 1. **Vercel:** *Add New → Project*, import the repository. Next.js and pnpm are detected automatically.
 2. **Environment variables:** everything from the [Environment](#environment) table, with your own project's values, for Production and Preview. Tick Development too if you want a plain `vercel env pull` to work; otherwise pull with `--environment=production`. Environment changes take effect on the next deploy.
-3. **Cron:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 5 * * *` (05:00 UTC). With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry, translation and re-extraction routes may run for up to 300 s.
+3. **Cron and region:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 5 * * *` (05:00 UTC). With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry, translation and re-extraction routes may run for up to 300 s. `"regions": ["dub1"]` runs every function in Dublin, beside the shared Supabase project (`eu-west-1`), and `"fluid": true` turns on Fluid compute. Both override the dashboard's Function Region and Fluid Compute settings, and both take effect with the next deploy. Point `regions` at the region of your own Supabase project.
 4. **Install command:** check that Vercel installs from `pnpm-lock.yaml` in frozen mode with pnpm 11, so the 7-day age gate applies. This is an open item in [TODO.md](TODO.md).
 5. **Supabase:** set your project's Site URL to the deployment's domain, add that domain to the Redirect URLs, and send new invites. On the shared project, the Site URL is the production domain and changes only when that domain does (for example after renaming the Vercel project). Only the owner changes it, and never to localhost or a preview URL, because every member's magic link follows it.
 6. **First run:** the same `curl` against `https://<domain>/api/cron/daily`. The next morning, check *Vercel → Logs* and *Cron Jobs*.
@@ -177,7 +177,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | Path | What is there |
 | --- | --- |
 | [`app/`](app/) | `/login`, the error and 404 pages, the manifest, and the route group below |
-| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, plus their loading page |
+| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, each with its loading skeleton |
 | [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the title band, the language toggle, and `post-blocks`, the block renderer |
 | [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
 | [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron |
@@ -214,7 +214,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 3. [`app/api/cron/daily/route.ts`](app/api/cron/daily/route.ts) → [`lib/pipeline/daily.ts`](lib/pipeline/daily.ts) → [`collect.ts`](lib/pipeline/collect.ts): the Radar writer.
 4. [`app/api/sources/route.ts`](app/api/sources/route.ts) → [`lib/pipeline/ingest.ts`](lib/pipeline/ingest.ts) → [`extract/index.ts`](lib/pipeline/extract/index.ts) → [`extract/article.ts`](lib/pipeline/extract/article.ts) → [`html-to-blocks.ts`](lib/pipeline/html-to-blocks.ts): the Library writer.
 5. [`lib/llm.ts`](lib/llm.ts): how a task finds its model.
-6. [`app/(app)/library/[id]/post-article.tsx`](<app/(app)/library/[id]/post-article.tsx>) → [`lib/post-view.ts`](lib/post-view.ts) → [`app/components/post-blocks.tsx`](app/components/post-blocks.tsx): how a post is read and rendered.
+6. [`app/(app)/library/[id]/post-article.tsx`](<app/(app)/library/[id]/post-article.tsx>) → [`lib/post-row.ts`](lib/post-row.ts) → [`lib/post-view.ts`](lib/post-view.ts) → [`app/components/post-blocks.tsx`](app/components/post-blocks.tsx): how a post is read and rendered.
 7. [`proxy.ts`](proxy.ts) and [`lib/supabase/server.ts`](lib/supabase/server.ts): sessions and the two Supabase clients.
 
 ## Recipes
@@ -351,3 +351,4 @@ update public.sources set attempts = 0 where status <> 'done' and attempts >= 3;
 - [Unified post template and reading tools](docs/superpowers/specs/2026-09-24-unified-post-template-design.md) (spec) and its [M1 plan](docs/superpowers/plans/2026-09-24-unified-post-template-m1.md)
 - [UI/UX, reading signals and search](docs/superpowers/specs/2026-09-24-ux-signals-search-design.md) (spec) and its [milestone A plan](docs/superpowers/plans/2026-09-24-ux-a-app-shell.md)
 - [Taiyaki link chat](docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md) (spec) and its [plan](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md)
+- [R1 "Gyors", the speed pass](docs/superpowers/specs/2026-09-27-r1-speed-design.md) (spec) and its [plan](docs/superpowers/plans/2026-09-27-r1-speed.md)

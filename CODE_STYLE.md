@@ -25,7 +25,8 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
 
 ## Imports
 
-- **`lib/` uses relative imports with the `.ts` extension** (`../blocks.ts`), never `@/`. That way `node --test` loads it without a bundler, and the client editor can import `lib/post-edit.ts` without pulling in server-only code.
+- **`lib/` uses relative imports with the `.ts` extension** (`../blocks.ts`), never `@/`. That way `node --test` loads it without a bundler, and the client editor can import `lib/post-view.ts` without pulling in server-only code.
+- **A module a client component reaches never imports zod,** not even through another module (`lib/client-bundle.test.ts`). A limit both sides need goes in `lib/pipeline/util.ts`, and the schema that enforces it stays with the server code.
 - **The exceptions** are the three Next-only server modules, `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`. They import with `@/`, and each starts with `import "server-only"`.
 - **`app/`, `components/` and `hooks/`** import across directories with `@/` (tsconfig `paths`), and siblings with an extensionless `./x`.
 - **Type-only imports** use `import type`, or an inline `type` specifier (`import { readNavMode, type NavMode }`).
@@ -80,10 +81,12 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
   - `lib/media.ts`: image paths;
   - `lib/api.ts`: `jsonError`, `postRoute`;
   - `lib/supabase/server.ts`: `getReader` / `getViewer`;
-  - `lib/pipeline/util.ts`: `hostOf`, `parseId`, `detectSource`, `safeHref`, `errorMessage`, `settledValues`, `publishedDate`…;
+  - `lib/pipeline/util.ts`: `hostOf`, `parseId`, `detectSource`, `safeHref`, `errorMessage`, `settledValues`, `publishedDate`…, and the limits client and server share (`TODO_TEXT_MAX`, `TITLE_MAX`, `SUMMARY_MAX`, `MINE_LIMIT`, `REEXTRACT_COOLDOWN_MINUTES`);
   - `lib/pipeline/fetch.ts`: `safeFetch`, `apiFetch`, `ensureOk`, `readText`;
   - `lib/blocks.ts`: `localizedSchema`, `parseBlocks`;
-  - `lib/post-view.ts`: `shownTitle`, the title readers see;
+  - `lib/post-view.ts`: `shownTitle`, the title readers see, and `editPayload`, the editor's save;
+  - `lib/post-row.ts`: `toPost`, the one way a posts row becomes a `Post`;
+  - `app/components/refresh-bar.tsx`: `useRefresh`, the one way a reader's action refreshes the page;
   - `lib/source-kinds.ts`: `SOURCE_KIND_LABELS`;
   - `lib/link-chat.ts`: `httpTransport`, the one fetcher for the `/api/sources` routes, and `memoryTransport`, its offline stand-in;
   - `readPageMeta` in `extract/article.ts`;

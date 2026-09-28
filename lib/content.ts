@@ -95,7 +95,8 @@ async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
   }));
 }
 
-// The two caches (spec 1.5; the rules are in ARCHITECTURE.md → Invariants). A cached function may not
+// The two caches (spec 1.5; the rules are in ARCHITECTURE.md → Invariants, the mechanics in CLAUDE.md →
+// Server path). A cached function may not
 // read cookies, so both read with the admin client: only the content tables and the archive_issues view,
 // which every member may read through RLS anyway. They hold content only, never the viewer, and are
 // reachable only through archivedWeek and archiveList, which take a signed-in Reader.

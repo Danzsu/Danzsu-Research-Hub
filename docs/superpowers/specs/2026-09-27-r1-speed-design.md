@@ -1,6 +1,6 @@
 # R1 „Gyors” — specifikáció
 
-**Dátum:** 2026-09-27 · **Állapot:** jóváhagyásra vár · **Sorrend:** a taiyaki után, az M2 előtt; a reszponzív munka első része (R1 Gyors → R2 Visszajelzés → R3 Elrendezés, mindegyik saját specifikációval, tervvel és review-val)
+**Dátum:** 2026-09-27 · **Állapot:** jóváhagyva (2026-09-27) · **Sorrend:** a taiyaki után, az M2 előtt; a reszponzív munka első része (R1 Gyors → R2 Visszajelzés → R3 Elrendezés, mindegyik saját specifikációval, tervvel és review-val)
 
 **Alapja:**
 
@@ -147,7 +147,7 @@ Lekérdezési hibánál a `getRadar` dob; ma `data ?? []`-t ad. Erre a gyorsít�
   - **`null` seed** (a szerver lekérdezése elbukott): GET, mint ma.
 - **Időküszöb nincs.** A szerveridő és a telefon órájának összevetéséhez kellene egy küszöb, amit egy perceket tévedő óra elront: mindig vagy soha nem töltene újra. A „már egyszer felcsatolt” kulcs pontosan a visszaállítást jelzi, óra nélkül.
 - A szabály egy tiszta, egységtesztelt segéd a `lib/reader-store.ts`-ben, a hook csak meghívja.
-- **Fejlesztői módban** a React Strict Mode kétszer futtatja az effectet. A második futás már látott kulcsot talál, ezért ott egy GET marad; élesben nincs ilyen. A kritériumot élesben mérjük.
+- **Fejlesztői módban sincs dupla GET.** A `store` a `useState` inicializálójából jön, ezért a React Strict Mode kettős effect-futása is ugyanazt a már felcsatolt kulcsot és a már hamis `syncing`-et találja: nem indul második GET. A kritériumot mégis élesben mérjük.
 
 ### 1.5 Zárt hetek és az archívum-lista gyorsítótára
 
@@ -475,4 +475,4 @@ Minden tény egy helyen szerepel, a többi hely hivatkozik rá.
 - **A zárt hetek gyorsítótára csak a második héttől hoz.** Ma nincs zárt hét; az első a W39 lesz, 2026-09-28 00:00 UTC-től.
 - **A route groupok fájlokat mozgatnak.** Az importok és a dokumentáció követik őket, az URL-ek nem változnak.
 - **A prefetch-bejegyzés 5 perc után lejár, és a frissítés is törli.** Az `onInvalidate` és a panel saját viewport-prefetchje pótolja; a maradék rés a 2.4-ben van leírva.
-- **Fejlesztői módban a Strict Mode miatt egy `GET /api/state` marad** (1.4), ezért a kritériumot élesben mérjük.
+- **Fejlesztői módban sincs extra `GET /api/state`** (1.4): a `store` a `useState`-ben él, ezért a Strict Mode kettős effect-futása sem indít másodikat. A kritériumot mégis élesben mérjük.

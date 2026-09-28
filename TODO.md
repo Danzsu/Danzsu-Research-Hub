@@ -92,6 +92,7 @@
 - [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon összecsukható oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (`/dev/preview`).
 - [x] **Teszt-keményítés és CI** (2026-09-25): route-tesztek a route-teszt réteggel, a `safeFetch` minden hívóhelye, a `fakeDb` szűrői, rögzített blokk-id-k, a `Progress` értéke a képernyőolvasónak, GitHub Actions CI az öt ellenőrzéssel. Terv: [docs/superpowers/plans/2026-09-25-test-hardening.md](docs/superpowers/plans/2026-09-25-test-hardening.md).
 - [x] **Taiyaki link-chat** (2026-09-27): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).
+- [x] **R1 „Gyors”** (2026-09-28): a függvények Dublinban futnak Fluid compute-tal, egy auth-ellenőrzés kérésenként, egy lekérdezés a Radarhoz, az olvasói állapot a nézett hétre szűkül, és `GET /api/state` csak Vissza után fut; a zárt hetek és az archívum-lista egy napig gyorsítótárban vannak. Oldalformájú vázak, függő pont a linkeken, felső sáv a frissítésekhez, a „Több” linkjeinek prefetchje; a zod kikerült a kliens csomagjából. Terv: [docs/superpowers/plans/2026-09-27-r1-speed.md](docs/superpowers/plans/2026-09-27-r1-speed.md).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
@@ -151,6 +152,12 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **Az R1 utólagos élő mérése** (a tulajdonosé, a deploy után; a terv 12. feladata):
+  - a válasz `x-vercel-id` fejléce `…::dub1`-re végződik, a deployment adatlapján a függvények Fluid compute-tal futnak, és a napi cron lefut;
+  - `node --env-file=.env.local --experimental-strip-types --no-warnings .superpowers/ux-audit/measure-live.mts after`, az egyszeri, csak olvasó, jóváhagyott munkamenettel; a számok a `live-before.json` mellé kerülnek, ígéret nélkül;
+  - a DevTools Network panelén friss betöltés és előre navigálás után nincs `GET /api/state`, Vissza után egy;
+  - 2026-09-28 után a Supabase API-naplójában egy zárt hét második megnyitása nem kéri az `issues`, `digest_items` és `github_top` táblát;
+  - telefonon és asztalon: a váz, a függő pont és a „Több” → Archívum prefetchje a valódi `(app)` navigációban.
 - [ ] **Élő próbák a taiyaki link-chat deployja után** (a kontroller futtatja, ha a felhasználó engedélyez egy bejelentkezett munkamenetet):
   - egy valódi link beküldése a chatből, és a szál „FELDOLGOZÁS…” → „KÉSZ · MEGNYITÁS →” váltása a poszt címével (a `posts(...)` beágyazás objektumként jön-e);
   - egy hibás beküldés „Újra”-ja (a sor `attempts` értéke 0 lesz, aztán 1);
@@ -184,12 +191,13 @@
     - több sikertelen küldés egyforma „Nem ment át, próbáld újra.” buborékokat halmoz a szál végére (csak a `signed_out` van összevonva);
     - egy másik beküldés sikeres „Újra”-ja nem törli a többi bejegyzés saját `signed_out` válaszát (`retryNotices`), az csak a saját „Újra”-ig vagy a panel bezárásáig marad;
     - a retry 403-a és 404-e „Nem ment át, próbáld újra.”-ként jelenik meg (ma egyik sem fordulhat elő);
-    - a `/` és az `/archive/[week]` még behúzza a zod-ot: a `reader-store.ts` a `state.ts`-ből importálja a `TODO_TEXT_MAX`-ot (ugyanaz a minta, amit a taiyaki a keretből kivett).
+    - [x] a zod kikerült a kliens csomagjából (R1); a `lib/client-bundle.test.ts` őrzi.
 - [ ] **`/glossary` a főmenübe** (döntve 2026-09-25, az M2 után): egy nem elsődleges tétel a `lib/nav.ts`-ben, a tesztjei bővítésével.
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
 - [ ] **Hibás beküldések kezelése.** „Újra” és „Törlés” gomb (a saját beküldésnél a beküldőnek, egyébként az adminnak), és a posztok eltávolítása (takedown).
   - [x] A saját beküldés „Újra” gombja kész: a taiyaki link-chatben (`POST /api/sources/[id]/retry`). A „Törlés” és az admin-rész marad itt.
 - [ ] **Lassú archívum** (a felhasználó jelezte 2026-09-25-én): a „Heti archívum” sokáig tölt. Kijelentkezve a szerver gyors (0,13–0,7 mp), ezért az ok a bejelentkezett úton vagy a route hideg indulásában lehet. A kivizsgáláshoz bejelentkezett mérés kell: engedély egy egyszeri teszt-munkamenetre, vagy a megfigyelésed (minden kattintásnál lassú-e, hány másodperc, mi látszik közben).
+  - Az R1 „Gyors” erre is válasz (a régió, a lekérdezések, a gyorsítótár és a visszajelzés). Az előtte–utána élő mérés a spec 3.3 pontja szerint: `.superpowers/ux-audit/live-before.json` és `live-after.json`, a fenti „Az R1 utólagos élő mérése” pont.
 - [ ] **Hibajelzés.** Ha a napi futás elbukik (Gemini-limit, lejárt kulcs), senki nem kap értesítést. Telegram-bot vagy email kellene. Addig a hiba a Vercel cron-logjában látszik.
 - [ ] **GitHub-token lejárat-figyelmeztető** (a GitHub-archívumhoz és a `GITHUB_TOKEN`-hez).
   - A GitHub a fine-grained token minden API-válaszában visszaküldi a lejárati dátumot (`GitHub-Authentication-Token-Expiration` fejléc).
@@ -226,11 +234,11 @@
 - [ ] **Generált Supabase-típusok** (`supabase gen types`). Most a kliens típus nélkül dolgozik.
 - [x] **Pipeline-teszt** mockolt LLM-válaszokkal. Az ingest, a napi futás, a fordítás és az `llm.ts` útválasztása offline tesztekkel fedett, mockolt modellválaszokkal (`fakeDb`, `mockFetch`).
 - [ ] **DNS rebinding** elleni védelem a linkletöltésnél. Csak akkor kell, ha nyilvános lesz a beküldés.
-- [ ] **Kevesebb getClaims() kérésenként.** A UI/UX A óta kérésenként három fut: a `proxy.ts`-é, az `(app)` layout `getViewer()`-e és az oldal `getReader()`-e. Ha a `getReader`-t és a `getViewer`-t React `cache()`-be csomagoljuk (`lib/supabase/server.ts`), a layout és az oldal egy hívást oszt meg, így kettő marad (a proxy külön fut, azt a `cache()` nem éri el).
+- [x] **Kevesebb getClaims() kérésenként** (R1): a `getReader()` React `cache()`-ben van (`lib/supabase/server.ts`), így az `(app)` layout és az oldal egy hívást oszt meg. Kérésenként kettő maradt, mert a `proxy.ts` külön kérésben fut.
 - [ ] **Elvész a fókusz** egy teendő törlése és a „+ teendő” után: a billentyűzettel dolgozó olvasónak újra kell keresnie a helyét.
 - [ ] **Közel-duplikátumok, amiket a jscpd nem lát:** a Library és az Archívum üres állapotának bekezdése és linkje, a `TITLE//` span-minta, az ikonsáv gombjainak osztálylistái, és az aktív menüpont osztálytöredéke a „Több” panelben (`app-shell.tsx`) és az oldalsávban (`desktop-nav.tsx`). A taiyaki tesztjeiből: a `failedA` / `failedB` fixture és a bejegyzés-kereső kétszer a `chat-thread.test.ts`-ben, a `said` segéd kétszer a `link-chat.test.ts`-ben.
 - [ ] **Apró rendrakás a taiyaki után:**
-  - a `MINE_LIMIT` a `lib/link-chat.ts`-ben él, így a szerveroldali `my-sources.ts` a kliens logikából importál; a helye a függőség nélküli `lib/pipeline/util.ts` (mint a `REEXTRACT_COOLDOWN_MINUTES`);
+  - [x] a `MINE_LIMIT` a függőség nélküli `lib/pipeline/util.ts`-be került (R1);
   - a `link-chat.tsx` a Library-frissítésnél a `"/dev/preview"` útvonalat írja be a kódba; a `preview` prop ugyanezt mondja;
   - a CLAUDE.md a Library-frissítést a „Focus and keys” pont alatt írja le, a „The panel” pontba való.
 - [ ] **Közös `createStore`.** A listeners / `subscribe` / `getSnapshot` váz már háromszor van meg (`reader-store`, `undo-queue`, `link-chat`).
@@ -238,6 +246,7 @@
 - [ ] **Zajos tesztkimenet.** Az `npm test` ma kb. 65 sort ír ki régebbi tesztekből (a pipeline, a fordítás és a route-ok hibanaplói). Ezekben is mockolni kell a `console`-t `t.mock.method`-dal, és ellenőrizni a hívásszámot (TESTING.md → Pitfalls, Log noise).
 - [ ] **Ismétlődő route-farok a jscpd küszöbe alatt:** az elfogad-és-ütemez vég (`after(() => processSource(…))` + 202) háromszor, a `MAP[result] → jsonError` négyszer.
 - [ ] **A `fakeDb` `splitColumns`-a nem érti a `!inner`-t** (és az `alias:col` formát sem); az M2-nek kell.
+- [ ] **`unstable_cache` → `use cache`.** Az R1 két gyorsítótára (`lib/content.ts`) a Next 16-ban leváltott `unstable_cache`-t használja. A `use cache` a Cache Components-szel jön; ha lesz ilyen mérföldkő, az cseréli le. A mérföldkőről az R1 utólagos élő mérése után születik döntés.
 - [ ] Signal-narancs szöveg paper/cream háttéren 2,7–2,9:1, kis szövegnél WCAG AA alatt; márka-döntés kell: sötétebb árnyalat kis szövegre vagy csak nagy/díszítő használat.
 - [ ] fix(ui): a DESIGN.md-ben felsorolt eltérések: checkbox `rounded-none shadow-none` (`reader-panel.tsx:104`), Sheet/Input/Textarea/Checkbox/pill homályos árnyéka, `PageHero` címe `cqi`-re (a szakasz már `@container`).
 - [ ] **Playwright e2e a CI-ban** — opció, nincs jóváhagyva (2026-09-25).

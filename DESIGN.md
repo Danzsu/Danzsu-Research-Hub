@@ -198,7 +198,7 @@ NEON NEWS RADAR looks like a hard-cornered broadsheet: ink on paper, one signal 
 2. **One accent, spent on meaning.** Signal marks what is active, hovered, focused, ranked or failed, and the `//` that closes a title. It is never decoration.
 3. **Flat and hard.** There's no radius and no blur. Gradients appear only in `.signal-grid`, which draws the Radar hero's grid lines and fades them in.
 4. **Dense, but capped.** Meta is small mono, titles are big display, and reading text stops at 75ch.
-5. **Motion answers the reader.** Hovers, the must-card lift, the sheets and the toast all react to an action. Page content has no entrance animations, and reduced motion is respected.
+5. **Motion answers the reader.** Hovers, the must-card lift, the sheets and the toast all react to an action. Page content has no entrance animations, and reduced motion is respected. The loading skeletons' placeholders fade in, but they are a loading state, not page content.
 6. **Bilingual by construction.** Every label has a Hungarian and an English string, and every heading survives a long Hungarian compound at 360px.
 
 ### Deliberate brand choices
@@ -364,14 +364,15 @@ Shadows are hard offsets with zero blur:
 
 `.lift` (`globals.css`) gives the taiyaki the Top 3 cards' "come forward" state, whose rules `.must-card` shares, on hover and also on keyboard focus. Under `prefers-reduced-motion` its shadow still lifts, without the translate.
 
-- **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. The link chat's Sheet opens and closes in 160ms, not the stock Sheet's 500ms and 300ms. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. The `.live-pulse` dot (9px, signal) pulses a ring every 2s.
+- **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. The link chat's Sheet opens and closes in 160ms, not the stock Sheet's 500ms and 300ms. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. The `.live-pulse` dot (9px, signal) pulses a ring every 2s. Loading feedback waits before it shows, so a fast answer flashes nothing: the pending dot and the refresh bar appear 100ms in, at once, and leave at once; the skeletons' placeholders fade in over 160ms after 150ms. The bar runs a third-wide segment across itself every 1.2s. Under reduced motion the dot's ring stops, the skeletons don't pulse and their placeholders appear without the fade, still after 150ms, and the bar stands still at full width.
 - **Layering.** From bottom to top:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
   - the desktop aside, `z-30`, so the rail's tooltips paint over both of those;
   - the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel from `md` to `2xl`, covers the button until it closes);
   - sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;
-  - the undo toast lane, `z-[60]`.
+  - the undo toast lane, `z-[60]`;
+  - the refresh bar, `z-[70]`.
 - **Known exceptions:** the vendored Sheet keeps shadcn's blurred `shadow-lg`. `Input`, `Textarea` and `Checkbox` keep `shadow-xs`, and so does the `outline` Button variant, which the Radar's progress pill uses. House components never add a blurred shadow. The fix for these, and for the checkbox corners (Shapes), is tracked in TODO.md.
 
 ## Shapes
@@ -670,6 +671,29 @@ Raise one from any event handler (`digest-dashboard.tsx`). The Undo button uses 
 
 ```tsx app/components/digest-dashboard.tsx
 toasts.show({ kind: "markedRead", undo: () => store.setFlag(item.id, "read", false) });
+```
+
+### Loading and pending feedback
+
+How they behave is in CLAUDE.md → App shell and navigation; their timing is in Elevation & Depth → Motion.
+
+- **The pending dot** (`PendingDot`, `app/components/nav-parts.tsx`) is the live dot in its text colour, signal by default, so on a card that turns signal on hover it follows the card's ink icon. It is always laid out, so nothing shifts when it shows:
+
+```css app/globals.css
+.pending-dot { background: currentColor; opacity: 0; animation-play-state: paused; }
+.pending-dot[data-pending] { opacity: 1; animation-play-state: running; transition: opacity 0s 100ms; }
+```
+
+- **The refresh bar** (`RefreshBar`, `app/components/refresh-bar.tsx`) is 2px of signal across the top of the viewport, above everything else:
+
+```tsx app/components/refresh-bar.tsx
+    <div aria-hidden="true" className="refresh-bar pointer-events-none fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden">
+```
+
+- **The skeletons** (`app/components/page-skeletons.tsx`) have one root each, the page's own surface, so the shell's `md:[&>:last-child]:pb-24` lands on it (Page shell). The bands (the Radar's header, chip bar and ink hero, `HeroBand`, the post's cream article) paint at once; the placeholders, the house `Skeleton` with `rounded-none`, `bg-paper/10` on ink and the default `bg-primary/10` on cream and paper, sit in `.skeleton-fill` groups. A `role="status"` line says "Betöltés…" / "Loading…" to assistive tech only. The Radar's root:
+
+```tsx app/components/page-skeletons.tsx
+    <div className="min-h-dvh min-w-0 bg-cream text-ink" aria-busy="true">
 ```
 
 ### Progress bar and the reader panel
