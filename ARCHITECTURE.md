@@ -74,7 +74,7 @@ Breaking one of these is a bug even when every test passes.
 - **No raw HTML reaches a page** (SECURITY.md → XSS).
 - **No secret reaches the browser** (SECURITY.md → Secrets).
 - **The admin client runs only in the pipeline, or after a route has made its own check** (SECURITY.md → Reader vs admin client).
-- **The content caches hold content that no longer changes, and nothing else.** `lib/content.ts` caches two things for a day: a closed week's Radar (`week < isoWeek(now).id`) and the `/archive` list, which the daily cron drops at once after every run.
+- **The content caches hold content that no longer changes, and nothing else.** `lib/content.ts` caches two things for a day: a closed week's Radar (`week < isoWeek(now).id`) and the `/archive` list, which the daily cron's revalidation drops after most runs — it's best-effort (CLAUDE.md → Server path), so the list's own one-day revalidate is the backstop.
   - The current week, the reader's own state (read, later, to-dos), a cookie or anything computed from one, and a viewer's id never go in. Only content does, keyed by the week's id or by a fixed key.
   - Sign-in comes first: the caches are reached only through `archivedWeek` and `archiveList`, which take a signed-in `Reader`, and nothing inside them reads cookies.
   - A failed query throws, so no failure is ever cached.

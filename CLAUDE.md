@@ -95,7 +95,7 @@ What each signed-in page asks Supabase for, on a warm instance (the ECC key veri
   - `closedWeek(week)`, key `["closed-week", "v1"]` plus the week, `{ revalidate: 86400 }`, no tag, since a closed week never changes;
   - the archive list, key `["archive-list", "v1"]`, `{ revalidate: 86400, tags: ["archive"] }` (`ARCHIVE_TAG`);
   - both read with the admin client, and both are reached only through `archivedWeek(reader, week, now?)`, which sends a week before the current ISO week to the cache and every other week to the reader's own client, and `archiveList(reader)`;
-  - the daily cron calls `revalidateTag("archive", { expire: 0 })` after every run, good or failed, because the `issues` upsert can't say whether it opened a new week; `{ expire: 0 }` makes the next `/archive` refill the list instead of serving it stale;
+  - the daily cron calls `revalidateTag("archive", { expire: 0 })` after every run, good or failed, because the `issues` upsert can't say whether it opened a new week; `{ expire: 0 }` makes the next `/archive` refill the list instead of serving it stale. It's best-effort: Next only applies a queued revalidation once the route returns a response, so a crash in `retryPendingSources` or the route hitting its own time limit drops it (`app/api/cron/daily/route.ts`); the list's own one-day `revalidate` is the backstop;
   - `getRadar` and the list's loader throw on a failed query, so a failure is never cached, and the page shows `app/error.tsx`.
 - **The rules** the caches keep are in ARCHITECTURE.md → Invariants, why they may use the admin client in SECURITY.md → Reader vs admin client, and the functions' region in README.md → Deploy. Next 16 replaces `unstable_cache` with `use cache`, which needs Cache Components (TODO.md).
 

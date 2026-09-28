@@ -34,7 +34,7 @@ export type PendingRemoval = { undo: () => void; commit: () => void };
 export const EMPTY_ITEM_STATE: ItemState = { read: false, saved: false };
 const FLAG_ACTIONS = { read: "set_read", saved: "set_saved" } as const;
 
-/** Library posts keep their read flag in item_states too. Radar ids look like `local-2026-W38-…`, so `post:` never collides. */
+/** Library posts keep their read flag in item_states too. Radar ids look like `local-2026w38-…`, so `post:` never collides. */
 export const POST_STATE_PREFIX = "post:";
 export const postStateKey = (postId: number) => `${POST_STATE_PREFIX}${postId}`;
 
@@ -113,8 +113,9 @@ export function createSeededStore(send: SendState, onError: () => void, seed: Re
 
 /** The store a Radar page's client starts with, chosen once from how its reader state starts: the
  *  preview always writes through its own in-memory sender (never real `fetch`, whatever `failWrites`
- *  says), and a real page always writes through `postState`. The one place that makes that choice, so
- *  a regression that quietly routes a preview write to the real API has exactly one line to break. */
+ *  says), and a real page always writes through `postState`. The one place that makes that choice —
+ *  but only for a caller that goes through it; app/components/shell.test.ts proves useReaderState does,
+ *  since a hook that built its own store here instead would still pass every test in this file. */
 export function createSourceStore(source: ReaderSource, onError: () => void): ReaderStore {
   return source.preview ? createReaderStore(memorySend(source.preview.failWrites), onError, source.preview.data) : createSeededStore(postState, onError, source.seed);
 }

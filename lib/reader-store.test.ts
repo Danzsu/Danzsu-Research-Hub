@@ -59,6 +59,13 @@ function countedFetch(t: TestContext): () => number {
   return () => calls;
 }
 
+const seed = (overrides: Partial<ReaderSeed> = {}): ReaderSeed => ({
+  issueId: "2026-W39",
+  seededAt: 1_000,
+  data: { states: { a: { read: true, saved: false } }, todos: [] },
+  ...overrides,
+});
+
 test("setting a flag to its current value sends nothing", async () => {
   const { sent, send } = recording();
   const store = createReaderStore(send, noop, empty);
@@ -323,20 +330,14 @@ test("createSourceStore's preview source with failWrites rolls back and reports 
 // Proves the test above isn't vacuous: a seed source's write does reach fetch, through postState.
 test("createSourceStore's seed source writes through postState, reaching fetch", async (t) => {
   const fetchCalls = countedFetch(t);
-  const seed: ReaderSeed = { issueId: "2026-W39", seededAt: 1, data: { states: {}, todos: [] } };
-  const store = createSourceStore({ seed }, noop);
+  const readerSeed = seed({ seededAt: 1, data: { states: {}, todos: [] } });
+  const store = createSourceStore({ seed: readerSeed }, noop);
   store.setFlag("a", "read", true);
   await store.settled();
   assert.equal(fetchCalls(), 1);
 });
 
-const seed = (overrides: Partial<ReaderSeed> = {}): ReaderSeed => ({
-  issueId: "2026-W39",
-  seededAt: 1_000,
-  data: { states: { a: { read: true, saved: false } }, todos: [] },
-  ...overrides,
-});
-/** The store a Radar page starts from its seed, as useReaderState does (createSeededStore itself). */
+/** The store a Radar page starts from its seed (createSeededStore itself, with a recording sender to inspect what it sent). */
 const seededStore = (from: ReaderSeed, mounted: Set<string>) => createSeededStore(recording().send, noop, from, mounted);
 
 // Review Focus 2. Kills a GET on every mount (the pre-R1 behaviour, the extra round trip after every

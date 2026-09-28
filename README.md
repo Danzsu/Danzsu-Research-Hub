@@ -178,7 +178,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | --- | --- |
 | [`app/`](app/) | `/login`, the error and 404 pages, the manifest, and the route group below |
 | [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, each with its loading skeleton |
-| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the title band, the language toggle, and `post-blocks`, the block renderer |
+| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the title band, the language toggle, `post-blocks` (the block renderer), `page-skeletons` (each page shape's loading fallback) and `refresh-bar` (the top bar during a reader-started refresh) |
 | [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
 | [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron |
 | [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link login, callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login` |
@@ -186,7 +186,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the feed list, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
-| [`lib/`](lib/) | The block model, the post view, post edits, translation, the model client, content queries, the link chat's logic and your own submissions, the language cookie, Supabase clients |
+| [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, translation, the model client, content queries and their caches, the link chat's logic and your own submissions, the language cookie, Supabase clients, and `idle-prefetch` (the mobile "More" sheet's idle prefetch) |
 | [`lib/test/`](lib/test/) | The offline render harness for component tests, the route-handler stubs (`route-hooks.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [DESIGN.md](DESIGN.md#dos-and-donts)) |
