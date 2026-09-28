@@ -26,9 +26,23 @@ function isClientRoot(file: ts.SourceFile): boolean {
   return first !== undefined && ts.isExpressionStatement(first) && ts.isStringLiteral(first.expression) && first.expression.text === "use client";
 }
 
-/** The specifiers of `file`'s imports and re-exports that compilation keeps. */
+/** Every dynamic `import("literal")` call anywhere in `file`, walked with forEachChild — a top-level
+ *  ImportDeclaration scan alone misses next/dynamic(() => import("./x")) and similar code-split calls
+ *  nested inside functions. A non-literal specifier can't be resolved statically, so it's skipped. */
+function dynamicImports(file: ts.SourceFile): string[] {
+  const specifiers: string[] = [];
+  const visitNode = (node: ts.Node): void => {
+    const arg = ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword ? node.arguments[0] : undefined;
+    if (arg && ts.isStringLiteral(arg)) specifiers.push(arg.text);
+    ts.forEachChild(node, visitNode);
+  };
+  visitNode(file);
+  return specifiers;
+}
+
+/** The specifiers of `file`'s imports, re-exports and dynamic `import()` calls that compilation keeps. */
 function valueImports(file: ts.SourceFile): string[] {
-  return file.statements.flatMap((statement) => {
+  const declared = file.statements.flatMap((statement) => {
     if (ts.isImportDeclaration(statement)) {
       const clause = statement.importClause;
       const named = clause?.namedBindings;
@@ -38,10 +52,13 @@ function valueImports(file: ts.SourceFile): string[] {
       return typesOnly ? [] : [(statement.moduleSpecifier as ts.StringLiteral).text];
     }
     if (ts.isExportDeclaration(statement) && statement.moduleSpecifier && !statement.isTypeOnly) {
-      return [(statement.moduleSpecifier as ts.StringLiteral).text];
+      const clause = statement.exportClause;
+      const typesOnly = clause && ts.isNamedExports(clause) && clause.elements.length > 0 && clause.elements.every((element) => element.isTypeOnly);
+      return typesOnly ? [] : [(statement.moduleSpecifier as ts.StringLiteral).text];
     }
     return [];
   });
+  return [...declared, ...dynamicImports(file)];
 }
 
 /** The repo's .ts/.tsx file an `@/…`, `./…` or `../…` import names; undefined for a package. */
