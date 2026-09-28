@@ -130,6 +130,8 @@ No test loads `lib/supabase/server.ts` or `lib/language.ts`: the route tests get
 - **A polling store left open.** A test that opens one (`createLinkChat(…).open()`) closes it in `t.after`. Otherwise a failing assertion leaves it polling on real timers, and `node --test` never exits.
 - **Log noise.** A new or changed test whose path logs mocks the `console` method with `t.mock.method` and asserts its call count, so it adds nothing to the run's output. Older tests still print about 65 stray lines (TODO.md → Technikai adósság).
 - **An occluded Playwright window.** A browser window behind others throttles `requestAnimationFrame` to about 1 fps and delays `ResizeObserver`, so scroll and resize measurements come out wrong. Call `page.bringToFront()` first, or check that `requestAnimationFrame` runs at full rate.
+- **A stale `.next/types/validator.ts`.** After you move or add a route file, a bare `npx tsc --noEmit` can fail there until the next `npm run build`. CI isn't affected, because it type-checks a fresh checkout before it builds.
+- **A stale `.next/cache/turbopack`.** `npm run build` and a running `next dev` share it, so after a build the dev server can serve stale CSS or JS. Before a Playwright measurement, check that the served stylesheet has the new rule; deleting only `.next/cache/turbopack` unsticks it.
 
 ## What isn't automated, and why
 
