@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Localized } from "../data/digest-types.ts";
 import { readOverrides } from "./overrides.ts";
-import { MINE_LIMIT, type SourceKind } from "./pipeline/util.ts";
+import { MINE_LIMIT, parseSubmittedUrl, type SourceKind } from "./pipeline/util.ts";
 import { shownTitle } from "./post-view.ts";
 
 // The reader's own submissions, for the taiyaki link chat: GET /api/sources/mine lists them, and
@@ -115,4 +115,37 @@ export async function retrySource(db: SupabaseClient, admin: SupabaseClient, vie
     return "failed";
   }
   return claimed?.length ? "accepted" : "not_failed";
+}
+
+/** URLs per `.in(...)` lookup: a week's hundred or so stay far under PostgREST's URL-length limit. */
+const LOOKUP_CHUNK = 30;
+
+/**
+ * Item id → the Library post already made from its URL: a card's "Olvasd itt" opens it (read-here
+ * spec 1). The URLs go through parseSubmittedUrl, as a submission's and the mirror's do, so both sides
+ * compare the same string. A failed lookup answers {} and is logged: the card then offers the chat,
+ * whose 409 still points at the post. Never cached: a post can appear any day, for an open week or a
+ * closed one.
+ */
+export async function readHerePosts(db: SupabaseClient, items: { id: string; url: string }[]): Promise<Record<string, number>> {
+  const idsByUrl = new Map<string, string[]>();
+  for (const item of items) {
+    const url = parseSubmittedUrl(item.url)?.toString();
+    if (url) idsByUrl.set(url, [...(idsByUrl.get(url) ?? []), item.id]);
+  }
+  const urls = [...idsByUrl.keys()];
+  const chunks = Array.from({ length: Math.ceil(urls.length / LOOKUP_CHUNK) }, (_, index) => urls.slice(index * LOOKUP_CHUNK, (index + 1) * LOOKUP_CHUNK));
+  const answers = await Promise.all(chunks.map((chunk) => db.from("sources").select("url, posts(id)").in("url", chunk)));
+  const posts: Record<string, number> = {};
+  for (const { data, error } of answers) {
+    if (error) {
+      console.warn("read-here post lookup failed", error);
+      return {};
+    }
+    for (const row of data ?? []) {
+      const post = embeddedPost(row.posts);
+      if (post) for (const id of idsByUrl.get(row.url as string) ?? []) posts[id] = post.id;
+    }
+  }
+  return posts;
 }

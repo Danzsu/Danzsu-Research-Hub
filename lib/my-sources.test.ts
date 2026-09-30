@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { duplicateSource, listMySources, retrySource } from "./my-sources.ts";
+import { duplicateSource, listMySources, readHerePosts, retrySource } from "./my-sources.ts";
 import { fakeDb, pgError } from "./pipeline/fake-db.ts";
 import { MINE_LIMIT } from "./pipeline/util.ts";
 
@@ -152,4 +152,40 @@ test("retrySource answers failed and logs once when the claim fails, leaving the
   assert.equal(await retrySource(db, admin, "owner", 5), "failed");
   assert.deepEqual(tables.sources, [{ id: 5, submitted_by: "owner", status: "failed" }]);
   assert.equal(error.mock.calls.length, 1);
+});
+
+// Spec 1, Review Focus 4. Kills a lookup by the raw item URL (a #fragment or an upper-case host misses
+// the normalized row the mirror and a submission store), a post given to the wrong item, a source with
+// no post given one, and a URL a submission refuses looked up at all.
+test("readHerePosts maps each item to the post made from its normalized URL, and leaves the rest out", async () => {
+  const db = fakeDb(undefined, {
+    sources: [
+      { id: 1, url: "https://blog.test/a", posts: { id: 11 } },
+      { id: 2, url: "https://blog.test/queued", posts: null },
+    ],
+  });
+  const posts = await readHerePosts(db, [
+    { id: "local-2026w40-a-1", url: "https://BLOG.test/a#section" },
+    { id: "local-2026w40-queued-2", url: "https://blog.test/queued" },
+    { id: "local-2026w40-new-3", url: "https://blog.test/new" },
+    { id: "local-2026w40-private-4", url: "http://10.0.0.1/x" },
+  ]);
+  assert.deepEqual(posts, { "local-2026w40-a-1": 11 });
+});
+
+// Kills the lookup cut to its first chunk: a busy week's 31st story would never find its post.
+test("readHerePosts looks up every chunk of a long week", async () => {
+  const urls = Array.from({ length: 31 }, (_, index) => `https://blog.test/${index}`);
+  const db = fakeDb(undefined, { sources: urls.map((url, index) => ({ id: index + 1, url, posts: { id: 100 + index } })) });
+  const posts = await readHerePosts(db, urls.map((url, index) => ({ id: `item-${index}`, url })));
+  assert.equal(Object.keys(posts).length, 31);
+  assert.equal(posts["item-30"], 130);
+});
+
+// Review Focus 5. Kills a lookup failure thrown (the Radar page would error) or swallowed without a log.
+test("readHerePosts answers {} and logs once when the lookup fails, so the cards offer the chat instead", async (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  const db = fakeDb(undefined, { sourceSelectError: pgError("08006", "connection failure") });
+  assert.deepEqual(await readHerePosts(db, [{ id: "a", url: "https://blog.test/a" }]), {});
+  assert.equal(warn.mock.callCount(), 1);
 });

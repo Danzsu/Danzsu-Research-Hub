@@ -96,7 +96,7 @@ export type PostgrestErrorShape = { code: string; message: string; details: stri
 
 export const pgError = (code: string, message: string, details: string | null = null): PostgrestErrorShape => ({ code, message, details, hint: null });
 
-type Filter = { column: string; op: "eq" | "neq" | "lt"; value: unknown };
+type Filter = { column: string; op: "eq" | "neq" | "lt" | "in"; value: unknown };
 
 /** One call on a select chain, as `queries` records it: the method, then its arguments. */
 type ChainCall = [method: string, ...args: unknown[]];
@@ -109,6 +109,7 @@ type ChainCall = [method: string, ...args: unknown[]];
 function passes(row: Record<string, unknown>, { column, op, value }: Filter): boolean {
   if (!(column in row)) return true;
   if (value === null || row[column] === null) return false;
+  if (op === "in") return (value as unknown[]).includes(row[column]);
   if (op === "eq") return row[column] === value;
   if (op === "neq") return row[column] !== value;
   return (row[column] as number) < (value as number);
@@ -149,10 +150,15 @@ function sourcesQuery(
     eq: filter("eq"),
     neq: filter("neq"),
     lt: filter("lt"),
+    in: filter("in"),
     order: (column: string, { ascending = true }: { ascending?: boolean } = {}) => {
       sortBy = { column, ascending };
       return query;
     },
+    // Awaited without single() or limit(), as readHerePosts' `.in(...)` lookup is: every row of the
+    // one-row fixtures (`sources`/`source`) that passes the filters.
+    then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+      Promise.resolve(error ? { data: null, error } : { data: matching(lookedUp).map((row) => project(row, columns)), error: null }).then(resolve, reject),
     limit: async (n: number) =>
       error ? { data: null, error } : { data: sorted(matching(listed)).slice(0, n).map((row) => project(row, columns)), error: null },
     single: async () => {
