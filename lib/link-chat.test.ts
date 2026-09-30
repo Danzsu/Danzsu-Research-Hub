@@ -430,6 +430,7 @@ test("send: every refusal, offline included, becomes a reply and keeps the text"
     [answer(400, { error: "invalid_url" }), { kind: "invalid_url" }],
     [answer(409, { error: "already_submitted", postId: 9 }), { kind: "already_submitted", postId: 9 }],
     [answer(409, { error: "already_submitted" }), { kind: "already_submitted", postId: null }],
+    [answer(409, { error: "already_submitted", queued: true }), { kind: "already_submitted", postId: null, queued: true }],
     [answer(401, { error: "unauthorized" }), { kind: "signed_out" }],
     [answer(500, { error: "insert_failed" }), { kind: "network" }],
     [offline, { kind: "network" }],
@@ -653,13 +654,13 @@ test("memoryTransport: answers like the real routes, only the targeted retry fli
   await assert.rejects(offlinePreview.retry(-1), TypeError);
 });
 
-// Kills a duplicate submission that's missing its postId when the matching source has no post yet
-// (Minor 5): the real route's `existingPostId` omits the key entirely, not `postId: null`.
-test("memoryTransport: a duplicate of a postless source answers already_submitted with no postId key", async () => {
+// Kills the preview answering a queued duplicate unlike the real route (Minor 5 of the taiyaki plan:
+// the route omits postId entirely, and says `queued` for a pending source).
+test("memoryTransport: a duplicate of a pending source with no post answers queued, with no postId key", async () => {
   const preview = memoryTransport([source(-1, "pending", { url: "https://blog.test/dup" })], false);
   const { status, body } = await preview.submit("https://blog.test/dup", null);
   assert.equal(status, 409);
-  assert.deepEqual(body, { error: "already_submitted" });
+  assert.deepEqual(body, { error: "already_submitted", queued: true });
   assert.ok(!("postId" in body));
 });
 

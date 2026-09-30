@@ -101,6 +101,7 @@ test("every local reply says what happened, with the post link and the sign-in l
     { kind: "invalid_url" },
     { kind: "already_submitted", postId: 9 },
     { kind: "already_submitted", postId: null },
+    { kind: "already_submitted", postId: null, queued: true },
     { kind: "signed_out" },
     { kind: "network" },
   ];
@@ -111,6 +112,7 @@ test("every local reply says what happened, with the post link and the sign-in l
     "Taiyaki: Ezt nem tudom megnyitni: csak nyilvános http(s) linket fogadok.",
     "Taiyaki: Ezt már beküldte valaki.MEGNYITÁS →",
     "Taiyaki: Ezt már beküldte valaki.",
+    "Taiyaki: Már sorban van, pár perc és kész.",
     "Taiyaki: Lejárt a belépésed.BELÉPÉS →",
     "Taiyaki: Nem ment át, próbáld újra.",
     "Taiyaki: Most nem érem el a beküldéseidet.",

@@ -28,6 +28,7 @@ const copy = {
     more_links: "Egyszerre egy linket tudok fogadni, az elsőt küldtem be.",
     invalid_url: "Ezt nem tudom megnyitni: csak nyilvános http(s) linket fogadok.",
     already_submitted: "Ezt már beküldte valaki.",
+    queued: "Már sorban van, pár perc és kész.",
     signed_out: "Lejárt a belépésed.",
     signIn: "BELÉPÉS →",
     network: "Nem ment át, próbáld újra.",
@@ -49,6 +50,7 @@ const copy = {
     more_links: "I take one link at a time, so I sent in the first one.",
     invalid_url: "I can't open that: I only take public http(s) links.",
     already_submitted: "Someone already sent this in.",
+    queued: "It's already in the queue; give it a few minutes.",
     signed_out: "Your sign-in has expired.",
     signIn: "SIGN IN →",
     network: "That didn't go through, try again.",
@@ -169,7 +171,7 @@ function NoticeText({ notice, language, loginHref, onOpenPost }: ThreadActions &
   if (notice.kind === "already_submitted") {
     return (
       <>
-        <p>{t.already_submitted}</p>
+        <p>{notice.queued ? t.queued : t.already_submitted}</p>
         {notice.postId !== null && (
           <Link href={`/library/${notice.postId}`} onClick={onOpenPost} className={action}>
             {t.open}

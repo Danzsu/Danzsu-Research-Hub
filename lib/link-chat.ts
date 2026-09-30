@@ -69,7 +69,7 @@ export function toThread(sources: MySource[]): ChatEntry[] {
  *  the panel stays open, and is never saved. */
 export type ChatNotice =
   | { kind: "no_link" | "more_links" | "invalid_url" | "network" | "signed_out" }
-  | { kind: "already_submitted"; postId: number | null };
+  | { kind: "already_submitted"; postId: number | null; queued?: true };
 
 /** What a route answered: its status and its JSON body (`{}` when the body isn't a JSON object). */
 export type Answer = { status: number; body: Record<string, unknown> };
@@ -97,7 +97,7 @@ export const httpTransport: ChatTransport = {
  * The offline preview's stand-in (local dev points at the production project): the seed is the
  * thread, a submission joins it as pending, and "Újra" sends a failed one back to pending. Nothing
  * is ever processed. Answers like the real routes: a URL already in the thread is `already_submitted`
- * (`postId` present only when that source already has a post, same as `existingPostId`), a retry of
+ * (`postId` present only when that source already has a post, `queued` when it is pending without one, as the real route answers), a retry of
  * an id not in the thread is `not_found`, and a retry of a source that isn't `failed` is `not_failed`;
  * the thread is the latest MINE_LIMIT, newest first. `fail` rejects every write the way an offline
  * fetch does; reads still answer. `delayMs` (the preview's slow=1) holds every answer that long, so
@@ -122,7 +122,10 @@ export function memoryTransport(seed: MySource[], fail: boolean, delayMs = 0): C
         const parsed = parseSubmittedUrl(url);
         if (!parsed) return { status: 400, body: { error: "invalid_url" } };
         const existing = sources.find((source) => source.url === parsed.toString());
-        if (existing) return { status: 409, body: { error: "already_submitted", ...(existing.post ? { postId: existing.post.id } : {}) } };
+        if (existing) {
+          const extra = existing.post ? { postId: existing.post.id } : existing.status === "pending" ? { queued: true } : {};
+          return { status: 409, body: { error: "already_submitted", ...extra } };
+        }
         const source: MySource = {
           id: nextId--,
           url: parsed.toString(),
@@ -173,7 +176,8 @@ function noticeFor({ status, body }: Answer): ChatNotice {
   if (status === 401) return { kind: "signed_out" };
   if (status === 400 && body.error === "invalid_url") return { kind: "invalid_url" };
   if (status === 409 && body.error === "already_submitted") {
-    return { kind: "already_submitted", postId: typeof body.postId === "number" ? body.postId : null };
+    const postId = typeof body.postId === "number" ? body.postId : null;
+    return body.queued === true ? { kind: "already_submitted", postId, queued: true } : { kind: "already_submitted", postId };
   }
   return { kind: "network" };
 }

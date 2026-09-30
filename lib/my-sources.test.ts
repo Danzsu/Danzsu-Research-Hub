@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existingPostId, listMySources, retrySource } from "./my-sources.ts";
+import { duplicateSource, listMySources, retrySource } from "./my-sources.ts";
 import { fakeDb, pgError } from "./pipeline/fake-db.ts";
 import { MINE_LIMIT } from "./pipeline/util.ts";
 
@@ -64,24 +64,26 @@ test("listMySources answers null when the query fails", async (t) => {
   assert.equal(error.mock.calls.length, 1);
 });
 
-// Kills: the post id read off the wrong embed shape, or a truthy post answered as if there were none.
-test("existingPostId answers the post's id when the duplicate link already has one", async () => {
-  const db = fakeDb(undefined, { sources: [{ id: 4, url: "https://blog.test/post", posts: { id: 9 } }] });
-  assert.equal(await existingPostId(db, "https://blog.test/post"), 9);
+// Kills: the post id read off the wrong embed shape, or the id and status the route acts on dropped.
+test("duplicateSource answers the source's id and status, and its post's id when it has one", async () => {
+  const db = fakeDb(undefined, { sources: [{ id: 4, url: "https://blog.test/post", status: "done", posts: { id: 9 } }] });
+  assert.deepEqual(await duplicateSource(db, "https://blog.test/post"), { id: 4, status: "done", postId: 9 });
 });
 
-// Kills: a source with no post yet answered as if it had one.
-test("existingPostId answers undefined when the duplicate link has no post yet", async () => {
-  const db = fakeDb(undefined, { sources: [{ id: 4, url: "https://blog.test/post", posts: null }] });
-  assert.equal(await existingPostId(db, "https://blog.test/post"), undefined);
+// Kills: a source with no post yet answered as if it had one (a postId key of undefined or null counts).
+test("duplicateSource leaves postId out when the duplicate link has no post yet", async () => {
+  const db = fakeDb(undefined, { sources: [{ id: 4, url: "https://blog.test/post", status: "pending", posts: null }] });
+  const found = await duplicateSource(db, "https://blog.test/post");
+  assert.deepEqual(found, { id: 4, status: "pending" });
+  assert.ok(found && !("postId" in found));
 });
 
-// Kills: a lookup failure left unlogged, or thrown instead of answered — the 409 the caller already
-// decided on must still go out, just without a postId.
-test("existingPostId answers undefined and logs once when the lookup itself fails", async (t) => {
+// Kills: a lookup failure left unlogged, or thrown instead of answered: the 409 the caller already
+// decided on must still go out, just plain.
+test("duplicateSource answers undefined and logs once when the lookup itself fails", async (t) => {
   const warn = t.mock.method(console, "warn", () => {});
   const db = fakeDb(undefined, { sourceSelectError: pgError("08006", "connection failure") });
-  assert.equal(await existingPostId(db, "https://blog.test/post"), undefined);
+  assert.equal(await duplicateSource(db, "https://blog.test/post"), undefined);
   assert.equal(warn.mock.calls.length, 1);
 });
 
