@@ -112,6 +112,8 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 | Semantic Scholar | API | ellenőrizendő | A Google Scholar helyett. |
 | OpenAlex | API | ellenőrizendő | A Google Scholar helyett. |
 | IBM Research | blog | ellenőrizendő | |
+| Star History Monthly | `https://rss.beehiiv.com/feeds/BbNzf9ozGZ.xml` | élőben ellenőrizve 2026-09-30: 20 tétel, havonta egy | A Bytebase (star-history.com) havi összefoglalója a gyorsan növő repókról. A tervezett GitHub-radarhoz kell (TODO.md). A star-history.com chart-API-ja (`https://api.star-history.com/svg?repos=<owner>/<repo>&type=Date`) egy repó csillag-idősorát rajzolja. Linkként használnánk, nem beágyazva, mert beágyazva minden megnyitás egy kérés lenne egy harmadik félhez. |
+| GenAI Works | a hírlevelük: `newsletter.genai.works` (beehiiv) | nincs nyilvános csatorna (2026-09-30: a `/feed` és a `/rss` 403) | A LinkedIn-posztjaik helyett ez jöhetne, ha a kiadó bekapcsolja az RSS-t. |
 | IBM Technology | cikkek és videók | ellenőrizendő | A videók a YouTube-kinyerőn mennek át. |
 
 **Súlyozás:** a Google DeepMind már bent van, de a kiemelt források közé kell emelni.
@@ -122,7 +124,7 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 | --- | --- |
 | Google Scholar | Nincs API-ja, és a feltételei tiltják a letöltést. Helyette: Semantic Scholar, OpenAlex. |
 | xAI | Az x.ai minden automatikus kérést 403-mal elutasít (2026-09-29), a közösségi tükör xAI-csatornája pedig 2026 májusa óta áll. Helyette: a `Grok` Hacker News-lekérdezés és a The Decoder. |
-| LinkedIn | Bejelentkezéshez kötött, nincs nyilvános csatornája, és a feltételei tiltják a gépi gyűjtést. A cégek ugyanazt a saját blogjukon is közlik. |
+| LinkedIn | Bejelentkezéshez kötött, nincs nyilvános csatornája, és a felhasználási feltételei tiltják a gépi gyűjtést (az RSS-hidak is így gyűjtenek). A hivatalos API (Community Management API) csak a saját, adminisztrált oldalak posztjait adja, jóváhagyott alkalmazással. A cégek ugyanazt jellemzően a saját blogjukon vagy hírlevelükben is közlik; lásd a GenAI Works-öt a jelöltek között. |
 
 ## Új forrás felvétele
 

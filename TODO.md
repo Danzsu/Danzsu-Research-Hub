@@ -181,6 +181,13 @@
     - új összefoglaló a teljes cikkből, nem a Radaré;
     - ha a cikk még nincs bent, az „Olvasd itt” a taiyaki chatet nyitja meg a linkkel; ha bent van, egy link a posztra;
     - a napi futás sorba állít (`pending` források), a feldolgozást a napi cron maradék ideje és 2–3 külön napi cron végzi, egy összehasonlító frissítéssel lefoglalva a forrást.
+- [ ] **GitHub-radar** (ötlet, 2026-09-30; saját tervezés kell, a sorrendje még nincs eldöntve):
+  - a heti Top 10 marad, és hetente archiválódik (ma is: `/archive/<hét>`);
+  - **pontszám a repóknak is:** a napi válogatás a repókat is pontozza (0–100), a Top 10 és a kedvencek mellett látszik;
+  - **szívecske (kedvenc)** repón és hírön, hogy hosszú távon megmaradjon: egy hetekre átívelő „Kedvencek” lista (az „Olvasási jelzések” pont szíve);
+  - **a chatbe dobott GitHub-link:** ha a pontszáma eléri a heti Top 10 legalját, jelölve bekerül a Top 10-be, ha nem, szívecskét kap;
+  - **„A hónap repói” (Top 3) a Top 10 felett:** a régóta vagy nagyon gyorsan növő, releváns repók, havi nézetben. Ehhez napi csillagszám-mentés kell (a „Valódi GitHub trending” pont);
+  - forrás: a Star History Monthly hírlevél és a star-history.com chart-linkje ([truthful_sites.md](truthful_sites.md) → Jelöltek).
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
