@@ -59,7 +59,7 @@ export async function listMySources(db: SupabaseClient, viewerId: string): Promi
 }
 
 /** The source a duplicate submission ran into (`sources.url` is unique), with its post once there is one. */
-export type DuplicateSource = { id: number; status: string; postId?: number };
+export type DuplicateSource = { id: number; status: string; attempts: number; postId?: number };
 
 /**
  * The source already holding `url`, once a duplicate submission's insert fails on `sources.url`'s
@@ -69,14 +69,14 @@ export type DuplicateSource = { id: number; status: string; postId?: number };
  * the 409 the caller already decided on still goes out, just plain.
  */
 export async function duplicateSource(db: SupabaseClient, url: string): Promise<DuplicateSource | undefined> {
-  const { data, error } = await db.from("sources").select("id, status, posts(id)").eq("url", url).maybeSingle();
+  const { data, error } = await db.from("sources").select("id, status, attempts, posts(id)").eq("url", url).maybeSingle();
   if (error) {
     console.warn("duplicate source lookup failed", error);
     return undefined;
   }
   if (!data) return undefined;
   const postId = embeddedPost(data.posts)?.id;
-  return { id: data.id as number, status: data.status as string, ...(postId === undefined ? {} : { postId }) };
+  return { id: data.id as number, status: data.status as string, attempts: (data.attempts as number | undefined) ?? 0, ...(postId === undefined ? {} : { postId }) };
 }
 
 export type RetryResult = "accepted" | "forbidden" | "not_found" | "not_failed" | "failed";

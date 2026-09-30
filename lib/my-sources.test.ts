@@ -66,15 +66,15 @@ test("listMySources answers null when the query fails", async (t) => {
 
 // Kills: the post id read off the wrong embed shape, or the id and status the route acts on dropped.
 test("duplicateSource answers the source's id and status, and its post's id when it has one", async () => {
-  const db = fakeDb(undefined, { sources: [{ id: 4, url: "https://blog.test/post", status: "done", posts: { id: 9 } }] });
-  assert.deepEqual(await duplicateSource(db, "https://blog.test/post"), { id: 4, status: "done", postId: 9 });
+  const db = fakeDb(undefined, { sources: [{ id: 4, url: "https://blog.test/post", status: "done", attempts: 1, posts: { id: 9 } }] });
+  assert.deepEqual(await duplicateSource(db, "https://blog.test/post"), { id: 4, status: "done", attempts: 1, postId: 9 });
 });
 
 // Kills: a source with no post yet answered as if it had one (a postId key of undefined or null counts).
 test("duplicateSource leaves postId out when the duplicate link has no post yet", async () => {
   const db = fakeDb(undefined, { sources: [{ id: 4, url: "https://blog.test/post", status: "pending", posts: null }] });
   const found = await duplicateSource(db, "https://blog.test/post");
-  assert.deepEqual(found, { id: 4, status: "pending" });
+  assert.deepEqual(found, { id: 4, status: "pending", attempts: 0 });
   assert.ok(found && !("postId" in found));
 });
 

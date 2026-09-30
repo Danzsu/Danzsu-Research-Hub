@@ -199,14 +199,15 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
   }
 
   // A card's "Olvasd itt" (read-here spec 1): its link goes in once the panel is open, as if the reader
-  // had pasted it. The field keeps whatever the reader was typing.
+  // had pasted it. The field keeps whatever the reader was typing. It waits for a send still on its way
+  // (chat.send refuses a second one), so a second card clicked right after the first still goes in.
   const takeQueuedLink = useEffectEvent((link: string) => {
     onQueuedLinkTaken?.();
     void submit(link);
   });
   useEffect(() => {
-    if (open && queuedLink) takeQueuedLink(queuedLink);
-  }, [open, queuedLink]);
+    if (open && queuedLink && !snapshot.sending) takeQueuedLink(queuedLink);
+  }, [open, queuedLink, snapshot.sending]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={isMobile}>

@@ -108,7 +108,7 @@ test("a failing mirror queue is logged once, and the digest still answers 200 wi
   withEnv(t, "CRON_SECRET", "s3cret");
   withEnv(t, "RADAR_MIRROR_USER_ID", "system-user");
   withGeminiKey(t);
-  t.mock.method(console, "warn", () => {});
+  const warn = t.mock.method(console, "warn", () => {});
   const error = t.mock.method(console, "error", () => {});
   mockFetch(t, goodRunFetch);
   routeStub.admin = fakeDb(undefined, {
@@ -120,4 +120,5 @@ test("a failing mirror queue is logged once, and the digest still answers 200 wi
   assert.equal(response.status, 200);
   assert.equal((await response.json()).mirrored, 0);
   assert.equal(error.mock.callCount(), 1);
+  assert.equal(warn.mock.callCount(), feeds.length); // each feed's 404, and nothing else
 });

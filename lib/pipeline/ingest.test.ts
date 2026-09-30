@@ -614,6 +614,24 @@ test("retryPendingSources() counts only the sources it claimed, not one another 
   assert.equal(await retryPendingSources(db), 1);
 });
 
+// Final review I1. Kills a queue run that takes over a source another run finished after the listing:
+// the listing's attempts are stale by then, and the finished post would be rebuilt (a second model
+// bill, and a translation thrown away).
+test("retryPendingSources() leaves a source that another run finished since the listing", async (t) => {
+  const fetched: string[] = [];
+  mockFetch(t, async (url) => {
+    fetched.push(url);
+    return new Response("", { status: 404 });
+  });
+  const db = fakeDb(undefined, {
+    pending: [{ id: 60, attempts: 0 }],
+    source: { ...newSource(60), attempts: 1, status: "done", claimed_at: null },
+    post: { id: 9, blocks: [] },
+  });
+  assert.equal(await retryPendingSources(db), 0);
+  assert.deepEqual([db.postUpserts, fetched], [[], []]);
+});
+
 test("retryPendingSources(): forwards its deadline into processSource, so a tight one shrinks the image budget mirrorImages actually receives", async (t) => {
   withGeminiKey(t);
   const html = manyImagesHtml(6);

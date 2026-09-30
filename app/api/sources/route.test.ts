@@ -75,6 +75,15 @@ test("POST /api/sources starts a queued source that has no post yet, and says it
   assert.deepEqual(await scheduledSourceIds(admin), [4]);
 });
 
+// Final review. Kills the kick re-running a source that has spent its attempts (a page that kills the
+// function every time would run again on every click): the cron gave up on it, and so does the kick.
+test("POST /api/sources starts nothing for a pending duplicate that has spent its attempts", async () => {
+  reader({ sourceInsertError: duplicate, sources: [{ id: 4, url: "https://blog.test/post", status: "pending", attempts: 3, posts: null }] });
+  const response = await submit({ url: "https://blog.test/post" });
+  assert.deepEqual([response.status, await response.json()], [409, { error: "already_submitted" }]);
+  assert.deepEqual(routeStub.scheduled, []);
+});
+
 // Kills a start for a source that already failed (only its submitter's "Újra" or the cron's retry
 // may run it again) or that is done.
 test("POST /api/sources starts nothing for a duplicate that failed or is done", async () => {

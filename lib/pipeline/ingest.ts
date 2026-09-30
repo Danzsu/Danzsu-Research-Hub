@@ -7,7 +7,8 @@ import { IMAGE_BUDGET_MS, mirrorImages, unusedMediaPaths } from "./images.ts";
 import { summarize, writeNotes } from "./summary.ts";
 import { errorMessage, type SourceKind } from "./util.ts";
 
-const MAX_ATTEMPTS = 3;
+/** The runs a source gets before the queue gives up on it (a reader's "Újra" resets the count). */
+export const MAX_ATTEMPTS = 3;
 
 // The cleanup prompt targets web-page chrome (nav, ads, share buttons); pdf (a Gemini
 // transcription), x (post text) and youtube (the video block) have none of that to strip,
@@ -110,9 +111,11 @@ async function buildPost(db: SupabaseClient, source: Source, previous: Block[], 
  * It claims the source first (spec 3): a lease on `claimed_at` stops a run that reads the source
  * while another works on it, and a compare-and-swap on `attempts` stops two that read it at once.
  * A finished run releases the lease; one older than CLAIM_LEASE_MS is a dead run's and is taken over.
+ * `expectedAttempts` is the value a queue listing saw: a run that claimed (and maybe finished) the source
+ * since then has moved it, so the queue leaves the source to that run instead of doing its work again.
  * ponytail: a run that dies after its posts lookup throws keeps the lease for its full 10 minutes.
  */
-export async function processSource(db: SupabaseClient, id: number, options: { deadline?: number } = {}): Promise<boolean> {
+export async function processSource(db: SupabaseClient, id: number, options: { deadline?: number; expectedAttempts?: number } = {}): Promise<boolean> {
   const { data: source, error } = await db.from("sources").select("id, url, kind, note, attempts, claimed_at").eq("id", id).single<Source>();
   if (error || !source) throw error ?? new Error(`source ${id} not found`);
   const now = Date.now();
@@ -121,7 +124,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
     .from("sources")
     .update({ attempts: source.attempts + 1, claimed_at: new Date(now).toISOString() })
     .eq("id", id)
-    .eq("attempts", source.attempts)
+    .eq("attempts", options.expectedAttempts ?? source.attempts)
     .select("id");
   if (claimError) throw claimError;
   if (!claimed?.length) return false;
@@ -174,13 +177,12 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
  * summarize() each have their own fallback route, so a single model task can take up to 2×120s,
  * and a pdf needs two such tasks (transcription, then summary). When that happens the platform
  * kills the function mid-flight, this attempt is spent, and the source is retried on the next
- * cron run. Upgrade path: a dedicated retry cron with its own 300s budget instead of sharing
- * runDaily's.
+ * cron run: the mirror crons (`/api/cron/mirror`) give the queue three more 300 s budgets a day.
  */
 export async function retryPendingSources(db: SupabaseClient, deadline?: number): Promise<number> {
   const { data, error } = await db
     .from("sources")
-    .select("id")
+    .select("id, attempts")
     .neq("status", "done")
     .lt("attempts", MAX_ATTEMPTS)
     .order("id")
@@ -191,7 +193,7 @@ export async function retryPendingSources(db: SupabaseClient, deadline?: number)
   for (const row of data ?? []) {
     if (deadline !== undefined && deadline - Date.now() < START_GATE_RESERVE_MS) break;
     // Counts the runs that claimed their source: one another run holds is skipped, not counted.
-    if (await processSource(db, row.id as number, { deadline })) processed++;
+    if (await processSource(db, row.id as number, { deadline, expectedAttempts: row.attempts as number })) processed++;
   }
   return processed;
 }
