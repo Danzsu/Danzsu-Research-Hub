@@ -22,6 +22,7 @@ import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-sto
 import { useLanguage } from "./language-context";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
+import { useReadHere } from "./link-chat";
 import { isUndoToast, toasts } from "./undo-toast";
 import { useModelContextTools } from "./use-model-context-tools";
 import { useReaderState } from "./use-reader-state";
@@ -116,6 +117,8 @@ export function DigestDashboard(
     archived?: boolean;
     /** /companies: the week's company news only, the latest day's Top 5 first, no category bar. */
     scope?: "companies";
+    /** Item id → its Library post (readHerePosts): the cards' "Olvasd itt" opens it. */
+    posts?: Record<string, number>;
   } & ReaderSource,
 ) {
   const { issue, githubTop10, archived = false } = props;
@@ -125,6 +128,7 @@ export function DigestDashboard(
   const { language } = useLanguage();
   const [filter, setFilter] = useState<Filter>("all");
   const { store, states, loadedStates, todos, syncing } = useReaderState(props);
+  const readHere = useReadHere();
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
   useModelContextTools(store, itemIds);
   const isMobile = useIsMobile();
@@ -147,6 +151,7 @@ export function DigestDashboard(
       }
     },
     onToggle: (itemId, flag) => store.toggleFlag(itemId, flag),
+    onReadHere: (item, opener) => readHere(item.url, opener),
     onAddTodo(item) {
       if (store.addTodo(item.title[language], item.id)) toasts.show({ kind: "todoAdded" });
     },
@@ -174,6 +179,7 @@ export function DigestDashboard(
     item,
     state: states[item.id] ?? EMPTY_ITEM_STATE,
     hasTodo: itemsWithTodo.has(item.id),
+    postId: props.posts?.[item.id],
     language,
     actions,
   });

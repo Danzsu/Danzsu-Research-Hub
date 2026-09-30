@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
 import { archivedWeek, getReaderSeed } from "@/lib/content";
+import { readHerePosts } from "@/lib/my-sources";
 import { isoWeekMonday } from "@/lib/pipeline/util";
 import { getReader } from "@/lib/supabase/server";
 
@@ -13,5 +14,7 @@ export default async function ArchivedIssuePage({ params }: { params: Promise<{ 
   if (!isoWeekMonday(week)) notFound();
   const [radar, seed] = await Promise.all([archivedWeek(reader, week), getReaderSeed(reader.db, week)]);
   if (!radar) notFound();
-  return <DigestDashboard archived {...radar} seed={seed} />;
+  // After the week, not beside it: the lookup needs its items. Never cached, unlike a closed week itself.
+  const posts = await readHerePosts(reader.db, radar.items);
+  return <DigestDashboard archived {...radar} seed={seed} posts={posts} />;
 }

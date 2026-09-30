@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
@@ -11,7 +11,7 @@ import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
-import { LinkChat, TaiyakiButton, type ChatPreview } from "./link-chat";
+import { LinkChat, ReadHereContext, TaiyakiButton, type ChatPreview, type ReadHere } from "./link-chat";
 import { AccountActions, NavEntry, SoonList } from "./nav-parts";
 import { RefreshProvider } from "./refresh-bar";
 import { SearchSoon, ShortcutHelp } from "./shell-dialogs";
@@ -53,6 +53,14 @@ export function AppShell({
     chatOpener.current = event.currentTarget;
     setChatOpen(!chatOpen);
   };
+  // A card's "Olvasd itt" (read-here spec 1): the chat opens with the card's link, and the card's button
+  // gets the focus back, like a taiyaki does. The link waits here until the open panel takes it.
+  const [queuedLink, setQueuedLink] = useState<string | null>(null);
+  const readHere = useCallback<ReadHere>((url, opener) => {
+    chatOpener.current = opener;
+    setQueuedLink(url);
+    setChatOpen(true);
+  }, []);
   const openSearch = () => setSearchOpen(true);
   const openHelp = () => setHelpOpen(true);
   const toggleNav = () => {
@@ -74,12 +82,14 @@ export function AppShell({
   return (
     <LanguageProvider initial={language}>
       <RefreshProvider>
-        <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
-          {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
-              so none of them covers the end of the page. The corner one's goes inside the page's own last element,
-              so that page's surface runs on under it. */}
-          <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
-        </DesktopNav>
+        <ReadHereContext value={readHere}>
+          <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
+            {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
+                so none of them covers the end of the page. The corner one's goes inside the page's own last element,
+                so that page's surface runs on under it. */}
+            <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
+          </DesktopNav>
+        </ReadHereContext>
         <MobileNav
           email={email}
           onSearch={openSearch}
@@ -97,7 +107,15 @@ export function AppShell({
           className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
         />
         {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
-        <LinkChat key={`${chatPreview?.failWrites}:${chatPreview?.delayMs}`} open={chatOpen} onOpenChange={setChatOpen} opener={chatOpener} preview={chatPreview} />
+        <LinkChat
+          key={`${chatPreview?.failWrites}:${chatPreview?.delayMs}`}
+          open={chatOpen}
+          onOpenChange={setChatOpen}
+          opener={chatOpener}
+          preview={chatPreview}
+          queuedLink={queuedLink}
+          onQueuedLinkTaken={() => setQueuedLink(null)}
+        />
         <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
         <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
         <UndoToast />

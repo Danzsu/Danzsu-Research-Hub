@@ -1,8 +1,11 @@
-import { Bookmark, BookmarkCheck, Check, Clock3, ExternalLink, ListChecks, ListPlus } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Bookmark, BookmarkCheck, Check, Clock3, ExternalLink, ListChecks, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DigestItem, Language } from "@/data/digest-types";
 import { nextCardIndex } from "@/lib/keymap";
+import { parseSubmittedUrl } from "@/lib/pipeline/util";
 import type { Flag, ItemState } from "@/lib/reader-store";
+import { PendingDot } from "./nav-parts";
 import { Tag } from "./tag";
 
 const copy = {
@@ -11,6 +14,7 @@ const copy = {
     min: "PERC",
     why: "MIÉRT FONTOS",
     open: "Megnyitás",
+    readHere: "Olvasd itt",
     later: "Később",
     addTodo: "Teendőhöz adás",
     hasTodo: "Már a teendők között",
@@ -21,6 +25,7 @@ const copy = {
     min: "MIN",
     why: "WHY IT MATTERS",
     open: "Open source",
+    readHere: "Read here",
     later: "Later",
     addTodo: "Add to to-dos",
     hasTodo: "Already a to-do",
@@ -33,9 +38,20 @@ export type CardActions = {
   onOpen: (item: DigestItem) => void;
   onToggle: (itemId: string, flag: Flag) => void;
   onAddTodo: (item: DigestItem) => void;
+  /** "Olvasd itt" with no Library post yet: the link chat sends the item's URL (read-here spec 1).
+   *  `opener` gets the focus back when the chat closes. */
+  onReadHere: (item: DigestItem, opener: HTMLButtonElement) => void;
 };
 
-export type CardProps = { item: DigestItem; state: ItemState; hasTodo: boolean; language: Language; actions: CardActions };
+export type CardProps = {
+  item: DigestItem;
+  state: ItemState;
+  hasTodo: boolean;
+  language: Language;
+  actions: CardActions;
+  /** The Library post already made from the item's URL (readHerePosts): "Olvasd itt" opens it. */
+  postId?: number;
+};
 
 const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
 
@@ -111,8 +127,8 @@ function CardText({ item, language, titleClassName }: CardProps & { titleClassNa
   );
 }
 
-/** [Open] [rating: milestone B] [Later] [+ to-do] … [Read]: every action in one row at the bottom, in thumb reach. */
-function CardFooter({ item, state, hasTodo, language, actions }: CardProps) {
+/** [Open] [Olvasd itt] [rating: milestone B] [Later] [+ to-do] … [Read]: every action in one row at the bottom, in thumb reach. */
+function CardFooter({ item, state, hasTodo, language, actions, postId }: CardProps) {
   const t = copy[language];
   const todoLabel = hasTodo ? t.hasTodo : t.addTodo;
   return (
@@ -131,6 +147,27 @@ function CardFooter({ item, state, hasTodo, language, actions }: CardProps) {
           {t.open} <ExternalLink />
         </a>
       </Button>
+      {/* Read-here spec 1: our own post when there is one; otherwise the chat sends the link, unless a submission would refuse it. */}
+      {postId !== undefined ? (
+        <Button asChild variant="brutal" className="min-h-10">
+          <Link href={`/library/${postId}`} onClick={() => actions.onOpen(item)}>
+            <BookOpen /> {t.readHere} <PendingDot />
+          </Link>
+        </Button>
+      ) : (
+        parseSubmittedUrl(item.url) && (
+          <Button
+            variant="brutal"
+            className="min-h-10"
+            onClick={(event) => {
+              actions.onOpen(item);
+              actions.onReadHere(item, event.currentTarget);
+            }}
+          >
+            <BookOpen /> {t.readHere}
+          </Button>
+        )
+      )}
       {/* Milestone B puts the 👎 👍 ❤ RatingControl here, between Open and Later (spec 1.4.3). */}
       <Button
         variant="brutal"
