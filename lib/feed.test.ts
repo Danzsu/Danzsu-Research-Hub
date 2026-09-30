@@ -47,5 +47,8 @@ test("dailyTop takes the latest day's items by their Budapest date, highest scor
   const late = at("late", "2026-09-28T23:30:00Z", 10);
   assert.deepEqual(ids(dailyTop([late, at("morning", "2026-09-29T06:00:00Z", 20)])), ["morning", "late"]);
   assert.equal(addedDayLabel(late.addedAt), "09. 29.");
+  // One run's rows share one created_at: a tie goes by id, so the Top 5 is the same on every load.
+  const tie = (id: string) => at(id, "2026-09-29T05:59:00Z", 70);
+  assert.deepEqual(ids(dailyTop([tie("b"), tie("a")])), ["a", "b"]);
   assert.deepEqual(dailyTop([]), []);
 });

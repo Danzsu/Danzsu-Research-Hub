@@ -112,8 +112,8 @@ const MORE_HREFS = MOBILE_MORE_NAV.flatMap((item) => (item.href ? [item.href] : 
 const slotClass =
   "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 
-/** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds Archívum, the
- *  language, the coming views and sign-out; on Archívum's pages its slot carries the active mark. */
+/** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds AI cégek and
+ *  Archívum, the language, the coming views and sign-out; on their pages its slot carries the active mark. */
 function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => void; chat: ReactNode }) {
   const { language } = useLanguage();
   const active = activeNavId(usePathname());

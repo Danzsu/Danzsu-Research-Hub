@@ -25,3 +25,11 @@ test("each of the six loading.tsx says Betöltés… / Loading… once, to assis
     }
   }
 });
+
+// Kills /companies painting the Radar's chip band: it has no category bar, so its hero would jump up.
+test("the companies skeleton is the Radar's without the chip band", () => {
+  const root = (Loading: ComponentType) =>
+    render(createElement(LanguageProvider, { initial: "en" } as ComponentProps<typeof LanguageProvider>, createElement(Loading))).body.firstElementChild;
+  const [radar, companies] = ["/", "/companies"].map((route) => root(loadings.find(([path]) => path === route)![1]));
+  assert.equal((radar?.children.length ?? 0) - (companies?.children.length ?? 0), 1);
+});

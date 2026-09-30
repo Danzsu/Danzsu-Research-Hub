@@ -30,7 +30,8 @@ export function feedItems(
   return sortUnreadFirst(visible, loadedStates);
 }
 
-// A daily run lands at 07:00 Budapest time, so the day is Budapest's, not UTC's.
+// The day is Budapest's, not UTC's: the cron (05:00 UTC) lands on the same date either way, but a manual
+// run after 22:00 UTC (23:00 in winter) already belongs to the next Budapest day.
 const budapestDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }); // 2026-09-29
 const budapestLabel = new Intl.DateTimeFormat("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit" });
 
@@ -41,5 +42,6 @@ export const addedDayLabel = (addedAt: string) => budapestLabel.format(new Date(
 export function dailyTop(items: DigestItem[], count = 5): DigestItem[] {
   const day = (item: DigestItem) => budapestDay.format(new Date(item.addedAt));
   const latest = items.map(day).sort().at(-1);
-  return items.filter((item) => day(item) === latest).sort((a, b) => b.score - a.score).slice(0, count);
+  // One run's rows share one created_at, so ties go by id: the same Top 5 on every load.
+  return items.filter((item) => day(item) === latest).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).slice(0, count);
 }

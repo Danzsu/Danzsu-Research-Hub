@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnQueries } from "./pipeline/feeds.ts";
+import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "./pipeline/feeds.ts";
 
 // truthful_sites.md → "Bent van" documents lib/pipeline/feeds.ts. This keeps the two equal, both ways:
 // it fails for a source added to or removed from either side, and for a changed URL, limit or category.
@@ -29,6 +29,6 @@ test("truthful_sites.md lists exactly the feeds the daily run reads, with their 
 });
 
 test("truthful_sites.md lists exactly the Hacker News queries and GitHub topics the daily run searches", () => {
-  assert.deepEqual(bullets("Hacker News"), hnQueries);
+  assert.deepEqual(bullets("Hacker News"), [...hnQueries, ...hnNames]);
   assert.deepEqual(bullets("GitHub"), githubTopics);
 });

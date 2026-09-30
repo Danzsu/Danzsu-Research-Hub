@@ -155,6 +155,18 @@ test("DigestDashboard with scope companies shows the latest run's company Top 5,
   assert.ok(labels.includes("THE WEEK'S OTHER COMPANY NEWS"), labels.join(" | "));
 });
 
+// Kills the two companies empty texts swapped or lost, and the Radar's "this week is still empty" banner
+// shown on a page that has its own note.
+test("DigestDashboard with scope companies says so when the week has no company news, or all of it is in the Top 5", () => {
+  const page = (items: typeof previewItems) =>
+    withShellProviders(DigestDashboard, { scope: "companies", issue: previewIssue, items, githubTop10: [], preview: { data: previewReader, failWrites: false } })
+      .body.textContent ?? "";
+  const none = page(previewItems.filter((item) => item.category !== "companies"));
+  assert.match(none, /No company news this week yet/);
+  assert.doesNotMatch(none, /still empty/);
+  assert.match(page(previewItems.filter((item) => item.id === "companies-2026-W39-mistral")), /Every company story this week is up top/);
+});
+
 // Kills createSeededStore's syncing decision hardcoded to one value: a fresh seed must start synced, a failed (null) one must start syncing.
 test("DigestDashboard starts synced from a fresh seed, not the syncing state", () => {
   const text = dashboardText({ issueId: "2026-W39", seededAt: 424_242, data: previewReader });
@@ -322,6 +334,7 @@ test("the Több slot carries the active mark on Archívum's pages only", (t) => 
   };
   assert.deepEqual(moreSlot("/archive/2026-W38"), ["Több", "true"]);
   assert.deepEqual(moreSlot("/archive"), ["Több", "true"]);
+  assert.deepEqual(moreSlot("/companies"), ["Több", "true"]);
   assert.deepEqual(moreSlot("/library"), ["Több", null]);
 });
 

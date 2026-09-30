@@ -69,7 +69,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 Breaking one of these is a bug even when every test passes.
 
 - **A Radar item's id never changes.** `item.id` is half the composite primary key of `item_states`, so renaming one silently orphans every reader's read and saved state. `itemId()` in `lib/pipeline/util.ts` derives it once, as `<category>-<yyyy>w<ww>-<slug>-<urlhash>`, from the category, the ISO week, the English title and the source URL. Inserts use `ignoreDuplicates` on `url`, so an existing row is never rewritten. `lib/pipeline/daily.test.ts` pins two literal ids. The reader state's week filter leans on the same form: `weekItemPattern` matches `%-<yyyy>w<ww>-%`, so a changed `itemId()` would silently drop reader rows (`lib/pipeline/util.test.ts` binds the two).
-- **An issue has three must-reads.** After every daily run, `refresh_must_read` marks the three highest scores of the issue (ties go to the earlier row). An issue with fewer than three items has fewer. The Top 3 grid is built for exactly three.
+- **An issue has three must-reads.** After every daily run, `refresh_must_read` marks the three highest scores of the issue (ties go to the earlier row). An issue with fewer than three items has fewer. The Top 3 grid is built for exactly three; the AI companies page reuses its cards for up to five (its daily Top 5), three then two.
 - **Block ids are content-addressed.** `assignIds` (`lib/blocks.ts`) derives each id from the block's type and normalized content, never from its position. That's why `hidden_blocks`, and later annotations, still point at the same block after a re-extraction.
 - **No raw HTML reaches a page** (SECURITY.md → XSS).
 - **No secret reaches the browser** (SECURITY.md → Secrets).
@@ -78,7 +78,7 @@ Breaking one of these is a bug even when every test passes.
   - The current week, the reader's own state (read, later, to-dos), a cookie or anything computed from one, and a viewer's id never go in. Only content does, keyed by the week's id or by a fixed key.
   - Sign-in comes first: the caches are reached only through `archivedWeek` and `archiveList`, which take a signed-in `Reader`, and nothing inside them reads cookies.
   - A failed query throws, so no failure is ever cached.
-  - Next's data cache outlives a deploy, so the key's version (`v1`) goes up whenever `RadarData` or `ArchiveIssue` changes shape.
+  - Next's data cache outlives a deploy, so each key's version goes up whenever the shape it caches changes (`RadarData` for the closed week, `ArchiveIssue` for the list).
 
   The mechanics are in CLAUDE.md → Server path.
 - **Every user-supplied or page-derived URL is fetched through `safeFetch`** (SECURITY.md → SSRF).

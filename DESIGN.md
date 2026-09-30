@@ -454,7 +454,7 @@ className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y
 
 ### Bottom bar and the "Több" sheet
 
-Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The active slot, the open "Több", or "Több" on an Archívum page (`data-active`) turns signal:
+Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The active slot, the open "Több", or "Több" on an AI cégek or Archívum page (`data-active`) turns signal:
 
 ```tsx app/components/app-shell.tsx
 className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
@@ -626,7 +626,7 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${state.read ?
 className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${state.read ? "story-read" : ""}`}
 ```
 
-- **must-card** shows a rank numeral (`01` to `03`), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
+- **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
 - **story-card** has a 96px meta gutter from `lg`, and one row of actions at the bottom: Open (`ink`), Later and to-do (`brutal` icons), and Read on the right.
 - **Both** dim to 58% once read, and take focus for j/k (`tabIndex={-1}` plus `focus-ring`).
 

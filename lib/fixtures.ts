@@ -49,21 +49,22 @@ export const previewItems: DigestItem[] = [
   }),
   digestItem("companies-2026-W39-must-2", { mustRead: true, category: "companies", score: 91 }),
   digestItem("local-2026-W39-must-3", { mustRead: true, score: 88 }),
+  // The rest in score order, as the database answers. The companies items make the AI companies page:
+  // must-2 and four from the same run are its daily Top 5; "yesterday" outscores them all but is a day
+  // older, so it stays below.
+  digestItem("companies-2026-W39-yesterday", { category: "companies", score: 95, addedAt: "2026-09-23T05:59:40Z" }),
+  digestItem("companies-2026-W39-mistral", { category: "companies", score: 86 }),
   digestItem("local-2026-W39-read", { score: 82 }),
+  digestItem("companies-2026-W39-meta", { category: "companies", score: 79 }),
   digestItem("local-2026-W39-long-url", {
     score: 77,
     source: LONG_URL,
     url: LONG_URL,
     tags: ["inference", "quantization", "runtime", "serving", "fine-tuning", "training", "agents", "evals"],
   }),
+  digestItem("companies-2026-W39-deepseek", { category: "companies", score: 73 }),
   digestItem("research-2026-W39-plain", { category: "research", score: 64 }),
   digestItem("companies-2026-W39-plain", { category: "companies", score: 58 }),
-  // The AI companies page: with the two above, five from the latest run (its daily Top 5), and one
-  // from the day before that outscores them all but stays below.
-  digestItem("companies-2026-W39-mistral", { category: "companies", score: 86 }),
-  digestItem("companies-2026-W39-meta", { category: "companies", score: 79 }),
-  digestItem("companies-2026-W39-deepseek", { category: "companies", score: 73 }),
-  digestItem("companies-2026-W39-yesterday", { category: "companies", score: 95, addedAt: "2026-09-23T05:59:40Z" }),
   digestItem("github-2026-W39-plain", { category: "github", score: 52 }),
 ];
 

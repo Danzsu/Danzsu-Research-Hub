@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
 import { apiFetch, ensureOk, githubHeaders } from "./fetch.ts";
-import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnQueries } from "./feeds.ts";
+import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "./feeds.ts";
 import { list, publishedDate, settledValues, xmlText } from "./util.ts";
 
 export type Candidate = {
@@ -58,11 +58,16 @@ async function fromFeeds(since: Date): Promise<Candidate[]> {
   return settledValues(results, (i) => `feed failed: ${feeds[i].name}`).flat();
 }
 
+const HN_SEARCHES = [
+  ...hnQueries.map((query) => ({ query, exact: "" })),
+  ...hnNames.map((query) => ({ query, exact: "&typoTolerance=false&restrictSearchableAttributes=title" })),
+];
+
 async function fromHackerNews(since: Date): Promise<Candidate[]> {
   const after = Math.floor(since.getTime() / 1000);
   const results = await Promise.allSettled(
-    hnQueries.map(async (query) => {
-      const url = `https://hn.algolia.com/api/v1/search?tags=story&query=${encodeURIComponent(query)}&numericFilters=created_at_i>${after},points>80`;
+    HN_SEARCHES.map(async ({ query, exact }) => {
+      const url = `https://hn.algolia.com/api/v1/search?tags=story&query=${encodeURIComponent(query)}${exact}&numericFilters=created_at_i>${after},points>80`;
       const data = (await (await get(url)).json()) as {
         hits: Array<{ title: string; url?: string; created_at: string; points: number; objectID: string }>;
       };
@@ -76,7 +81,7 @@ async function fromHackerNews(since: Date): Promise<Candidate[]> {
       }));
     }),
   );
-  return settledValues(results, (i) => `hacker news query failed: ${hnQueries[i]}`).flat();
+  return settledValues(results, (i) => `hacker news query failed: ${HN_SEARCHES[i].query}`).flat();
 }
 
 export async function collectRepos(now: Date): Promise<Repo[]> {

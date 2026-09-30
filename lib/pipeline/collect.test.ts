@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { collectRepos, dedupeCandidates, parseFeed, type Candidate } from "./collect.ts";
-import { githubTopics } from "./feeds.ts";
+import { collectCandidates, collectRepos, dedupeCandidates, parseFeed, type Candidate } from "./collect.ts";
+import { feeds, githubTopics, hnNames, hnQueries } from "./feeds.ts";
 import { mockFetch } from "./mock-fetch.ts";
 
 const since = new Date("2026-09-21T00:00:00Z");
@@ -113,4 +113,29 @@ test("collectRepos logs each failing topic search (an expired GitHub token) inst
   assert.deepEqual(await collectRepos(new Date("2026-09-23T05:00:00Z")), []);
   assert.equal(warn.mock.callCount(), githubTopics.length);
   assert.match(String(warn.mock.calls[0].arguments[0]), /^github topic failed: llm: https:\/\/api\.github\.com\/\S+ 401$/);
+});
+
+// Kills the lab names searched like the topics: Algolia's typo tolerance and full-text match read "Grok"
+// as "Growing" and "MiniMax" as "Minimal" (2026-09-30: 3 of 23 Grok hits were about Grok). And kills the
+// exact match spilling onto the topic queries, which would cut their real hits ("LLM" 72 → 48).
+test("the lab names search Hacker News exactly and in titles only, the topic queries as before", async (t) => {
+  const searched = new Map<string, URLSearchParams>();
+  mockFetch(t, (url) => {
+    if (!url.startsWith("https://hn.algolia.com/")) return new Response("", { status: 404 });
+    const params = new URL(url).searchParams;
+    searched.set(params.get("query") ?? "", params);
+    return Response.json({ hits: [] });
+  });
+  const warn = t.mock.method(console, "warn", () => {});
+  await collectCandidates(since);
+  assert.deepEqual([...searched.keys()].sort(), [...hnQueries, ...hnNames].sort());
+  for (const name of hnNames) {
+    assert.equal(searched.get(name)?.get("typoTolerance"), "false", name);
+    assert.equal(searched.get(name)?.get("restrictSearchableAttributes"), "title", name);
+  }
+  for (const query of hnQueries) {
+    assert.equal(searched.get(query)?.has("typoTolerance"), false, query);
+    assert.equal(searched.get(query)?.has("restrictSearchableAttributes"), false, query);
+  }
+  assert.equal(warn.mock.callCount(), feeds.length, "every feed 404s here, and each logs once");
 });

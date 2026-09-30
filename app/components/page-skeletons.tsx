@@ -17,13 +17,14 @@ function Busy() {
   );
 }
 
-/** `/` and `/archive/[week]`: the cream column, the header and chip bands, the ink hero, the Top 3 and three stories. */
-export function RadarSkeleton() {
+/** `/`, `/companies` and `/archive/[week]`: the cream column, the header and chip bands, the ink hero, the Top 3 and
+ *  three stories. `/companies` has no category bar, so it leaves the chip band out (`chips={false}`). */
+export function RadarSkeleton({ chips = true }: { chips?: boolean }) {
   return (
     <div className="min-h-dvh min-w-0 bg-cream text-ink" aria-busy="true">
       <Busy />
       <div className="h-16 border-b-2 border-ink" />
-      <div className="h-14 border-b-2 border-ink" />
+      {chips && <div className="h-14 border-b-2 border-ink" />}
       <div className="px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
         <div className="h-56 border-2 border-ink bg-ink sm:h-64" />
         <div className="skeleton-fill mt-9 space-y-4 @container">
