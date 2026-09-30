@@ -54,7 +54,7 @@ node --experimental-strip-types --no-warnings --test "app/media/[[]...path]/rout
 `fakeDb` is an offline Supabase client for tests that exercise real pipeline wiring.
 
 - **`model_settings`** answers with `route` and records each task asked for (`.tasks`).
-- **`sources`** (one `source`, or several `sources`), `posts`, storage and the RPCs answer from `tables`. Any other table upserts, recorded on `.upserts`, and its select chain answers from `tables.rows`: `eq`, `neq`, `lt` and `like` (`likes`, SQL's `%` and `_`) filter the rows, `order`, `limit` and `gte` are only recorded (`gte` also lands on `.gteCalls`), and it answers awaited or through `maybeSingle()`. Every call of that chain lands on `.queries`, so a test can check the query a loader sent. `tableErrors` fails a table's select.
+- **`sources`** (one `source`, or several `sources`), `posts`, storage and the RPCs answer from `tables`. A `sources` select also takes `.in(column, values)` and can be awaited without `single()` (`readHerePosts`); its `upsert(rows, options).select()` (`queueMirrors`) records on `.sourceUpserts` and, like ON CONFLICT DO NOTHING, skips a `url` already in the fixture, answering only the rows it inserted. Any other table upserts, recorded on `.upserts`, and its select chain answers from `tables.rows`: `eq`, `neq`, `lt` and `like` (`likes`, SQL's `%` and `_`) filter the rows, `order`, `limit` and `gte` are only recorded (`gte` also lands on `.gteCalls`), and it answers awaited or through `maybeSingle()`. Every call of that chain lands on `.queries`, so a test can check the query a loader sent. `tableErrors` fails a table's select.
 - **Filters.** Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows, as PostgREST would. A column the fixture never set passes every filter, so a test of which row the code reads needs a fixture whose `id` and `source_id` differ. A null filter value, or a null row value, never passes, as in SQL: only the `posts` update chain's `.is(...)` matches null.
 - **`sources` selects** are projected to their column list, one level into an embed (`posts(id, title, overrides)`; `table(*)` keeps the embed whole), so a column the select drops reads `undefined`, as with PostgREST. A listing applies `order(column, { ascending })` before `limit(n)`, over `pending` when a test sets it and over `sources` / `source` otherwise. `!inner` and `alias:col` aren't parsed yet.
 - **Errors.** A `sources` `single()` that matches no row, or several, answers PGRST116; `maybeSingle()` answers null for none and PGRST116 for several. `pgError(code, message)` builds any other PostgREST-shaped error.
@@ -62,6 +62,7 @@ node --experimental-strip-types --no-warnings --test "app/media/[[]...path]/rout
   - `postError` makes every `posts` lookup fail, or only the Nth with `postErrorOnCall`;
   - `postUpsertError` and `postUpdateError` fail the `posts` writes;
   - `sourceInsertError` takes a `pgError`, such as `"23505"`;
+  - `sourceUpsertError` fails `queueMirrors`' upsert;
   - `sourceSelectError` fails every `sources` select;
   - `sourceUpdateError` fails the `sources` update, which still records its payload on `sourceUpdates`;
   - `rpcError` takes a `pgError`, such as `"42501"`;

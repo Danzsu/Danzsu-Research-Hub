@@ -94,6 +94,7 @@
 - [x] **Taiyaki link-chat** (2026-09-27): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).
 - [x] **R1 „Gyors”** (2026-09-28): a függvények Dublinban futnak Fluid compute-tal, egy auth-ellenőrzés kérésenként, egy lekérdezés a Radarhoz, az olvasói állapot a nézett hétre szűkül, és `GET /api/state` csak Vissza után fut; a zárt hetek és az archívum-lista egy napig gyorsítótárban vannak. Oldalformájú vázak, függő pont a linkeken, felső sáv a frissítésekhez, a „Több” linkjeinek prefetchje; a zod kikerült a kliens csomagjából. Terv: [docs/superpowers/plans/2026-09-27-r1-speed.md](docs/superpowers/plans/2026-09-27-r1-speed.md).
 - [x] **Hírek csomag** (2026-09-30): hat új forrás (Mistral, Microsoft Research, Meta AI Research, Anthropic Research, Recode China AI, ChinAI) és öt laborneves Hacker News-keresés (`Grok`, `DeepSeek`, `Qwen`, `Kimi`, `MiniMax`, pontos egyezéssel, csak a címben). Új menüpont: **AI cégek** (`/companies`), fent a legutóbbi napi futás öt legjobb céges hírével, alatta a hét többi céges hírével. Az xAI és a LinkedIn géppel nem olvasható ([truthful_sites.md](truthful_sites.md) → Kizárva).
+- [x] **„Olvasd itt” és automatikus tükör** (2026-09-30): minden hírkártyán „Olvasd itt”: ha a cikkből már van Library-poszt, oda visz, ha nincs, a taiyaki chatben beküldi. A napi futás a hét 85 pont feletti híreit és a Top 3-at a rendszer-fiók nevén sorba teszi, a `/api/cron/mirror` 07, 08 és 09 UTC-kor feldolgozza őket. Egy forráson egyszerre egy futás dolgozik (`claimed_at` lease). Terv: [docs/superpowers/plans/2026-09-30-read-here-mirror.md](docs/superpowers/plans/2026-09-30-read-here-mirror.md).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
@@ -153,6 +154,10 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **Az „Olvasd itt” élesítése** (a tulajdonosé, ebben a sorrendben):
+  1. *SQL Editor*: a `supabase/migrations/20260930000000_source_claims.sql` futtatása, **a push előtt** (a kód olvassa az oszlopot);
+  2. [x] a rendszer-fiók (*Authentication → Users → Add user*, Auto Confirm) és a `RADAR_MIRROR_USER_ID` a Vercelben (2026-09-30);
+  3. push, a `read-here` branch merge-e után.
 - [ ] **Az R1 utólagos élő mérése** (a tulajdonosé, a deploy után; a terv 12. feladata):
   - a válasz `x-vercel-id` fejléce `…::dub1`-re végződik, a deployment adatlapján a függvények Fluid compute-tal futnak, és a napi cron lefut;
   - `node --env-file=.env.local --experimental-strip-types --no-warnings .superpowers/ux-audit/measure-live.mts after`, az egyszeri, csak olvasó, jóváhagyott munkamenettel; a számok a `live-before.json` mellé kerülnek, ígéret nélkül;
@@ -166,21 +171,6 @@
   - az `/archive` oldalon a „Több” aktív jelölése mobilon;
   - a lekérdezés leáll a panel bezárása után (`browser_network_requests`);
   - a `/library` oldalon a chatből beküldött link megjelenik a listában (`router.refresh()`; az előnézet listája fixture, ott nem látszik).
-- [ ] **Olvasás a saját oldalunkon a Radarból is** (döntve 2026-09-27, az R1 „Gyors” után, az R2 előtt; saját rövid tervezés kell). A Library már most a saját felületén mutatja a beküldött cikkeket, tükrözött ábrákkal (M1), a Radar-kártyák viszont az eredeti oldalra visznek. Két rész:
-  - **„Olvasd itt” gomb minden Radar-kártyán:** a cikk bemegy a Library-pipeline-ba, és amint kész, a saját oldalunkon nyílik meg. Ha már bent van, azonnal nyílik.
-  - **Automatikus tükör a legjobbakról:** a napi futás a legjobb híreket magától beteszi a Library-be.
-  - Eldöntendő a tervezéskor:
-    - mi számít „legjobbnak” (a Top 3, vagy egy pontszám felett minden);
-    - kinek a nevén fut az automatikus beküldés (`sources.submitted_by`);
-    - a cron 300 mp-es kerete: a cron csak sorba állít, a feldolgozás külön fut;
-    - a Radar kétnyelvű összefoglalója újrahasznosítható-e, hogy ne fizessünk kétszer a modellért;
-    - a `noarchive` oldalak továbbra is csak AI-jegyzetet kapnak.
-  - **Döntések (2026-09-29), a tervezés félúton áll** (az 1. rész, a kártya, jóváhagyásra vár):
-    - a tükörbe minden 85 pont feletti hír és a hét Top 3-a kerül;
-    - külön rendszer-fiók a beküldő (meghívott fiók, az azonosítója környezeti változóban);
-    - új összefoglaló a teljes cikkből, nem a Radaré;
-    - ha a cikk még nincs bent, az „Olvasd itt” a taiyaki chatet nyitja meg a linkkel; ha bent van, egy link a posztra;
-    - a napi futás sorba állít (`pending` források), a feldolgozást a napi cron maradék ideje és 2–3 külön napi cron végzi, egy összehasonlító frissítéssel lefoglalva a forrást.
 - [ ] **GitHub-radar** (ötlet, 2026-09-30; saját tervezés kell, a sorrendje még nincs eldöntve):
   - a heti Top 10 marad, és hetente archiválódik (ma is: `/archive/<hét>`);
   - **pontszám a repóknak is:** a napi válogatás a repókat is pontozza (0–100), a Top 10 és a kedvencek mellett látszik;

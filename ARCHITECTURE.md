@@ -20,7 +20,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 - `app/(app)/` holds the signed-in pages (`/`, `/companies`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list. Three more route groups hold one page each, `(radar)/` (`/`), `library/(list)/` and `archive/(list)/`, so that each page's `loading.tsx` wraps that page alone (CLAUDE.md → App shell and navigation). `companies/` is the AI companies page: `/` and it both render `current-week-page.tsx`, the current week's dashboard, the second with `scope="companies"`.
 - The rest of `app/`, outside the group:
   - `login/` and `auth/` (login, callback, signout);
-  - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract) and `cron/daily`;
+  - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract), `cron/daily` and `cron/mirror`;
   - `media/[...path]/`, which serves the mirrored images to signed-in readers;
   - `dev/preview/`, the offline preview on fixtures;
   - the error, not-found and manifest files;
@@ -36,7 +36,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - the hooks: `use-reader-state`, `use-shortcuts`, `use-model-context-tools`.
 - `components/ui/` holds vendored shadcn components on the unified `radix-ui` package. A few are hand-patched (CLAUDE.md → Hand-authored components). Most aren't used yet and are kept for the UI/UX milestones. `hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel and the link chat use it.
 - `lib/pipeline/` holds the two writers:
-  - the Radar: `daily.ts`, `collect.ts`, `feeds.ts`;
+  - the Radar: `daily.ts`, `collect.ts`, `feeds.ts`, and `mirror.ts`, which queues the week's best items for the Library;
   - the Library: `ingest.ts` (`processSource`, `retryPendingSources`), and `extract/` with one extractor per source kind, where `index.ts` holds the fallback chain;
   - HTML to blocks: `html-to-blocks.ts`, plus `html-noise.ts` and `cleanup.ts` for the three noise layers;
   - images: `html-images.ts` and `images.ts` (mirroring);
@@ -74,6 +74,7 @@ Breaking one of these is a bug even when every test passes.
 - **No raw HTML reaches a page** (SECURITY.md → XSS).
 - **No secret reaches the browser** (SECURITY.md → Secrets).
 - **The admin client runs only in the pipeline, or after a route has made its own check** (SECURITY.md → Reader vs admin client).
+- **One run works on a source at a time.** `processSource` claims it first, with a lease and a compare-and-swap; the mechanics are in CLAUDE.md → How content gets in.
 - **The content caches hold content that no longer changes, and nothing else.** `lib/content.ts` caches two things for a day: a closed week's Radar (`week < isoWeek(now).id`) and the `/archive` list, which the daily cron's revalidation drops after most runs — it's best-effort (CLAUDE.md → Server path), so the list's own one-day revalidate is the backstop.
   - The current week, the reader's own state (read, later, to-dos), a cookie or anything computed from one, and a viewer's id never go in. Only content does, keyed by the week's id or by a fixed key.
   - Sign-in comes first: the caches are reached only through `archivedWeek` and `archiveList`, which take a signed-in `Reader`, and nothing inside them reads cookies.

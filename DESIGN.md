@@ -389,7 +389,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
 
 ### Page shell
 
-`app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar and the taiyaki, and the refresh bar's provider, the two taiyaki buttons, the link chat, the dialogs and the toast are mounted once:
+`app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar and the taiyaki, and the refresh bar's provider, the "Olvasd itt" context around the page, the two taiyaki buttons, the link chat, the dialogs and the toast are mounted once:
 
 ```tsx app/components/app-shell.tsx
     <LanguageProvider initial={language}>
@@ -637,7 +637,7 @@ className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${stat
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
-- **story-card** has a 96px meta gutter from `lg`, and one row of actions at the bottom: Open (`ink`), Later and to-do (`brutal` icons), and Read on the right.
+- **story-card** has a 96px meta gutter from `lg`, and one row of actions at the bottom: Open (`ink`), Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link), Later and to-do (`brutal` icons), and Read on the right.
 - **Both** dim to 58% once read, and take focus for j/k (`tabIndex={-1}` plus `focus-ring`).
 
 ### Image frame

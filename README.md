@@ -4,7 +4,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON N
 
 ## What it is
 
-**Radar** is the weekly digest. Every morning a cron job collects AI news from RSS feeds, Hacker News and GitHub, lets a model pick and score what matters, and writes it into the current ISO week's issue. Readers see a top-3 must-read, a scored feed in four categories (local models, research, companies, GitHub), a GitHub top-10, an **AI companies** page (`/companies`: the latest daily run's five best company stories, then the week's other company news) and an archive of past weeks. Each reader's read, saved and to-do state is their own.
+**Radar** is the weekly digest. Every morning a cron job collects AI news from RSS feeds, Hacker News and GitHub, lets a model pick and score what matters, and writes it into the current ISO week's issue. Readers see a top-3 must-read, a scored feed in four categories (local models, research, companies, GitHub), an **Olvasd itt** (read here) button on every card that opens the story as our own Library post, a GitHub top-10, an **AI companies** page (`/companies`: the latest daily run's five best company stories, then the week's other company news) and an archive of past weeks. Each reader's read, saved and to-do state is their own.
 
 **Library** is where members save links: articles, YouTube videos, arXiv papers, PDFs, GitHub repositories and X posts. Each link becomes a post. Its content is converted into typed blocks and its images are mirrored, so the post survives the original going dead. A model writes the title, summary and key points in both languages. The submitter can edit the title and summary, hide blocks, and re-extract the post; any reader can ask for a Hungarian translation of the body. The canonical source link is always shown. A taiyaki button on every page (the bottom-right corner on desktop, the middle of the bottom bar on phones) opens a small chat: drop a link with a note, watch it go from processing to done, and retry it if it failed.
 
@@ -106,12 +106,13 @@ Copy [.env.example](.env.example) to `.env.local` and fill it in. Every variable
 | `GROQ_API_KEY` | no | Without it, the tasks seeded on Groq run on their Gemini fallback |
 | `CRON_SECRET` | yes | A long random string (`openssl rand -hex 32`); the cron route's bearer token |
 | `GITHUB_TOKEN` | no | Raises the GitHub API rate limit for the daily repo search and the GitHub extractor |
+| `RADAR_MIRROR_USER_ID` | no | The Library mirror's system account (see Supabase below): the daily run queues the week's best Radar items under this user. Unset, the mirror queues nothing |
 
 Once the Vercel project exists, `vercel env pull --environment=production .env.local` fills the file from it. A plain `vercel env pull` reads the Development environment, which stays empty unless Development was ticked when the variables were added (see [Deploy](#deploy)). Pulling production puts the production **secret key** on your machine, and that key bypasses RLS on every table and in Storage: keep `.env.local` private, and prefer your own project for experiments. Variables marked **Sensitive** in Vercel come back empty from `env pull`, so enter those by hand.
 
 ### Supabase
 
-**On the shared project**, everything is already set up and migrated up to `post_blocks`. Don't change its settings, and don't apply migrations to catch up. Ask the owner to invite you (*Authentication → Users → Invite user*).
+**On the shared project**, everything is already set up and migrated up to `post_blocks`; the owner runs the rest (`drop_post_body`, `source_claims`) when TODO.md says so. Don't change its settings, and don't apply migrations to catch up. Ask the owner to invite you (*Authentication → Users → Invite user*).
 
 To sign in locally against it: request a link on `http://localhost:3000/login`. The email links to the production domain, because the templates build the link from the Site URL. Replace the link's origin with `http://localhost:3000`, keep the path and query, and open it. The token-hash callback ([`app/auth/callback/route.ts`](app/auth/callback/route.ts)) verifies on any origin. A link works only once, so don't open the production one first.
 
@@ -123,6 +124,7 @@ To sign in locally against it: request a link on `http://localhost:3000/login`. 
 - *Authentication → SMTP Settings:* the built-in mailer delivers only to members of the project's Supabase team and only a few emails an hour, so set up a custom SMTP server before inviting anyone else.
 - Apply the migrations in the table below, then check the *Table Editor*: every table has RLS enabled.
 - *Authentication → Users → Invite user:* invite yourself.
+- *Authentication → Users → Add user → Create new user*, Auto Confirm: the Library mirror's system account. Use an address you control (a `+radar` alias of your own works), give it a long random password, and never sign in with it. Its UID goes into `RADAR_MIRROR_USER_ID`.
 
 ### Migrations
 
@@ -134,6 +136,7 @@ This table is the one list of migrations; AGENTS.md, CLAUDE.md and TODO.md point
 | 2 | `20260923010000_model_settings.sql` | `model_settings` and its first four tasks |
 | 3 | `20260924000000_post_blocks.sql` | The block columns on `posts`, six source kinds, three more tasks, the `media` bucket, `update_post_overrides` |
 | 4 | `20260925000000_drop_post_body.sql` | Drops the old `posts.body` column. On a fresh project, run it with the rest. On the shared project, only after the block-based code is deployed |
+| 5 | `20260930000000_source_claims.sql` | `sources.claimed_at`: a pipeline run's claim on its source, so two runs never work on one. On the shared project, run it before deploying the code that reads it |
 
 > ⚠️ **Don't run `supabase db push` against the shared project: it would apply the drop migration early**, while production still reads `posts.body`. This warning stays until the TODO.md item "Csak az M1 deployja után" is done. The Supabase CLI isn't set up in this repository anyway (there is no `supabase/config.toml`).
 
@@ -163,7 +166,7 @@ The shared project is already deployed. These steps are for a deployment of your
 
 1. **Vercel:** *Add New → Project*, import the repository. Next.js and pnpm are detected automatically.
 2. **Environment variables:** everything from the [Environment](#environment) table, with your own project's values, for Production and Preview. Tick Development too if you want a plain `vercel env pull` to work; otherwise pull with `--environment=production`. Environment changes take effect on the next deploy.
-3. **Cron and region:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 5 * * *` (05:00 UTC). With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry, translation and re-extraction routes may run for up to 300 s. `"regions": ["dub1"]` runs every function in Dublin, beside the shared Supabase project (`eu-west-1`), and `"fluid": true` turns on Fluid compute. Both override the dashboard's Function Region and Fluid Compute settings, and both take effect with the next deploy. Point `regions` at the region of your own Supabase project.
+3. **Cron and region:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 5 * * *` (05:00 UTC), and `/api/cron/mirror` at 07, 08 and 09 UTC, which only works the Library's queue (the mirror's sources and any run a crash left behind). On Hobby each runs once a day, anywhere within its hour. With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry, translation and re-extraction routes may run for up to 300 s. `"regions": ["dub1"]` runs every function in Dublin, beside the shared Supabase project (`eu-west-1`), and `"fluid": true` turns on Fluid compute. Both override the dashboard's Function Region and Fluid Compute settings, and both take effect with the next deploy. Point `regions` at the region of your own Supabase project.
 4. **Install command:** check that Vercel installs from `pnpm-lock.yaml` in frozen mode with pnpm 11, so the 7-day age gate applies. This is an open item in [TODO.md](TODO.md).
 5. **Supabase:** set your project's Site URL to the deployment's domain, add that domain to the Redirect URLs, and send new invites. On the shared project, the Site URL is the production domain and changes only when that domain does (for example after renaming the Vercel project). Only the owner changes it, and never to localhost or a preview URL, because every member's magic link follows it.
 6. **First run:** the same `curl` against `https://<domain>/api/cron/daily`. The next morning, check *Vercel → Logs* and *Cron Jobs*.
@@ -313,6 +316,7 @@ Mirroring other people's articles is a managed risk, not a solved problem. What 
 
 - **Not indexed.** `robots: noindex` in [`app/layout.tsx`](app/layout.tsx).
 - **Invite-only.** Every page except `/login` and every API route needs a signed-in member (the cron needs its secret instead), and so do the mirrored images.
+- **The mirror copies the best by itself.** The daily run also queues the week's best Radar items (85+ points and the Top 3) for the Library, under a system account. The same rules hold for them as for a member's link.
 - **`noarchive` is honoured.** A page whose robots meta tag or `X-Robots-Tag` header says `noarchive` is not mirrored. The post holds AI-written notes in the model's own words instead, with a link to the original.
 - **Attribution.** Every post shows its canonical source link, the author or site, and a © line.
 - **Takedown.** Delete the `sources` row in the Table Editor; its post goes with it. The mirrored images stay, so then delete the `<source_id>` folder in the `media` bucket under *Storage*. There is no takedown button yet (see [TODO.md](TODO.md)).
