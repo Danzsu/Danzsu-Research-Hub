@@ -124,7 +124,7 @@ To sign in locally against it: request a link on `http://localhost:3000/login`. 
 - *Authentication → SMTP Settings:* the built-in mailer delivers only to members of the project's Supabase team and only a few emails an hour, so set up a custom SMTP server before inviting anyone else.
 - Apply the migrations in the table below, then check the *Table Editor*: every table has RLS enabled.
 - *Authentication → Users → Invite user:* invite yourself.
-- *Authentication → Users → Add user → Create new user*, Auto Confirm: the Library mirror's system account. Use an address you control (a `+radar` alias of your own works), give it a long random password, and never sign in with it. Its UID goes into `RADAR_MIRROR_USER_ID`.
+- *Authentication → Users → Add user → Create new user*, Auto Confirm: the Library mirror's system account. Use an address you control (a `+radar` alias of your own works), give it a long random password, and never sign in with it. Its UID goes into `RADAR_MIRROR_USER_ID`. Never delete this user: `sources.submitted_by` cascades, so every mirrored source and post would go with it, and their images would stay orphaned in Storage.
 
 ### Migrations
 
