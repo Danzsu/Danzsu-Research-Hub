@@ -24,6 +24,7 @@ export function digestItem(id: string, overrides: Partial<DigestItem> = {}): Dig
     readMinutes: 4,
     publishedAt: "2026-09-21",
     publishedLabel: publishedLabel("2026-09-21"),
+    addedAt: "2026-09-24T05:59:40Z",
     source: "example.test",
     url: `https://example.test/${id}`,
     tags: ["inference", "open-weights"],
@@ -57,6 +58,12 @@ export const previewItems: DigestItem[] = [
   }),
   digestItem("research-2026-W39-plain", { category: "research", score: 64 }),
   digestItem("companies-2026-W39-plain", { category: "companies", score: 58 }),
+  // The AI companies page: with the two above, five from the latest run (its daily Top 5), and one
+  // from the day before that outscores them all but stays below.
+  digestItem("companies-2026-W39-mistral", { category: "companies", score: 86 }),
+  digestItem("companies-2026-W39-meta", { category: "companies", score: 79 }),
+  digestItem("companies-2026-W39-deepseek", { category: "companies", score: 73 }),
+  digestItem("companies-2026-W39-yesterday", { category: "companies", score: 95, addedAt: "2026-09-23T05:59:40Z" }),
   digestItem("github-2026-W39-plain", { category: "github", score: 52 }),
 ];
 

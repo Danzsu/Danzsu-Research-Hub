@@ -25,7 +25,7 @@ const budapest = new Intl.DateTimeFormat("hu-HU", {
 export type RadarData = { issue: CurrentIssue; items: DigestItem[]; githubTop10: GithubTopEntry[] };
 
 const RADAR_COLUMNS =
-  "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why), github_top(repo, focus, url)";
+  "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url)";
 
 /**
  * The latest issue, or the one `issueId` names ('2026-W38'), with its items and repos embedded: one
@@ -64,6 +64,7 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
       readMinutes: row.read_minutes,
       publishedAt: row.published_at,
       publishedLabel: publishedLabel(row.published_at),
+      addedAt: row.created_at,
       source: row.source,
       url: row.url,
       tags: row.tags,
@@ -100,14 +101,14 @@ async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
 // read cookies, so both read with the admin client: only the content tables and the archive_issues view,
 // which every member may read through RLS anyway. They hold content only, never the viewer, and are
 // reachable only through archivedWeek and archiveList, which take a signed-in Reader.
-// ⚠️ Next's data cache outlives a deploy (unstable_cache.md): bump "v1" whenever RadarData or
-// ArchiveIssue changes shape, or a deploy serves the old shape for up to a day.
+// ⚠️ Next's data cache outlives a deploy (unstable_cache.md): bump the key's version whenever RadarData
+// or ArchiveIssue changes shape, or a deploy serves the old shape for up to a day. v2: items gained addedAt.
 const ONE_DAY = 86_400;
 /** The daily cron's revalidateTag drops the archive list with this tag. */
 export const ARCHIVE_TAG = "archive";
 
 // A closed week never changes, so it needs no tag: a day later Next refills it in the background.
-const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v1"], { revalidate: ONE_DAY });
+const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v2"], { revalidate: ONE_DAY });
 const cachedArchive = unstable_cache(() => getArchive(createAdminClient()), ["archive-list", "v1"], { revalidate: ONE_DAY, tags: [ARCHIVE_TAG] });
 
 /** The type keeps a signed-out caller away from the caches; this keeps one whose types were cast. */

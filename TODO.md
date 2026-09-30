@@ -93,6 +93,7 @@
 - [x] **Teszt-keményítés és CI** (2026-09-25): route-tesztek a route-teszt réteggel, a `safeFetch` minden hívóhelye, a `fakeDb` szűrői, rögzített blokk-id-k, a `Progress` értéke a képernyőolvasónak, GitHub Actions CI az öt ellenőrzéssel. Terv: [docs/superpowers/plans/2026-09-25-test-hardening.md](docs/superpowers/plans/2026-09-25-test-hardening.md).
 - [x] **Taiyaki link-chat** (2026-09-27): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).
 - [x] **R1 „Gyors”** (2026-09-28): a függvények Dublinban futnak Fluid compute-tal, egy auth-ellenőrzés kérésenként, egy lekérdezés a Radarhoz, az olvasói állapot a nézett hétre szűkül, és `GET /api/state` csak Vissza után fut; a zárt hetek és az archívum-lista egy napig gyorsítótárban vannak. Oldalformájú vázak, függő pont a linkeken, felső sáv a frissítésekhez, a „Több” linkjeinek prefetchje; a zod kikerült a kliens csomagjából. Terv: [docs/superpowers/plans/2026-09-27-r1-speed.md](docs/superpowers/plans/2026-09-27-r1-speed.md).
+- [x] **Hírek csomag** (2026-09-30): hét új forrás (Mistral, Microsoft Research, Meta AI Research, Anthropic Research, OpenAI Research, Recode China AI, ChinAI) és öt új Hacker News-lekérdezés (`Grok`, `DeepSeek`, `Qwen`, `Kimi`, `MiniMax`). Új menüpont: **AI cégek** (`/companies`), fent a legutóbbi napi futás öt legjobb céges hírével, alatta a hét többi céges hírével. Az xAI és a LinkedIn géppel nem olvasható ([truthful_sites.md](truthful_sites.md) → Kizárva).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
@@ -143,7 +144,7 @@
   - **Nyitott kérdés:** a chat-indexhez a szövegdarabokat is a DB-ben tartjuk-e, vagy a GitHubról olvassuk. Ezt a chat tervezésekor döntjük el.
 - [ ] **Kabala (mascot) az oldalra**, hogy barátságosabb legyen.
 - [ ] **Kutatási források bővítése és priorizálás:**
-  - Új források: a jelöltek, az állapotuk és a felvétel lépései a [truthful_sites.md](truthful_sites.md) → Jelöltek részben. Ide tartozik a research.google (a felhasználó kérésére, közvetlenül az M1 15. feladata után) és a DeepMind súlyozása. A ByteByteGo és az Anthropic 2026-09-27 óta bent van.
+  - Új források: a jelöltek, az állapotuk és a felvétel lépései a [truthful_sites.md](truthful_sites.md) → Jelöltek részben. Ide tartozik a research.google (a felhasználó kérésére, közvetlenül az M1 15. feladata után) és a DeepMind súlyozása. A ByteByteGo és az Anthropic 2026-09-27 óta bent van, a Microsoft Research és a többi új forrás 2026-09-30 óta.
   - Szűrés, hogy ne legyen túl sok (döntés, 2026-09-24):
     - naponta legfeljebb kb. 8 kiemelt tétel, csak 60 pont felett;
     - a 40–59 pontosak egy összecsukott „Többi” szakaszba kerülnek, és a keresésben is megtalálhatók;
@@ -174,6 +175,12 @@
     - a cron 300 mp-es kerete: a cron csak sorba állít, a feldolgozás külön fut;
     - a Radar kétnyelvű összefoglalója újrahasznosítható-e, hogy ne fizessünk kétszer a modellért;
     - a `noarchive` oldalak továbbra is csak AI-jegyzetet kapnak.
+  - **Döntések (2026-09-29), a tervezés félúton áll** (az 1. rész, a kártya, jóváhagyásra vár):
+    - a tükörbe minden 85 pont feletti hír és a hét Top 3-a kerül;
+    - külön rendszer-fiók a beküldő (meghívott fiók, az azonosítója környezeti változóban);
+    - új összefoglaló a teljes cikkből, nem a Radaré;
+    - ha a cikk még nincs bent, az „Olvasd itt” a taiyaki chatet nyitja meg a linkkel; ha bent van, egy link a posztra;
+    - a napi futás sorba állít (`pending` források), a feldolgozást a napi cron maradék ideje és 2–3 külön napi cron végzi, egy összehasonlító frissítéssel lefoglalva a forrást.
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.

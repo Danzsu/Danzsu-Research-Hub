@@ -62,6 +62,8 @@ export type DigestItem = {
   publishedLabel: string;
   /** ISO date. Display uses `publishedLabel`; sorting and the pipeline use this. */
   publishedAt: string;
+  /** When the daily run added it (`digest_items.created_at`, an ISO timestamp): the daily Top 5 goes by it. */
+  addedAt: string;
   /** Publisher or handle, rendered as plain text. The link lives in `url`. */
   source: string;
   url: string;

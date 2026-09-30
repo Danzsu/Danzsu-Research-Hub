@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { CurrentIssue, DigestItem, GithubTopEntry } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { feedItems, type Filter } from "@/lib/feed";
+import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
 import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
 import { useLanguage } from "./language-context";
 import { ReaderPanel } from "./reader-panel";
@@ -39,6 +39,12 @@ const copy = {
     frozen: "LEZÁRVA",
     collecting: "GYŰJTÉS",
     lead: "Helyi modellek · kutatás · élvonalbeli cégek · repók",
+    companiesTitle: "AI CÉGEK",
+    companiesLead: "OpenAI · Google · Anthropic · xAI · Meta · Mistral · Microsoft · kínai laborok",
+    dailyTop: "NAPI TOP 5",
+    companiesFeed: "A HÉT TÖBBI CÉGES HÍRE",
+    emptyCompanies: "Ezen a héten még nincs céges hír, a napi futás tölti fel.",
+    emptyCompaniesAll: "A hét minden céges híre fent, a napi Top 5-ben van.",
     all: "Aktuális radar",
     local: "Local LLM Lab",
     research: "Kutatási radar",
@@ -67,6 +73,12 @@ const copy = {
     frozen: "FROZEN",
     collecting: "COLLECTING",
     lead: "Local models · research · frontier companies · repositories",
+    companiesTitle: "AI COMPANIES",
+    companiesLead: "OpenAI · Google · Anthropic · xAI · Meta · Mistral · Microsoft · Chinese labs",
+    dailyTop: "DAILY TOP 5",
+    companiesFeed: "THE WEEK'S OTHER COMPANY NEWS",
+    emptyCompanies: "No company news this week yet; the daily run fills it.",
+    emptyCompaniesAll: "Every company story this week is up top, in the daily Top 5.",
     all: "Current radar",
     local: "Local LLM Lab",
     research: "Research radar",
@@ -102,9 +114,14 @@ export function DigestDashboard(
     githubTop10: GithubTopEntry[];
     /** A closed week opened from /archive: same reading UI, no "live" framing. */
     archived?: boolean;
+    /** /companies: the week's company news only, the latest day's Top 5 first, no category bar. */
+    scope?: "companies";
   } & ReaderSource,
 ) {
-  const { issue, items, githubTop10, archived = false } = props;
+  const { issue, githubTop10, archived = false } = props;
+  const companies = props.scope === "companies";
+  // Memoized: a fresh array each render would re-register the WebMCP tools (their effect keys on the ids).
+  const items = useMemo(() => (companies ? props.items.filter((item) => item.category === "companies") : props.items), [companies, props.items]);
   const { language } = useLanguage();
   const [filter, setFilter] = useState<Filter>("all");
   const { store, states, loadedStates, todos, syncing } = useReaderState(props);
@@ -113,8 +130,10 @@ export function DigestDashboard(
   const isMobile = useIsMobile();
   const t = copy[language];
 
-  const topThree = items.filter((item) => item.mustRead);
-  const feed = feedItems(items, filter, states, loadedStates);
+  const top = companies ? dailyTop(items) : items.filter((item) => item.mustRead);
+  const feed = companies
+    ? feedItems(items, "companies", states, loadedStates).filter((item) => !top.includes(item))
+    : feedItems(items, filter, states, loadedStates);
   const readCount = items.filter((item) => states[item.id]?.read).length;
   const progress = items.length ? Math.round((readCount / items.length) * 100) : 0;
   const openTodos = todos.filter((todo) => !todo.done).length;
@@ -159,7 +178,10 @@ export function DigestDashboard(
     actions,
   });
 
-  const emptyFeed = filter === "saved" ? t.emptySaved : filter !== "all" ? t.emptyCategory : items.length ? t.emptyAll : null;
+  const radarEmpty = filter === "saved" ? t.emptySaved : filter !== "all" ? t.emptyCategory : items.length ? t.emptyAll : null;
+  const companiesEmpty = items.length ? t.emptyCompaniesAll : t.emptyCompanies;
+  const emptyFeed = companies ? companiesEmpty : radarEmpty;
+  const topLabel = companies && top.length ? `${t.dailyTop} · ${addedDayLabel(top[0].addedAt)}` : t.mustRead;
 
   // Rendered twice: as the 2xl side column, and inside the header Sheet below 2xl.
   const panel = (
@@ -224,22 +246,24 @@ export function DigestDashboard(
       <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_330px]">
         {/* The chip bar belongs to this column, so the 2xl panel beside it is not covered. */}
         <div className="min-w-0">
-          <nav
-            aria-label={t.categories}
-            className="sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
-          >
-            {filters.map(({ id, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={filter === id}
-                onClick={() => setFilter(id)}
-                className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
-              >
-                <Icon className="size-3.5" /> {t[id]}
-              </button>
-            ))}
-          </nav>
+          {!companies && (
+            <nav
+              aria-label={t.categories}
+              className="sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
+            >
+              {filters.map(({ id, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={filter === id}
+                  onClick={() => setFilter(id)}
+                  className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
+                >
+                  <Icon className="size-3.5" /> {t[id]}
+                </button>
+              ))}
+            </nav>
+          )}
 
           <main className="min-w-0 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
             <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-7 text-paper sm:px-8 sm:py-9">
@@ -254,9 +278,10 @@ export function DigestDashboard(
                     </span>
                   </div>
                   <h1 className="max-w-4xl font-display text-[clamp(2.6rem,15cqi,8rem)] leading-[0.77] tracking-[-0.07em]">
-                    AI WEEKLY<span className="text-signal">{"//"}</span>
+                    {companies ? t.companiesTitle : "AI WEEKLY"}
+                    <span className="text-signal">{"//"}</span>
                   </h1>
-                  <p className="mt-5 max-w-2xl font-mono text-sm leading-6 text-paper/65">{t.lead}</p>
+                  <p className="mt-5 max-w-2xl font-mono text-sm leading-6 text-paper/65">{companies ? t.companiesLead : t.lead}</p>
                 </div>
                 <div className="border-l border-paper/25 pl-5 font-mono text-xs leading-6 text-paper/60">
                   <p className="text-signal">{t.archive}</p>
@@ -268,7 +293,7 @@ export function DigestDashboard(
               </div>
             </section>
 
-            {!items.length && !archived && (
+            {!items.length && !archived && !companies && (
               <div className="mt-4 border border-signal/50 bg-signal/10 px-4 py-3 font-mono text-xs leading-5 text-ink/70">※ {t.sample}</div>
             )}
 
@@ -301,11 +326,11 @@ export function DigestDashboard(
               </section>
             ) : (
               <>
-                {filter === "all" && topThree.length > 0 && (
+                {filter === "all" && top.length > 0 && (
                   <section className="mt-9 @container">
-                    <SectionLabel icon={Zap} label={t.mustRead} />
+                    <SectionLabel icon={Zap} label={topLabel} />
                     <div className="grid gap-4 @3xl:grid-cols-3">
-                      {topThree.map((item, index) => (
+                      {top.map((item, index) => (
                         <MustReadCard key={item.id} rank={index + 1} {...cardProps(item)} />
                       ))}
                     </div>
@@ -313,7 +338,7 @@ export function DigestDashboard(
                 )}
 
                 <section className="mt-9">
-                  <SectionLabel icon={Newspaper} label={t.feed} />
+                  <SectionLabel icon={Newspaper} label={companies ? t.companiesFeed : t.feed} />
                   <div className="space-y-4">
                     {feed.map((item) => (
                       <StoryCard key={item.id} {...cardProps(item)} />

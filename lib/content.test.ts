@@ -23,6 +23,7 @@ const itemRow = (id: string, score: number, mustRead = false) => ({
   title: text(`Title ${id}`),
   summary: text("Summary."),
   why: text("Why."),
+  created_at: "2026-09-16T05:59:50+00:00",
 });
 /** An issues row with its two embeds, as PostgREST answers the one Radar query. */
 const issueRow = (id: string, overrides: Record<string, unknown> = {}) => ({
@@ -51,6 +52,7 @@ test("getRadar maps the one embedded answer: the items in the database's order, 
     readMinutes: 6,
     publishedAt: "2026-09-15",
     publishedLabel: "09 / 15",
+    addedAt: "2026-09-16T05:59:50+00:00",
     source: "arXiv cs.CL",
     url: "https://arxiv.org/abs/2609.00002",
     tags: ["evals"],
@@ -71,7 +73,7 @@ test("getRadar asks for the named week or the latest issue in one query, with th
   assert.deepEqual([empty?.items, empty?.githubTop10], [[], []]);
   const select = [
     "select",
-    "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why), github_top(repo, focus, url)",
+    "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url)",
   ];
   const embedOrder = [
     ["order", "must_read", { ascending: false, referencedTable: "digest_items" }],
@@ -162,7 +164,7 @@ test("archivedWeek reads a closed week through the one-day cache and the admin c
   const radar = await archivedWeek(reader, "2026-W38", wednesdayW39);
   assert.deepEqual(radar, { issue: { id: "2026-W38", label: "2026 / W38", updated: "09. 20. 07:00", archiveAt: "09. 20." }, items: [], githubTop10: [] });
   assert.equal(routeStub.adminCalls, 1);
-  assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v1"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
+  assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v2"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
 });
 
 // Kills `<` → `<=`: the week still being collected would be frozen for a day, and a reader would miss

@@ -5,6 +5,7 @@ import Link from "next/link";
 export const PREVIEW_VIEWS = [
   "radar",
   "radar-empty",
+  "companies",
   "library",
   "library-empty",
   "archive",

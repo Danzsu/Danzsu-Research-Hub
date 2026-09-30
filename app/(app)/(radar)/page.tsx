@@ -1,15 +1,7 @@
-import { notFound, redirect } from "next/navigation";
-import { DigestDashboard } from "@/app/components/digest-dashboard";
-import { getRadar, getReaderSeed } from "@/lib/content";
-import { getReader } from "@/lib/supabase/server";
+import { CurrentWeekPage } from "../current-week-page";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
-  const reader = await getReader();
-  if (!reader) redirect("/login");
-  const radar = await getRadar(reader.db);
-  if (!radar) notFound(); // unreachable: without an issue id getRadar always returns data
-  // After the Radar, not beside it: the latest week's id comes from its answer.
-  return <DigestDashboard {...radar} seed={await getReaderSeed(reader.db, radar.issue.id)} />;
+export default function Home() {
+  return <CurrentWeekPage path="/" />;
 }

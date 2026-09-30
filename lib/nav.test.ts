@@ -16,6 +16,7 @@ test("every nav item has a unique id and href and a label in both languages, and
 
 test("activeNavId goes by path prefix at segment boundaries", () => {
   assert.equal(activeNavId("/"), "radar");
+  assert.equal(activeNavId("/companies"), "companies");
   assert.equal(activeNavId("/archive"), "archive");
   assert.equal(activeNavId("/archive/2026-W38"), "archive");
   assert.equal(activeNavId("/library/42"), "library");
@@ -26,7 +27,7 @@ test("activeNavId goes by path prefix at segment boundaries", () => {
 });
 
 test("the toggle switches in place only where both languages are on the page", () => {
-  for (const path of ["/", "/library", "/library/", "/archive", "/archive/2026-W38", "/dev/preview"]) {
+  for (const path of ["/", "/companies", "/library", "/library/", "/archive", "/archive/2026-W38", "/dev/preview"]) {
     assert.equal(switchesLanguageInPlace(path), true, path);
   }
   for (const path of ["/library/42", "/archive/2026-W38/x", "/dev/preview/post", "/login"]) {
@@ -40,6 +41,7 @@ test("the mobile bar holds three page slots, Több holds every other primary ite
   assert.equal(MOBILE_BAR_NAV.length, 3);
   assert.deepEqual([...MOBILE_BAR_NAV, ...MOBILE_MORE_NAV].map(({ id }) => id).sort(), PRIMARY_NAV.map(({ id }) => id).sort());
   assert.equal(inMobileMore(activeNavId("/archive/2026-W38")), true);
+  assert.equal(inMobileMore(activeNavId("/companies")), true);
   assert.equal(inMobileMore(activeNavId("/library/42")), false);
   assert.equal(inMobileMore(null), false);
 });

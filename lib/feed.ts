@@ -29,3 +29,17 @@ export function feedItems(
   );
   return sortUnreadFirst(visible, loadedStates);
 }
+
+// A daily run lands at 07:00 Budapest time, so the day is Budapest's, not UTC's.
+const budapestDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }); // 2026-09-29
+const budapestLabel = new Intl.DateTimeFormat("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit" });
+
+/** The Budapest day an item was added on, as the Radar writes its dates: `09. 29.` */
+export const addedDayLabel = (addedAt: string) => budapestLabel.format(new Date(addedAt));
+
+/** The AI companies page's Top 5: the latest day's items (by the Budapest day they were added on), highest score first. */
+export function dailyTop(items: DigestItem[], count = 5): DigestItem[] {
+  const day = (item: DigestItem) => budapestDay.format(new Date(item.addedAt));
+  const latest = items.map(day).sort().at(-1);
+  return items.filter((item) => day(item) === latest).sort((a, b) => b.score - a.score).slice(0, count);
+}

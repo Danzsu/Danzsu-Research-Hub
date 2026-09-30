@@ -2,7 +2,7 @@ import type { Localized } from "../data/digest-types.ts";
 
 // The one list both navigations are built from: the mobile bottom bar and the desktop nav.
 
-export type NavId = "radar" | "library" | "search" | "archive" | "collection" | "stats" | "chat";
+export type NavId = "radar" | "companies" | "library" | "search" | "archive" | "collection" | "stats" | "chat";
 
 export type NavItem = {
   id: NavId;
@@ -17,6 +17,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: "radar", href: "/", label: { hu: "Radar", en: "Radar" } },
+  { id: "companies", href: "/companies", mobileMore: true, label: { hu: "AI cégek", en: "AI companies" } },
   { id: "library", href: "/library", label: { hu: "Könyvtár", en: "Library" } },
   { id: "search", href: null, label: { hu: "Keresés", en: "Search" } },
   { id: "archive", href: "/archive", mobileMore: true, label: { hu: "Archívum", en: "Archive" } },
@@ -48,6 +49,6 @@ export function activeNavId(pathname: string): NavId | null {
  * switches them without a server round trip. Any other page is refreshed, so nothing stays in the old language.
  * /dev/preview renders the same list views on fixtures (development only); its post view, /dev/preview/post, is refreshed.
  */
-const IN_PLACE_LANGUAGE = [/^\/$/, /^\/library\/?$/, /^\/archive(\/[^/]+)?\/?$/, /^\/dev\/preview\/?$/];
+const IN_PLACE_LANGUAGE = [/^\/$/, /^\/companies\/?$/, /^\/library\/?$/, /^\/archive(\/[^/]+)?\/?$/, /^\/dev\/preview\/?$/];
 
 export const switchesLanguageInPlace = (pathname: string) => IN_PLACE_LANGUAGE.some((pattern) => pattern.test(pathname));

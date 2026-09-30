@@ -2,7 +2,7 @@
 
 import Link, { useLinkStatus } from "next/link";
 import type { ReactNode } from "react";
-import { Archive, BookOpen, ChartColumn, FolderOpen, LogOut, MessageSquare, Radar, Search, UserRound, type LucideIcon } from "lucide-react";
+import { Archive, BookOpen, Building2, ChartColumn, FolderOpen, LogOut, MessageSquare, Radar, Search, UserRound, type LucideIcon } from "lucide-react";
 import { SOON_NAV, type NavId, type NavItem } from "@/lib/nav";
 import { useLanguage } from "./language-context";
 
@@ -17,6 +17,7 @@ const copy = {
 
 export const navIcons: Record<NavId, LucideIcon> = {
   radar: Radar,
+  companies: Building2,
   library: BookOpen,
   search: Search,
   archive: Archive,

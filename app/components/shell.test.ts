@@ -129,6 +129,32 @@ test("DigestDashboard renders the Top 3, the feed and the to-do panel from the p
   assert.equal(doc.querySelectorAll("aside li").length, previewReader.todos.length);
 });
 
+// The AI companies page. Kills the scope left off (other categories on the page, or the category bar
+// back), a Top 5 that isn't the latest run's by score (the fixture's older 95 would lead it), a Top 5
+// card repeated in the feed below, and the date missing from the label.
+test("DigestDashboard with scope companies shows the latest run's company Top 5, dated, and the week's other company news below", () => {
+  const doc = withShellProviders(DigestDashboard, {
+    scope: "companies",
+    issue: previewIssue,
+    items: previewItems,
+    githubTop10: previewGithub,
+    preview: { data: previewReader, failWrites: false },
+  });
+  const ids = (selector: string) => [...doc.querySelectorAll(selector)].map((card) => card.getAttribute("data-card-id"));
+  assert.equal(doc.querySelector('nav[aria-label="Categories"]'), null);
+  assert.deepEqual(ids(".must-card"), [
+    "companies-2026-W39-must-2",
+    "companies-2026-W39-mistral",
+    "companies-2026-W39-meta",
+    "companies-2026-W39-deepseek",
+    "companies-2026-W39-plain",
+  ]);
+  assert.deepEqual(ids(".story-card"), ["companies-2026-W39-yesterday"]);
+  const labels = [...doc.querySelectorAll("h2")].map((heading) => heading.textContent);
+  assert.ok(labels.includes("DAILY TOP 5 · 09. 24."), labels.join(" | "));
+  assert.ok(labels.includes("THE WEEK'S OTHER COMPANY NEWS"), labels.join(" | "));
+});
+
 // Kills createSeededStore's syncing decision hardcoded to one value: a fresh seed must start synced, a failed (null) one must start syncing.
 test("DigestDashboard starts synced from a fresh seed, not the syncing state", () => {
   const text = dashboardText({ issueId: "2026-W39", seededAt: 424_242, data: previewReader });
@@ -306,13 +332,13 @@ test("every nav link carries one hidden pending dot, the search button none, and
     navigationStub.linkPending = false;
   });
   const doc = shell("en");
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1]); // Radar, Library, Archive
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1]); // Radar, AI companies, Library, Archive
   assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
   const searchButtons = [...doc.querySelectorAll("aside nav button, #mobile-nav > button")].filter((button) => button.textContent?.startsWith("Search"));
   assert.deepEqual(hiddenSpanCounts(searchButtons), [0, 0]);
   assert.equal(doc.querySelectorAll("[data-pending]").length, 0);
   navigationStub.linkPending = true;
-  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 5);
+  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 6);
 });
 
 // Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { feedItems, sortUnreadFirst } from "./feed.ts";
+import { addedDayLabel, dailyTop, feedItems, sortUnreadFirst } from "./feed.ts";
 import { digestItem } from "./fixtures.ts";
 
 const read = { read: true, saved: false };
@@ -33,4 +33,19 @@ test("the saved view keeps a card saved at load time even after it's un-saved li
   const states = { a: { read: false, saved: false } };
   const loadedStates = { a: { read: false, saved: true } };
   assert.deepEqual(ids(feedItems(items, "saved", states, loadedStates)), ["a"]);
+});
+
+// The AI companies page's Top 5. Kills a pick that ignores the day (yesterday's 99 would push out a story
+// of today's run), one that orders by anything but the score, one that keeps more than five, and a day
+// cut at UTC midnight instead of Budapest's.
+test("dailyTop takes the latest day's items by their Budapest date, highest score first, at most five", () => {
+  const at = (id: string, addedAt: string, score: number) => digestItem(id, { addedAt, score });
+  const scores = [61, 90, 72, 55, 83, 47];
+  const items = [at("yesterday", "2026-09-28T05:59:00Z", 99), ...scores.map((score, i) => at(`today-${score}`, `2026-09-29T05:5${i}:00Z`, score))];
+  assert.deepEqual(ids(dailyTop(items)), ["today-90", "today-83", "today-72", "today-61", "today-55"]);
+  // 23:30 UTC on the 28th is already the 29th in Budapest (CEST, UTC+2).
+  const late = at("late", "2026-09-28T23:30:00Z", 10);
+  assert.deepEqual(ids(dailyTop([late, at("morning", "2026-09-29T06:00:00Z", 20)])), ["morning", "late"]);
+  assert.equal(addedDayLabel(late.addedAt), "09. 29.");
+  assert.deepEqual(dailyTop([]), []);
 });

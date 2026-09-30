@@ -465,7 +465,7 @@ const slotClass =
   "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 ```
 
-"Több" is a cream bottom Sheet holding a display title with its `//`, Archívum (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on Archívum. The active Archívum is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
+"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek and Archívum (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
 
 ```tsx app/components/app-shell.tsx
         <SheetContent

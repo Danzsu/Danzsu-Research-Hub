@@ -32,8 +32,15 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
   return (
     <AppShell language={language} email={previewEmail} initialNavMode={navMode} chatPreview={{ sources: previewMySources, failWrites, delayMs }}>
       <PreviewNav current={view} failWrites={failWrites} slow={delayMs > 0} />
-      {view === "radar" && (
-        <DigestDashboard key={String(failWrites)} issue={previewIssue} items={previewItems} githubTop10={previewGithub} preview={{ data: previewReader, failWrites }} />
+      {(view === "radar" || view === "companies") && (
+        <DigestDashboard
+          key={`${view}:${failWrites}`}
+          scope={view === "companies" ? "companies" : undefined}
+          issue={previewIssue}
+          items={previewItems}
+          githubTop10={previewGithub}
+          preview={{ data: previewReader, failWrites }}
+        />
       )}
       {view === "radar-empty" && (
         <DigestDashboard key={String(failWrites)} issue={previewIssue} items={[]} githubTop10={[]} preview={{ data: { states: {}, todos: [] }, failWrites }} />
