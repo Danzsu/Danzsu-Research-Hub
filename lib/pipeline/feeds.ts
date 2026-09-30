@@ -27,10 +27,20 @@ export const feeds: Array<{ name: string; url: string; hint: DigestCategory; lim
   { name: "Anthropic Engineering", url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml", hint: "research" },
   // DeepLearning.AI's own feed for The Batch, on its CMS host. A whole weekly issue (`/issue-372/`) repeats its articles.
   { name: "The Batch", url: "https://charonhub.deeplearning.ai/rss/", hint: "research", exclude: /\/issue-\d+\/?$/ },
+  // Checked live on 2026-09-29. Meta's AI Research category on its engineering blog: ai.meta.com has no feed.
+  { name: "Mistral", url: "https://mistral.ai/rss.xml", hint: "companies" },
+  { name: "Microsoft Research", url: "https://www.microsoft.com/en-us/research/feed/", hint: "research" },
+  { name: "Meta AI Research", url: "https://engineering.fb.com/category/ai-research/feed/", hint: "research" },
+  { name: "Anthropic Research", url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_research.xml", hint: "research" },
+  { name: "OpenAI Research", url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_openai_research.xml", hint: "research" },
+  // The Chinese labs (DeepSeek, Qwen, Kimi, Zhipu, MiniMax) publish no feeds; these two newsletters cover them.
+  { name: "Recode China AI", url: "https://recodechinaai.substack.com/feed", hint: "companies" },
+  { name: "ChinAI", url: "https://chinai.substack.com/feed", hint: "companies" },
 ];
 
 // Hacker News (Algolia) queries; only stories above the points floor.
-export const hnQueries = ["LLM", "AI model", "open weights", "AI agents"];
+// The last five catch big launches from labs without a feed (xAI blocks automated requests).
+export const hnQueries = ["LLM", "AI model", "open weights", "AI agents", "Grok", "DeepSeek", "Qwen", "Kimi", "MiniMax"];
 
 // GitHub topics searched for repos created in the last week, ranked by stars.
 export const githubTopics = ["llm", "ai-agents", "generative-ai", "local-llm", "rag", "mcp"];

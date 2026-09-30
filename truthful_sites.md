@@ -27,7 +27,7 @@ A céges blog elsődleges forrás, de érdekelt fél: a saját termékéről ír
 
 ### Hírcsatornák (RSS, Atom)
 
-A csatornák 2026-09-23-án élőben ellenőrizve, a ByteByteGo, az Anthropic és a The Batch 2026-09-27-én. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
+A csatornák 2026-09-23-án élőben ellenőrizve, a ByteByteGo, az Anthropic és a The Batch 2026-09-27-én, a Mistral, a Microsoft Research, a Meta AI Research, az Anthropic Research, az OpenAI Research és a két kínai hírlevél 2026-09-29-én. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
 
 A promóciót és az ismétlést két szűrő tartja távol:
 
@@ -53,16 +53,29 @@ A promóciót és az ismétlést két szűrő tartja távol:
 | Anthropic | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml` | companies | 25 | elsődleges (céges), külső RSS-tükörrel |
 | Anthropic Engineering | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_engineering.xml` | research | 25 | elsődleges (céges), külső RSS-tükörrel |
 | The Batch | `https://charonhub.deeplearning.ai/rss/` | research | 25 | másodlagos (szerkesztett heti hírlevél, DeepLearning.AI) |
+| Mistral | `https://mistral.ai/rss.xml` | companies | 25 | elsődleges (céges) |
+| Microsoft Research | `https://www.microsoft.com/en-us/research/feed/` | research | 25 | elsődleges (céges kutatólabor) |
+| Meta AI Research | `https://engineering.fb.com/category/ai-research/feed/` | research | 25 | elsődleges (céges) |
+| Anthropic Research | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_research.xml` | research | 25 | elsődleges (céges), külső RSS-tükörrel |
+| OpenAI Research | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_openai_research.xml` | research | 25 | elsődleges (céges), külső RSS-tükörrel |
+| Recode China AI | `https://recodechinaai.substack.com/feed` | companies | 25 | másodlagos (a kínai AI-cégekről szóló hírlevél) |
+| ChinAI | `https://chinai.substack.com/feed` | companies | 25 | másodlagos (Jeffrey Ding heti hírlevele, kínai források fordításával) |
 
 **ByteByteGo:** rendszertervezés és AI-infrastruktúra. A tételek felében ott a teljes szöveg (`content:encoded`), a poszt-oldalak szerverről letölthetők, `noarchive` nincs rajtuk. A fizetős posztokból csak részlet érhető el (Substack).
 
-**Anthropic:** az anthropic.com nem ad RSS-t (2026-09-27: a szokásos feed-címek 404-et adnak, és az oldal sem hivatkozik feedre). A két csatornát egy közösségi projekt, a [github.com/Olshansk/rss-feeds](https://github.com/Olshansk/rss-feeds) állítja elő az anthropic.com-ról. A tételek linkjei az anthropic.com-ra mutatnak, a tartalom tehát elsődleges, csak a csatorna külső. Harmadik fél tartja karban, ezért bármikor leállhat. Ha elhal, a pipeline csak figyelmeztetést naplóz. Tartalék: az anthropic.com hivatalos `sitemap.xml`-je (`/news/` és `/engineering/` címek `lastmod`-dal), ehhez saját gyűjtő kell.
+**Anthropic:** az anthropic.com nem ad RSS-t (2026-09-27: a szokásos feed-címek 404-et adnak, és az oldal sem hivatkozik feedre). A három csatornát egy közösségi projekt, a [github.com/Olshansk/rss-feeds](https://github.com/Olshansk/rss-feeds) állítja elő az anthropic.com-ról. A tételek linkjei az anthropic.com-ra mutatnak, a tartalom tehát elsődleges, csak a csatorna külső. Harmadik fél tartja karban, ezért bármikor leállhat. Ha elhal, a pipeline csak figyelmeztetést naplóz. Tartalék: az anthropic.com hivatalos `sitemap.xml`-je (`/news/` és `/engineering/` címek `lastmod`-dal), ehhez saját gyűjtő kell.
 
 **The Batch:** a DeepLearning.AI heti hírlevele (Andrew Ng levele, kutatási és céges hírek, „Data Points” rövidhírek).
 
 - **A csatorna:** a `www.deeplearning.ai` nem ad RSS-t, a hivatalos csatorna a tartalomkezelőjük aldomainjén van (`charonhub.deeplearning.ai`). Nagyjából heti 15 tételt ad.
 - **A linkek** is a charonhub.deeplearning.ai-ra mutatnak. Élőben működnek, `noarchive` nincs rajtuk, és ugyanaz a cikk a `www.deeplearning.ai/the-batch/<slug>` címen is elérhető.
 - **Szűrés:** a teljes heti számot (`/issue-372/`) a szűrő kihagyja, mert a cikkei külön tételként is jönnek.
+
+**Meta AI Research:** az ai.meta.com nem ad RSS-t (a `/blog/rss/` 404, 2026-09-29), ezért a Meta mérnöki blogjának AI-kutatási kategóriája jön be. A közösségi tükör Meta-csatornája július óta nem frissült.
+
+**OpenAI Research:** ugyanaz a közösségi tükör állítja elő, mint az Anthropic csatornáit; a hivatalos OpenAI-hírcsatorna mellett a kutatási posztokat hozza. A tükör címeibe néha belekerül a dátum és a kategória („Sep 29, 2026Frontier Red Team…”); a válogató modell úgyis saját címet ír.
+
+**A kínai laborok** (DeepSeek, Qwen, Kimi, Zhipu, MiniMax) nem adnak géppel olvasható csatornát (2026-09-29: a Qwen blogja egy éve áll, a többinek nincs feedje). Két hírlevél és a Hacker News fedi le őket: a Recode China AI hetente többször, a ChinAI hetente ír róluk, a nagy bejelentések pedig a lenti lekérdezésekkel jönnek.
 
 ### Hacker News
 
@@ -72,6 +85,13 @@ Közösségi forrás. Az Algolia keresője az elmúlt 2 nap 80 pont feletti tör
 - `AI model`
 - `open weights`
 - `AI agents`
+- `Grok`
+- `DeepSeek`
+- `Qwen`
+- `Kimi`
+- `MiniMax`
+
+Az utolsó öt a csatorna nélküli laborok nagy bejelentéseit hozza (2026-09-29). A 80 pontos küszöb miatt csak az jön át, amiről sokan beszélnek.
 
 ### GitHub
 
@@ -95,7 +115,6 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 | Semantic Scholar | API | ellenőrizendő | A Google Scholar helyett. |
 | OpenAlex | API | ellenőrizendő | A Google Scholar helyett. |
 | IBM Research | blog | ellenőrizendő | |
-| Microsoft Research | blog | ellenőrizendő | |
 | IBM Technology | cikkek és videók | ellenőrizendő | A videók a YouTube-kinyerőn mennek át. |
 
 **Súlyozás:** a Google DeepMind már bent van, de a kiemelt források közé kell emelni.
@@ -105,6 +124,8 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 | Név | Miért |
 | --- | --- |
 | Google Scholar | Nincs API-ja, és a feltételei tiltják a letöltést. Helyette: Semantic Scholar, OpenAlex. |
+| xAI | Az x.ai minden automatikus kérést 403-mal elutasít (2026-09-29), a közösségi tükör xAI-csatornája pedig 2026 májusa óta áll. Helyette: a `Grok` Hacker News-lekérdezés és a The Decoder. |
+| LinkedIn | Bejelentkezéshez kötött, nincs nyilvános csatornája, és a feltételei tiltják a gépi gyűjtést. A cégek ugyanazt a saját blogjukon is közlik. |
 
 ## Új forrás felvétele
 
