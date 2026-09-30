@@ -1,6 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
-import { jsonError } from "@/lib/api";
+import { isCronRequest, jsonError } from "@/lib/api";
 import { ARCHIVE_TAG } from "@/lib/content";
 import { runDaily } from "@/lib/pipeline/daily";
 import { retryPendingSources } from "@/lib/pipeline/ingest";
@@ -12,10 +12,7 @@ export const maxDuration = 300;
 // triggers a manual run: curl -H "Authorization: Bearer $CRON_SECRET" <site>/api/cron/daily
 export async function GET(request: NextRequest) {
   const start = Date.now();
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return jsonError(401, "unauthorized");
-  }
+  if (!isCronRequest(request)) return jsonError(401, "unauthorized");
 
   const db = createAdminClient();
   // A failed digest (model outage, bad key) must not also stall the pending link submissions.

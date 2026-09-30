@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { jsonError, postRoute } from "./api.ts";
+import { isCronRequest, jsonError, postRoute } from "./api.ts";
+import { withEnv } from "./pipeline/mock-fetch.ts";
 
 test("jsonError answers JSON with the status, the error and any extra fields", async () => {
   const response = jsonError(429, "cooldown", { retryAfter: 60 });
@@ -38,4 +39,26 @@ test("postRoute hands the handler the request, the reader and the numeric post i
     return Response.json({ ok: true }, { status: 202 });
   })(request, context("7"));
   assert.equal(response.status, 202);
+});
+
+// X1, for both cron routes. Kills `Bearer undefined` matching an unset secret, an empty secret opening
+// the route, and a compare that is case-insensitive or takes a prefix. (Surrounding whitespace can't be
+// tested: Headers trims a value, as HTTP does.)
+test("isCronRequest takes only the exact bearer of a set CRON_SECRET", (t) => {
+  const request = (authorization?: string) => new Request("http://localhost/api/cron/x", { headers: authorization ? { authorization } : {} });
+  const cases: [string | undefined, string | undefined, boolean][] = [
+    [undefined, undefined, false],
+    [undefined, "Bearer undefined", false],
+    ["", "Bearer ", false],
+    ["s3cret", undefined, false],
+    ["s3cret", "Bearer wrong", false],
+    ["s3cret", "s3cret", false],
+    ["s3cret", "bearer s3cret", false],
+    ["s3cret", "Bearer s3cre", false],
+    ["s3cret", "Bearer s3cret", true],
+  ];
+  for (const [secret, header, expected] of cases) {
+    withEnv(t, "CRON_SECRET", secret);
+    assert.equal(isCronRequest(request(header)), expected, `${secret} / ${header}`);
+  }
 });

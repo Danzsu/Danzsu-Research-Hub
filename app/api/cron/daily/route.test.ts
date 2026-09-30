@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { fakeDb } from "../../../../lib/pipeline/fake-db.ts";
 import { feeds } from "../../../../lib/pipeline/feeds.ts";
-import { geminiResponse, mockFetch, TEST_HOST, withEnv, withGeminiKey } from "../../../../lib/pipeline/mock-fetch.ts";
+import { geminiResponse, mockFetch, TEST_HOST, withBudgetGone, withEnv, withGeminiKey } from "../../../../lib/pipeline/mock-fetch.ts";
 import { isoWeek } from "../../../../lib/pipeline/util.ts";
 import { resetRoute, routeStub } from "../../../../lib/test/route-hooks.ts";
 
@@ -89,9 +89,7 @@ test("the route forwards its own deadline: with 181s of the 300s budget already 
   // Only two Date.now() calls happen on this path: the route's own `start`, then
   // retryPendingSources' own start-gate check — nothing between them (this catch-and-continue
   // digest path never reaches processSource) calls Date.now() again.
-  const start = 1_000_000;
-  let calls = 0;
-  t.mock.method(Date, "now", () => (calls++ === 0 ? start : start + 181_000));
+  withBudgetGone(t, 181_000);
 
   const response = await GET(cronRequest("Bearer s3cret"));
 
