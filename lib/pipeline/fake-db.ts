@@ -30,6 +30,8 @@ export type FakeIngestTables = {
   pending?: Record<string, unknown>[];
   /** Forces `sources`' `insert(...).select().single()` to resolve with this error, e.g. `pgError("23505", …)`. */
   sourceInsertError?: PostgrestErrorShape;
+  /** Forces `sources`' `upsert(...).select()` (queueMirrors) to resolve with this error. */
+  sourceUpsertError?: PostgrestErrorShape;
   /** Forces every `sources` select (the listing, `single()`, `maybeSingle()`) to resolve with this error. */
   sourceSelectError?: PostgrestErrorShape;
   /** Forces `sources`' `update(...).eq(...)` to resolve with this error instead of applying the write
@@ -54,6 +56,8 @@ export type FakeIngestDb = SupabaseClient & {
   sourceUpdates: Record<string, unknown>[];
   /** Every `sources` INSERT payload, in call order. */
   sourceInserts: Record<string, unknown>[];
+  /** Every `sources` UPSERT (queueMirrors), in call order: its rows and options. */
+  sourceUpserts: { values: Record<string, unknown>[]; options: Record<string, unknown> }[];
   /** Every `posts` UPSERT payload, in call order. */
   postUpserts: Record<string, unknown>[];
   /** Every `posts` UPSERT's second (options) argument, same order as `postUpserts`. */
@@ -309,7 +313,7 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * bytes, so a test can mirror an image and then see it (or its absence) in a later list.
  * `storage.from(bucket)` throws for any `bucket` other than `MEDIA_BUCKET` — every real caller
  * only ever names that one, so this catches a hardcoded wrong bucket rather than silently ignoring it.
- * Every write is recorded on `.sourceUpdates`/`.sourceInserts`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
+ * Every write is recorded on `.sourceUpdates`/`.sourceInserts`/`.sourceUpserts`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
  * Unlike `posts`' `upsert` above, a `sources` `insert` isn't written through: a later `sources`
  * `select()` in the same test still only sees `tables.source`/`tables.sources`, never the row
  * `insert()` just recorded.
@@ -321,6 +325,7 @@ export function fakeDb(
   const tasks: string[] = [];
   const sourceUpdates: Record<string, unknown>[] = [];
   const sourceInserts: Record<string, unknown>[] = [];
+  const sourceUpserts: { values: Record<string, unknown>[]; options: Record<string, unknown> }[] = [];
   const postUpserts: Record<string, unknown>[] = [];
   const postUpsertOptions: Record<string, unknown>[] = [];
   const postUpdates: Record<string, unknown>[] = [];
@@ -358,6 +363,17 @@ export function fakeDb(
               return tables.sourceInsertError ? { data: null, error: tables.sourceInsertError } : { data: { id: lookedUp.length + 1 }, error: null };
             },
           }),
+        }),
+        // queueMirrors' insert-or-skip. Like PostgREST's ignoreDuplicates (ON CONFLICT DO NOTHING), a row
+        // whose `url` is already in `sources` is skipped, and `.select()` answers only the rows it inserted.
+        upsert: (values: Record<string, unknown>[], options?: Record<string, unknown>) => ({
+          select: async () => {
+            sourceUpserts.push({ values, options: options ?? {} });
+            if (tables.sourceUpsertError) return { data: null, error: tables.sourceUpsertError };
+            const known = new Set(lookedUp.map((row) => row.url));
+            const fresh = values.filter((row) => !known.has(row.url));
+            return { data: fresh.map((_, index) => ({ id: lookedUp.length + index + 1 })), error: null };
+          },
         }),
         // Written through, like `posts`' update below: only the rows every `.eq` filter matches change,
         // and a later `sources` select sees them, so a second compare-and-swap on a column the first
@@ -497,6 +513,7 @@ export function fakeDb(
     tasks,
     sourceUpdates,
     sourceInserts,
+    sourceUpserts,
     postUpserts,
     postUpsertOptions,
     postUpdates,
