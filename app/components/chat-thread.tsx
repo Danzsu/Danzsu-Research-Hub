@@ -97,7 +97,7 @@ function Mine({ entry, language }: { entry: OutgoingMessage; language: Language 
     <div className={`${bubble} ml-auto w-fit bg-ink text-paper shadow-[3px_3px_0_var(--signal)]`}>
       <span className="sr-only">{`${copy[language].me} `}</span>
       {entry.href ? (
-        <a href={entry.href} target="_blank" rel="noreferrer" className="focus-ring underline">
+        <a href={entry.href} target="_blank" rel="noreferrer" className="press-ink focus-ring underline">
           {entry.url}
           <ExternalLink aria-hidden="true" className="ml-1 inline size-4 align-text-bottom" />
         </a>

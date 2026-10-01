@@ -62,7 +62,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
         <Link
           href="/"
           aria-label="NEON NEWS RADAR"
-          className={`focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}
+          className={`press-ink focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}
         >
           <span className="grid size-10 shrink-0 place-items-center rounded-full border border-signal bg-signal text-ink">
             <Radar className="size-5" />

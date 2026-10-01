@@ -126,7 +126,7 @@ export function AccountActions({ email, iconOnly = false }: { email: string; ico
     return (
       <form action="/auth/signout" method="post" className="flex justify-center">
         <NavTooltip label={t.signOut}>
-          <button type="submit" aria-label={t.signOut} className="focus-ring grid size-10 place-items-center text-paper/70 hover:text-signal">
+          <button type="submit" aria-label={t.signOut} className="press-ink focus-ring grid size-10 place-items-center text-paper/70 hover:text-signal">
             <LogOut className="size-4" />
           </button>
         </NavTooltip>
@@ -138,7 +138,7 @@ export function AccountActions({ email, iconOnly = false }: { email: string; ico
       <UserRound className="size-4 shrink-0 opacity-60" />
       <p className="min-w-0 flex-1 truncate font-mono text-[11px] opacity-70">{email}</p>
       <form action="/auth/signout" method="post">
-        <button type="submit" className="focus-ring min-h-10 font-mono text-[11px] opacity-70 hover:text-signal hover:opacity-100">
+        <button type="submit" className="press-shift focus-ring min-h-10 font-mono text-[11px] opacity-70 hover:text-signal hover:opacity-100 active:text-signal active:opacity-100">
           {t.signOut} →
         </button>
       </form>

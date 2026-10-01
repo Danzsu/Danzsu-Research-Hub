@@ -156,12 +156,13 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 /* The pressed state (R2 spec 3): 2px down-right into the page, at once, easing back on release. `.press`
    turns ink, for light surfaces; `.press-ink` turns signal, for ink ones, where ink wouldn't show. :active
    needs no hover, so a tap shows it too. Unlayered, so it wins over the utilities' hover and aria-pressed
-   fills. The taiyaki sits into its shadow. */
+   fills. `.press-shift` only moves, for a control that sits on both surfaces and brings its own colours.
+   The taiyaki sits into its shadow. */
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
 .press-ink:active { background-color: var(--signal); color: var(--ink); transition-duration: 0ms; }
 .lift:active { transform: translate(3px, 3px); box-shadow: none; transition-duration: 0ms; }
 @media (prefers-reduced-motion: no-preference) {
-  .press:active, .press-ink:active { transform: translate(2px, 2px); }
+  .press:active, .press-ink:active, .press-shift:active { transform: translate(2px, 2px); }
 }
 .story-read { opacity: 0.58; }
 

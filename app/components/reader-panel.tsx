@@ -103,7 +103,7 @@ export function ReaderPanel({ language, progress, readCount, total, syncing, tod
                   checked={item.done}
                   disabled={item.id < 0}
                   onCheckedChange={(checked) => onToggle(item.id, checked === true)}
-                  className="border-ink data-[state=checked]:bg-ink"
+                  className="press border-ink data-[state=checked]:bg-ink"
                 />
                 <span className={`min-w-0 flex-1 text-sm leading-5 [overflow-wrap:anywhere] ${item.done ? "text-ink/40 line-through" : ""}`}>
                   {item.text}

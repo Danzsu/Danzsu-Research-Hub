@@ -597,14 +597,14 @@ className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-ce
 
 ### Pressed state
 
-Every control shows a press, and it needs no hover, so a tap shows it too. The house Button variants, the category chips, the GitHub rows, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar and the Library and archive cards carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle, which sits on both, takes its own hover colours instead. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+Every control shows a press, and it needs no hover, so a tap shows it too. The house Button variants, the category chips, the GitHub rows, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar and the Library and archive cards carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
 
 ```css app/globals.css
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
 .press-ink:active { background-color: var(--signal); color: var(--ink); transition-duration: 0ms; }
 .lift:active { transform: translate(3px, 3px); box-shadow: none; transition-duration: 0ms; }
 @media (prefers-reduced-motion: no-preference) {
-  .press:active, .press-ink:active { transform: translate(2px, 2px); }
+  .press:active, .press-ink:active, .press-shift:active { transform: translate(2px, 2px); }
 }
 ```
 
