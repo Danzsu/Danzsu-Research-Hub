@@ -155,9 +155,9 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
-- [ ] **Élő próba az R2 deploy után** (a tulajdonos, bejelentkezve): egy hibás Mentés és Fordítás hibasora, és egy újrakinyerés követése a poszt oldalán.
+- [ ] **Élő próba az R2 deploy után** (a tulajdonos, bejelentkezve): egy hibás Mentés és Fordítás hibasora; egy újrakinyerés követése a poszt oldalán, nyitott szerkesztővel is; egy menükattintás egy futó Fordítás alatt (azonnal navigál); a lenyomott állapot egy valódi telefonon.
 - [ ] **Az „Olvasd itt” élesítése** (a tulajdonosé, ebben a sorrendben):
-  1. *SQL Editor*: a `supabase/migrations/20260930000000_source_claims.sql` futtatása, **a push előtt** (a kód olvassa az oszlopot);
+  1. *SQL Editor*: a `supabase/migrations/20260930000000_source_claims.sql` futtatása, **a push előtt** (a kód olvassa az oszlopot; az R2 óta a poszt oldala is, így nélküle minden poszt oldala hibaoldalt mutat);
   2. [x] a rendszer-fiók (*Authentication → Users → Add user*, Auto Confirm) és a `RADAR_MIRROR_USER_ID` a Vercelben (2026-09-30);
   3. push, a `read-here` branch merge-e után.
 - [ ] **Az R1 utólagos élő mérése** (a tulajdonosé, a deploy után; a terv 12. feladata):
