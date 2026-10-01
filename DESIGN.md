@@ -548,8 +548,8 @@ In use (`app/(app)/library/library-view.tsx`):
 
 ```tsx components/ui/button.tsx
         // House variants. rounded-* is already 0 through --radius, so no rounded-none needed. `press` is
-        // their pressed state (globals.css).
-        ink: "press bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
+        // their pressed state (globals.css); the ink variant, already ink, presses to signal.
+        ink: "press-ink bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
         signal: "press border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper",
         brutal: "press border-2 border-ink bg-paper font-mono text-xs text-ink hover:bg-signal",
       },
@@ -597,11 +597,11 @@ className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-ce
 
 ### Pressed state
 
-Every control shows a press, and it needs no hover, so a tap shows it too. The house Button variants, the category chips, the GitHub rows, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar and the Library and archive cards carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the GitHub rows, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar and the Library and archive cards carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
 
 ```css app/globals.css
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
-.press-ink:active { background-color: var(--signal); color: var(--ink); transition-duration: 0ms; }
+.press-ink:active, .press[aria-pressed="true"]:active, .press[data-state="checked"]:active { background-color: var(--signal); color: var(--ink); transition-duration: 0ms; }
 .lift:active { transform: translate(3px, 3px); box-shadow: none; transition-duration: 0ms; }
 @media (prefers-reduced-motion: no-preference) {
   .press:active, .press-ink:active, .press-shift:active { transform: translate(2px, 2px); }

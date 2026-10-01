@@ -20,8 +20,8 @@ const buttonVariants = cva(
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
         // House variants. rounded-* is already 0 through --radius, so no rounded-none needed. `press` is
-        // their pressed state (globals.css).
-        ink: "press bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
+        // their pressed state (globals.css); the ink variant, already ink, presses to signal.
+        ink: "press-ink bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
         signal: "press border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper",
         brutal: "press border-2 border-ink bg-paper font-mono text-xs text-ink hover:bg-signal",
       },
