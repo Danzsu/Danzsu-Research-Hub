@@ -8,6 +8,7 @@ import {
   isValidVimeoId,
   mediaSources,
   primaryVideoId,
+  rebaseDrafts,
   videoEmbedSrc,
   withQuery,
   type PostQuery,
@@ -173,4 +174,18 @@ test("editPayload: a field reset back to the model text is omitted, clearing any
   assert.deepEqual(editPayload(generated, edited, []).title, edited.title);
   const reset = { title: generated.generatedTitle, summary: generated.generatedSummary }; // "Original" clicked
   assert.equal("title" in editPayload(generated, reset, []), false);
+});
+
+// R2 final review, Important 2. The post page now refreshes under an open editor while a re-extraction runs,
+// so the shown text can change beneath the drafts. Kills a draft left on the old model text (Save would then
+// freeze it as an override over the new one), and an edited draft overwritten by the new text.
+test("rebaseDrafts moves each untouched language onto the new text, keeps an edited one, and Save then sends no override", () => {
+  const previous = { hu: "Régi cím", en: "Old title" };
+  const next = { hu: "Új cím", en: "New title" };
+  assert.deepEqual(rebaseDrafts(previous, previous, next), next);
+  assert.deepEqual(rebaseDrafts({ hu: "Saját cím", en: "Old title" }, previous, next), { hu: "Saját cím", en: "New title" });
+  assert.deepEqual(rebaseDrafts({ hu: "Régi cím", en: "My own title" }, previous, next), { hu: "Új cím", en: "My own title" });
+  const summary = { hu: "Új összefoglaló", en: "New summary" };
+  const payload = editPayload({ generatedTitle: next, generatedSummary: summary }, { title: rebaseDrafts(previous, previous, next), summary }, []);
+  assert.deepEqual(payload, { hidden: [] });
 });

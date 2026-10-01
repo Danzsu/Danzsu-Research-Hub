@@ -69,6 +69,13 @@ export function editPayload(
   return { ...(title && { title }), ...(summary && { summary }), hidden };
 }
 
+/** The editor's draft after the text the page shows changed beneath it (a re-extraction the page followed):
+ *  each language still showing the old text moves to the new one, and one the reader edited stays. Without
+ *  this, Save would send the old model text back as an override over the new (R2 final review). */
+export function rebaseDrafts(draft: Localized, previous: Localized, next: Localized): Localized {
+  return { hu: draft.hu === previous.hu ? next.hu : draft.hu, en: draft.en === previous.en ? next.en : draft.en };
+}
+
 export const isValidVimeoId = (id: string): boolean => /^\d+$/.test(id);
 
 /** Only a data: URL of an image the pipeline itself produces — never `svg` (stored-XSS risk elsewhere in the pipeline). */

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Language } from "@/data/digest-types";
 import { SUMMARY_MAX, TITLE_MAX } from "@/lib/pipeline/util";
-import { editPayload, type Post, type PostQuery } from "@/lib/post-view";
+import { editPayload, rebaseDrafts, type Post, type PostQuery } from "@/lib/post-view";
 import { RefreshWhileProcessing } from "../refresh-while-processing";
 
 const copy = {
@@ -82,6 +82,15 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
   const summaryId = (lang: "hu" | "en") => `${fieldId}-summary-${lang}`;
   const [title, setTitle] = useState(post.title);
   const [summary, setSummary] = useState(post.summary);
+  // The text the drafts started from. The page refreshes beneath an open editor while a re-extraction runs,
+  // so a new title or summary moves every untouched draft onto it (rebaseDrafts).
+  const [shown, setShown] = useState({ title: post.title, summary: post.summary });
+  const changed = (a: Post["title"], b: Post["title"]) => a.hu !== b.hu || a.en !== b.en;
+  if (changed(shown.title, post.title) || changed(shown.summary, post.summary)) {
+    setShown({ title: post.title, summary: post.summary });
+    setTitle(rebaseDrafts(title, shown.title, post.title));
+    setSummary(rebaseDrafts(summary, shown.summary, post.summary));
+  }
   const [hidden, setHidden] = useState(() => new Set(post.hiddenBlocks));
   const [busy, setBusy] = useState(false);
   const [reextracting, setReextracting] = useState(false);
