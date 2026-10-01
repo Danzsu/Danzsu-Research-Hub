@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { ErrorLine } from "@/app/components/error-line";
 import { useLanguage } from "@/app/components/language-context";
 import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { httpTransport, memoryTransport, type ChatTransport } from "@/lib/link-chat";
+import { parseSubmittedUrl } from "@/lib/pipeline/util";
 
 const copy = {
   hu: {
@@ -53,36 +55,45 @@ export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
   const [busy, setBusy] = useState(false);
   const t = copy[language];
 
-  async function submit(event: React.FormEvent) {
+  function submit(event: React.FormEvent) {
     event.preventDefault();
+    // The route's own rule, in the page's language, before anything is sent (R2 spec 2).
+    if (!parseSubmittedUrl(url)) {
+      setStatus("invalid_url");
+      return;
+    }
     setBusy(true);
-    try {
-      const result = await submitVia(preview ? memoryTransport([], preview.failWrites) : httpTransport, url, note);
-      const known = result.error === "invalid_url" || result.error === "already_submitted" ? result.error : "error";
-      setStatus(result.ok ? "ok" : known);
-      if (result.ok) {
+    refresh(undefined, async () => {
+      try {
+        const result = await submitVia(preview ? memoryTransport([], preview.failWrites) : httpTransport, url, note);
+        const known = result.error === "invalid_url" || result.error === "already_submitted" ? result.error : "error";
+        setStatus(result.ok ? "ok" : known);
+        if (!result.ok) return false;
         setUrl("");
         setNote("");
-        refresh();
+        return true;
+      } catch {
+        setStatus("error");
+        return false;
+      } finally {
+        setBusy(false);
       }
-    } catch {
-      setStatus("error");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
-    <form id="submit" onSubmit={submit} className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
+    <form id="submit" onSubmit={submit} noValidate className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
       <p className="font-mono text-xs tracking-[0.14em] text-signal">BEKÜLDÉS / SUBMIT</p>
       {/* @lg (not sm:), keyed to the hero's @container: in the narrow full-sidebar column this must
           wrap on the column's own width, not the viewport (page-header.tsx). */}
       <div className="mt-3 flex flex-col gap-2 @lg:flex-row">
         <Input
           type="url"
-          required
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => {
+            setUrl(event.target.value);
+            setStatus(null);
+          }}
           placeholder={t.urlPlaceholder}
           aria-label={t.url}
           className="min-h-10 flex-1 border-2 border-ink bg-cream focus-visible:border-signal"
@@ -93,13 +104,17 @@ export function SubmitForm({ preview }: { preview?: { failWrites: boolean } }) {
       </div>
       <Input
         value={note}
-        onChange={(event) => setNote(event.target.value)}
+        onChange={(event) => {
+          setNote(event.target.value);
+          setStatus(null);
+        }}
         maxLength={500}
         placeholder={t.notePlaceholder}
         aria-label={t.note}
         className="mt-2 min-h-10 border-ink/40 bg-cream focus-visible:border-signal"
       />
-      {status && <p className="mt-3 font-mono text-xs text-ink/70" role="status">{t[status]}</p>}
+      <ErrorLine className="mt-3">{status === "invalid_url" || status === "error" ? t[status] : null}</ErrorLine>
+      {(status === "ok" || status === "already_submitted") && <p className="mt-3 font-mono text-xs text-ink/70" role="status">{t[status]}</p>}
     </form>
   );
 }

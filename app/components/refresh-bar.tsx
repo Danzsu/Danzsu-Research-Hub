@@ -6,9 +6,12 @@ import { createContext, useContext, useTransition, type ReactNode } from "react"
 // The five refreshes a reader starts (spec 2.3: Save, Translate, the language toggle, a Library
 // submission, the link chat's send) share one transition, so the bar shows while any of them waits and
 // React does the counting. The Library's background refresh (refresh-while-processing.tsx) calls
-// router.refresh() itself, outside it, so it never lights the bar.
+// router.refresh() itself, outside it, so it never lights the bar. A write that leads to the refresh (Save,
+// Translate, a Library submission) runs inside it too, as `work`, so the bar shows from the click, not only
+// once the write has answered (R2 spec 1).
 
-type Refresh = (pushTo?: string) => void;
+/** `work`, when given, runs first and answers whether to go on; it reports its own failure. */
+type Refresh = (pushTo?: string, work?: () => Promise<boolean>) => void;
 
 const RefreshContext = createContext<Refresh | null>(null);
 
@@ -16,10 +19,21 @@ const RefreshContext = createContext<Refresh | null>(null);
 export function RefreshProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const refresh: Refresh = (pushTo) =>
-    startTransition(() => {
-      if (pushTo) router.push(pushTo);
-      router.refresh();
+  const refresh: Refresh = (pushTo, work) =>
+    startTransition(async () => {
+      // A throw here would reach the error boundary; the caller's own failure state is the place for it.
+      const goOn = work
+        ? await work().catch((error: unknown) => {
+            console.error("refresh work failed", error);
+            return false;
+          })
+        : true;
+      if (!goOn) return;
+      // Updates after an await need marking as a transition again.
+      startTransition(() => {
+        if (pushTo) router.push(pushTo);
+        router.refresh();
+      });
     });
   return (
     <RefreshContext value={refresh}>
@@ -29,7 +43,8 @@ export function RefreshProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** `refresh(pushTo?)`: navigates to `pushTo` first when given, then refreshes, inside the shell's transition. */
+/** `refresh(pushTo?, work?)`: runs `work` first when given and stops when it answers false; then navigates
+ *  to `pushTo` when given, and refreshes, all inside the shell's transition. */
 export function useRefresh(): Refresh {
   const refresh = useContext(RefreshContext);
   if (!refresh) throw new Error("useRefresh must be used inside RefreshProvider (app/components/app-shell.tsx)");

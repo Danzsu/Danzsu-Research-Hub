@@ -238,7 +238,7 @@ Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-pape
 | Pair | Ratio | Where |
 | --- | --- | --- |
 | ink on paper / cream | 16.1 / 15.1 | all body text |
-| signal on ink, ink on signal | 5.6 | nav, hover states, the failed toast, signal buttons |
+| signal on ink, ink on signal | 5.6 | nav, hover states, the failed toast, the error line, signal buttons |
 | cyan on ink | 11.7 | the PROCESSING status |
 | `text-ink/72` on paper | 6.9 | card summaries |
 | `text-paper/55` on ink | 5.5 | secondary text on ink |
@@ -663,6 +663,14 @@ function ImageFrame({ dashed = false, caption, children }: { dashed?: boolean; c
 className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain"
 ```
 
+### ErrorLine
+
+`app/components/error-line.tsx`. A failed write, on a light surface: ink on a signal strip inside an always-mounted `role="alert"` region, so the region is in the accessibility tree before the error arrives; the strip shows only while there is one. The Library form, Translate, Save and Re-extract use it; a neutral status stays a `role="status"` line in `text-ink/70`:
+
+```tsx app/components/error-line.tsx
+      {children ? <p className={`border-2 border-ink bg-signal px-3 py-2 font-mono text-xs text-ink ${className}`}>{children}</p> : null}
+```
+
 ### Undo toast
 
 `app/components/undo-toast.tsx`. There is one fixed lane. Below `md` it sits above the bottom bar and the raised taiyaki (`bottom: 5.75rem` plus the safe area); from `md` up it is 1.5rem from the bottom and stops short of the taiyaki's corner (`md:right-24`). It is `z-[60]`, so it sits over open sheets. A failed write turns the toast signal:
@@ -733,7 +741,7 @@ className="min-h-10 flex-1 border-2 border-ink bg-cream focus-visible:border-sig
 That field is from `app/(app)/library/submit-form.tsx`, whose form sits on a paper card:
 
 ```tsx app/(app)/library/submit-form.tsx
-<form id="submit" onSubmit={submit} className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
+<form id="submit" onSubmit={submit} noValidate className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
 ```
 
 A multi-line field, from `app/(app)/library/[id]/post-editor.tsx`:

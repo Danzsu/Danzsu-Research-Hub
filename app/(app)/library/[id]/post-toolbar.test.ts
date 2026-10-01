@@ -46,5 +46,6 @@ test("PostToolbar shows the edit link to the submitter only, and always mounts i
   assert.equal(edit(renderToolbar({})), null);
   const doc = renderToolbar({ canEdit: true });
   assert.ok(edit(doc));
-  assert.equal(doc.querySelector('[role="status"]')?.textContent, "");
+  // Its failure line's alert region (ErrorLine), mounted before any failure so the change is announced.
+  assert.equal(doc.querySelector('[role="alert"]')?.textContent, "");
 });

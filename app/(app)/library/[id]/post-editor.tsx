@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
+import { ErrorLine } from "@/app/components/error-line";
 import { PostBlocks } from "@/app/components/post-blocks";
 import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
@@ -91,19 +92,24 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
       return next;
     });
 
-  async function save() {
+  function save() {
     setBusy(true);
-    const response = await fetch(`/api/posts/${post.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(editPayload(post, { title, summary }, [...hidden])),
-    }).catch(() => null);
-    setBusy(false);
-    if (!response?.ok) return setStatus({ text: response?.status === 400 ? t.invalid : t.failed, failed: true });
-    refresh(`/library/${post.id}`);
+    setStatus(null);
+    refresh(`/library/${post.id}`, async () => {
+      const response = await fetch(`/api/posts/${post.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(editPayload(post, { title, summary }, [...hidden])),
+      }).catch(() => null);
+      setBusy(false);
+      if (response?.ok) return true;
+      setStatus({ text: response?.status === 400 ? t.invalid : t.failed, failed: true });
+      return false;
+    });
   }
 
   async function reextract() {
+    setStatus(null);
     setReextracting(true);
     const response = await fetch(`/api/posts/${post.id}/reextract`, { method: "POST" }).catch(() => null);
     const data = (await response?.json().catch(() => ({}))) as { retryAfter?: number };
@@ -120,7 +126,7 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
         className="space-y-8"
         onSubmit={(event) => {
           event.preventDefault();
-          void save();
+          save();
         }}
       >
         <div className="grid gap-4 border-2 border-ink bg-paper p-5 sm:grid-cols-2">
@@ -170,7 +176,8 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
           <Button type="button" variant="brutal" className="min-h-10" onClick={() => void reextract()} disabled={reextracting}><RefreshCw /> {t.reextract}</Button>
           {/* Always mounted: a live region must already be in the accessibility tree before its text
               changes, or screen readers may not announce the change at all. */}
-          <p role="status" className={`font-mono text-xs ${status?.failed ? "text-signal" : "text-ink/70"}`}>{status?.text ?? ""}</p>
+          <p role="status" className="font-mono text-xs text-ink/70">{status && !status.failed ? status.text : ""}</p>
+          <ErrorLine>{status?.failed ? status.text : null}</ErrorLine>
         </div>
       </form>
       <PostBlocks
