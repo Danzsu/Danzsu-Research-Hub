@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { ErrorLine } from "@/app/components/error-line";
 import { PostBlocks } from "@/app/components/post-blocks";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Language } from "@/data/digest-types";
 import { SUMMARY_MAX, TITLE_MAX } from "@/lib/pipeline/util";
 import { editPayload, type Post, type PostQuery } from "@/lib/post-view";
+import { RefreshWhileProcessing } from "../refresh-while-processing";
 
 const copy = {
   hu: {
@@ -48,6 +49,8 @@ const copy = {
   },
 };
 
+const AWAIT_CLAIM_MS = 30_000;
+
 /** A field with its label and its reset-to-the-model's-text button. */
 function FieldRow({ htmlFor, label, resetLabel, resetText, onReset, children }: {
   htmlFor: string;
@@ -83,6 +86,16 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
   const [busy, setBusy] = useState(false);
   const [reextracting, setReextracting] = useState(false);
   const [status, setStatus] = useState<{ text: string; failed: boolean } | null>(null);
+  // After a 202, until the server shows the run's claim (post.processing, which the page then follows
+  // itself): the run may not have claimed the source by the first refresh, or may already be done.
+  // At most AWAIT_CLAIM_MS (R2 spec 1).
+  const [awaitingClaim, setAwaitingClaim] = useState(false);
+  if (awaitingClaim && post.processing) setAwaitingClaim(false);
+  useEffect(() => {
+    if (!awaitingClaim) return;
+    const timer = setTimeout(() => setAwaitingClaim(false), AWAIT_CLAIM_MS);
+    return () => clearTimeout(timer);
+  }, [awaitingClaim]);
 
   const toggle = (id: string) =>
     setHidden((current) => {
@@ -115,12 +128,16 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
     const data = (await response?.json().catch(() => ({}))) as { retryAfter?: number };
     setReextracting(false);
     if (response?.status === 429 && data.retryAfter) setStatus({ text: t.cooldown(data.retryAfter), failed: false });
-    else if (response?.ok) setStatus({ text: t.started, failed: false });
+    else if (response?.ok) {
+      setStatus({ text: t.started, failed: false });
+      setAwaitingClaim(true);
+    }
     else setStatus({ text: t.failed, failed: true });
   }
 
   return (
     <div className="space-y-8">
+      <RefreshWhileProcessing active={awaitingClaim} />
       {/* A real form, so Enter in a title field saves and the browser enforces required / maxLength. */}
       <form
         className="space-y-8"

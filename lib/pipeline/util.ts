@@ -137,6 +137,15 @@ export function detectSource(url: URL): SourceKind {
  *  `cooldownRemaining`'s own default and `requestReextract`'s explicit claim window. */
 export const REEXTRACT_COOLDOWN_MINUTES = 10;
 
+// A run's claim on its source (processSource). Twice the routes' 300 s maxDuration: a claim older than
+// this belongs to a run the platform killed, and the next run takes the source over.
+export const CLAIM_LEASE_MS = 10 * 60_000;
+
+/** True while a run holds the source: its `claimed_at` is younger than CLAIM_LEASE_MS. */
+export function claimHeld(claimedAt: string | null | undefined, now: number): boolean {
+  return Boolean(claimedAt) && now - Date.parse(claimedAt as string) < CLAIM_LEASE_MS;
+}
+
 /** Seconds until a post may be re-extracted again. */
 export function cooldownRemaining(extractedAt: string | null, now: Date, minutes = REEXTRACT_COOLDOWN_MINUTES): number {
   if (!extractedAt) return 0;

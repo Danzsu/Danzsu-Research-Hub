@@ -40,6 +40,8 @@ export type Post = {
   submittedBy: string | null;
   /** The source's last extraction error: a re-extraction failed and the post kept its content. A good run clears it. */
   lastError: string | null;
+  /** A run holds the post's source right now (`sources.claimed_at`, claimHeld): the page follows it until it is done. */
+  processing: boolean;
   extractedAt: string | null;
   createdAt: string;
 };

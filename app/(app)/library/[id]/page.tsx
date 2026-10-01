@@ -4,6 +4,7 @@ import { getLanguage } from "@/lib/language";
 import { parseId } from "@/lib/pipeline/util";
 import type { PostQuery } from "@/lib/post-view";
 import { getReader } from "@/lib/supabase/server";
+import { RefreshWhileProcessing } from "../refresh-while-processing";
 import { MarkPostRead } from "./mark-post-read";
 import { PostArticle } from "./post-article";
 
@@ -28,6 +29,8 @@ export default async function PostPage({
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <MarkPostRead postId={post.id} />
+      {/* A run on this post's source (a re-extraction): the page follows it until it is done (R2 spec 1). */}
+      <RefreshWhileProcessing active={post.processing} />
       <PostArticle post={post} language={language} query={query} canEdit={post.submittedBy === reader.viewer.id} />
     </main>
   );

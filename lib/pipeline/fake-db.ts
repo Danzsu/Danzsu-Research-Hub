@@ -43,7 +43,8 @@ export type FakeIngestTables = {
    *  `pgError("42501", …)` for the `update_post_overrides` "not the submitter" case. */
   rpcError?: PostgrestErrorShape;
   /** Rows any other table's select chain answers from, by table name: `issues`, `item_states`, `todos`,
-   *  `archive_issues`, runDaily's recent-items lookup on `digest_items` (see `tableQuery`). */
+   *  `archive_issues`, runDaily's recent-items lookup on `digest_items`, the Library list on `posts`
+   *  (`getPosts`; see `tableQuery`). */
   rows?: Record<string, Record<string, unknown>[]>;
   /** Forces any other table's select, by table name, to resolve with this error instead of its rows. */
   tableErrors?: Record<string, PostgrestErrorShape>;
@@ -346,6 +347,13 @@ export function fakeDb(
   const objects = new Set(tables.media ?? []);
   let postSelectCalls = 0;
 
+  // Any table's select chain over `rows` / `tableErrors` (see tableQuery).
+  const selectFrom = (table: string, columns: string) => {
+    const calls: ChainCall[] = [["select", columns]];
+    queries.push({ table, calls });
+    return tableQuery(tables.rows?.[table] ?? [], tables.tableErrors?.[table], calls, (column, value) => gteCalls.push({ table, column, value }), columns);
+  };
+
   const from = (table: string) => {
     if (table === "model_settings") {
       return {
@@ -407,6 +415,8 @@ export function fakeDb(
     if (table === "posts") {
       return {
         select: (columns = "*") => ({
+          // The Library list (getPosts): `rows.posts` and `tableErrors.posts`, like any other table.
+          order: (...args: unknown[]) => selectFrom("posts", columns).order(...args),
           eq: (column: string, value: unknown) => {
             eqCalls.push({ table: "posts", column, value });
             postSelectCalls++;
@@ -465,11 +475,7 @@ export function fakeDb(
         upserts.push({ table, values, options: options ?? {} });
         return { data: null, error: null };
       },
-      select: (columns = "*") => {
-        const calls: ChainCall[] = [["select", columns]];
-        queries.push({ table, calls });
-        return tableQuery(tables.rows?.[table] ?? [], tables.tableErrors?.[table], calls, (column, value) => gteCalls.push({ table, column, value }), columns);
-      },
+      select: (columns = "*") => selectFrom(table, columns),
     };
   };
 

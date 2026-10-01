@@ -5,7 +5,7 @@ import { aiCleanup } from "./cleanup.ts";
 import { extract } from "./extract/index.ts";
 import { IMAGE_BUDGET_MS, mirrorImages, unusedMediaPaths } from "./images.ts";
 import { summarize, writeNotes } from "./summary.ts";
-import { errorMessage, type SourceKind } from "./util.ts";
+import { claimHeld, errorMessage, type SourceKind } from "./util.ts";
 
 /** The runs a source gets before the queue gives up on it (a reader's "Újra" resets the count). */
 export const MAX_ATTEMPTS = 3;
@@ -21,10 +21,6 @@ const AI_CLEANUP_KINDS: ReadonlySet<SourceKind> = new Set(["article", "github", 
 // start the last source in a batch — a source that does hit the full worst case can still outlive
 // `deadline` regardless.
 export const START_GATE_RESERVE_MS = 120_000;
-
-// A run's claim on its source (spec 3). Twice the routes' 300 s maxDuration: a claim older than this
-// belongs to a run the platform killed, and the next run takes the source over.
-export const CLAIM_LEASE_MS = 10 * 60_000;
 
 // The image budget's own reserve, held back for the summarize() call that follows mirrorImages
 // inside buildPost. Sized for the *typical* case, not the worst case above: reserving the full
@@ -119,7 +115,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
   const { data: source, error } = await db.from("sources").select("id, url, kind, note, attempts, claimed_at").eq("id", id).single<Source>();
   if (error || !source) throw error ?? new Error(`source ${id} not found`);
   const now = Date.now();
-  if (source.claimed_at && now - Date.parse(source.claimed_at) < CLAIM_LEASE_MS) return false;
+  if (claimHeld(source.claimed_at, now)) return false;
   const { data: claimed, error: claimError } = await db
     .from("sources")
     .update({ attempts: source.attempts + 1, claimed_at: new Date(now).toISOString() })

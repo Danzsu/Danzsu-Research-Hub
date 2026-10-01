@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CLAIM_LEASE_MS,
+  claimHeld,
   archiveLabel,
   arxivId,
   cooldownRemaining,
@@ -412,4 +414,13 @@ test("archiveLabel names the Sunday that closes the week, across month and year 
   assert.equal(archiveLabel(isoWeekMonday("2026-W39")!), "09. 27.");
   assert.equal(archiveLabel(isoWeekMonday("2026-W40")!), "10. 04.");
   assert.equal(archiveLabel(isoWeekMonday("2026-W53")!), "01. 03.");
+});
+
+// R2 spec 1. Kills a lease that never expires, one that expires a moment early, and a missing claim read as held.
+test("claimHeld: a claim holds for CLAIM_LEASE_MS, and none is held without one", () => {
+  const now = Date.parse("2026-10-01T08:00:00Z");
+  assert.equal(claimHeld(null, now), false);
+  assert.equal(claimHeld(undefined, now), false);
+  assert.equal(claimHeld(new Date(now - CLAIM_LEASE_MS + 1_000).toISOString(), now), true);
+  assert.equal(claimHeld(new Date(now - CLAIM_LEASE_MS).toISOString(), now), false);
 });

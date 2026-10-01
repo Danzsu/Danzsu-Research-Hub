@@ -4,7 +4,6 @@ import sharp from "sharp";
 import type { Block } from "../blocks.ts";
 import { IMAGE_BUDGET_MS } from "./images.ts";
 import {
-  CLAIM_LEASE_MS,
   failureUpdate,
   imageBudgetFor,
   processSource,
@@ -14,6 +13,7 @@ import {
   SUMMARY_RESERVE_MS,
 } from "./ingest.ts";
 import { fakeDb, pgError } from "./fake-db.ts";
+import { CLAIM_LEASE_MS } from "./util.ts";
 import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockDns, mockFetch, TEST_HOST, withGeminiKey, youtubeUrl } from "./mock-fetch.ts";
 
 test("failureUpdate keeps a published post when re-extraction fails", () => {
