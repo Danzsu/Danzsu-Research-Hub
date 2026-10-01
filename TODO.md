@@ -95,6 +95,7 @@
 - [x] **R1 „Gyors”** (2026-09-28): a függvények Dublinban futnak Fluid compute-tal, egy auth-ellenőrzés kérésenként, egy lekérdezés a Radarhoz, az olvasói állapot a nézett hétre szűkül, és `GET /api/state` csak Vissza után fut; a zárt hetek és az archívum-lista egy napig gyorsítótárban vannak. Oldalformájú vázak, függő pont a linkeken, felső sáv a frissítésekhez, a „Több” linkjeinek prefetchje; a zod kikerült a kliens csomagjából. Terv: [docs/superpowers/plans/2026-09-27-r1-speed.md](docs/superpowers/plans/2026-09-27-r1-speed.md).
 - [x] **Hírek csomag** (2026-09-30): hat új forrás (Mistral, Microsoft Research, Meta AI Research, Anthropic Research, Recode China AI, ChinAI) és öt laborneves Hacker News-keresés (`Grok`, `DeepSeek`, `Qwen`, `Kimi`, `MiniMax`, pontos egyezéssel, csak a címben). Új menüpont: **AI cégek** (`/companies`), fent a legutóbbi napi futás öt legjobb céges hírével, alatta a hét többi céges hírével. Az xAI és a LinkedIn géppel nem olvasható ([truthful_sites.md](truthful_sites.md) → Kizárva).
 - [x] **„Olvasd itt” és automatikus tükör** (2026-09-30): minden hírkártyán „Olvasd itt”: ha a cikkből már van Library-poszt, oda visz, ha nincs, a taiyaki chatben beküldi. A napi futás a hét 85 pont feletti híreit és a Top 3-at a rendszer-fiók nevén sorba teszi, a `/api/cron/mirror` 07, 08 és 09 UTC-kor feldolgozza őket. Egy forráson egyszerre egy futás dolgozik (`claimed_at` lease). Terv: [docs/superpowers/plans/2026-09-30-read-here-mirror.md](docs/superpowers/plans/2026-09-30-read-here-mirror.md).
+- [x] **R2 „Visszajelzés”** (2026-10-01): a chat saját buboréka azonnal megjelenik, a hibás küldés és teendő visszaadja a szövegét, az ismételt válasz nem halmozódik; a felső sáv a teljes Mentés, Fordítás és beküldés alatt fut; egy közös, jól olvasható hibasor; a Library olvasási hibája hibaoldalt mutat; a poszt oldala követi az újrakinyerést; benyomódás minden kattintható elemen, 160 ms-os sheetek és toast, csökkentett mozgásnál semmi nem mozdul, érintőképernyőn 40 px. Terv: [docs/superpowers/plans/2026-10-01-r2-feedback.md](docs/superpowers/plans/2026-10-01-r2-feedback.md).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
@@ -154,6 +155,7 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **Élő próba az R2 deploy után** (a tulajdonos, bejelentkezve): egy hibás Mentés és Fordítás hibasora, és egy újrakinyerés követése a poszt oldalán.
 - [ ] **Az „Olvasd itt” élesítése** (a tulajdonosé, ebben a sorrendben):
   1. *SQL Editor*: a `supabase/migrations/20260930000000_source_claims.sql` futtatása, **a push előtt** (a kód olvassa az oszlopot);
   2. [x] a rendszer-fiók (*Authentication → Users → Add user*, Auto Confirm) és a `RADAR_MIRROR_USER_ID` a Vercelben (2026-09-30);
@@ -178,7 +180,7 @@
   - **a chatbe dobott GitHub-link:** ha a pontszáma eléri a heti Top 10 legalját, jelölve bekerül a Top 10-be, ha nem, szívecskét kap;
   - **„A hónap repói” (Top 3) a Top 10 felett:** a régóta vagy nagyon gyorsan növő, releváns repók, havi nézetben. Ehhez napi csillagszám-mentés kell (a „Valódi GitHub trending” pont);
   - forrás: a Star History Monthly hírlevél és a star-history.com chart-linkje ([truthful_sites.md](truthful_sites.md) → Jelöltek).
-- [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Mindkét értelemben:
+- [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Az R1 Gyors és az R2 Visszajelzés kész; hátra van az **R3 Elrendezés** (a mobil fekvő keret, a széles képernyő, a panel és a chat takarása, a taiyaki kerete ink oldalon). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
   Emellett jobb visszajelző effektek és további javítások. Előbb egy átvilágítás az egész appon: Playwright-mérések 360/768/1280 px-en és a lassú pontok felmérése. Ebből lesz egy jóváhagyandó terv.
