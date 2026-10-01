@@ -364,7 +364,7 @@ Shadows are hard offsets with zero blur:
 
 `.lift` (`globals.css`) gives the taiyaki the Top 3 cards' "come forward" state, whose rules `.must-card` shares, on hover and also on keyboard focus. Under `prefers-reduced-motion` its shadow still lifts, without the translate.
 
-- **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. The link chat's Sheet opens and closes in 160ms, not the stock Sheet's 500ms and 300ms. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. The `.live-pulse` dot (9px, signal) pulses a ring every 2s. Loading feedback waits before it shows, so a fast answer flashes nothing: the pending dot and the refresh bar appear 100ms in, at once, and leave at once; the skeletons' placeholders fade in over 160ms after 150ms. The bar runs a third-wide segment across itself every 1.2s. Under reduced motion the dot's ring stops, the skeletons don't pulse and their placeholders appear without the fade, still after 150ms, and the bar stands still at full width.
+- **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. Every Sheet and Dialog opens and closes in 160ms. The toast slides in from 8px and fades out over 160ms. A press moves 2px at once and eases back on release. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. Nothing moves on hover or press either: the shadows and colours still change. The `.live-pulse` dot (9px, signal) pulses a ring every 2s. Loading feedback waits before it shows, so a fast answer flashes nothing: the pending dot and the refresh bar appear 100ms in, at once, and leave at once; the skeletons' placeholders fade in over 160ms after 150ms. The bar runs a third-wide segment across itself every 1.2s. Under reduced motion the dot's ring stops, the skeletons don't pulse and their placeholders appear without the fade, still after 150ms, and the bar stands still at full width.
 - **Layering.** From bottom to top:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
@@ -453,7 +453,7 @@ className={`sticky top-0 z-30 hidden h-dvh shrink-0 flex-col border-r border-pap
 
 ```tsx app/components/desktop-nav.tsx
 const itemClassFull =
-  "focus-ring flex min-h-10 w-full items-center gap-3 border-l-2 border-transparent px-3 font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
+  "press-ink focus-ring flex min-h-10 w-full items-center gap-3 border-l-2 border-transparent px-3 font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
 ```
 
 The tooltip (`NavTooltip`):
@@ -472,7 +472,7 @@ className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-sign
 
 ```tsx app/components/app-shell.tsx
 const slotClass =
-  "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 ```
 
 "Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek and Archívum (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
@@ -547,10 +547,11 @@ In use (`app/(app)/library/library-view.tsx`):
 `components/ui/button.tsx` keeps the stock shadcn variants and adds three house variants and an extended size set:
 
 ```tsx components/ui/button.tsx
-        // House variants. rounded-* is already 0 through --radius, so no rounded-none needed.
-        ink: "bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
-        signal: "border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper",
-        brutal: "border-2 border-ink bg-paper font-mono text-xs text-ink hover:bg-signal",
+        // House variants. rounded-* is already 0 through --radius, so no rounded-none needed. `press` is
+        // their pressed state (globals.css).
+        ink: "press bg-ink font-mono text-xs text-paper hover:bg-signal hover:text-ink",
+        signal: "press border-2 border-ink bg-signal font-mono text-xs text-ink hover:bg-ink hover:text-paper",
+        brutal: "press border-2 border-ink bg-paper font-mono text-xs text-ink hover:bg-signal",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -563,7 +564,7 @@ In use (`app/(app)/library/library-view.tsx`):
         "icon-lg": "size-10",
 ```
 
-The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does, and a toggle shows its pressed state in ink (both from `story-card.tsx`):
+The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does, and a toggle shows its pressed state in ink (both from `story-card.tsx`). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
 
 ```tsx app/components/story-card.tsx
 <Button asChild variant="ink" className="min-h-10">
@@ -589,10 +590,23 @@ The keyboard focus style, defined as an `@utility` in `app/globals.css`:
 Every custom interactive element carries it. On a signal-coloured control, override the colour with `--focus`, as the category chips do (`digest-dashboard.tsx`):
 
 ```tsx app/components/digest-dashboard.tsx
-className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
+className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal"
 ```
 
 `Button` and `Input` keep shadcn's own 3px `ring/50` focus ring.
+
+### Pressed state
+
+Every control shows a press, and it needs no hover, so a tap shows it too. The house Button variants, the category chips, the GitHub rows, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar and the Library and archive cards carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle, which sits on both, takes its own hover colours instead. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+
+```css app/globals.css
+.press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
+.press-ink:active { background-color: var(--signal); color: var(--ink); transition-duration: 0ms; }
+.lift:active { transform: translate(3px, 3px); box-shadow: none; transition-duration: 0ms; }
+@media (prefers-reduced-motion: no-preference) {
+  .press:active, .press-ink:active { transform: translate(2px, 2px); }
+}
+```
 
 ### `Tag`
 
@@ -621,7 +635,6 @@ export function Tag({ tag }: { tag: string }) {
   .story-card:hover { transform: translateX(3px); box-shadow: -6px 0 0 var(--signal); }
 }
 .lift:focus-visible { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
-.story-read { opacity: 0.58; }
 ```
 
 ```tsx app/components/story-card.tsx
@@ -680,9 +693,9 @@ className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-a
 ```
 
 ```tsx app/components/undo-toast.tsx
-          className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs ${
-            toast.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"
-          }`}
+          className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs duration-160 ${
+            toast ? "animate-in fade-in-0 slide-in-from-bottom-2" : "animate-out fade-out-0 [animation-fill-mode:forwards]"
+          } ${shown.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"}`}
 ```
 
 Raise one from any event handler (`digest-dashboard.tsx`). The Undo button uses the `signal` variant:

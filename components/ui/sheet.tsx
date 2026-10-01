@@ -62,7 +62,8 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
+          // The house 160ms, not the stock 500ms in and 300ms out (DESIGN.md → Motion).
+          "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out duration-160 data-[state=closed]:animate-out data-[state=open]:animate-in",
           side === "right" &&
             "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
           side === "left" &&
@@ -77,7 +78,7 @@ function SheetContent({
       >
         {children}
         {showCloseButton && (
-          <SheetPrimitive.Close className="focus-ring absolute top-2 right-2 grid size-10 place-items-center border-2 border-ink bg-paper transition-colors hover:bg-signal disabled:pointer-events-none">
+          <SheetPrimitive.Close className="press focus-ring absolute top-2 right-2 grid size-10 place-items-center border-2 border-ink bg-paper transition-colors hover:bg-signal disabled:pointer-events-none">
             <XIcon className="size-4" />
             <span className="sr-only">{closeLabel}</span>
           </SheetPrimitive.Close>

@@ -128,7 +128,7 @@ export function AppShell({
 const MORE_HREFS = MOBILE_MORE_NAV.flatMap((item) => (item.href ? [item.href] : []));
 
 const slotClass =
-  "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 
 /** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds AI cégek and
  *  Archívum, the language, the coming views and sign-out; on their pages its slot carries the active mark. */
@@ -192,7 +192,7 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
                   active={active === item.id}
                   onSearch={onSearch}
                   onClick={() => setMoreOpen(false)}
-                  className="focus-ring -ml-3.5 flex min-h-10 items-center gap-3 border-l-2 border-transparent pl-3 font-mono text-sm aria-[current=page]:border-signal aria-[current=page]:bg-signal/10"
+                  className="press focus-ring -ml-3.5 flex min-h-10 items-center gap-3 border-l-2 border-transparent pl-3 font-mono text-sm aria-[current=page]:border-signal aria-[current=page]:bg-signal/10"
                   iconClass="size-4"
                 />
               </li>

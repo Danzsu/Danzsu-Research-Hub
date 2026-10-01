@@ -65,7 +65,7 @@ const bubble = "max-w-[85%] border-2 border-ink px-3 py-2 text-sm leading-6 [ove
 // links are ink, and the signal goes into their underline.
 const signalUnderline = "text-ink underline decoration-signal decoration-2 underline-offset-4";
 const microLabel = "font-mono text-[11px] tracking-[0.14em]";
-const action = `focus-ring inline-flex min-h-10 items-center ${microLabel} ${signalUnderline} hover:decoration-ink`;
+const action = `press focus-ring inline-flex min-h-10 items-center ${microLabel} ${signalUnderline} hover:decoration-ink`;
 /** Send and ÚJRA while their request is on its way: aria-disabled, not disabled, so they keep the focus,
  *  but dimmed and deaf to the pointer. */
 export const busyClass = "aria-disabled:pointer-events-none aria-disabled:opacity-50";

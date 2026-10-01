@@ -176,7 +176,7 @@ function CardFooter({ item, state, hasTodo, language, actions, postId }: CardPro
         aria-label={t.later}
         title={t.later}
         onClick={() => actions.onToggle(item.id, "saved")}
-        className={`size-10 sm:size-8 ${pressedClass}`}
+        className={`size-10 sm:pointer-fine:size-8 ${pressedClass}`}
       >
         {state.saved ? <BookmarkCheck /> : <Bookmark />}
       </Button>
@@ -187,7 +187,7 @@ function CardFooter({ item, state, hasTodo, language, actions, postId }: CardPro
         aria-label={todoLabel}
         title={todoLabel}
         onClick={() => actions.onAddTodo(item)}
-        className="size-10 sm:size-8"
+        className="size-10 sm:pointer-fine:size-8"
       >
         {hasTodo ? <ListChecks /> : <ListPlus />}
       </Button>
@@ -195,7 +195,7 @@ function CardFooter({ item, state, hasTodo, language, actions, postId }: CardPro
         variant="brutal"
         aria-pressed={state.read}
         onClick={() => actions.onToggle(item.id, "read")}
-        className={`ml-auto min-h-10 sm:min-h-8 ${pressedClass}`}
+        className={`ml-auto min-h-10 sm:pointer-fine:min-h-8 ${pressedClass}`}
       >
         <Check /> {t.read}
       </Button>

@@ -118,7 +118,7 @@ export function ReaderPanel({ language, progress, readCount, total, syncing, tod
                   if (event.detail <= 1) onDelete(item.id);
                 }}
                 aria-label={t.delete}
-                className="size-10 hover:bg-signal/20 sm:size-8"
+                className="press size-10 hover:bg-signal/20 sm:pointer-fine:size-8"
               >
                 <Trash2 />
               </Button>

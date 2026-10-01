@@ -221,7 +221,7 @@ export function DigestDashboard(
               variant="outline"
               size="sm"
               aria-label={t.panel}
-              className="h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:h-9 2xl:hidden"
+              className="press h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:pointer-fine:h-9 2xl:hidden"
             >
               <ListTodo /> {progress}%{openTodos > 0 && <span className="text-signal">· {openTodos}</span>}
             </Button>
@@ -263,7 +263,7 @@ export function DigestDashboard(
                   type="button"
                   aria-pressed={filter === id}
                   onClick={() => setFilter(id)}
-                  className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
+                  className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal"
                 >
                   <Icon className="size-3.5" /> {t[id]}
                 </button>
@@ -314,7 +314,7 @@ export function DigestDashboard(
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="focus-ring group flex min-w-0 items-center gap-4 border-2 border-ink bg-paper p-4 transition hover:-translate-y-0.5 hover:bg-signal"
+                        className="press focus-ring group flex min-w-0 items-center gap-4 border-2 border-ink bg-paper p-4 transition motion-safe:hover:-translate-y-0.5 hover:bg-signal"
                       >
                         <span className="font-display text-3xl text-signal group-hover:text-ink">{String(index + 1).padStart(2, "0")}</span>
                         <span className="min-w-0 flex-1">

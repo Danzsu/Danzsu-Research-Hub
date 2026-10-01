@@ -235,8 +235,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
           if (!isMobile || isUndoToast(event.target)) event.preventDefault();
         }}
         onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, opener.current)}
-        // The house 160ms, not the stock Sheet's 500ms in and 300ms out.
-        className="max-h-[75dvh] gap-0 data-[state=closed]:duration-160 data-[state=open]:duration-160 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
+        className="max-h-[75dvh] gap-0 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
       >
         <SheetHeader className="flex-row items-center gap-2 bg-ink py-3 pr-14 pl-4">
           <TaiyakiIcon className="size-6 shrink-0" />
