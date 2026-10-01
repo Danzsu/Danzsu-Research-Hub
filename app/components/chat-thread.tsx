@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { Language } from "@/data/digest-types";
-import { toThread, type ChatEntry, type ChatNotice, type ChatSnapshot } from "@/lib/link-chat";
+import { toThread, type ChatEntry, type ChatNotice, type ChatSnapshot, type OutgoingMessage } from "@/lib/link-chat";
 import { SOURCE_KIND_LABELS } from "@/lib/source-kinds";
 import { TaiyakiIcon } from "./taiyaki-icon";
 
@@ -19,6 +19,7 @@ const copy = {
     received: "Megkaptam,",
     processing: "FELDOLGOZÁS…",
     loading: "BETÖLTÉS…",
+    sending: "KÜLDÉS…",
     done: "KÉSZ · MEGNYITÁS →",
     failed: "Nem sikerült feldolgozni.",
     retry: "ÚJRA",
@@ -41,6 +42,7 @@ const copy = {
     received: "Got it:",
     processing: "PROCESSING…",
     loading: "LOADING…",
+    sending: "SENDING…",
     done: "DONE · OPEN →",
     failed: "I couldn't process it.",
     retry: "RETRY",
@@ -90,7 +92,7 @@ function Taiyaki({ language, children }: { language: Language; children: ReactNo
   );
 }
 
-function Mine({ entry, language }: { entry: ChatEntry; language: Language }) {
+function Mine({ entry, language }: { entry: OutgoingMessage; language: Language }) {
   return (
     <div className={`${bubble} ml-auto w-fit bg-ink text-paper shadow-[3px_3px_0_var(--signal)]`}>
       <span className="sr-only">{`${copy[language].me} `}</span>
@@ -119,6 +121,16 @@ type ThreadActions = {
 /** A refused ÚJRA's reply scrolls just far enough to show when it lands out of view (ÚJRA clicked at the
  *  scroller's edge). Module-level, so React calls it once, when the reply mounts, not on every render. */
 const revealRefusal = (reply: HTMLDivElement | null) => reply?.scrollIntoView({ block: "nearest" });
+
+// Each local reply keeps the key of its own object: a repeat replaces the last one with a new object
+// (`say` in lib/link-chat.ts), and the new key makes a screen reader announce it again.
+const noticeKeys = new WeakMap<ChatNotice, number>();
+let nextNoticeKey = 0;
+function noticeKey(notice: ChatNotice): number {
+  let key = noticeKeys.get(notice);
+  if (key === undefined) noticeKeys.set(notice, (key = nextNoticeKey++));
+  return key;
+}
 
 function Reply({ entry, retrying, refusal, ...actions }: ThreadActions & { entry: ChatEntry; retrying: boolean; refusal?: ChatNotice }) {
   const { language, onRetry, onOpenPost } = actions;
@@ -194,7 +206,7 @@ function NoticeText({ notice, language, loginHref, onOpenPost }: ThreadActions &
 }
 
 /** The thread: the greeting, the reader's own submissions (oldest first) with the taiyaki's replies, then the local replies. */
-export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "retrying" | "retryNotices"> }) {
+export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "outgoing" | "retrying" | "retryNotices"> }) {
   const { language } = actions;
   const t = copy[language];
   // Nothing has answered yet, and no local reply or the unreachable line already covers it: one
@@ -224,9 +236,8 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
           </Taiyaki>
         </li>
       ))}
-      {snapshot.notices.map((notice, index) => (
-        // Append-only while the panel is open, so the position is a stable key.
-        <li key={index}>
+      {snapshot.notices.map((notice) => (
+        <li key={noticeKey(notice)}>
           <Taiyaki language={language}>
             <NoticeText notice={notice} {...actions} />
           </Taiyaki>
@@ -236,6 +247,14 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
         <li>
           <Taiyaki language={language}>
             <p>{t.unreachable}</p>
+          </Taiyaki>
+        </li>
+      )}
+      {snapshot.outgoing && (
+        <li className="space-y-2">
+          <Mine entry={snapshot.outgoing} language={language} />
+          <Taiyaki language={language}>
+            <InProgress label={t.sending} />
           </Taiyaki>
         </li>
       )}

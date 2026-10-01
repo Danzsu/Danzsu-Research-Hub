@@ -48,6 +48,9 @@ export type ChatReply =
 /** One submission in the thread: the reader's message (`href` already through safeHref) and the taiyaki's reply. */
 export type ChatEntry = { id: number; url: string; href: string | undefined; note: string | null; reply: ChatReply };
 
+/** The reader's own message while its send is on its way (R2 spec 1). */
+export type OutgoingMessage = Pick<ChatEntry, "url" | "href" | "note">;
+
 function replyTo(source: MySource): ChatReply {
   if (source.status === "failed") return { state: "failed", error: source.error };
   if (source.status === "done" && source.post) return { state: "done", postId: source.post.id, title: source.post.title };
@@ -162,6 +165,8 @@ export type ChatSnapshot = {
   /** The last GET /api/sources/mine failed; the next good one clears it. */
   unreachable: boolean;
   sending: boolean;
+  /** Shown at the thread's end from the moment Send is pressed until the answer lands (R2 spec 1). */
+  outgoing: OutgoingMessage | null;
   /** Sources whose "Újra" is on its way. */
   retrying: number[];
   /** Each source's refused "Újra", shown in its own entry under the button: the reader who clicked it may
@@ -169,7 +174,7 @@ export type ChatSnapshot = {
   retryNotices: Record<number, ChatNotice>;
 };
 
-const INITIAL: ChatSnapshot = { sources: null, notices: [], unreachable: false, sending: false, retrying: [], retryNotices: {} };
+const INITIAL: ChatSnapshot = { sources: null, notices: [], unreachable: false, sending: false, outgoing: null, retrying: [], retryNotices: {} };
 
 /** A refused submission or retry, as the reply the thread shows. */
 function noticeFor({ status, body }: Answer): ChatNotice {
@@ -204,10 +209,14 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
   };
   // `signed_out` is deduped here, not just in `load()`'s own 401 branch: a second retry or send can
   // also land its own 401 straight through `noticeFor`, once the session has actually expired — the
-  // dedupe has to hold for every caller of `say`, not only the polling GET's.
+  // dedupe has to hold for every caller of `say`, not only the polling GET's. Any other reply equal to
+  // the last one replaces it instead of stacking a copy (R2 spec 1); the new object gets a new key in
+  // ChatThread, so a screen reader hears it again.
   const say = (notice: ChatNotice) => {
     if (notice.kind === "signed_out" && snapshot.notices.some((existing) => existing.kind === "signed_out")) return;
-    set({ notices: [...snapshot.notices, notice] });
+    const last = snapshot.notices.at(-1);
+    const kept = last && JSON.stringify(last) === JSON.stringify(notice) ? snapshot.notices.slice(0, -1) : snapshot.notices;
+    set({ notices: [...kept, notice] });
   };
 
   function schedule() {
@@ -226,7 +235,9 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     }, POLL_MS);
   }
 
-  async function load() {
+  /** `sent`: this load follows the reader's own send, so the list it lands takes that send's bubble away
+   *  in the same snapshot, and the message never shows twice. */
+  async function load(sent = false) {
     const request = ++latest;
     // A fresh load supersedes whatever was scheduled before it. Cleared here, not left to
     // `schedule()`'s own `clearTimeout`, because the 401 branch below returns before reaching
@@ -241,7 +252,7 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     }
     if (request !== latest) return;
     if (answer?.status === 200 && Array.isArray(answer.body.sources)) {
-      set({ sources: answer.body.sources as MySource[], unreachable: false });
+      set({ sources: answer.body.sources as MySource[], unreachable: false, ...(sent ? { outgoing: null } : {}) });
     } else if (answer?.status === 401) {
       // Signed out: say so (deduped in `say`), clear `unreachable` so the two notices never sit side
       // by side, and stop — reopening (which reloads) is what restarts polling, not another tick.
@@ -254,9 +265,9 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     schedule();
   }
 
-  async function reload() {
+  async function reload(sent = false) {
     polls = 0;
-    await load();
+    await load(sent);
   }
 
   return {
@@ -288,7 +299,7 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         say({ kind: "no_link" });
         return false;
       }
-      set({ sending: true });
+      set({ sending: true, outgoing: { url: message.url, href: safeHref(message.url, message.url), note: message.note } });
       try {
         const answer = await transport.submit(message.url, message.note);
         if (answer.status !== 202) {
@@ -300,13 +311,13 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         // more_links notice, so that one still shows.
         set({ notices: [] });
         if (message.moreLinks) say({ kind: "more_links" });
-        await reload();
+        await reload(true);
         return true;
       } catch {
         say({ kind: "network" });
         return false;
       } finally {
-        set({ sending: false });
+        set({ sending: false, outgoing: null });
       }
     },
     /** "Újra": one request per source at a time. A 409 means another click already started it. A refusal

@@ -141,6 +141,9 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
   );
   const snapshot = useSyncExternalStore(chat.subscribe, chat.getSnapshot, chat.getSnapshot);
   const [text, setText] = useState("");
+  // The field's own send: while it is on its way, its text shows as the thread's bubble and the field is
+  // empty; a refused send gives it back. A card's queued link never hides what the reader is typing (R2 spec 1).
+  const [fieldSending, setFieldSending] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   // The reader is at the thread's end (within 40px, as of their last scroll): only then does it follow
   // what grows, so someone who scrolled up to read stays where they are.
@@ -192,7 +195,10 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
   }
 
   async function send() {
-    if (!(await submit(text))) return;
+    setFieldSending(true);
+    const sent = await submit(text);
+    setFieldSending(false);
+    if (!sent) return;
     setText("");
     // Send pressed from the keyboard has the focus; the next link goes in the field.
     input.current?.focus();
@@ -263,7 +269,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
         >
           <Textarea
             ref={input}
-            value={text}
+            value={fieldSending && snapshot.outgoing ? "" : text}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
               if (isSendKey(event.nativeEvent)) {

@@ -183,7 +183,7 @@
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
   Emellett jobb visszajelző effektek és további javítások. Előbb egy átvilágítás az egész appon: Playwright-mérések 360/768/1280 px-en és a lassú pontok felmérése. Ebből lesz egy jóváhagyandó terv.
   - A taiyaki link-chatből ide parkolt tételek:
-    - lassú küldésnél azonnal jelenjen meg egy „küldés…” buborék (optimista);
+    - [x] lassú küldésnél azonnal jelenjen meg egy „küldés…” buborék (optimista) (R2, 2026-10-01);
     - ink oldalon (Library, Archívum) a sarokgomb ink kerete és árnyéka eltűnik;
     - ha a gomb után semmi nem kapható fókuszba, az előre Tab a gomb és a panel között körbejár;
     - a Radar olvasópanelje saját Tab-hurkot tart; ha ezt javítjuk, a `tabPastPanel` közös helyre költözik;
@@ -192,7 +192,7 @@
     - iOS safe area: nincs `viewport-fit=cover`, ezért a Safariban minden `env(safe-area-inset-bottom)` 0;
     - az sr-only beszélő-előtag szóköze nem jut el a Chrome akadálymentességi fájába (a csomópontok amúgy is külön vannak);
     - a chat mezőjén a stock `Textarea` `shadow-xs`-e: a lenti fix(ui) pont része;
-    - több sikertelen küldés egyforma „Nem ment át, próbáld újra.” buborékokat halmoz a szál végére (csak a `signed_out` van összevonva);
+    - [x] több sikertelen küldés egyforma „Nem ment át, próbáld újra.” buborékokat halmoz a szál végére (csak a `signed_out` van összevonva) (R2, 2026-10-01);
     - egy másik beküldés sikeres „Újra”-ja nem törli a többi bejegyzés saját `signed_out` válaszát (`retryNotices`), az csak a saját „Újra”-ig vagy a panel bezárásáig marad;
     - a retry 403-a és 404-e „Nem ment át, próbáld újra.”-ként jelenik meg (ma egyik sem fordulhat elő);
     - [x] a zod kikerült a kliens csomagjából (R1); a `lib/client-bundle.test.ts` őrzi.
