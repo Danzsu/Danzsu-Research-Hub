@@ -198,7 +198,7 @@ export function DigestDashboard(
       total={items.length}
       syncing={syncing}
       todos={todos}
-      onAdd={(text) => store.addTodo(text)}
+      onAdd={(text, onFailed) => store.addTodo(text, undefined, onFailed)}
       onToggle={(id, done) => store.setTodoDone(id, done)}
       onDelete={deleteTodo}
     />

@@ -44,8 +44,8 @@ export function ReaderPanel({ language, progress, readCount, total, syncing, tod
   total: number;
   syncing: boolean;
   todos: Todo[];
-  /** False when nothing was added (blank text): the input keeps what was typed. */
-  onAdd: (text: string) => boolean;
+  /** False when nothing was added (blank text): the input keeps what was typed. `onFailed` runs if the write fails. */
+  onAdd: (text: string, onFailed: () => void) => boolean;
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
 }) {
@@ -53,7 +53,9 @@ export function ReaderPanel({ language, progress, readCount, total, syncing, tod
   const t = copy[language];
   const openTodos = todos.filter((item) => !item.done).length;
   const add = () => {
-    if (onAdd(text)) setText("");
+    const typed = text;
+    // A failed write gives the text back, unless the reader has already typed the next one (R2 spec 1).
+    if (onAdd(typed, () => setText((current) => current || typed))) setText("");
   };
 
   return (

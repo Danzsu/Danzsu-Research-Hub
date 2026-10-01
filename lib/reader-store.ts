@@ -270,8 +270,10 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
     },
     setFlag,
     toggleFlag: (itemId: string, flag: Flag) => setFlag(itemId, flag, !(snapshot.states[itemId] ?? EMPTY_ITEM_STATE)[flag]),
-    /** False when nothing was added: blank text, or the item already has a to-do. Trimmed and capped like parseStateAction (lib/state.ts). */
-    addTodo(rawText: string, itemId?: string): boolean {
+    /** False when nothing was added: blank text, or the item already has a to-do. Trimmed and capped like
+     *  parseStateAction (lib/state.ts). `onFailed` runs when the server refuses it, once its row is gone,
+     *  so the panel can give the text back (R2 spec 1). */
+    addTodo(rawText: string, itemId?: string, onFailed?: () => void): boolean {
       const text = rawText.trim().slice(0, TODO_TEXT_MAX);
       if (!text || (itemId !== undefined && snapshot.todos.some((item) => item.itemId === itemId))) return false;
       const tempId = nextTempId--;
@@ -287,6 +289,7 @@ export function createReaderStore(send: SendState, onError: () => void, initial?
           .catch(() => {
             setTodos(snapshot.todos.filter((item) => item.id !== tempId));
             onError();
+            onFailed?.();
           }),
       );
       return true;
