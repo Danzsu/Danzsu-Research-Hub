@@ -114,13 +114,14 @@ Once the Vercel project exists, `vercel env pull --environment=production .env.l
 
 **On the shared project**, everything is already set up and migrated up to `post_blocks`; the owner runs the rest (`drop_post_body`, `source_claims`) when TODO.md says so. Don't change its settings, and don't apply migrations to catch up. Ask the owner to invite you (*Authentication → Users → Invite user*).
 
-To sign in locally against it: request a link on `http://localhost:3000/login`. The email links to the production domain, because the templates build the link from the Site URL. Replace the link's origin with `http://localhost:3000`, keep the path and query, and open it. The token-hash callback ([`app/auth/callback/route.ts`](app/auth/callback/route.ts)) verifies on any origin. A link works only once, so don't open the production one first.
+To sign in locally against it: request a link on `http://localhost:3000/login`. The email links to the production domain, because the templates build the link from the Site URL. Replace the link's origin with `http://localhost:3000`, keep the path and query, and open it. The token-hash callback ([`app/auth/callback/route.ts`](app/auth/callback/route.ts)) verifies on any origin. A link works only once, so don't open the production one first. Google sign-in works locally too once the shared project lists `http://localhost:3000/**` among its Redirect URLs (the owner sets it).
 
 **On your own project**, set it up once:
 
 - *Authentication → Sign In / Providers:* turn off **Allow new users to sign up**. That is the invite list.
 - *Authentication → URL Configuration:* set the Site URL to `http://localhost:3000` (it's your project), and add `http://localhost:3000/**` to the Redirect URLs.
 - *Authentication → Email Templates:* point Magic Link at `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`, and Invite user at the same link with `type=invite`.
+- *Google sign-in* (optional): in the Google Cloud Console's Google Auth Platform, create a Web application client whose redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`, then turn on *Authentication → Sign In / Providers → Google* with its client ID and secret. Sign-ups stay off. TODO.md lists the steps in order.
 - *Authentication → SMTP Settings:* the built-in mailer delivers only to members of the project's Supabase team and only a few emails an hour, so set up a custom SMTP server before inviting anyone else.
 - Apply the migrations in the table below, then check the *Table Editor*: every table has RLS enabled.
 - *Authentication → Users → Invite user:* invite yourself.

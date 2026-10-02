@@ -35,6 +35,8 @@ Only `main` and the production deployment built from it get security fixes. Othe
 
 The invite gate, sign-in and session handling are in CLAUDE.md → Auth. What each table lets a reader do is in CLAUDE.md → Database.
 
+**Google sign-in.** Sign-ups stay off, so a Google account with no invited user is refused and nothing is created. Supabase links a Google identity to an invited user whenever Google says the email is verified and it matches. Google vouches only for `@gmail.com` addresses and Google Workspace accounts; for any other address `email_verified` can be stale, because the address may have changed hands. So members are invited only at their Gmail or Workspace address, the one their Google account uses; a member invited at another address signs in with the magic link. The mirror's system account is a `+radar` alias, never a Google account's primary address, so Google can't reach it. Removing a member means deleting or banning the user, which ends every way they sign in.
+
 After sign-in, the redirect target goes through `safeNext`. It accepts only same-site paths, and it checks them on the parsed URL, because the parser turns `/\t/evil.com` into `//evil.com`.
 
 ### Secrets

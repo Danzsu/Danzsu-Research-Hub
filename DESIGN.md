@@ -231,7 +231,7 @@ The remapped shadcn tokens:
 - `muted` is `#e8d9aa`, `muted-foreground` is `#6b6252` and `destructive` is `#c7352a`. They are only reached through vendored components, and no app code uses them directly.
 - The `sidebar-*` tokens serve the vendored shadcn sidebar, which the app no longer renders.
 
-Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-paper/45` to `/70`), and hairlines on ink are `border-paper/15` to `/30`. Three colour literals live outside `:root`: the `bg-[#1c1c1c]` of the Library and Archive cards on ink, `themeColor: "#141414"` (ink) in `app/layout.tsx`, which paints the mobile browser chrome, and `rgb(241 95 34 / …)` (signal at an opacity) in the `.live-pulse` ring in `globals.css`.
+Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-paper/45` to `/70`), and hairlines on ink are `border-paper/15` to `/30`. Four colour literals live outside `:root`: the `bg-[#1c1c1c]` of the Library and Archive cards on ink, `themeColor: "#141414"` (ink) in `app/layout.tsx`, which paints the mobile browser chrome, `rgb(241 95 34 / …)` (signal at an opacity) in the `.live-pulse` ring in `globals.css`, and the four colours of Google's "G" on the login page's Google button (`app/login/page.tsx`), which Google's brand rules ask to keep unchanged.
 
 **Contrast** (WCAG ratios, computed from the tokens):
 
