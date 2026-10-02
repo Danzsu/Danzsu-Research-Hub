@@ -155,6 +155,17 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **A Google-belépés beállítása** (a tulajdonosé, ebben a sorrendben; a kód nem függ tőle, a terv: [docs/superpowers/specs/2026-10-02-google-sign-in-design.md](docs/superpowers/specs/2026-10-02-google-sign-in-design.md)):
+  1. **Google Cloud Console → Google Auth Platform:**
+     - *Branding*: az app neve „NEON NEWS RADAR”, egy támogatási e-mail-cím;
+     - *Audience*: External (közzétenni nem kell, a csak név, e-mail és profil scope-okat kérő app tesztelési módban is korlátozás nélkül működik);
+     - *Data access*: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`;
+     - *Clients → Create client*: Web application; *Authorized redirect URIs*: `https://<projekt-ref>.supabase.co/auth/v1/callback` (a `<projekt-ref>` a Supabase projekt azonosítója, a Supabase URL-jében látszik);
+     - a *Client ID*-t és a *Client secret*-et csak a Supabase-be másold, sehova máshova.
+  2. **Supabase → Authentication → Sign In / Providers → Google:** bekapcsolás, a Client ID és a Client secret beillesztése, mentés. Az *Allow new users to sign up* maradjon **kikapcsolva** (ez a meghívásos kapu), és az *Email* szolgáltató maradjon bekapcsolva (a magic link tartalék).
+  3. **Supabase → Authentication → URL Configuration:** a *Site URL* marad a production domain (soha ne írd át); a *Redirect URLs* közé vedd fel a `http://localhost:3000/**`-ot a helyi próbához.
+  4. **A tagok címe:** minden tag Gmail- vagy Google Workspace-címen legyen meghívva, és az legyen a Google-fiókja elsődleges címe. Más szolgáltatónál lévő címen meghívott tag a magic linket használja (a Google csak a Gmail- és Workspace-címekért kezeskedik; SECURITY.md → Auth and the invite gate).
+  5. **A deploy után három próba:** egy tag belép Google-lel; egy nem meghívott Google-fiók a „Ez a Google-fiók nincs meghívva.” üzenetet kapja; egy megszakított Google-belépés az általános hibaüzenetet hozza.
 - [ ] **Élő próba az R2 deploy után** (a tulajdonos, bejelentkezve): egy hibás Mentés és Fordítás hibasora; egy újrakinyerés követése a poszt oldalán, nyitott szerkesztővel is; egy menükattintás egy futó Fordítás alatt (azonnal navigál); a lenyomott állapot egy valódi telefonon.
 - [ ] **Az „Olvasd itt” élesítése** (a tulajdonosé, ebben a sorrendben):
   1. *SQL Editor*: a `supabase/migrations/20260930000000_source_claims.sql` futtatása, **a push előtt** (a kód olvassa az oszlopot; az R2 óta a poszt oldala is, így nélküle minden poszt oldala hibaoldalt mutat);
