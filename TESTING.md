@@ -106,6 +106,8 @@ Importing it registers `tsx-hooks.ts`, whose `STUBS` map resolves `@/lib/supabas
 
 Call `resetRoute()` first in every test, and import this file by its relative path, because a second path would load a second instance. Then import the route with `await import("./route.ts")`.
 
+The sign-in routes (`app/auth/*`) run signed out and only use the client's `auth`. `lib/test/fake-auth.ts` gives them one: `fakeAuth(answers?)` resets the route, installs an auth stub as the reader's client and returns the log of every auth call with its argument; `authRequest(pathAndQuery, form?)` builds the `NextRequest`-shaped request (a `Request` with `nextUrl`) those routes read.
+
 No test loads `lib/supabase/server.ts` or `lib/language.ts`: the route tests get `route-hooks.ts` in the first one's place. `lib/content.ts` is loaded by `lib/content.test.ts` and by the state and cron routes' tests, with `server-only` mapped to the empty module.
 
 ### Fixtures

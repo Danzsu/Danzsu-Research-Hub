@@ -12,7 +12,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON N
 | --- | --- |
 | App | Next.js 16 App Router, React 19 |
 | Hosting and scheduler | Vercel, with Vercel Cron once a day |
-| Database, auth, files | Supabase: Postgres with RLS, magic-link auth, a private Storage bucket |
+| Database, auth, files | Supabase: Postgres with RLS, magic-link and Google sign-in, a private Storage bucket |
 | Styling | Tailwind 4 (CSS-first) and vendored shadcn/ui on the unified `radix-ui` package |
 | Models | Gemini (Google AI Studio) for curation, summaries, video, PDF transcription and translation; Groq for the cheap shortlist and cleanup passes. Plain `fetch`, no SDKs |
 
@@ -69,7 +69,7 @@ Every source ends up as the same block model ([`lib/blocks.ts`](lib/blocks.ts)):
 
 **Translation** ([`lib/translate.ts`](lib/translate.ts)) runs on demand from the post page. Only the text of the blocks goes to the model, in chunks; links, images and structure are copied from the original. A translation that finishes after the post was re-extracted is refused, and the reader is asked to retry.
 
-**Auth, RLS and the one reader write to posts.** Sign-in is a Supabase magic link, and sign-ups are disabled, so the member list is whoever was invited. Every table has row-level security: readers may read content, insert sources, and touch only their own read, saved and to-do rows. The pipeline writes content with the secret key. The one exception is the submitter's edits: the `update_post_overrides` database function checks that the caller submitted the post and then writes only its `overrides` and `hidden_blocks` columns.
+**Auth, RLS and the one reader write to posts.** Sign-in is a Supabase magic link or Google, and sign-ups are disabled, so the member list is whoever was invited. Every table has row-level security: readers may read content, insert sources, and touch only their own read, saved and to-do rows. The pipeline writes content with the secret key. The one exception is the submitter's edits: the `update_post_overrides` database function checks that the caller submitted the post and then writes only its `overrides` and `hidden_blocks` columns.
 
 **`model_settings`** is a table with one row per model task: a provider and model, plus an optional fallback. Editing a row changes the model on the next run, with no redeploy. API keys stay in environment variables. The task list and the seeded models are in [CLAUDE.md](CLAUDE.md#how-content-gets-in).
 
@@ -185,13 +185,13 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the title band, the language toggle, `post-blocks` (the block renderer), `page-skeletons` (each page shape's loading fallback) and `refresh-bar` (the top bar during a reader-started refresh) |
 | [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
 | [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron |
-| [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link login, callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login` |
+| [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link and Google sign-in, the callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login` |
 | [`app/media/`](app/media/) | Serves mirrored images to signed-in readers |
 | [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the feed list, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
 | [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, translation, the model client, content queries and their caches, the link chat's logic and your own submissions, the language cookie, Supabase clients, and `idle-prefetch` (the mobile "More" sheet's idle prefetch) |
-| [`lib/test/`](lib/test/) | The offline render harness for component tests, the route-handler stubs (`route-hooks.ts`), and a `Post` fixture (`testPost`) |
+| [`lib/test/`](lib/test/) | The offline render harness for component tests, the route-handler stubs (`route-hooks.ts`), the sign-in routes' Supabase auth stub (`fake-auth.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [DESIGN.md](DESIGN.md#dos-and-donts)) |
 | [`supabase/migrations/`](supabase/migrations/) | Schema, RLS, database functions, model seeds |

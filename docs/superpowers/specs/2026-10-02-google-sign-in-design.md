@@ -54,7 +54,7 @@ A tagok egy kattintással, Google-fiókkal is beléphessenek, levélváltás né
 
 1. **Google Cloud Console → Google Auth Platform:**
    - Branding: az app neve „NEON NEWS RADAR”, és egy támogatási e-mail-cím;
-   - Audience: External;
+   - Audience: External, majd Publish app → In production (alap scope-okkal nem kell Google-ellenőrzés, Testing módban viszont csak a teszt-felhasználók léphetnének be);
    - Data access: az `openid`, `email` és `profile` scope;
    - Clients: egy Web application kliens, ezzel az Authorized redirect URI-val: `https://<projekt-ref>.supabase.co/auth/v1/callback`;
    - a Client ID-t és a Client secretet csak a Supabase-be másold, ide ne.

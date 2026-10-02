@@ -19,7 +19,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 
 - `app/(app)/` holds the signed-in pages (`/`, `/companies`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list. Three more route groups hold one page each, `(radar)/` (`/`), `library/(list)/` and `archive/(list)/`, so that each page's `loading.tsx` wraps that page alone (CLAUDE.md → App shell and navigation). `companies/` is the AI companies page: `/` and it both render `current-week-page.tsx`, the current week's dashboard, the second with `scope="companies"`.
 - The rest of `app/`, outside the group:
-  - `login/` and `auth/` (login, callback, signout);
+  - `login/` and `auth/` (login, google, callback, signout);
   - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract), `cron/daily` and `cron/mirror`;
   - `media/[...path]/`, which serves the mirrored images to signed-in readers;
   - `dev/preview/`, the offline preview on fixtures;
@@ -102,7 +102,7 @@ Breaking one of these is a bug even when every test passes.
 
 ## Cross-cutting concerns
 
-- **Auth.** A Supabase magic link, invite-only. `proxy.ts` sends a signed-out visitor to `/login`, and every page and API route still checks the session itself (CLAUDE.md → Auth).
+- **Auth.** A Supabase magic link or Google sign-in, invite-only. `proxy.ts` sends a signed-out visitor to `/login`, and every page and API route still checks the session itself (CLAUDE.md → Auth).
 - **Language.** The reader's choice is the `lang` cookie, read on the server by `getLanguage()` and on the client by `useLanguage()`.
   - Some pages switch language in place (`switchesLanguageInPlace()` in `lib/nav.ts`): the Radar, the Library list, the archive and an archived week. Their client components read `copy[language]`, and their server components hand both languages to `<LocalizedText value={…} />`.
   - Every other page, such as a post, renders in the server's language, and the toggle refreshes it.
