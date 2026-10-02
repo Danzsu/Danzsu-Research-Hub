@@ -296,6 +296,21 @@ export function safeNext(value: unknown): string {
   }
 }
 
+/** Where a sign-in comes back to: /auth/callback with the post-login target (already through safeNext). */
+export function authCallback(origin: string, next: string): string {
+  const callback = new URL("/auth/callback", origin);
+  callback.searchParams.set("next", next);
+  return callback.toString();
+}
+
+/** The login page after a failed sign-in: the reason the page explains (app/login/page.tsx), and the target kept. */
+export function loginWithError(origin: string, reason: "1" | "google" | "not_invited", next: string): string {
+  const login = new URL("/login", origin);
+  login.searchParams.set("error", reason);
+  login.searchParams.set("next", next);
+  return login.toString();
+}
+
 /** `raw` resolved against `base`, kept only when it is an http(s) URL: the gate every rendered href
  *  passes. Here, zod-free, so the link chat can use it without pulling blocks.ts into the shell. */
 export function safeHref(raw: string | null | undefined, base: string): string | undefined {
