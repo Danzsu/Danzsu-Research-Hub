@@ -10,9 +10,19 @@ const back = async (query: string) => (await GET(authRequest(`/auth/callback${qu
 // and an unsafe `next` kept on the error path.
 test("the callback maps Google's refusals to not_invited or google, keeps a safe next, and opens no session", async () => {
   const calls = fakeAuth();
-  assert.equal(await back("?error=access_denied&error_code=signup_disabled&error_description=Signups+not+allowed+for+this+instance&next=%2Flibrary"), "http://localhost/login?error=not_invited&next=%2Flibrary");
-  assert.equal(await back("?error=access_denied&next=%2Flibrary"), "http://localhost/login?error=google&next=%2Flibrary");
-  assert.equal(await back("?error=server_error&code=abc&next=%2F%2Fevil.test"), "http://localhost/login?error=google&next=%2F");
+  assert.equal(await back("?next=%2Flibrary&via=google&error=access_denied&error_code=signup_disabled&error_description=Signups+not+allowed+for+this+instance"), "http://localhost/login?error=not_invited&next=%2Flibrary");
+  assert.equal(await back("?next=%2Flibrary&via=google&error=access_denied"), "http://localhost/login?error=google&next=%2Flibrary");
+  assert.equal(await back("?next=%2F%2Fevil.test&via=google&error=server_error&code=abc"), "http://localhost/login?error=google&next=%2F");
+  assert.deepEqual(calls, []);
+});
+
+// Final review, Important 1. GoTrue refuses a default magic link (expired, already used, opened first by a
+// mail scanner) by sending the reader back with an error too. Kills that shown as a Google failure to a
+// member who never touched Google: only a round trip marked via=google is Google's.
+test("the callback keeps a refused magic link on the link message, and opens no session", async () => {
+  const calls = fakeAuth();
+  assert.equal(await back("?next=%2Flibrary&error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired"), "http://localhost/login?error=1&next=%2Flibrary");
+  assert.equal(await back("?next=%2Flibrary&error=server_error"), "http://localhost/login?error=1&next=%2Flibrary");
   assert.deepEqual(calls, []);
 });
 

@@ -296,10 +296,12 @@ export function safeNext(value: unknown): string {
   }
 }
 
-/** Where a sign-in comes back to: /auth/callback with the post-login target (already through safeNext). */
-export function authCallback(origin: string, next: string): string {
+/** Where a sign-in comes back to: /auth/callback with the post-login target (already through safeNext).
+ *  `via` marks a Google round trip, so the callback can tell Google's refusals from a refused magic link. */
+export function authCallback(origin: string, next: string, via?: "google"): string {
   const callback = new URL("/auth/callback", origin);
   callback.searchParams.set("next", next);
+  if (via) callback.searchParams.set("via", via);
   return callback.toString();
 }
 

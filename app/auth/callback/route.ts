@@ -10,10 +10,12 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const origin = request.nextUrl.origin;
   const next = safeNext(params.get("next"));
-  // Refused: sign-ups are off, so an uninvited Google account gets signup_disabled; anything else (the
-  // reader cancelled at Google) is a plain Google failure. No session is tried, even with a stray code.
+  // Refused, and no session is tried, even with a stray code. Sign-ups are off, so an uninvited Google account
+  // gets signup_disabled. Any other refusal of a round trip marked via=google (the reader cancelled at
+  // Google) is a Google failure; GoTrue refuses an expired or used magic link this way too, and that stays
+  // the link message.
   if (params.get("error")) {
-    const reason = params.get("error_code") === "signup_disabled" ? "not_invited" : "google";
+    const reason = params.get("error_code") === "signup_disabled" ? "not_invited" : params.get("via") === "google" ? "google" : "1";
     return NextResponse.redirect(loginWithError(origin, reason, next));
   }
   const tokenHash = params.get("token_hash");
