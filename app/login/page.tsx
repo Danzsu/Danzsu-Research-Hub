@@ -55,7 +55,8 @@ export default async function LoginPage({
           <ErrorLine className="mt-7">{failure && both(failure)}</ErrorLine>
           <form action="/auth/google" method="post" className="mt-7">
             <input type="hidden" name="next" value={target} />
-            <Button type="submit" variant="brutal" className="min-h-10 w-full">
+            {/* Wraps on a narrow phone: the two-language label is wider than the 360px card. */}
+            <Button type="submit" variant="brutal" className="h-auto min-h-10 w-full whitespace-normal py-2">
               <GoogleMark /> {both(copy.google)}
             </Button>
           </form>
