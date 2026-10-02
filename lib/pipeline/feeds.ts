@@ -11,7 +11,6 @@ export const feeds: Array<{ name: string; url: string; hint: DigestCategory; lim
   { name: "arXiv cs.AI", url: "https://rss.arxiv.org/rss/cs.AI", hint: "research", limit: 40 },
   { name: "Hugging Face", url: "https://huggingface.co/blog/feed.xml", hint: "local" },
   { name: "Ollama", url: "https://ollama.com/blog/rss.xml", hint: "local" },
-  { name: "r/LocalLLaMA", url: "https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day", hint: "local", limit: 15 },
   { name: "Simon Willison", url: "https://simonwillison.net/atom/everything/", hint: "local", limit: 15 },
   { name: "OpenAI", url: "https://openai.com/news/rss.xml", hint: "companies" },
   { name: "Google DeepMind", url: "https://deepmind.google/blog/rss.xml", hint: "companies" },

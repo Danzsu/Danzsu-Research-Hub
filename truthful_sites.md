@@ -40,7 +40,6 @@ A promóciót és az ismétlést két szűrő tartja távol:
 | arXiv cs.AI | `https://rss.arxiv.org/rss/cs.AI` | research | 40 | elsődleges (preprint, nem lektorált) |
 | Hugging Face | `https://huggingface.co/blog/feed.xml` | local | 25 | elsődleges |
 | Ollama | `https://ollama.com/blog/rss.xml` | local | 25 | elsődleges |
-| r/LocalLLaMA | `https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day` | local | 15 | közösségi |
 | Simon Willison | `https://simonwillison.net/atom/everything/` | local | 15 | elsődleges (független szakértő) |
 | OpenAI | `https://openai.com/news/rss.xml` | companies | 25 | elsődleges (céges) |
 | Google DeepMind | `https://deepmind.google/blog/rss.xml` | companies | 25 | elsődleges (céges) |
@@ -124,6 +123,7 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 | --- | --- |
 | Google Scholar | Nincs API-ja, és a feltételei tiltják a letöltést. Helyette: Semantic Scholar, OpenAlex. |
 | xAI | Az x.ai minden automatikus kérést 403-mal elutasít (2026-09-29), a közösségi tükör xAI-csatornája pedig 2026 májusa óta áll. Helyette: a `Grok` Hacker News-lekérdezés és a The Decoder. |
+| Reddit (r/LocalLLaMA) | A tulajdonos döntése (2026-10-02): közösségi fórum, nem szerkesztett, ellenőrzött forrás. A helyi modellek híreit a Hugging Face, az Ollama és Simon Willison hozza. |
 | LinkedIn | Bejelentkezéshez kötött, nincs nyilvános csatornája, és a felhasználási feltételei tiltják a gépi gyűjtést (az RSS-hidak is így gyűjtenek). A hivatalos API (Community Management API) csak a saját, adminisztrált oldalak posztjait adja, jóváhagyott alkalmazással. A cégek ugyanazt jellemzően a saját blogjukon vagy hírlevelükben is közlik; lásd a GenAI Works-öt a jelöltek között. |
 
 ## Új forrás felvétele
