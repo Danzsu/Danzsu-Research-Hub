@@ -391,6 +391,8 @@ test("getGithubRepos throws on a failed query, with the PostgREST error as the c
 
 // G1 spec 5 and Review Focus 4. Kills the order lost (the latest ❤ first), a gone target kept as a broken
 // row, a post shown with the model's title over the reader's own, and a 👍 listed as a favourite.
+// Final review: a ❤ repo that fell out of the week's final Top 10 (the daily run rewrites it by rank) has
+// no github_repos row, so it is kept from its own id; an id that isn't a repo path is left out.
 test("getFavorites lists the reader's ❤ items, posts and repos, latest first, and leaves out what is gone", async () => {
   const db = fakeDb(undefined, {
     rows: {
@@ -400,6 +402,8 @@ test("getFavorites lists the reader's ❤ items, posts and repos, latest first, 
         { target_kind: "post", target_id: "99", value: 2, updated_at: "2026-10-01T10:00:00Z" },
         { target_kind: "item", target_id: "local-2026w39-a", value: 2, updated_at: "2026-09-30T10:00:00Z" },
         { target_kind: "item", target_id: "local-2026w39-b", value: 1, updated_at: "2026-09-29T10:00:00Z" },
+        { target_kind: "repo", target_id: "dropped/tool", value: 2, updated_at: "2026-09-28T10:00:00Z" },
+        { target_kind: "repo", target_id: "javascript:alert(1)", value: 2, updated_at: "2026-09-27T10:00:00Z" },
       ],
       digest_items: [
         { id: "local-2026w39-a", issue_id: "2026-W39", title: { hu: "Hír", en: "News" }, url: "https://blog.test/a", source: "Blog" },
@@ -413,6 +417,7 @@ test("getFavorites lists the reader's ❤ items, posts and repos, latest first, 
     { kind: "post", id: "7", title: { hu: "Saját", en: "Own" }, href: "/library/7", external: false, detail: null },
     { kind: "repo", id: "owner/tool", title: "Owner/Tool", href: "https://github.com/owner/tool", external: true, detail: "W40" },
     { kind: "item", id: "local-2026w39-a", title: { hu: "Hír", en: "News" }, href: "https://blog.test/a", external: true, detail: "Blog · W39" },
+    { kind: "repo", id: "dropped/tool", title: "dropped/tool", href: "https://github.com/dropped/tool", external: true, detail: null },
   ]);
 });
 

@@ -11,7 +11,7 @@ import type {
 import { readOverrides } from "@/lib/overrides";
 import { toPost } from "@/lib/post-row";
 import { shownTitle, type Post } from "@/lib/post-view";
-import { archiveLabel, inChunks, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
+import { archiveLabel, githubRepo, inChunks, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
 import { RATING_FILTERS, ratingKey, ratingTargetId, type RatingFilter, type RatingKind, type RatingTarget, type RatingValue, type Ratings } from "@/lib/ratings";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 import { createAdminClient, type Reader } from "@/lib/supabase/server";
@@ -276,7 +276,9 @@ async function lookUp<T>(ids: T[], run: (chunk: T[]) => PromiseLike<Lookup>): Pr
 }
 
 /** The reader's ❤ items, posts and repos, the latest first (G1 spec 5). A ❤ whose target is gone (a deleted
- *  post) is left out. Throws on a failed query: this list is the page's content. */
+ *  post) is left out, except a repo: one that fell out of its week's final Top 10 (the daily run rewrites the
+ *  week's rows by rank) has no github_repos row, so it is kept from its own id. Throws on a failed query:
+ *  this list is the page's content. */
 export async function getFavorites(db: SupabaseClient): Promise<Favorite[]> {
   const { data: hearts, error } = await db.from("ratings").select("target_kind, target_id, updated_at").eq("value", 2).order("updated_at", { ascending: false });
   if (error) throw queryFailed("favorites", error);
@@ -298,6 +300,11 @@ export async function getFavorites(db: SupabaseClient): Promise<Favorite[]> {
   for (const row of posts.data ?? []) {
     const title = shownTitle(row.title, readOverrides(row.overrides));
     found.set(`post:${row.id}`, { kind: "post", id: String(row.id), title, href: `/library/${row.id}`, external: false, detail: null });
+  }
+  for (const id of repoIds) {
+    const url = URL.parse(`https://github.com/${id}`);
+    const repo = url && githubRepo(url);
+    if (repo) found.set(`repo:${id}`, { kind: "repo", id, title: id, href: `https://github.com/${repo.owner}/${repo.repo}`, external: true, detail: null });
   }
   for (const row of repos.data ?? []) {
     const detail = String(row.last_week).slice(5);
