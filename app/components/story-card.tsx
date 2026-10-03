@@ -6,6 +6,7 @@ import { nextCardIndex } from "@/lib/keymap";
 import { parseSubmittedUrl } from "@/lib/pipeline/util";
 import type { Flag, ItemState } from "@/lib/reader-store";
 import { PendingDot } from "./nav-parts";
+import { pressedClass } from "./rating-control";
 import { Tag } from "./tag";
 
 const copy = {
@@ -53,7 +54,6 @@ export type CardProps = {
   postId?: number;
 };
 
-const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
 
 /** Makes a card a j/k stop: focusable from script (not by Tab) and findable by id. */
 const cardFocus = (itemId: string) => ({ tabIndex: -1, "data-card-id": itemId });

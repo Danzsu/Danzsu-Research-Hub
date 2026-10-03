@@ -36,6 +36,8 @@ const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
 const { CHAT_PANEL_ID, LinkChat, ReadHereContext, TaiyakiButton } = await import("./link-chat.tsx");
 const { RefreshBar, RefreshProvider } = await import("./refresh-bar.tsx");
+const { RatingsProvider } = await import("./rating-control.tsx");
+const sendNothing = { send: async () => ({}) };
 const { PostToolbar } = await import("../(app)/library/[id]/post-toolbar.tsx");
 const { useReaderState } = await import("./use-reader-state.ts");
 
@@ -50,7 +52,7 @@ const withShellProviders = <P extends object>(Component: ComponentType<P>, props
     createElement(
       LanguageProvider,
       { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-      createElement(RefreshProvider, null, createElement(ReadHereContext, { value: noop }, createElement(Component, props))),
+      createElement(RatingsProvider, sendNothing, createElement(RefreshProvider, null, createElement(ReadHereContext, { value: noop }, createElement(Component, props)))),
     ),
   );
 /** Renders DigestDashboard from a real seed (never preview) and returns its body text. */
@@ -414,7 +416,11 @@ test("useReadHere outside AppShell throws, naming where the provider lives", () 
       createElement(
         LanguageProvider,
         { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-        createElement(RefreshProvider, null, createElement(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } })),
+        createElement(
+          RatingsProvider,
+          sendNothing,
+          createElement(RefreshProvider, null, createElement(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } })),
+        ),
       ),
     );
   assert.throws(bare, /useReadHere must be used inside AppShell \(app\/components\/app-shell\.tsx\)/);

@@ -393,45 +393,48 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
 
 ```tsx app/components/app-shell.tsx
     <LanguageProvider initial={language}>
-      <RefreshProvider>
-        <ReadHereContext value={readHere}>
-          <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
-            {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
-                so none of them covers the end of the page. The corner one's goes inside the page's own last element,
-                so that page's surface runs on under it. */}
-            <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
-          </DesktopNav>
-        </ReadHereContext>
-        <MobileNav
-          email={email}
-          onSearch={openSearch}
-          chat={
-            <TaiyakiButton
-              open={chatOpen}
-              onClick={toggleChat}
-              className="-mt-[18px] grid size-14 self-start justify-self-center shadow-[3px_3px_0_var(--signal)]"
-            />
-          }
-        />
-        <TaiyakiButton
-          open={chatOpen}
-          onClick={toggleChat}
-          className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
-        />
-        {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
-        <LinkChat
-          key={`${chatPreview?.failWrites}:${chatPreview?.delayMs}`}
-          open={chatOpen}
-          onOpenChange={setChatOpen}
-          opener={chatOpener}
-          preview={chatPreview}
-          queuedLink={queuedLink}
-          onQueuedLinkTaken={() => setQueuedLink(null)}
-        />
-        <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
-        <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
-        <UndoToast />
-      </RefreshProvider>
+      {/* The preview's ratings stay in memory, like its other writes. */}
+      <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
+        <RefreshProvider>
+          <ReadHereContext value={readHere}>
+            <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
+              {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
+                  so none of them covers the end of the page. The corner one's goes inside the page's own last element,
+                  so that page's surface runs on under it. */}
+              <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
+            </DesktopNav>
+          </ReadHereContext>
+          <MobileNav
+            email={email}
+            onSearch={openSearch}
+            chat={
+              <TaiyakiButton
+                open={chatOpen}
+                onClick={toggleChat}
+                className="-mt-[18px] grid size-14 self-start justify-self-center shadow-[3px_3px_0_var(--signal)]"
+              />
+            }
+          />
+          <TaiyakiButton
+            open={chatOpen}
+            onClick={toggleChat}
+            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+          />
+          {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
+          <LinkChat
+            key={`${chatPreview?.failWrites}:${chatPreview?.delayMs}`}
+            open={chatOpen}
+            onOpenChange={setChatOpen}
+            opener={chatOpener}
+            preview={chatPreview}
+            queuedLink={queuedLink}
+            onQueuedLinkTaken={() => setQueuedLink(null)}
+          />
+          <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+          <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
+          <UndoToast />
+        </RefreshProvider>
+      </RatingsProvider>
     </LanguageProvider>
 ```
 
@@ -564,14 +567,14 @@ In use (`app/(app)/library/library-view.tsx`):
         "icon-lg": "size-10",
 ```
 
-The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does, and a toggle shows its pressed state in ink (both from `story-card.tsx`). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
+The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-control.tsx`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
 
 ```tsx app/components/story-card.tsx
 <Button asChild variant="ink" className="min-h-10">
 ```
 
-```tsx app/components/story-card.tsx
-const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
+```tsx app/components/rating-control.tsx
+export const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
 ```
 
 ### `focus-ring`
