@@ -11,7 +11,7 @@ import type {
 import { readOverrides } from "@/lib/overrides";
 import { toPost } from "@/lib/post-row";
 import { shownTitle, type Post } from "@/lib/post-view";
-import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
+import { archiveLabel, inChunks, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
 import { RATING_FILTERS, ratingKey, ratingTargetId, type RatingFilter, type RatingKind, type RatingTarget, type RatingValue, type Ratings } from "@/lib/ratings";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 import { createAdminClient, type Reader } from "@/lib/supabase/server";
@@ -189,15 +189,15 @@ export async function getReadPostIds(db: SupabaseClient): Promise<Set<number>> {
 /** The reader's own ratings on `targets`, by ratingKey (RLS: own rows only). Like getReadPostIds, a failure
  *  only costs showing them, so it logs and answers none (G1 spec 3). */
 export async function getRatings(db: SupabaseClient, targets: RatingTarget[]): Promise<Ratings> {
-  if (!targets.length) return {};
   const wanted = new Set(targets.map(ratingKey));
-  const { data, error } = await db.from("ratings").select("target_kind, target_id, value").in("target_id", [...new Set(targets.map(ratingTargetId))]);
-  if (error) {
-    console.error("ratings query failed", error);
+  const answers = await inChunks([...new Set(targets.map(ratingTargetId))], (ids) => db.from("ratings").select("target_kind, target_id, value").in("target_id", ids));
+  const failed = answers.find((answer) => answer.error);
+  if (failed) {
+    console.error("ratings query failed", failed.error);
     return {};
   }
   const ratings: Ratings = {};
-  for (const row of data) {
+  for (const row of answers.flatMap((answer) => answer.data ?? [])) {
     const key = ratingKey({ kind: row.target_kind as RatingKind, id: row.target_id as string });
     if (wanted.has(key)) ratings[key] = row.value as RatingValue;
   }
@@ -268,9 +268,12 @@ export async function getGithubRepos(
 export type Favorite = { kind: RatingKind; id: string; title: Localized | string; href: string; external: boolean; detail: string | null };
 
 type Row = Record<string, unknown>;
-/** A lookup that skips the query when there is nothing to look up. */
-const lookUp = (ids: unknown[], run: () => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>) =>
-  ids.length ? run() : Promise.resolve({ data: [] as Row[], error: null });
+type Lookup = { data: Row[] | null; error: { message: string } | null };
+/** A lookup by id in chunks (inChunks), as one answer: the first failure, or every row; no query for no ids. */
+async function lookUp<T>(ids: T[], run: (chunk: T[]) => PromiseLike<Lookup>): Promise<Lookup> {
+  const answers = await inChunks(ids, run);
+  return answers.find((answer) => answer.error) ?? { data: answers.flatMap((answer) => answer.data ?? []), error: null };
+}
 
 /** The reader's ❤ items, posts and repos, the latest first (G1 spec 5). A ❤ whose target is gone (a deleted
  *  post) is left out. Throws on a failed query: this list is the page's content. */
@@ -282,9 +285,9 @@ export async function getFavorites(db: SupabaseClient): Promise<Favorite[]> {
   const postIds = idsOf("post").map(Number).filter(Number.isInteger);
   const repoIds = idsOf("repo");
   const [items, posts, repos] = await Promise.all([
-    lookUp(itemIds, () => db.from("digest_items").select("id, issue_id, title, url, source").in("id", itemIds)),
-    lookUp(postIds, () => db.from("posts").select("id, title, overrides").in("id", postIds)),
-    lookUp(repoIds, () => db.from("github_repos").select("repo_key, repo, url, last_week").in("repo_key", repoIds)),
+    lookUp(itemIds, (chunk) => db.from("digest_items").select("id, issue_id, title, url, source").in("id", chunk)),
+    lookUp(postIds, (chunk) => db.from("posts").select("id, title, overrides").in("id", chunk)),
+    lookUp(repoIds, (chunk) => db.from("github_repos").select("repo_key, repo, url, last_week").in("repo_key", chunk)),
   ]);
   for (const result of [items, posts, repos]) if (result.error) throw queryFailed("favorites", result.error);
   const found = new Map<string, Favorite>();

@@ -313,6 +313,19 @@ test("getRatings answers the reader's own ratings by key, and a failed query log
   assert.equal(logged.mock.callCount(), 1);
 });
 
+/** The value lists a fake db's `.in(...)` calls on `table` received, one per query. */
+const inLists = (db: ReturnType<typeof fakeDb>, table: string) =>
+  db.queries.filter((query) => query.table === table).flatMap(({ calls }) => calls.filter(([method]) => method === "in").map(([, , values]) => values as unknown[]));
+
+// Final review. Kills one `.in(...)` with every id: a busy week's hundred-odd ids pass PostgREST's URL-length
+// limit, and every rating on the Radar would vanish with the failed query.
+test("getRatings looks the ids up 30 at a time and answers every chunk's ratings", async () => {
+  const targets = Array.from({ length: 31 }, (_, index) => ({ kind: "item" as const, id: `local-2026w39-${index}` }));
+  const db = fakeDb(undefined, { rows: { ratings: [{ target_kind: "item", target_id: "local-2026w39-0", value: 2 }, { target_kind: "item", target_id: "local-2026w39-30", value: -1 }] } });
+  assert.deepEqual(await getRatings(db, targets), { "item:local-2026w39-0": 2, "item:local-2026w39-30": -1 });
+  assert.deepEqual(inLists(db, "ratings").map((values) => values.length), [30, 1]);
+});
+
 // Review Focus 3. Kills a page number taken as written (NaN, 0, or a 999-page query).
 test("githubPage reads a page from 1 to 20, and anything else as 1", () => {
   assert.deepEqual(["1", "3", "20", "21", "999", "0", "-2", "abc", undefined].map(githubPage), [1, 3, 20, 20, 20, 1, 1, 1, 1]);
@@ -401,4 +414,25 @@ test("getFavorites lists the reader's ❤ items, posts and repos, latest first, 
     { kind: "repo", id: "owner/tool", title: "Owner/Tool", href: "https://github.com/owner/tool", external: true, detail: "W40" },
     { kind: "item", id: "local-2026w39-a", title: { hu: "Hír", en: "News" }, href: "https://blog.test/a", external: true, detail: "Blog · W39" },
   ]);
+});
+
+// Final review. Kills a ❤ lookup sent in one `.in(...)`: a reader's hearts only grow, and past the URL-length
+// limit the collection would fail to an error page.
+test("getFavorites looks the ❤ items up 30 at a time", async () => {
+  const ids = Array.from({ length: 31 }, (_, index) => `local-2026w39-${index}`);
+  const db = fakeDb(undefined, {
+    rows: {
+      ratings: ids.map((id) => ({ target_kind: "item", target_id: id, value: 2, updated_at: "2026-10-01T10:00:00Z" })),
+      digest_items: ids.map((id) => ({ id, issue_id: "2026-W39", title: { hu: id, en: id }, url: `https://blog.test/${id}`, source: "Blog" })),
+    },
+  });
+  assert.equal((await getFavorites(db)).length, 31);
+  assert.deepEqual(inLists(db, "digest_items").map((values) => values.length), [30, 1]);
+});
+
+// Kills a failed lookup answered as no rows: the collection would quietly show fewer hearts instead of the error page.
+test("getFavorites throws when a lookup fails, with the PostgREST error as the cause", async () => {
+  const error = pgError("08006", "connection failure");
+  const db = fakeDb(undefined, { rows: { ratings: [{ target_kind: "item", target_id: "a", value: 2, updated_at: "2026-10-01T10:00:00Z" }] }, tableErrors: { digest_items: error } });
+  await assert.rejects(getFavorites(db), (e: unknown) => e instanceof Error && e.cause === error);
 });

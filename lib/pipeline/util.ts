@@ -377,6 +377,15 @@ export const errorMessage = (error: unknown): string => {
   return typeof message === "string" ? message : String(error);
 };
 
+/** Values per `.in(...)` lookup: a list this long stays far under PostgREST's URL-length limit. */
+export const LOOKUP_CHUNK = 30;
+
+/** `lookup` over `values` in slices of LOOKUP_CHUNK, side by side; the answers in slice order, none for no values. */
+export function inChunks<T, R>(values: T[], lookup: (chunk: T[]) => PromiseLike<R>): Promise<R[]> {
+  const chunks = Array.from({ length: Math.ceil(values.length / LOOKUP_CHUNK) }, (_, index) => values.slice(index * LOOKUP_CHUNK, (index + 1) * LOOKUP_CHUNK));
+  return Promise.all(chunks.map(lookup));
+}
+
 /** The fulfilled values, in order; each rejection is logged as `<label(index)>: <reason>` and skipped. */
 export function settledValues<T>(results: PromiseSettledResult<T>[], label: (index: number) => string): T[] {
   return results.flatMap((result, index) => {
