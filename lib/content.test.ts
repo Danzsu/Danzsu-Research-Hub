@@ -36,10 +36,20 @@ const issueRow = (id: string, overrides: Record<string, unknown> = {}) => ({
 
 // Kills a mapping that re-sorts or drops the embedded rows (the database orders them: must_read, then
 // score), a tuple with its fields swapped, and an issue id that isn't the row's.
-test("getRadar maps the one embedded answer: the items in the database's order, the repos as tuples, the week's id", async () => {
+test("getRadar maps the one embedded answer: the items in the database's order, the repos with their score, the week's id", async () => {
   const items = [itemRow("2609.00002", 80, true), itemRow("2609.00001", 95)];
   const db = fakeDb(undefined, {
-    rows: { issues: [issueRow("2026-W38", { digest_items: items, github_top: [{ repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool" }] })] },
+    rows: {
+      issues: [
+        issueRow("2026-W38", {
+          digest_items: items,
+          github_top: [
+            { repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool", stars: 120, language: "Go", score: 77 },
+            { repo: "owner/old", focus: "Before G1", url: "https://github.com/owner/old", stars: null, language: null, score: null },
+          ],
+        }),
+      ],
+    },
   });
   const radar = await getRadar(db, "2026-W38");
   assert.deepEqual(radar?.issue, { id: "2026-W38", label: "2026 / W38", updated: "09. 20. 07:00", archiveAt: "09. 20." });
@@ -60,7 +70,10 @@ test("getRadar maps the one embedded answer: the items in the database's order, 
     summary: text("Summary."),
     why: text("Why."),
   });
-  assert.deepEqual(radar?.githubTop10, [["owner/tool", "A tool", "https://github.com/owner/tool"]]);
+  assert.deepEqual(radar?.githubTop10, [
+    { repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool", stars: 120, language: "Go", score: 77 },
+    { repo: "owner/old", focus: "Before G1", url: "https://github.com/owner/old", stars: null, language: null, score: null },
+  ]);
 });
 
 // Kills the embeds' order dropped or aimed at the wrong table (the Top 3 would no longer lead), a
@@ -73,7 +86,7 @@ test("getRadar asks for the named week or the latest issue in one query, with th
   assert.deepEqual([empty?.items, empty?.githubTop10], [[], []]);
   const select = [
     "select",
-    "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url)",
+    "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url, stars, language, score)",
   ];
   const embedOrder = [
     ["order", "must_read", { ascending: false, referencedTable: "digest_items" }],
@@ -184,7 +197,7 @@ test("archivedWeek reads a closed week through the one-day cache and the admin c
   const radar = await archivedWeek(reader, "2026-W38", wednesdayW39);
   assert.deepEqual(radar, { issue: { id: "2026-W38", label: "2026 / W38", updated: "09. 20. 07:00", archiveAt: "09. 20." }, items: [], githubTop10: [] });
   assert.equal(routeStub.adminCalls, 1);
-  assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v2"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
+  assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v3"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
 });
 
 // Kills `<` → `<=`: the week still being collected would be frozen for a day, and a reader would miss

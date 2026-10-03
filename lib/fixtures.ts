@@ -69,8 +69,9 @@ export const previewItems: DigestItem[] = [
 ];
 
 export const previewGithub: GithubTopEntry[] = [
-  ["ggml-org/llama.cpp", "LLM inference in C/C++", "https://github.com/ggml-org/llama.cpp"],
-  [`example/${LONG_WORD}`, "Egy nagyon hosszú nevű repó / a repository with a very long name", "https://github.com/example/long"],
+  { repo: "ggml-org/llama.cpp", focus: "LLM inference in C/C++", url: "https://github.com/ggml-org/llama.cpp", stars: 81000, language: "C++", score: 92 },
+  // A week before G1: no stars, language or score.
+  { repo: `example/${LONG_WORD}`, focus: "Egy nagyon hosszú nevű repó / a repository with a very long name", url: "https://github.com/example/long", stars: null, language: null, score: null },
 ];
 
 export const previewArchive: ArchiveIssue[] = [

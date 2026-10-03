@@ -31,7 +31,7 @@ function queryFailed(what: string, error: { message: string }): Error {
 }
 
 const RADAR_COLUMNS =
-  "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url)";
+  "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url, stars, language, score)";
 
 /**
  * The latest issue, or the one `issueId` names ('2026-W38'), with its items and repos embedded: one
@@ -78,7 +78,7 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
       summary: row.summary as Localized,
       why: row.why as Localized,
     })),
-    githubTop10: latest.github_top.map((row) => [row.repo, row.focus, row.url] as const),
+    githubTop10: latest.github_top.map(({ repo, focus, url, stars, language, score }) => ({ repo, focus, url, stars, language, score })),
   };
 }
 
@@ -109,12 +109,13 @@ async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
 // reachable only through archivedWeek and archiveList, which take a signed-in Reader.
 // ⚠️ Next's data cache outlives a deploy (unstable_cache.md): bump the key's version whenever RadarData
 // or ArchiveIssue changes shape, or a deploy serves the old shape for up to a day. v2: items gained addedAt.
+// v3: githubTop10 rows became objects with stars, language and score.
 const ONE_DAY = 86_400;
 /** The daily cron's revalidateTag drops the archive list with this tag. */
 export const ARCHIVE_TAG = "archive";
 
 // A closed week never changes, so it needs no tag: a day later Next refills it in the background.
-const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v2"], { revalidate: ONE_DAY });
+const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v3"], { revalidate: ONE_DAY });
 const cachedArchive = unstable_cache(() => getArchive(createAdminClient()), ["archive-list", "v1"], { revalidate: ONE_DAY, tags: [ARCHIVE_TAG] });
 
 /** The type keeps a signed-out caller away from the caches; this keeps one whose types were cast. */

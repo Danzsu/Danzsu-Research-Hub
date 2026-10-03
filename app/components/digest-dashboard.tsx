@@ -308,7 +308,7 @@ export function DigestDashboard(
                 <SectionLabel icon={GitFork} label="GITHUB / TOP 10" />
                 {githubTop10.length ? (
                   <div className="grid gap-3 @2xl:grid-cols-2">
-                    {githubTop10.map(([repo, focus, url], index) => (
+                    {githubTop10.map(({ repo, focus, url }, index) => (
                       <a
                         key={repo}
                         href={url}
