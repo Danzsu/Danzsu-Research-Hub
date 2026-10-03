@@ -54,5 +54,15 @@ export async function POST(request: Request) {
       const { error } = await db.from("todos").delete().eq("id", parsed.id);
       return error ? failed(error) : NextResponse.json({ ok: true });
     }
+    case "set_rating": {
+      // RLS scopes both to the caller's own row, like the to-dos.
+      const { error } =
+        parsed.value === null
+          ? await db.from("ratings").delete().eq("target_kind", parsed.kind).eq("target_id", parsed.id)
+          : await db
+              .from("ratings")
+              .upsert({ target_kind: parsed.kind, target_id: parsed.id, value: parsed.value, updated_at: now }, { onConflict: "user_id,target_kind,target_id" });
+      return error ? failed(error) : NextResponse.json({ ok: true });
+    }
   }
 }

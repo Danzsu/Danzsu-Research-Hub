@@ -48,6 +48,8 @@ export type FakeIngestTables = {
   rows?: Record<string, Record<string, unknown>[]>;
   /** Forces any other table's select, by table name, to resolve with this error instead of its rows. */
   tableErrors?: Record<string, PostgrestErrorShape>;
+  /** Forces any other table's upsert or delete, by table name, to resolve with this error. */
+  tableWriteErrors?: Record<string, PostgrestErrorShape>;
 };
 
 export type FakeIngestDb = SupabaseClient & {
@@ -81,6 +83,8 @@ export type FakeIngestDb = SupabaseClient & {
   rpcCalls: { name: string; args: Record<string, unknown> }[];
   /** Every UPSERT into a table other than `posts` (issues, digest_items, github_top), in call order. */
   upserts: { table: string; values: unknown; options: Record<string, unknown> }[];
+  /** Every other table's delete, in call order: the table and its `.eq(...)` filters. */
+  deletes: { table: string; filters: [column: string, value: unknown][] }[];
   /** Every `select().gte(column, value)` against a table other than `posts`/`sources`, in call order. */
   gteCalls: { table: string; column: string; value: unknown }[];
   /** Every select chain against a table other than `model_settings`/`sources`/`posts`, in call order:
@@ -208,6 +212,12 @@ function tableQuery(rows: Record<string, unknown>[], error: PostgrestErrorShape 
     like: (column: string, pattern: string) => {
       kept.push((row) => !(column in row) || likes(String(row[column]), pattern));
       return record("like", column, pattern);
+    },
+    in: filter("in"),
+    // SQL's `is`: null matches only null (passes() treats a null value as no match).
+    is: (column: string, value: unknown) => {
+      kept.push((row) => !(column in row) || (row[column] ?? null) === value);
+      return record("is", column, value);
     },
     gte: (column: string, value: unknown) => {
       onGte(column, value);
@@ -342,6 +352,7 @@ export function fakeDb(
   const writes: FakeIngestDb["writes"] = [];
   const rpcCalls: FakeIngestDb["rpcCalls"] = [];
   const upserts: FakeIngestDb["upserts"] = [];
+  const deletes: FakeIngestDb["deletes"] = [];
   const gteCalls: FakeIngestDb["gteCalls"] = [];
   const queries: FakeIngestDb["queries"] = [];
   const objects = new Set(tables.media ?? []);
@@ -470,10 +481,25 @@ export function fakeDb(
         },
       };
     }
+    const writeError = tables.tableWriteErrors?.[table];
     return {
       upsert: async (values: unknown, options?: Record<string, unknown>) => {
         upserts.push({ table, values, options: options ?? {} });
-        return { data: null, error: null };
+        return { data: null, error: writeError ?? null };
+      },
+      // Chainable `.eq(...)` filters, awaitable like the real builder.
+      delete: () => {
+        const filters: [string, unknown][] = [];
+        deletes.push({ table, filters });
+        const chain = {
+          eq: (column: string, value: unknown) => {
+            filters.push([column, value]);
+            return chain;
+          },
+          then: (onFulfilled: (result: UpdateResult) => unknown, onRejected?: (reason: unknown) => unknown) =>
+            Promise.resolve({ data: null, error: writeError ?? null }).then(onFulfilled, onRejected),
+        };
+        return chain;
       },
       select: (columns = "*") => selectFrom(table, columns),
     };
@@ -535,6 +561,7 @@ export function fakeDb(
     writes,
     rpcCalls,
     upserts,
+    deletes,
     gteCalls,
     queries,
   } as unknown as FakeIngestDb;

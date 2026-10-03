@@ -1,4 +1,5 @@
 import { parseId, TODO_TEXT_MAX } from "./pipeline/util.ts";
+import type { RatingWrite } from "./ratings.ts";
 
 // The reader's own state (read / later flags, to-dos) with optimistic writes. Framework-free, so the
 // ordering and rollback rules run under node --test; app/components/use-reader-state.ts binds it to React.
@@ -26,7 +27,8 @@ export type StateWrite =
   | { action: "set_read" | "set_saved"; itemId: string; value: boolean }
   | { action: "add_todo"; text: string; itemId?: string }
   | { action: "set_todo"; id: number; value: boolean }
-  | { action: "delete_todo"; id: number };
+  | { action: "delete_todo"; id: number }
+  | RatingWrite;
 export type SendState = (write: StateWrite) => Promise<{ id?: number }>;
 /** A hidden to-do. Call exactly one of the two, once; the undo toast guarantees that. */
 export type PendingRemoval = { undo: () => void; commit: () => void };
