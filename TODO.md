@@ -155,7 +155,7 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
-- [ ] **A kiadás: a `google-sso` PR** (2026-10-03). A PR mindent visz, ami még nincs fent: R1, Hírek csomag, „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés. A merge élesít (production deploy), ezért ebben a sorrendben:
+- [ ] **A kiadás: a `google-sso` PR** (2026-10-03). A PR mindent visz, ami még nincs fent (az R1 és a Hírek csomag már él): „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés, az R3 spec. A merge élesít (production deploy), ezért ebben a sorrendben:
   1. **push:** `git push -u origin google-sso`, majd a PR megnyitása a GitHubon (a Vercel ekkor csak preview-t épít, a production nem változik);
   2. **SQL Editor:** a `supabase/migrations/20260930000000_source_claims.sql` futtatása (lent, „Az „Olvasd itt” élesítése” 1. pont);
   3. **a Google-belépés beállítása** (a következő pont 1–4. lépése);
