@@ -426,8 +426,10 @@ export function fakeDb(
     if (table === "posts") {
       return {
         select: (columns = "*") => ({
-          // The Library list (getPosts): `rows.posts` and `tableErrors.posts`, like any other table.
+          // The Library list (getPosts) and the collection's lookup (getFavorites): `rows.posts` and
+          // `tableErrors.posts`, like any other table.
           order: (...args: unknown[]) => selectFrom("posts", columns).order(...args),
+          in: (column: string, values: unknown[]) => selectFrom("posts", columns).in(column, values),
           eq: (column: string, value: unknown) => {
             eqCalls.push({ table: "posts", column, value });
             postSelectCalls++;

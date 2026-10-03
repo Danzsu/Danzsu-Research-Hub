@@ -8,9 +8,11 @@ import type {
   GithubTopEntry,
   Localized,
 } from "@/data/digest-types";
+import { readOverrides } from "@/lib/overrides";
 import { toPost } from "@/lib/post-row";
-import type { Post } from "@/lib/post-view";
+import { shownTitle, type Post } from "@/lib/post-view";
 import { archiveLabel, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
+import { RATING_FILTERS, ratingKey, ratingTargetId, type RatingFilter, type RatingKind, type RatingTarget, type RatingValue, type Ratings } from "@/lib/ratings";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 import { createAdminClient, type Reader } from "@/lib/supabase/server";
 
@@ -182,6 +184,123 @@ export async function getReadPostIds(db: SupabaseClient): Promise<Set<number>> {
   const { data, error } = await db.from("item_states").select("item_id").like("item_id", `${POST_STATE_PREFIX}%`).eq("is_read", true);
   if (error) console.error("read posts query failed", error);
   return readPostIds((data ?? []).map((row) => row.item_id as string));
+}
+
+/** The reader's own ratings on `targets`, by ratingKey (RLS: own rows only). Like getReadPostIds, a failure
+ *  only costs showing them, so it logs and answers none (G1 spec 3). */
+export async function getRatings(db: SupabaseClient, targets: RatingTarget[]): Promise<Ratings> {
+  if (!targets.length) return {};
+  const wanted = new Set(targets.map(ratingKey));
+  const { data, error } = await db.from("ratings").select("target_kind, target_id, value").in("target_id", [...new Set(targets.map(ratingTargetId))]);
+  if (error) {
+    console.error("ratings query failed", error);
+    return {};
+  }
+  const ratings: Ratings = {};
+  for (const row of data) {
+    const key = ratingKey({ kind: row.target_kind as RatingKind, id: row.target_id as string });
+    if (wanted.has(key)) ratings[key] = row.value as RatingValue;
+  }
+  return ratings;
+}
+
+export const GITHUB_PAGE = 30;
+/** The GitHub tab's `?page=`: 1 to 20, anything else 1 (20 pages of 30 is every repo a year of weeks can hold). */
+export function githubPage(raw: string | undefined): number {
+  const page = Number(raw);
+  return Number.isInteger(page) && page >= 1 ? Math.min(page, 20) : 1;
+}
+
+export type GithubRepo = {
+  key: string;
+  repo: string;
+  focus: string;
+  url: string;
+  stars: number | null;
+  language: string | null;
+  score: number | null;
+  firstWeek: string;
+  lastWeek: string;
+  weekCount: number;
+  bestRank: number;
+  rating: RatingValue | null;
+};
+
+const REPO_COLUMNS = "repo_key, repo, focus, url, stars, language, score, first_week, last_week, week_count, best_rank, rating";
+
+/** The archive's GitHub tab (G1 spec 4): one row per repo from the github_repos view, with the reader's own
+ *  rating; the 👎 ones last, then the latest week first; `page` pages of GITHUB_PAGE, one more row read to
+ *  tell whether there is more. Throws on a failed query, like getPosts. */
+export async function getGithubRepos(
+  db: SupabaseClient,
+  { rating, language, page }: { rating?: RatingFilter; language?: string; page: number },
+): Promise<{ repos: GithubRepo[]; more: boolean; languages: string[] }> {
+  let query = db.from("github_repos").select(REPO_COLUMNS);
+  if (rating) query = RATING_FILTERS[rating] === null ? query.is("rating", null) : query.eq("rating", RATING_FILTERS[rating]);
+  if (language) query = query.eq("language", language);
+  const shown = page * GITHUB_PAGE;
+  const [listed, languages] = await Promise.all([
+    query.order("disliked").order("last_week", { ascending: false }).order("best_rank").limit(shown + 1),
+    db.from("github_repos").select("language"),
+  ]);
+  if (listed.error) throw queryFailed("github repos", listed.error);
+  if (languages.error) throw queryFailed("github languages", languages.error);
+  return {
+    repos: listed.data.slice(0, shown).map((row) => ({
+      key: row.repo_key,
+      repo: row.repo,
+      focus: row.focus,
+      url: row.url,
+      stars: row.stars,
+      language: row.language,
+      score: row.score,
+      firstWeek: row.first_week,
+      lastWeek: row.last_week,
+      weekCount: row.week_count,
+      bestRank: row.best_rank,
+      rating: row.rating as RatingValue | null,
+    })),
+    more: listed.data.length > shown,
+    languages: [...new Set(languages.data.flatMap((row) => (row.language ? [row.language as string] : [])))].sort(),
+  };
+}
+
+export type Favorite = { kind: RatingKind; id: string; title: Localized | string; href: string; external: boolean; detail: string | null };
+
+type Row = Record<string, unknown>;
+/** A lookup that skips the query when there is nothing to look up. */
+const lookUp = (ids: unknown[], run: () => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>) =>
+  ids.length ? run() : Promise.resolve({ data: [] as Row[], error: null });
+
+/** The reader's ❤ items, posts and repos, the latest first (G1 spec 5). A ❤ whose target is gone (a deleted
+ *  post) is left out. Throws on a failed query: this list is the page's content. */
+export async function getFavorites(db: SupabaseClient): Promise<Favorite[]> {
+  const { data: hearts, error } = await db.from("ratings").select("target_kind, target_id, updated_at").eq("value", 2).order("updated_at", { ascending: false });
+  if (error) throw queryFailed("favorites", error);
+  const idsOf = (kind: RatingKind) => hearts.filter((row) => row.target_kind === kind).map((row) => row.target_id as string);
+  const itemIds = idsOf("item");
+  const postIds = idsOf("post").map(Number).filter(Number.isInteger);
+  const repoIds = idsOf("repo");
+  const [items, posts, repos] = await Promise.all([
+    lookUp(itemIds, () => db.from("digest_items").select("id, issue_id, title, url, source").in("id", itemIds)),
+    lookUp(postIds, () => db.from("posts").select("id, title, overrides").in("id", postIds)),
+    lookUp(repoIds, () => db.from("github_repos").select("repo_key, repo, url, last_week").in("repo_key", repoIds)),
+  ]);
+  for (const result of [items, posts, repos]) if (result.error) throw queryFailed("favorites", result.error);
+  const found = new Map<string, Favorite>();
+  for (const row of items.data ?? []) {
+    const detail = `${row.source} · ${String(row.issue_id).slice(5)}`;
+    found.set(`item:${row.id}`, { kind: "item", id: row.id as string, title: row.title as Localized, href: row.url as string, external: true, detail });
+  }
+  for (const row of posts.data ?? []) {
+    const title = shownTitle(row.title, readOverrides(row.overrides));
+    found.set(`post:${row.id}`, { kind: "post", id: String(row.id), title, href: `/library/${row.id}`, external: false, detail: null });
+  }
+  for (const row of repos.data ?? []) {
+    const detail = String(row.last_week).slice(5);
+    found.set(`repo:${row.repo_key}`, { kind: "repo", id: row.repo_key as string, title: row.repo as string, href: row.url as string, external: true, detail });
+  }
+  return hearts.flatMap((row) => found.get(`${row.target_kind}:${row.target_id}`) ?? []);
 }
 
 export async function getPost(db: SupabaseClient, id: number): Promise<Post | null> {

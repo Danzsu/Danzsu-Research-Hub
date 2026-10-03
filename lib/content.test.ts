@@ -6,7 +6,21 @@ import { resetRoute, routeStub, signedIn } from "./test/route-hooks.ts";
 
 // lib/content.ts is a Next-only server module (`@/` imports, `server-only`, `next/cache`): route-hooks.ts
 // registers the loader that resolves them, and stands in for lib/supabase/server.ts and next/cache.
-const { archivedWeek, archiveList, getOpenSources, getPost, getPosts, getRadar, getReadPostIds, getReaderState, getReaderSeed } = await import("./content.ts");
+const {
+  archivedWeek,
+  archiveList,
+  getFavorites,
+  getGithubRepos,
+  getOpenSources,
+  getPost,
+  getPosts,
+  getRadar,
+  getRatings,
+  getReadPostIds,
+  getReaderState,
+  getReaderSeed,
+  githubPage,
+} = await import("./content.ts");
 
 const text = (en: string) => ({ hu: `${en} (hu)`, en });
 /** A digest_items row as the embed selects it. */
@@ -278,4 +292,113 @@ test("a failed query in either cached loader rejects, so the cache keeps nothing
   const reader = signedIn(fakeDb());
   await assert.rejects(archivedWeek(reader, "2026-W38", wednesdayW39), /radar query failed: connection failure/);
   await assert.rejects(archiveList(reader), /archive query failed: connection failure/);
+});
+
+// G1 spec 3. Kills a lookup that answers another kind's rating for the same id, a repo found only in its
+// stored casing, and a failure that fails the page instead of costing only the marks.
+test("getRatings answers the reader's own ratings by key, and a failed query logs and answers none", async (t) => {
+  const db = fakeDb(undefined, {
+    rows: {
+      ratings: [
+        { target_kind: "item", target_id: "a", value: 2 },
+        { target_kind: "post", target_id: "a", value: -1 },
+        { target_kind: "repo", target_id: "owner/tool", value: 1 },
+      ],
+    },
+  });
+  assert.deepEqual(await getRatings(db, [{ kind: "item", id: "a" }, { kind: "repo", id: "Owner/Tool" }]), { "item:a": 2, "repo:owner/tool": 1 });
+  assert.deepEqual(await getRatings(db, []), {});
+  const logged = t.mock.method(console, "error", () => {});
+  assert.deepEqual(await getRatings(fakeDb(undefined, { tableErrors: { ratings: pgError("08006", "connection failure") } }), [{ kind: "item", id: "a" }]), {});
+  assert.equal(logged.mock.callCount(), 1);
+});
+
+// Review Focus 3. Kills a page number taken as written (NaN, 0, or a 999-page query).
+test("githubPage reads a page from 1 to 20, and anything else as 1", () => {
+  assert.deepEqual(["1", "3", "20", "21", "999", "0", "-2", "abc", undefined].map(githubPage), [1, 3, 20, 20, 20, 1, 1, 1, 1]);
+});
+
+const repoRow = (key: string, overrides: Record<string, unknown> = {}) => ({
+  repo_key: key,
+  repo: key,
+  focus: "f",
+  url: `https://github.com/${key}`,
+  stars: 10,
+  language: "Go",
+  score: 70,
+  first_week: "2026-W38",
+  last_week: "2026-W40",
+  week_count: 2,
+  best_rank: 3,
+  rating: null,
+  disliked: false,
+  ...overrides,
+});
+
+// G1 spec 4. Kills the 👎 not sorted last, the filters not passed to the view, a page that can't tell
+// there is more, and the language list not deduplicated.
+test("getGithubRepos asks the view for one page with the 👎 last, applies the filters, and says when there is more", async () => {
+  const rows = Array.from({ length: 31 }, (_, i) => repoRow(`o/r${i}`, { language: i % 2 ? "Go" : "Rust" }));
+  const db = fakeDb(undefined, { rows: { github_repos: rows } });
+  const page = await getGithubRepos(db, { page: 1 });
+  assert.equal(page.repos.length, 30);
+  assert.equal(page.more, true);
+  assert.deepEqual(page.languages, ["Go", "Rust"]);
+  assert.deepEqual(page.repos[0], {
+    key: "o/r0",
+    repo: "o/r0",
+    focus: "f",
+    url: "https://github.com/o/r0",
+    stars: 10,
+    language: "Rust",
+    score: 70,
+    firstWeek: "2026-W38",
+    lastWeek: "2026-W40",
+    weekCount: 2,
+    bestRank: 3,
+    rating: null,
+  });
+  const listing = db.queries.find(({ table, calls }) => table === "github_repos" && calls.some(([method]) => method === "limit"));
+  assert.deepEqual(listing?.calls.filter(([method]) => method === "order" || method === "limit"), [
+    ["order", "disliked"],
+    ["order", "last_week", { ascending: false }],
+    ["order", "best_rank"],
+    ["limit", 31],
+  ]);
+  const filtered = fakeDb(undefined, { rows: { github_repos: [repoRow("o/a", { rating: 2 }), repoRow("o/b"), repoRow("o/c", { rating: 2, language: "Rust" })] } });
+  assert.deepEqual((await getGithubRepos(filtered, { rating: "heart", language: "Go", page: 1 })).repos.map((r) => r.key), ["o/a"]);
+  assert.deepEqual((await getGithubRepos(filtered, { rating: "none", page: 1 })).repos.map((r) => r.key), ["o/b"]);
+});
+
+// Kills a failed tab read answered as an empty tab.
+test("getGithubRepos throws on a failed query, with the PostgREST error as the cause", async () => {
+  const error = pgError("08006", "connection failure");
+  await assert.rejects(getGithubRepos(fakeDb(undefined, { tableErrors: { github_repos: error } }), { page: 1 }), (e: unknown) => e instanceof Error && e.cause === error);
+});
+
+// G1 spec 5 and Review Focus 4. Kills the order lost (the latest ❤ first), a gone target kept as a broken
+// row, a post shown with the model's title over the reader's own, and a 👍 listed as a favourite.
+test("getFavorites lists the reader's ❤ items, posts and repos, latest first, and leaves out what is gone", async () => {
+  const db = fakeDb(undefined, {
+    rows: {
+      ratings: [
+        { target_kind: "post", target_id: "7", value: 2, updated_at: "2026-10-03T10:00:00Z" },
+        { target_kind: "repo", target_id: "owner/tool", value: 2, updated_at: "2026-10-02T10:00:00Z" },
+        { target_kind: "post", target_id: "99", value: 2, updated_at: "2026-10-01T10:00:00Z" },
+        { target_kind: "item", target_id: "local-2026w39-a", value: 2, updated_at: "2026-09-30T10:00:00Z" },
+        { target_kind: "item", target_id: "local-2026w39-b", value: 1, updated_at: "2026-09-29T10:00:00Z" },
+      ],
+      digest_items: [
+        { id: "local-2026w39-a", issue_id: "2026-W39", title: { hu: "Hír", en: "News" }, url: "https://blog.test/a", source: "Blog" },
+        { id: "local-2026w39-b", issue_id: "2026-W39", title: { hu: "Hasznos", en: "Useful" }, url: "https://blog.test/b", source: "Blog" },
+      ],
+      posts: [{ id: 7, title: { hu: "Modell", en: "Model" }, overrides: { title: { hu: "Saját", en: "Own" } } }],
+      github_repos: [repoRow("owner/tool", { repo: "Owner/Tool" })],
+    },
+  });
+  assert.deepEqual(await getFavorites(db), [
+    { kind: "post", id: "7", title: { hu: "Saját", en: "Own" }, href: "/library/7", external: false, detail: null },
+    { kind: "repo", id: "owner/tool", title: "Owner/Tool", href: "https://github.com/owner/tool", external: true, detail: "W40" },
+    { kind: "item", id: "local-2026w39-a", title: { hu: "Hír", en: "News" }, href: "https://blog.test/a", external: true, detail: "Blog · W39" },
+  ]);
 });
