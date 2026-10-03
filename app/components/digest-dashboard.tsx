@@ -382,12 +382,12 @@ export function GithubTopList({ entries, ratings }: { entries: GithubTopEntry[];
   return (
     <div className="grid gap-3 @2xl:grid-cols-2">
       {entries.map(({ repo, focus, url, score }, index) => (
-        <div key={repo} className={`flex flex-wrap items-center gap-2 ${dislikedClass}`}>
+        <div key={repo} className={`flex min-w-0 flex-wrap items-center gap-2 ${dislikedClass}`}>
           <a
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="press focus-ring group flex min-w-0 flex-1 items-center gap-4 border-2 border-ink bg-paper p-4 transition motion-safe:hover:-translate-y-0.5 hover:bg-signal"
+            className="press focus-ring group flex min-w-0 grow basis-80 items-center gap-4 border-2 border-ink bg-paper p-4 transition motion-safe:hover:-translate-y-0.5 hover:bg-signal"
           >
             <span className="font-display text-3xl text-signal group-hover:text-ink">{String(index + 1).padStart(2, "0")}</span>
             <span className="min-w-0 flex-1">
