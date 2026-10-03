@@ -95,6 +95,7 @@
 - [x] **R1 „Gyors”** (2026-09-28): a függvények Dublinban futnak Fluid compute-tal, egy auth-ellenőrzés kérésenként, egy lekérdezés a Radarhoz, az olvasói állapot a nézett hétre szűkül, és `GET /api/state` csak Vissza után fut; a zárt hetek és az archívum-lista egy napig gyorsítótárban vannak. Oldalformájú vázak, függő pont a linkeken, felső sáv a frissítésekhez, a „Több” linkjeinek prefetchje; a zod kikerült a kliens csomagjából. Terv: [docs/superpowers/plans/2026-09-27-r1-speed.md](docs/superpowers/plans/2026-09-27-r1-speed.md).
 - [x] **Hírek csomag** (2026-09-30): hat új forrás (Mistral, Microsoft Research, Meta AI Research, Anthropic Research, Recode China AI, ChinAI) és öt laborneves Hacker News-keresés (`Grok`, `DeepSeek`, `Qwen`, `Kimi`, `MiniMax`, pontos egyezéssel, csak a címben). Új menüpont: **AI cégek** (`/companies`), fent a legutóbbi napi futás öt legjobb céges hírével, alatta a hét többi céges hírével. Az xAI és a LinkedIn géppel nem olvasható ([truthful_sites.md](truthful_sites.md) → Kizárva).
 - [x] **„Olvasd itt” és automatikus tükör** (2026-09-30): minden hírkártyán „Olvasd itt”: ha a cikkből már van Library-poszt, oda visz, ha nincs, a taiyaki chatben beküldi. A napi futás a hét 85 pont feletti híreit és a Top 3-at a rendszer-fiók nevén sorba teszi, a `/api/cron/mirror` 07, 08 és 09 UTC-kor feldolgozza őket. Egy forráson egyszerre egy futás dolgozik (`claimed_at` lease). Terv: [docs/superpowers/plans/2026-09-30-read-here-mirror.md](docs/superpowers/plans/2026-09-30-read-here-mirror.md).
+- [x] **G1 „Értékelés, GitHub-fül és Gyűjtemény”** (2026-10-03): 👎 👍 ❤ a hírkártyákon, a Top 10 repóin, a Library-posztokon és a GitHub-fülön; a 👎-os sor halvány, és a Libraryben és a GitHub-fülön a lista végére kerül. A napi futás a repókat is pontozza, és elmenti a csillagszámukat és a nyelvüket. Új: az archívum **GitHub-füle** (`/archive/github`, minden heti Top 10 repója egy listában, értékelés és nyelv szerint szűrve) és a **Gyűjtemény** (`/collection`, a ❤-es hírek, posztok és repók, hetektől függetlenül). Terv: [docs/superpowers/plans/2026-10-03-g1-ratings-github-collection.md](docs/superpowers/plans/2026-10-03-g1-ratings-github-collection.md).
 - [x] **R2 „Visszajelzés”** (2026-10-01): a chat saját buboréka azonnal megjelenik, a hibás küldés és teendő visszaadja a szövegét, az ismételt válasz nem halmozódik; a felső sáv a teljes Mentés, Fordítás és beküldés alatt fut; egy közös, jól olvasható hibasor; a Library olvasási hibája hibaoldalt mutat; a poszt oldala követi az újrakinyerést; benyomódás minden kattintható elemen, 160 ms-os sheetek és toast, csökkentett mozgásnál semmi nem mozdul, érintőképernyőn 40 px. Terv: [docs/superpowers/plans/2026-10-01-r2-feedback.md](docs/superpowers/plans/2026-10-01-r2-feedback.md).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
@@ -155,6 +156,7 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **A G1 élesítése** (a `github-ratings` branch, a `google-sso` PR merge-e után): a `supabase/migrations/20261003000000_ratings_github_repos.sql` futtatása az SQL Editorban **a deploy előtt** (a Radar lekérdezése az új oszlopokat olvassa), utána a merge. Élő próba: egy ❤ a Radaron megjelenik a Gyűjteményben, és a GitHub-fül listázza a korábbi hetek repóit.
 - [ ] **A kiadás: a `google-sso` PR** (2026-10-03). A PR mindent visz, ami még nincs fent (az R1 és a Hírek csomag már él): „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés, az R3 spec. A merge élesít (production deploy), ezért ebben a sorrendben:
   1. **push:** `git push -u origin google-sso`, majd a PR megnyitása a GitHubon (a Vercel ekkor csak preview-t épít, a production nem változik);
   2. **SQL Editor:** a `supabase/migrations/20260930000000_source_claims.sql` futtatása (lent, „Az „Olvasd itt” élesítése” 1. pont);
@@ -192,10 +194,9 @@
   - a `/library` oldalon a chatből beküldött link megjelenik a listában (`router.refresh()`; az előnézet listája fixture, ott nem látszik).
 - [ ] **GitHub-radar** (ötlet, 2026-09-30; **ez következik**, a tulajdonos sorrendje 2026-10-03: GitHub-rész → keresés → olvasás a saját oldalon; az R3 Elrendezés speckel kész, és utánuk jön):
   - a heti Top 10 marad, és hetente archiválódik (ma is: `/archive/<hét>`);
-  - **pontszám a repóknak is:** a napi válogatás a repókat is pontozza (0–100), a Top 10 és a kedvencek mellett látszik;
-  - **szívecske (kedvenc)** repón és hírön, hogy hosszú távon megmaradjon: egy hetekre átívelő „Kedvencek” lista (az „Olvasási jelzések” pont szíve);
-  - **a chatbe dobott GitHub-link:** ha a pontszáma eléri a heti Top 10 legalját, jelölve bekerül a Top 10-be, ha nem, szívecskét kap;
-  - **„A hónap repói” (Top 3) a Top 10 felett:** a régóta vagy nagyon gyorsan növő, releváns repók, havi nézetben. Ehhez napi csillagszám-mentés kell (a „Valódi GitHub trending” pont);
+  - [x] **G1** (2026-10-03): pontszám, csillagszám és nyelv a repóknak, 👎 👍 ❤ a repókon, híreken és posztokon, az archívum GitHub-füle és a Gyűjtemény (lent a „Kész” alatt);
+  - **G3, a chatbe dobott GitHub-link:** ha a pontszáma eléri a heti Top 10 legalját, jelölve bekerül a Top 10-be, ha nem, szívecskét kap;
+  - **G2, „A hónap repói” (Top 3) a Top 10 felett:** a régóta vagy nagyon gyorsan növő, releváns repók, havi nézetben. Ehhez napi csillagszám-mentés kell (a „Valódi GitHub trending” pont);
   - forrás: a Star History Monthly hírlevél és a star-history.com chart-linkje ([truthful_sites.md](truthful_sites.md) → Jelöltek).
 - [ ] **Halasztott apróságok** (a záró reviewk „Minor” pontjai, egyik sem sürgős):
   - **R2:**

@@ -138,6 +138,7 @@ This table is the one list of migrations; AGENTS.md, CLAUDE.md and TODO.md point
 | 3 | `20260924000000_post_blocks.sql` | The block columns on `posts`, six source kinds, three more tasks, the `media` bucket, `update_post_overrides` |
 | 4 | `20260925000000_drop_post_body.sql` | Drops the old `posts.body` column. On a fresh project, run it with the rest. On the shared project, only after the block-based code is deployed |
 | 5 | `20260930000000_source_claims.sql` | `sources.claimed_at`: a pipeline run's claim on its source, so two runs never work on one. On the shared project, run it before deploying the code that reads it |
+| 6 | `20261003000000_ratings_github_repos.sql` | `ratings`, the `github_top` columns `stars`, `language` and `score`, and the `github_repos` view. On the shared project, run it before deploying the code that reads it: the Radar's query reads the new columns |
 
 > ⚠️ **Don't run `supabase db push` against the shared project: it would apply the drop migration early**, while production still reads `posts.body`. This warning stays until the TODO.md item "Csak az M1 deployja után" is done. The Supabase CLI isn't set up in this repository anyway (there is no `supabase/config.toml`).
 
@@ -181,8 +182,8 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | Path | What is there |
 | --- | --- |
 | [`app/`](app/) | `/login`, the error and 404 pages, the manifest, and the route group below |
-| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), the AI companies page (`/companies`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, each with its loading skeleton |
-| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the title band, the language toggle, `post-blocks` (the block renderer), `page-skeletons` (each page shape's loading fallback) and `refresh-bar` (the top bar during a reader-started refresh) |
+| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), the AI companies page (`/companies`), `/archive`, `/archive/[week]`, the archive's GitHub tab (`/archive/github`), `/library`, `/library/[id]`, the collection of favourites (`/collection`), each with its loading skeleton |
+| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the rating group (`rating-control`) and the filter chips, the title band, the language toggle, `post-blocks` (the block renderer), `page-skeletons` (each page shape's loading fallback) and `refresh-bar` (the top bar during a reader-started refresh) |
 | [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
 | [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron |
 | [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link and Google sign-in, the callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login` |
@@ -190,7 +191,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the feed list, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
-| [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, translation, the model client, content queries and their caches, the link chat's logic and your own submissions, the language cookie, Supabase clients, and `idle-prefetch` (the mobile "More" sheet's idle prefetch) |
+| [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, translation, the model client, content queries and their caches, the link chat's logic and your own submissions, the ratings store (`ratings`), the language cookie, Supabase clients, and `idle-prefetch` (the mobile "More" sheet's idle prefetch) |
 | [`lib/test/`](lib/test/) | The offline render harness for component tests, the route-handler stubs (`route-hooks.ts`), the sign-in routes' Supabase auth stub (`fake-auth.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [DESIGN.md](DESIGN.md#dos-and-donts)) |

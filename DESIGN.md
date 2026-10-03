@@ -467,7 +467,7 @@ className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y
 
 ### Bottom bar and the "Több" sheet
 
-Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The active slot, the open "Több", or "Több" on an AI cégek or Archívum page (`data-active`) turns signal:
+Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The active slot, the open "Több", or "Több" on an AI cégek, Archívum or Gyűjtemény page (`data-active`) turns signal:
 
 ```tsx app/components/app-shell.tsx
 className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
@@ -478,7 +478,7 @@ const slotClass =
   "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 ```
 
-"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek and Archívum (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
+"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek, Archívum and Gyűjtemény (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
 
 ```tsx app/components/app-shell.tsx
         <SheetContent
@@ -600,7 +600,7 @@ className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-ce
 
 ### Pressed state
 
-Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the GitHub rows, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar and the Library and archive cards carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the GitHub rows, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
 
 ```css app/globals.css
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
@@ -655,6 +655,18 @@ className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${disl
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
 - **story-card** has a 96px meta gutter from `lg`, and one row of actions at the bottom: Open (`ink`), Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link), Later and to-do (`brutal` icons), and Read on the right.
 - **Both** dim to 58% once read, and take focus for j/k (`tabIndex={-1}` plus `focus-ring`).
+
+### `RatingControl` and the filter chips
+
+`app/components/rating-control.tsx`. A `role="group"` of three `brutal` icon toggles, Nem hasznos 👎, Hasznos 👍 and Kedvenc ❤, each `aria-pressed` and painted with `pressedClass`: 40px, and 32px from `sm` with a fine pointer only (`Button`). The group carries its value as `data-rating` (`down`, `up`, `heart`), so the row around it styles itself: a 👎 row dims and its border turns dashed, and stays readable and clickable. Both class strings live in `rating-classes.ts`, a plain module, because server components use them:
+
+```tsx app/components/rating-classes.ts
+export const dislikedClass = "has-[[data-rating=down]]:opacity-60 has-[[data-rating=down]]:border-dashed";
+```
+
+A Library card is one link, which can't hold a button, so it shows `RatingBadge` instead: the value's icon (the heart filled) with its name sr-only, and nothing when unrated.
+
+The filter chips (`FilterChips`, `app/components/filter-chips.tsx`) are the archive's tabs and the filter rows of the GitHub tab and the collection: 40px links on ink with a `border-paper/30` frame and `press-ink`, the current one `aria-current="page"` with a signal border and text, each with its pending dot.
 
 ### Image frame
 
