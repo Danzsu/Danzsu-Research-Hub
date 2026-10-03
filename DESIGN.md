@@ -567,13 +567,13 @@ In use (`app/(app)/library/library-view.tsx`):
         "icon-lg": "size-10",
 ```
 
-The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-control.tsx`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
+The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
 
 ```tsx app/components/story-card.tsx
 <Button asChild variant="ink" className="min-h-10">
 ```
 
-```tsx app/components/rating-control.tsx
+```tsx app/components/rating-classes.ts
 export const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
 ```
 

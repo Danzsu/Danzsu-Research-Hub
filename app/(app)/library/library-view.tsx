@@ -2,7 +2,8 @@ import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCirc
 import { LocalizedText } from "@/app/components/language-context";
 import { PendingDot } from "@/app/components/nav-parts";
 import { PageHero } from "@/app/components/page-header";
-import { dislikedClass, RatingBadge } from "@/app/components/rating-control";
+import { dislikedClass } from "@/app/components/rating-classes";
+import { RatingBadge } from "@/app/components/rating-control";
 import { Tag } from "@/app/components/tag";
 import type { SubmittedSource } from "@/lib/content";
 import { hostOf } from "@/lib/pipeline/util";

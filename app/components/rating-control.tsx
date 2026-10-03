@@ -5,17 +5,13 @@ import { createContext, useContext, useState, useSyncExternalStore, type PropsWi
 import { Button } from "@/components/ui/button";
 import { createRatingStore, ratingKey, type RatingStore, type RatingTarget, type RatingValue, type RatingWrite } from "@/lib/ratings";
 import { useLanguage } from "./language-context";
+import { pressedClass } from "./rating-classes";
 import { toasts } from "./undo-toast";
 
 const copy = {
   hu: { group: "Értékelés", down: "Nem hasznos", up: "Hasznos", heart: "Kedvenc" },
   en: { group: "Rating", down: "Not useful", up: "Useful", heart: "Favourite" },
 };
-
-/** A toggle's pressed state, in ink (DESIGN.md → Components → Button): the card toggles use it too. */
-export const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
-/** A card or row that holds a 👎 rating dims and turns its frame dashed, unlike a read one (B spec 2.4). */
-export const dislikedClass = "has-[[data-rating=down]]:opacity-60 has-[[data-rating=down]]:border-dashed";
 
 const BUTTONS = [
   { value: -1, name: "down", Icon: ThumbsDown },

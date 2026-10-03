@@ -7,7 +7,8 @@ import { parseSubmittedUrl } from "@/lib/pipeline/util";
 import type { RatingValue } from "@/lib/ratings";
 import type { Flag, ItemState } from "@/lib/reader-store";
 import { PendingDot } from "./nav-parts";
-import { dislikedClass, pressedClass, RatingControl } from "./rating-control";
+import { dislikedClass, pressedClass } from "./rating-classes";
+import { RatingControl } from "./rating-control";
 import { Tag } from "./tag";
 
 const copy = {
