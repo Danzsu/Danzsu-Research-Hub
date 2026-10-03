@@ -155,6 +155,12 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **A kiadás: a `google-sso` PR** (2026-10-03). A PR mindent visz, ami még nincs fent: R1, Hírek csomag, „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés. A merge élesít (production deploy), ezért ebben a sorrendben:
+  1. **push:** `git push -u origin google-sso`, majd a PR megnyitása a GitHubon (a Vercel ekkor csak preview-t épít, a production nem változik);
+  2. **SQL Editor:** a `supabase/migrations/20260930000000_source_claims.sql` futtatása (lent, „Az „Olvasd itt” élesítése” 1. pont);
+  3. **a Google-belépés beállítása** (a következő pont 1–4. lépése);
+  4. **a PR merge-e** a GitHubon; utána helyben `git checkout main && git pull`;
+  5. **az élő próbák:** a Google-belépés 5. lépése, az R2 élő próbája, az R1 utólagos mérése, a taiyaki élő próbái (lent).
 - [ ] **A Google-belépés beállítása** (a tulajdonosé, ebben a sorrendben, **a push előtt**: a belépő oldal első gombja ezt használja, és beállítás nélkül a Supabase nyers hibaoldalára visz; a terv: [docs/superpowers/specs/2026-10-02-google-sign-in-design.md](docs/superpowers/specs/2026-10-02-google-sign-in-design.md)):
   1. **Google Cloud Console → Google Auth Platform:**
      - *Branding*: az app neve „NEON NEWS RADAR”, egy támogatási e-mail-cím;
@@ -170,7 +176,7 @@
 - [ ] **Az „Olvasd itt” élesítése** (a tulajdonosé, ebben a sorrendben):
   1. *SQL Editor*: a `supabase/migrations/20260930000000_source_claims.sql` futtatása, **a push előtt** (a kód olvassa az oszlopot; az R2 óta a poszt oldala is, így nélküle minden poszt oldala hibaoldalt mutat);
   2. [x] a rendszer-fiók (*Authentication → Users → Add user*, Auto Confirm) és a `RADAR_MIRROR_USER_ID` a Vercelben (2026-09-30);
-  3. push, a `read-here` branch merge-e után.
+  3. a `google-sso` PR merge-e (fent, „A kiadás”).
 - [ ] **Az R1 utólagos élő mérése** (a tulajdonosé, a deploy után; a terv 12. feladata):
   - a válasz `x-vercel-id` fejléce `…::dub1`-re végződik, a deployment adatlapján a függvények Fluid compute-tal futnak, és a napi cron lefut;
   - `node --env-file=.env.local --experimental-strip-types --no-warnings .superpowers/ux-audit/measure-live.mts after`, az egyszeri, csak olvasó, jóváhagyott munkamenettel; a számok a `live-before.json` mellé kerülnek, ígéret nélkül;
@@ -184,13 +190,23 @@
   - az `/archive` oldalon a „Több” aktív jelölése mobilon;
   - a lekérdezés leáll a panel bezárása után (`browser_network_requests`);
   - a `/library` oldalon a chatből beküldött link megjelenik a listában (`router.refresh()`; az előnézet listája fixture, ott nem látszik).
-- [ ] **GitHub-radar** (ötlet, 2026-09-30; saját tervezés kell, a sorrendje még nincs eldöntve):
+- [ ] **GitHub-radar** (ötlet, 2026-09-30; **ez következik**, a tulajdonos sorrendje 2026-10-03: GitHub-rész → keresés → olvasás a saját oldalon; az R3 Elrendezés speckel kész, és utánuk jön):
   - a heti Top 10 marad, és hetente archiválódik (ma is: `/archive/<hét>`);
   - **pontszám a repóknak is:** a napi válogatás a repókat is pontozza (0–100), a Top 10 és a kedvencek mellett látszik;
   - **szívecske (kedvenc)** repón és hírön, hogy hosszú távon megmaradjon: egy hetekre átívelő „Kedvencek” lista (az „Olvasási jelzések” pont szíve);
   - **a chatbe dobott GitHub-link:** ha a pontszáma eléri a heti Top 10 legalját, jelölve bekerül a Top 10-be, ha nem, szívecskét kap;
   - **„A hónap repói” (Top 3) a Top 10 felett:** a régóta vagy nagyon gyorsan növő, releváns repók, havi nézetben. Ehhez napi csillagszám-mentés kell (a „Valódi GitHub trending” pont);
   - forrás: a Star History Monthly hírlevél és a star-history.com chart-linkje ([truthful_sites.md](truthful_sites.md) → Jelöltek).
+- [ ] **Halasztott apróságok** (a záró reviewk „Minor” pontjai, egyik sem sürgős):
+  - **R2:**
+    - lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni;
+    - a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön;
+    - a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön).
+  - **Google-belépés:**
+    - kézzel gyártott `?error=constructor` / `toString` / `__proto__` cím a belépő oldalon „undefined / undefined”-et mutat: `Object.hasOwn`, és a hibakódok közös `LoginError` típusa;
+    - egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik;
+    - a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
+    - a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban.
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Az R1 Gyors és az R2 Visszajelzés kész; hátra van az **R3 Elrendezés** (a mobil fekvő keret, a széles képernyő, a panel és a chat takarása, a taiyaki kerete ink oldalon). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
