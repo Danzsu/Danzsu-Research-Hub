@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { ArchiveView } from "@/app/(app)/archive/archive-view";
+import { GithubView } from "@/app/(app)/archive/github-view";
+import { CollectionView } from "@/app/(app)/collection/collection-view";
 import { LibraryView } from "@/app/(app)/library/library-view";
 import { AppShell } from "@/app/components/app-shell";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
@@ -7,7 +9,9 @@ import { ListSkeleton, PostSkeleton, RadarSkeleton } from "@/app/components/page
 import {
   previewArchive,
   previewEmail,
+  previewFavorites,
   previewGithub,
+  previewGithubRepos,
   previewIssue,
   previewItems,
   previewMySources,
@@ -54,6 +58,8 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
       {view === "library-empty" && <LibraryView posts={[]} open={[]} readIds={new Set()} ratings={{}} preview={{ failWrites }} />}
       {view === "archive" && <ArchiveView issues={previewArchive} />}
       {view === "archive-empty" && <ArchiveView issues={[]} />}
+      {view === "github" && <GithubView repos={previewGithubRepos} more languages={["C++", "Python", "Rust"]} filters={{ page: 1 }} />}
+      {view === "collection" && <CollectionView favorites={previewFavorites} />}
       {view === "radar-loading" && <RadarSkeleton />}
       {view === "library-loading" && <ListSkeleton form />}
       {view === "archive-loading" && <ListSkeleton />}

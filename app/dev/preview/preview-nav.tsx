@@ -10,6 +10,8 @@ export const PREVIEW_VIEWS = [
   "library-empty",
   "archive",
   "archive-empty",
+  "github",
+  "collection",
   // The (app) pages' loading skeletons: /dev has no loading.tsx, so offline this is the only way to see them.
   "radar-loading",
   "library-loading",

@@ -19,6 +19,8 @@ test("activeNavId goes by path prefix at segment boundaries", () => {
   assert.equal(activeNavId("/companies"), "companies");
   assert.equal(activeNavId("/archive"), "archive");
   assert.equal(activeNavId("/archive/2026-W38"), "archive");
+  assert.equal(activeNavId("/archive/github"), "archive");
+  assert.equal(activeNavId("/collection"), "collection");
   assert.equal(activeNavId("/library/42"), "library");
   assert.equal(activeNavId("/library/"), "library");
   assert.equal(activeNavId("/libraryx"), null);
@@ -42,6 +44,14 @@ test("the mobile bar holds three page slots, Több holds every other primary ite
   assert.deepEqual([...MOBILE_BAR_NAV, ...MOBILE_MORE_NAV].map(({ id }) => id).sort(), PRIMARY_NAV.map(({ id }) => id).sort());
   assert.equal(inMobileMore(activeNavId("/archive/2026-W38")), true);
   assert.equal(inMobileMore(activeNavId("/companies")), true);
+  assert.equal(inMobileMore(activeNavId("/collection")), true);
   assert.equal(inMobileMore(activeNavId("/library/42")), false);
   assert.equal(inMobileMore(null), false);
+});
+
+// G1 spec 5. Kills the collection left "soon" (an inert row), or kept off the mobile "Több".
+test("the collection is a live page in the mobile Több sheet", () => {
+  const collection = NAV_ITEMS.find((item) => item.id === "collection");
+  assert.deepEqual([collection?.href, collection?.soon, collection?.mobileMore], ["/collection", undefined, true]);
+  assert.equal(switchesLanguageInPlace("/collection"), true);
 });

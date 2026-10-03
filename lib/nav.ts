@@ -21,7 +21,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: "library", href: "/library", label: { hu: "Könyvtár", en: "Library" } },
   { id: "search", href: null, label: { hu: "Keresés", en: "Search" } },
   { id: "archive", href: "/archive", mobileMore: true, label: { hu: "Archívum", en: "Archive" } },
-  { id: "collection", href: null, soon: true, label: { hu: "Gyűjtemény", en: "Collection" } },
+  { id: "collection", href: "/collection", mobileMore: true, label: { hu: "Gyűjtemény", en: "Collection" } },
   { id: "stats", href: null, soon: true, label: { hu: "Statisztika", en: "Statistics" } },
   { id: "chat", href: null, soon: true, label: { hu: "Chat", en: "Chat" } },
 ];
@@ -49,6 +49,6 @@ export function activeNavId(pathname: string): NavId | null {
  * switches them without a server round trip. Any other page is refreshed, so nothing stays in the old language.
  * /dev/preview renders the same list views on fixtures (development only); its post view, /dev/preview/post, is refreshed.
  */
-const IN_PLACE_LANGUAGE = [/^\/$/, /^\/companies\/?$/, /^\/library\/?$/, /^\/archive(\/[^/]+)?\/?$/, /^\/dev\/preview\/?$/];
+const IN_PLACE_LANGUAGE = [/^\/$/, /^\/companies\/?$/, /^\/library\/?$/, /^\/archive(\/[^/]+)?\/?$/, /^\/collection\/?$/, /^\/dev\/preview\/?$/];
 
 export const switchesLanguageInPlace = (pathname: string) => IN_PLACE_LANGUAGE.some((pattern) => pattern.test(pathname));

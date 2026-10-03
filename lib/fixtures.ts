@@ -1,6 +1,6 @@
 import { assignIds, type BlockDraft } from "./blocks.ts";
 import type { ArchiveIssue, CurrentIssue, DigestItem, GithubTopEntry } from "../data/digest-types.ts";
-import type { SubmittedSource } from "./content.ts";
+import type { Favorite, GithubRepo, SubmittedSource } from "./content.ts";
 import type { MySource } from "./my-sources.ts";
 import { publishedLabel } from "./pipeline/util.ts";
 import type { Post } from "./post-view.ts";
@@ -73,6 +73,53 @@ export const previewGithub: GithubTopEntry[] = [
   { repo: "ggml-org/llama.cpp", focus: "LLM inference in C/C++", url: "https://github.com/ggml-org/llama.cpp", stars: 81000, language: "C++", score: 92 },
   // A week before G1: no stars, language or score.
   { repo: `example/${LONG_WORD}`, focus: "Egy nagyon hosszú nevű repó / a repository with a very long name", url: "https://github.com/example/long", stars: null, language: null, score: null },
+];
+
+/** The archive's GitHub tab, as the github_repos view orders it: a ❤ repo, an unrated one from before G1
+ *  (no stars, language or score), and a 👎 one last. */
+export const previewGithubRepos: GithubRepo[] = [
+  {
+    key: "huggingface/transformers",
+    repo: "huggingface/transformers",
+    focus: "Model definitions for text, vision and audio",
+    url: "https://github.com/huggingface/transformers",
+    stars: 152000,
+    language: "Python",
+    score: 88,
+    firstWeek: "2026-W36",
+    lastWeek: "2026-W39",
+    weekCount: 3,
+    bestRank: 2,
+    rating: 2,
+  },
+  {
+    key: `example/${LONG_WORD.toLowerCase()}`,
+    repo: `example/${LONG_WORD}`,
+    focus: "Egy nagyon hosszú nevű repó / a repository with a very long name",
+    url: "https://github.com/example/long",
+    stars: null,
+    language: null,
+    score: null,
+    firstWeek: "2026-W38",
+    lastWeek: "2026-W38",
+    weekCount: 1,
+    bestRank: 7,
+    rating: null,
+  },
+  {
+    key: "astral-sh/uv",
+    repo: "astral-sh/uv",
+    focus: "A Python package manager written in Rust",
+    url: "https://github.com/astral-sh/uv",
+    stars: 64000,
+    language: "Rust",
+    score: 61,
+    firstWeek: "2026-W39",
+    lastWeek: "2026-W39",
+    weekCount: 1,
+    bestRank: 9,
+    rating: -1,
+  },
 ];
 
 export const previewArchive: ArchiveIssue[] = [
@@ -197,6 +244,13 @@ export const previewRatings: Ratings = {
   "post:-1": 2,
   "post:-2": -1,
 };
+
+/** The collection: the ❤ marks of previewRatings and previewGithubRepos, the latest first, one of each kind. */
+export const previewFavorites: Favorite[] = [
+  { kind: "item", id: previewItems[1].id, title: previewItems[1].title, href: previewItems[1].url, external: true, detail: `${previewItems[1].source} · W39` },
+  { kind: "post", id: "-1", title: previewPosts[0].title, href: "/library/-1", external: false, detail: null },
+  { kind: "repo", id: previewGithubRepos[0].key, title: previewGithubRepos[0].repo, href: previewGithubRepos[0].url, external: true, detail: "W39" },
+];
 
 /** The link chat's thread, newest first as GET /api/sources/mine answers it: one submission in each
  *  state, a long link and a long note. Negative ids, like the posts: the retry route 404s them, and
