@@ -4,6 +4,7 @@ import type { SubmittedSource } from "./content.ts";
 import type { MySource } from "./my-sources.ts";
 import { publishedLabel } from "./pipeline/util.ts";
 import type { Post } from "./post-view.ts";
+import type { Ratings } from "./ratings.ts";
 import type { ReaderData } from "./reader-store.ts";
 import { testPost } from "./test/fixtures.ts";
 
@@ -187,6 +188,15 @@ export const previewReadPostIds = new Set([-2]);
  *  /library/-1 route 404s before any query); every other readable card asks the chat, whose preview
  *  transport never reaches the API. */
 export const previewReadHerePosts: Record<string, number> = { "local-2026-W39-read": -1 };
+
+/** The preview's ratings, one of each kind and value: a ❤ and a 👎 item, a 👍 repo, a ❤ and a 👎 post. */
+export const previewRatings: Ratings = {
+  "item:companies-2026-W39-must-2": 2,
+  "item:local-2026-W39-must-3": -1,
+  "repo:ggml-org/llama.cpp": 1,
+  "post:-1": 2,
+  "post:-2": -1,
+};
 
 /** The link chat's thread, newest first as GET /api/sources/mine answers it: one submission in each
  *  state, a long link and a long note. Negative ids, like the posts: the retry route 404s them, and

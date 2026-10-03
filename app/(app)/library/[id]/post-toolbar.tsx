@@ -4,16 +4,18 @@ import Link from "next/link";
 import { useState } from "react";
 import { Languages, PenLine } from "lucide-react";
 import { ErrorLine } from "@/app/components/error-line";
+import { RatingControl } from "@/app/components/rating-control";
 import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
 import type { Language } from "@/data/digest-types";
+import type { RatingValue } from "@/lib/ratings";
 
 const copy = {
   hu: { original: "Eredeti", translated: "Magyarul", translate: "Fordítás magyarra", working: "Fordítás…", failed: "A fordítás nem sikerült, próbáld újra.", edit: "Szerkesztés", group: "Szöveg nyelve" },
   en: { original: "Original", translated: "Hungarian", translate: "Translate to Hungarian", working: "Translating…", failed: "Translation failed, try again.", edit: "Edit", group: "Text language" },
 };
 
-export function PostToolbar({ postId, language, hasTranslation, showingTranslation, canEdit, hasTranslatable }: {
+export function PostToolbar({ postId, language, hasTranslation, showingTranslation, canEdit, hasTranslatable, rating }: {
   postId: number;
   language: Language;
   hasTranslation: boolean;
@@ -21,6 +23,8 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
   canEdit: boolean;
   /** No translatable text (extraction failed / a bare video / an all-code or all-repo post) — nothing to translate. */
   hasTranslatable: boolean;
+  /** The reader's rating of the post, from the page's render (getRatings). */
+  rating: RatingValue | null;
 }) {
   const refresh = useRefresh();
   const [busy, setBusy] = useState(false);
@@ -40,6 +44,7 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <RatingControl target={{ kind: "post", id: String(postId) }} initial={rating} />
       {hasTranslation ? (
         <div className="flex" role="group" aria-label={t.group}>
           <Button asChild variant={showingTranslation ? "brutal" : "ink"} className="min-h-10">

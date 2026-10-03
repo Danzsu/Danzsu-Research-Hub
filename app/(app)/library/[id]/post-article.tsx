@@ -7,6 +7,7 @@ import { safeHref } from "@/lib/blocks";
 import { hostOf } from "@/lib/pipeline/util";
 import { readMinutes } from "@/lib/post-row";
 import type { Post, PostQuery } from "@/lib/post-view";
+import type { RatingValue } from "@/lib/ratings";
 import { SOURCE_KIND_LABELS } from "@/lib/source-kinds";
 import { translatable } from "@/lib/translate";
 import { PostEditor } from "./post-editor";
@@ -21,7 +22,7 @@ const copy = {
 };
 
 /** The post page body. The offline preview (app/dev/preview) renders it with fixture posts. */
-export function PostArticle({ post, language, query, canEdit }: { post: Post; language: Language; query: PostQuery; canEdit: boolean }) {
+export function PostArticle({ post, language, query, canEdit, rating }: { post: Post; language: Language; query: PostQuery; canEdit: boolean; rating: RatingValue | null }) {
   const t = notices[language];
   const labels = copy[language];
   const showingTranslation = query.text === "hu" && Boolean(post.blocksHu);
@@ -54,6 +55,7 @@ export function PostArticle({ post, language, query, canEdit }: { post: Post; la
               showingTranslation={showingTranslation}
               canEdit={canEdit}
               hasTranslatable={translatable(post.blocks).length > 0}
+              rating={rating}
             />
             {originalHref && (
               <Button asChild variant="ink" className="min-h-10">

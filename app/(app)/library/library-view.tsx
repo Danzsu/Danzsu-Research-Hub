@@ -2,10 +2,12 @@ import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCirc
 import { LocalizedText } from "@/app/components/language-context";
 import { PendingDot } from "@/app/components/nav-parts";
 import { PageHero } from "@/app/components/page-header";
+import { dislikedClass, RatingBadge } from "@/app/components/rating-control";
 import { Tag } from "@/app/components/tag";
 import type { SubmittedSource } from "@/lib/content";
 import { hostOf } from "@/lib/pipeline/util";
 import type { Post } from "@/lib/post-view";
+import { ratingKey, type Ratings } from "@/lib/ratings";
 import { PostCardLink } from "./opened-posts";
 import { RefreshWhileProcessing } from "./refresh-while-processing";
 import { SubmitForm } from "./submit-form";
@@ -30,11 +32,14 @@ export function LibraryView({
   posts,
   open,
   readIds,
+  ratings,
   preview,
 }: {
   posts: Post[];
   open: SubmittedSource[];
   readIds: Set<number>;
+  /** The posts' ratings by ratingKey (getRatings): each card's badge. */
+  ratings: Ratings;
   preview?: { failWrites: boolean };
 }) {
   return (
@@ -73,14 +78,17 @@ export function LibraryView({
                 key={post.id}
                 postId={post.id}
                 read={readIds.has(post.id)}
-                className="press-ink focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6"
+                className={`press-ink focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6 ${dislikedClass}`}
               >
                 <div className="flex items-start justify-between">
                   <span className="flex items-center gap-2">
                     <Icon className="size-7 text-signal group-hover:text-ink" />
                     <PendingDot className="group-hover:text-ink" />
                   </span>
-                  <span className="font-mono text-[10px] opacity-60">{post.createdAt.slice(0, 10)}</span>
+                  <span className="flex items-center gap-3">
+                    <RatingBadge target={{ kind: "post", id: String(post.id) }} initial={ratings[ratingKey({ kind: "post", id: String(post.id) })] ?? null} />
+                    <span className="font-mono text-[10px] opacity-60">{post.createdAt.slice(0, 10)}</span>
+                  </span>
                 </div>
                 <p className="mt-6 font-mono text-xs tracking-[0.15em] opacity-60">{post.author ?? hostOf(post.url)}</p>
                 <h2 className="mt-2 font-display text-2xl leading-[1.02] [overflow-wrap:anywhere] sm:text-3xl">

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createRatingStore, downLast, nextRating, radarTargets, ratingFilter, ratingKey, ratingTargetId, type RatingWrite } from "./ratings.ts";
+import { createRatingStore, downLast, nextRating, postsDownLast, radarTargets, ratingFilter, ratingKey, ratingTargetId, type RatingWrite } from "./ratings.ts";
 
 // Review Focus 1. Kills a repo keyed by its casing (the Top 10's "Owner/Repo" and the tab's "owner/repo"
 // would hold two ratings), and an item or post id lowercased (they are case-sensitive keys).
@@ -27,6 +27,12 @@ test("downLast moves the disliked entries to the end and keeps every other order
 test("ratingFilter takes only the four known filters", () => {
   assert.deepEqual(["heart", "up", "down", "none"].map(ratingFilter), ["heart", "up", "down", "none"]);
   for (const param of [undefined, "", "toString", "__proto__", "HEART", "2"]) assert.equal(ratingFilter(param), undefined, String(param));
+});
+
+// The Library's order. Kills a post's 👎 looked up under another kind, or a ❤ sent to the end.
+test("postsDownLast sends the Library's 👎 posts to the end", () => {
+  const ratings = { "post:2": -1, "post:1": 2, "item:3": -1 } as const;
+  assert.deepEqual(postsDownLast([{ id: 1 }, { id: 2 }, { id: 3 }], ratings).map((post) => post.id), [1, 3, 2]);
 });
 
 test("radarTargets rates the week's items and repos", () => {

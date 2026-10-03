@@ -22,6 +22,10 @@ export function downLast<T>(list: T[], disliked: (entry: T) => boolean): T[] {
   return [...list.filter((entry) => !disliked(entry)), ...list.filter(disliked)];
 }
 
+/** The Library's order: a 👎 post at the end (G1 spec 3). */
+export const postsDownLast = <T extends { id: number }>(posts: T[], ratings: Ratings): T[] =>
+  downLast(posts, (post) => ratings[ratingKey({ kind: "post", id: String(post.id) })] === -1);
+
 /** The GitHub tab's `?rating=`: the value it keeps, null for the unrated. */
 export const RATING_FILTERS = { heart: 2, up: 1, down: -1, none: null } as const;
 export type RatingFilter = keyof typeof RATING_FILTERS;

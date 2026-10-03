@@ -18,8 +18,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import type { CurrentIssue, DigestItem, GithubTopEntry } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
+import { ratingKey, type Ratings } from "@/lib/ratings";
 import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
 import { useLanguage } from "./language-context";
+import { dislikedClass, RatingControl } from "./rating-control";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
 import { useReadHere } from "./link-chat";
@@ -54,7 +56,6 @@ const copy = {
     saved: "Mentve későbbre",
     mustRead: "TOP 3 · KÖTELEZŐ",
     feed: "A HÉT ÉLŐ ADATFOLYAMA",
-    tracked: "FIGYELT REPO",
     sample: "Ez a heti kiadás még üres — a napi automatikus futás tölti fel.",
     emptyAll: "A hét minden híre fent, a Top 3-ban van.",
     emptySaved: "Még nincs mentett hír. A kártyák Később gombjával gyűjtheted ide.",
@@ -88,7 +89,6 @@ const copy = {
     saved: "Saved for later",
     mustRead: "TOP 3 · MUST READ",
     feed: "THE WEEK'S LIVE SIGNAL",
-    tracked: "TRACKED REPO",
     sample: "This week's issue is still empty — the daily automated run fills it.",
     emptyAll: "Every story this week is up top, in the Top 3.",
     emptySaved: "Nothing saved yet. Collect stories here with the Later button on a card.",
@@ -119,6 +119,8 @@ export function DigestDashboard(
     scope?: "companies";
     /** Item id → its Library post (readHerePosts): the cards' "Olvasd itt" opens it. */
     posts?: Record<string, number>;
+    /** The page's ratings by ratingKey (getRatings): the cards' and repos' initial values. */
+    ratings?: Ratings;
   } & ReaderSource,
 ) {
   const { issue, githubTop10, archived = false } = props;
@@ -180,6 +182,7 @@ export function DigestDashboard(
     state: states[item.id] ?? EMPTY_ITEM_STATE,
     hasTodo: itemsWithTodo.has(item.id),
     postId: props.posts?.[item.id],
+    rating: props.ratings?.[ratingKey({ kind: "item", id: item.id })] ?? null,
     language,
     actions,
   });
@@ -307,25 +310,7 @@ export function DigestDashboard(
               <section className="mt-9 @container">
                 <SectionLabel icon={GitFork} label="GITHUB / TOP 10" />
                 {githubTop10.length ? (
-                  <div className="grid gap-3 @2xl:grid-cols-2">
-                    {githubTop10.map(({ repo, focus, url }, index) => (
-                      <a
-                        key={repo}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="press focus-ring group flex min-w-0 items-center gap-4 border-2 border-ink bg-paper p-4 transition motion-safe:hover:-translate-y-0.5 hover:bg-signal"
-                      >
-                        <span className="font-display text-3xl text-signal group-hover:text-ink">{String(index + 1).padStart(2, "0")}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-mono text-sm font-bold">{repo}</span>
-                          <span className="block text-sm text-ink/55 group-hover:text-ink/75">{focus}</span>
-                        </span>
-                        <span className="hidden font-mono text-[10px] sm:inline">{t.tracked}</span>
-                        <ExternalLink className="size-4" />
-                      </a>
-                    ))}
-                  </div>
+                  <GithubTopList entries={githubTop10} ratings={props.ratings} />
                 ) : (
                   <EmptyNote>{t.emptyGithub}</EmptyNote>
                 )}
@@ -388,4 +373,32 @@ function SectionLabel({ icon: Icon, label }: { icon: LucideIcon; label: string }
 /** An empty view says what to do next (spec 1.4.10). */
 function EmptyNote({ children }: { children: ReactNode }) {
   return <div className="border-2 border-dashed border-ink/35 p-10 text-center font-mono text-sm text-ink/55">{children}</div>;
+}
+
+/** The week's GitHub Top 10 (the "github" chip): each row a link to the repo with its score, and its rating
+ *  group beside it, outside the link (G1 spec 3). */
+export function GithubTopList({ entries, ratings }: { entries: GithubTopEntry[]; ratings?: Ratings }) {
+  return (
+    <div className="grid gap-3 @2xl:grid-cols-2">
+      {entries.map(({ repo, focus, url, score }, index) => (
+        <div key={repo} className={`flex flex-wrap items-center gap-2 ${dislikedClass}`}>
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="press focus-ring group flex min-w-0 flex-1 items-center gap-4 border-2 border-ink bg-paper p-4 transition motion-safe:hover:-translate-y-0.5 hover:bg-signal"
+          >
+            <span className="font-display text-3xl text-signal group-hover:text-ink">{String(index + 1).padStart(2, "0")}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-mono text-sm font-bold">{repo}</span>
+              <span className="block text-sm text-ink/55 group-hover:text-ink/75">{focus}</span>
+            </span>
+            <span className="border border-ink px-2 py-1 font-mono text-[10px]">{score === null ? "—" : `${score}/100`}</span>
+            <ExternalLink className="size-4" />
+          </a>
+          <RatingControl target={{ kind: "repo", id: repo }} initial={ratings?.[ratingKey({ kind: "repo", id: repo })] ?? null} />
+        </div>
+      ))}
+    </div>
+  );
 }

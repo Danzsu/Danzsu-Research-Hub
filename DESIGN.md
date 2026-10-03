@@ -641,7 +641,7 @@ export function Tag({ tag }: { tag: string }) {
 ```
 
 ```tsx app/components/story-card.tsx
-className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${state.read ? "story-read" : ""}`}
+className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClass} ${state.read ? "story-read" : ""}`}
 ```
 
 ```tsx app/components/story-card.tsx
@@ -649,7 +649,7 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${state.read ?
 ```
 
 ```tsx app/components/story-card.tsx
-className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${state.read ? "story-read" : ""}`}
+className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.

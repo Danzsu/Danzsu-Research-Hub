@@ -20,7 +20,7 @@ export default async function PreviewPostPage({ searchParams }: { searchParams: 
       <PreviewNav current="post" failWrites={false} slow={delayMs > 0} />
       <main className="min-h-dvh bg-ink">
         {previewPosts.map((post) => (
-          <PostArticle key={post.id} post={post} language={language} query={query} canEdit={false} />
+          <PostArticle key={post.id} post={post} language={language} query={query} canEdit={false} rating={null} />
         ))}
         {/* Like the real post page, so Back to the preview's Library shows the cards dimmed; nothing is sent. */}
         {previewPosts.map((post) => (

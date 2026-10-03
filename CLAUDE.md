@@ -85,9 +85,9 @@ What each signed-in page asks Supabase for, on a warm instance (the ECC key veri
 
 | Page | Queries |
 | --- | --- |
-| `/` | `getRadar` (one query: the latest issue with its `digest_items` and `github_top` embedded), then `getReaderSeed` (2 in parallel) beside `readHerePosts` (one `sources` → `posts` lookup per 30 URLs, in parallel, never cached): 3 + ⌈items / 30⌉, two in a row, because the latest week's id and items come from the first answer |
+| `/` | `getRadar` (one query: the latest issue with its `digest_items` and `github_top` embedded), then `getReaderSeed` (2 in parallel) beside `readHerePosts` (one `sources` → `posts` lookup per 30 URLs, in parallel, never cached) and `getRatings` (one `ratings` query for the week's items and repos): 4 + ⌈items / 30⌉, two in a row, because the latest week's id and items come from the first answer |
 | `/companies` | the same as `/`: both render `CurrentWeekPage` (`app/(app)/current-week-page.tsx`) |
-| `/archive/[week]` | `archivedWeek` ∥ `getReaderSeed`, then `readHerePosts` (it needs the week's items): 3 + ⌈items / 30⌉, two deep; a closed week from the cache: 2 + ⌈items / 30⌉ |
+| `/archive/[week]` | `archivedWeek` ∥ `getReaderSeed`, then `readHerePosts` ∥ `getRatings` (both need the week's items): 4 + ⌈items / 30⌉, two deep; a closed week from the cache: 3 + ⌈items / 30⌉ |
 | `/archive` | `archiveList`: 1, or 0 from the cache |
 | `GET /api/state?issue=` | `getReaderState`: 2 in parallel |
 
