@@ -166,6 +166,9 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .press:active, .press-ink:active, .press-shift:active { transform: translate(2px, 2px); }
 }
 .story-read { opacity: 0.58; }
+/* A saved card (2a spec D4): a 4px signal bar on its left edge, visible without the Later toggle. */
+.story-card, .must-card { position: relative; }
+.story-card[data-saved]::before, .must-card[data-saved]::before { content: ""; position: absolute; inset: -2px auto -2px -2px; width: 4px; background: var(--signal); }
 
 /* The loading skeletons' placeholders (page-skeletons.tsx): in after 150ms, in the house 160ms, so a fast
    load flashes none. Reduced motion (below) keeps the wait and drops the fade. */

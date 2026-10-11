@@ -235,6 +235,19 @@ test("StoryCard puts the source in its meta row, one Read here button, the toolb
   assert.equal(article.querySelectorAll("button[aria-pressed]").length, 5); // Later + Read + the three rating toggles
 });
 
+// 2a spec D4 and Review Focus 1. Kills a saved card with no mark of its own (only the toggle showed it), a 👎
+// that also dims (read and 👎 would look the same), and a read 👎 card losing either sign.
+test("a card shows saved, read and 👎 with three different signs that can combine", () => {
+  const item = previewItems.find((candidate) => !candidate.mustRead)!;
+  const saved = withShellProviders(StoryCard, { item, state: { read: false, saved: true }, hasTodo: false, language: "en", actions: cardActions, rating: null });
+  assert.equal(saved.querySelector("article")?.hasAttribute("data-saved"), true);
+  const readDown = withShellProviders(StoryCard, { item, state: { read: true, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: -1 });
+  const article = readDown.querySelector("article")!;
+  assert.ok(article.classList.contains("story-read"));
+  assert.equal(article.querySelector('[role="group"]')?.getAttribute("data-rating"), "down");
+  assert.equal(article.hasAttribute("data-saved"), false);
+});
+
 test("MustReadCard dims once read and shows its rank", () => {
   const item = previewItems.find((candidate) => candidate.mustRead)!;
   const doc = withShellProviders(MustReadCard, { rank: 1, item, state: { read: true, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: null });

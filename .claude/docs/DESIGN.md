@@ -653,15 +653,23 @@ className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${disl
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
+- **Three states, three signs** (2a spec D4), which combine freely:
+
+  | State | Sign | Where |
+  | --- | --- | --- |
+  | Read | `story-read`: `opacity: 0.58`, and the card goes to the end of the feed | `globals.css` |
+  | 👎 | a dashed frame, nothing dimmer (`dislikedClass`, `rating-classes.ts`) | the card's `has-[[data-rating=down]]` |
+  | Saved for later | a 4px signal bar on the left edge (`data-saved`, `.story-card[data-saved]::before`) | `globals.css` |
+
 - **story-card** has a 96px meta gutter from `lg`, the source as a link in its meta row (also the `o` shortcut's target, `data-card-open`), and one row of actions at the bottom (2a spec D1): Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link) as the one primary action, then the tool unit (`CardToolbar`, `card-toolbar.tsx`: 👎 👍 ❤, Later, to-do, one flex unit that wraps as a whole), and Read last on the right.
 - **Both** dim to 58% once read, and take focus for j/k (`tabIndex={-1}` plus `focus-ring`).
 
 ### `RatingControl` and the filter chips
 
-`app/components/rating-control.tsx`. A `role="group"` of three `brutal` icon toggles, Nem hasznos 👎, Hasznos 👍 and Kedvenc ❤, each `aria-pressed` and painted with `pressedClass`: 40px, and 32px from `sm` with a fine pointer only (`Button`). The group carries its value as `data-rating` (`down`, `up`, `heart`), so the row around it styles itself: a 👎 row dims and its border turns dashed, and stays readable and clickable. Both class strings live in `rating-classes.ts`, a plain module, because server components use them:
+`app/components/rating-control.tsx`. A `role="group"` of three `brutal` icon toggles, Nem hasznos 👎, Hasznos 👍 and Kedvenc ❤, each `aria-pressed` and painted with `pressedClass`: 40px, and 32px from `sm` with a fine pointer only (`Button`). The group carries its value as `data-rating` (`down`, `up`, `heart`), so the row around it styles itself: a 👎 row turns its border dashed and stays as readable and clickable as the rest. Both class strings live in `rating-classes.ts`, a plain module, because server components use them:
 
 ```tsx app/components/rating-classes.ts
-export const dislikedClass = "has-[[data-rating=down]]:opacity-60 has-[[data-rating=down]]:border-dashed";
+export const dislikedClass = "has-[[data-rating=down]]:border-dashed";
 ```
 
 A Library card is one link, which can't hold a button, so it shows `RatingBadge` instead: the value's icon (the heart filled) with its name sr-only, and nothing when unrated.

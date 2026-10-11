@@ -39,3 +39,9 @@ test("RatingBadge marks a rated post and shows nothing for an unrated one", () =
 test("RatingControl outside RatingsProvider throws", () => {
   assert.throws(() => render(createElement(LanguageProvider, hu, createElement(RatingControl, { target: { kind: "item", id: "a" }, initial: null }))), /RatingsProvider/);
 });
+
+// 2a spec D4. Kills a 👎 card that also dims: read dims, 👎 dashes, so the two stay apart on sight.
+test("dislikedClass only dashes the frame", async () => {
+  const { dislikedClass } = await import("./rating-classes.ts");
+  assert.equal(dislikedClass, "has-[[data-rating=down]]:border-dashed");
+});

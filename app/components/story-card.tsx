@@ -63,6 +63,7 @@ export function StoryCard(props: CardProps) {
   return (
     <article
       {...cardFocus(item.id)}
+      data-saved={state.saved || undefined}
       className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
@@ -91,6 +92,7 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
   return (
     <article
       {...cardFocus(item.id)}
+      data-saved={state.saved || undefined}
       className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="mb-6 flex items-start justify-between">
