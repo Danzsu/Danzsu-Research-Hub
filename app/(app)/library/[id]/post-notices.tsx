@@ -23,7 +23,7 @@ export const notices = {
   },
 };
 
-const banner = "mt-4 border-l-4 border-signal pl-4 text-sm";
+const banner = "mt-4 max-w-[75ch] border-l-4 border-signal pl-4 text-sm";
 
 /** The notices under the post's title. The last extraction error is for the submitter only: they can re-extract. */
 export function PostNotices({ post, language, originalHref, canEdit }: {

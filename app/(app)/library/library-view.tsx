@@ -48,9 +48,9 @@ export function LibraryView({
       <RefreshWhileProcessing active={open.some((source) => source.status === "pending")} />
       <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm preview={preview} />} />
 
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-10">
+      <section className="mx-auto max-w-[1600px] px-4 py-10 @container sm:px-10">
         {open.length > 0 && (
-          <div className="mb-8 space-y-2 font-mono text-xs">
+          <div className="mb-8 max-w-[75ch] space-y-2 font-mono text-xs">
             {open.map((source) => (
               <p key={source.id} className="flex flex-wrap gap-3 border border-paper/20 px-4 py-3">
                 <span className={source.status === "failed" ? "text-signal" : "text-cyan"}>
@@ -71,7 +71,7 @@ export function LibraryView({
             </a>
           </p>
         )}
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-5 @[48rem]:grid-cols-2 @[72rem]:grid-cols-3 @[96rem]:grid-cols-4">
           {posts.map((post) => {
             const Icon = kindIcons[post.kind];
             return (

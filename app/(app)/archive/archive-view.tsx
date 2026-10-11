@@ -25,9 +25,10 @@ export function ArchiveView({ issues }: { issues: ArchiveIssue[] }) {
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="WEEKLY FREEZE / HETI ZÁRÁS" title="ARCHIVE" lead={<LocalizedText value={copy.lead} />} />
-      <section className="mx-auto grid max-w-6xl gap-5 px-4 py-10 sm:px-10 lg:grid-cols-2">
+      <section className="mx-auto max-w-[1600px] px-4 py-10 @container sm:px-10">
+        <div className="grid gap-5 @[48rem]:grid-cols-2 @[72rem]:grid-cols-3 @[96rem]:grid-cols-4">
         {!issues.length && (
-          <p className="font-mono text-sm text-paper/55 lg:col-span-2">
+          <p className="font-mono text-sm text-paper/55 @[48rem]:col-span-2 @[72rem]:col-span-3 @[96rem]:col-span-4">
             <LocalizedText value={copy.empty} />{" "}
             <Link href="/" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
               <LocalizedText value={copy.toRadar} />
@@ -64,6 +65,7 @@ export function ArchiveView({ issues }: { issues: ArchiveIssue[] }) {
             </div>
           </Link>
         ))}
+        </div>
       </section>
     </main>
   );

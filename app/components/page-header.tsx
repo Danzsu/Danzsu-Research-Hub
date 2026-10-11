@@ -10,7 +10,7 @@ export function HeroBand({ aside, children }: { aside?: ReactNode; children: Rea
     // @container: the sidebar (256px full, 56px rail) makes this section's own width, not the
     // viewport, the thing the two-column switch below has to key off (spec: Design language → Responsive rules).
     <section className="@container border-b-2 border-signal bg-cream px-4 py-8 text-ink sm:px-10 sm:py-10">
-      <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
+      <div className={`mx-auto max-w-[1600px] ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
         {/* The title's own column is the container (2a spec D2): on the Library the form sits beside it. */}
         <div className="min-w-0 @container">{children}</div>
         {aside}

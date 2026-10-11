@@ -99,7 +99,7 @@ export default async function AboutPage() {
     <PublicPage language={await getLanguage()}>
       <PageHero eyebrow="INVITE-ONLY / CSAK MEGHÍVÓVAL" title="NEON NEWS RADAR" lead={<LocalizedText value={copy.lead} />} />
       <main>
-        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-10">
+        <section className="mx-auto max-w-[1600px] px-4 py-12 sm:px-10">
           <h2 className="font-display text-3xl tracking-[-0.04em] sm:text-4xl">
             <LocalizedText value={copy.featuresTitle} />
             <span className="text-signal">{"//"}</span>
@@ -118,7 +118,7 @@ export default async function AboutPage() {
             ))}
           </ul>
         </section>
-        <section id="login" className="mx-auto max-w-6xl px-4 pb-16 sm:px-10">
+        <section id="login" className="mx-auto max-w-[1600px] px-4 pb-16 sm:px-10">
           <div className="max-w-md border-2 border-ink bg-cream p-7 text-ink shadow-[8px_8px_0_var(--signal)] sm:p-9">
             <h2 className="font-display text-4xl leading-[0.9] tracking-[-0.04em]">
               <LocalizedText value={copy.signInTitle} />

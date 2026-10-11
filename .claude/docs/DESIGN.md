@@ -289,13 +289,13 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
   - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, with the taiyaki raised 16px out of its centre slot; the content column's bottom padding clears both (Components → Page shell).
   - From `md` up, the desktop nav takes its place: a 256px sidebar (`w-64`) or a 56px icon rail (`w-14`).
   - The Radar's categories are a sticky chip bar at every width.
-- **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md` to `2xl`, and a 330px column from `2xl`. It is non-modal, so the undo toast stays usable while it is open.
+- **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md`, and a 330px column once the Radar's own column is 95rem wide (`@[95rem]`, R3 §2: the nav and the viewport decide together). It is non-modal, so the undo toast stays usable while it is open.
 - **Touch targets are at least 40px** (`min-h-10`, or `size-10 sm:size-8` for icon buttons, which may shrink to 32px from `sm` up).
 - **Use `dvh`, not `vh`.**
 - **Hover styles only for pointers.** Custom `:hover` effects in `globals.css` sit inside `@media (hover: hover)`, because touch screens keep `:hover` after a tap. Tailwind's `hover:` variant already does this.
-- **Widths.** Page content is capped at `max-w-6xl`, post text blocks at `max-w-[75ch]`, card text at `max-w-3xl` and leads at `max-w-2xl`. Images, code and video take the full column. A `PageHero` title is sized to its own column (`12cqi`, 2a spec D2) and never breaks inside a word from `sm`; the band is `py-8 sm:py-10`, so a list page starts within the first screen. The Radar's own hero keeps its size, and on a phone shows one status line instead of its lead and close box (R3 §1).
+- **Widths.** Page content is capped at `max-w-[1600px]` (the hero and the grids line up), a story card at 900px, post text blocks, the post's notices, its © line and the Library's open-source rows at `max-w-[75ch]`, card text at `max-w-3xl` and leads at `max-w-2xl`. Images, code and video take the full column. A `PageHero` title is sized to its own column (`12cqi`, 2a spec D2) and never breaks inside a word from `sm`; the band is `py-8 sm:py-10`, so a list page starts within the first screen. The Radar's own hero keeps its size, and on a phone shows one status line instead of its lead and close box (R3 §1).
 - **Gutters.** `px-4` (16px) everywhere at 360px. From `sm` it is `px-7` in the Radar (its main column widens to `px-10` from `lg`) and `px-10` on the other pages.
-- **Rhythm.** Radar sections are `mt-9` apart, each opening with a `SectionLabel` (a signal icon square and a mono title over a 2px ink rule). Feed cards are `space-y-4`, the must-read grid is `gap-4`, and the Library grid is `gap-5`.
+- **Rhythm.** Radar sections are `mt-9` apart, each opening with a `SectionLabel` (a signal icon square and a mono title over a 2px ink rule). Feed cards are `space-y-4`, the must-read grid is `gap-4`, and the Library and archive grids are `gap-5` with 1, 2, 3 then 4 columns by their own width (`@[48rem]`, `@[72rem]`, `@[96rem]`, R3 §3).
 
 **Alignment.**
 
@@ -303,7 +303,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 - Centring is kept for a few things: a lone card (`StatusCard` on ink), empty-state notes, the bottom bar's slots, the rail's icons and the toast lane.
 - Secondary actions go to the right edge: the Radar header's panel pill, a card's Read button (`ml-auto`), the post page's Original link, and the hero's weekly-close block from `lg`.
 
-**Desktop, the Radar at `md` and up** (at `2xl` the panel becomes a 330px column on the right):
+**Desktop, the Radar at `md` and up** (from a 95rem-wide Radar the panel becomes a 330px column on the right):
 
 ```text
 +-----------+----------------------------------------------------+
@@ -369,7 +369,7 @@ Shadows are hard offsets with zero blur:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
   - the desktop aside, `z-30`, so the rail's tooltips paint over both of those;
-  - the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel from `md` to `2xl`, covers the button until it closes);
+  - the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel below `@[95rem]`, covers the button until it closes);
   - sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;
   - the undo toast lane, `z-[60]`;
   - the refresh bar, `z-[70]`.
@@ -511,7 +511,7 @@ The Sheet's close button, and the one in dialogs, is a 40px square with a 2px in
 
 ```tsx app/components/page-header.tsx
     <section className="@container border-b-2 border-signal bg-cream px-4 py-8 text-ink sm:px-10 sm:py-10">
-      <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
+      <div className={`mx-auto max-w-[1600px] ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
         {/* The title's own column is the container (2a spec D2): on the Library the form sits beside it. */}
         <div className="min-w-0 @container">{children}</div>
         {aside}
@@ -652,7 +652,7 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClas
 ```
 
 ```tsx app/components/story-card.tsx
-className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+className={`focus-ring story-card max-w-[900px] border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
@@ -775,7 +775,7 @@ How they behave is in CLAUDE.md → App shell and navigation; their timing is in
 ```
 
 - **The to-do list:** a 40px field and a `signal` add button, then rows whose label is the 40px target (the 16px checkbox alone would be too small).
-- **Opening it:** below `2xl`, a round outline pill in the Radar header opens the panel. It shows `NN%`, plus the open to-do count in signal.
+- **Opening it:** below the column width (`@[95rem]`), a round outline pill in the Radar header opens the panel. It shows `NN%`, plus the open to-do count in signal.
 
 ### Form fields
 

@@ -100,7 +100,7 @@ export function PostArticle({ post, language, query, canEdit, rating }: { post: 
           )
         )}
 
-        <p className="mt-12 border-t-2 border-ink pt-4 font-mono text-[11px] tracking-[0.15em] text-ink/55 [overflow-wrap:anywhere]">
+        <p className="mt-12 max-w-[75ch] border-t-2 border-ink pt-4 font-mono text-[11px] tracking-[0.15em] text-ink/55 [overflow-wrap:anywhere]">
           © {post.author ?? post.siteName ?? hostOf(post.url)} · {post.url}
         </p>
       </div>

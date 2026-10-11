@@ -248,6 +248,18 @@ test("a card shows saved, read and 👎 with three different signs that can comb
   assert.equal(article.hasAttribute("data-saved"), false);
 });
 
+// R3 spec §2–3. Kills the panel column keyed to the viewport (2xl) instead of the Radar's own width, a story
+// card with no width cap on a wide screen, and the list grids stuck at two columns.
+test("the Radar's panel column and the list grids follow their own width, and a story card is capped", () => {
+  const radar = withShellProviders(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } });
+  const root = radar.querySelector("aside")!.parentElement!;
+  assert.match(root.className, /@\[95rem\]:grid-cols/);
+  assert.doesNotMatch(root.className, /2xl:grid-cols/);
+  assert.match(radar.querySelector("article.story-card")?.className ?? "", /max-w-\[900px\]/);
+  const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, ratings: {}, preview: { failWrites: false } });
+  assert.match(library.querySelector('a[href^="/library/"]')!.parentElement!.className, /@\[72rem\]:grid-cols-3/);
+});
+
 test("MustReadCard dims once read and shows its rank", () => {
   const item = previewItems.find((candidate) => candidate.mustRead)!;
   const doc = withShellProviders(MustReadCard, { rank: 1, item, state: { read: true, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: null });

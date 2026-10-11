@@ -194,7 +194,7 @@ export function DigestDashboard(
   const emptyFeed = companies ? companiesEmpty : radarEmpty;
   const topLabel = companies && top.length ? `${t.dailyTop} · ${addedDayLabel(top[0].addedAt)}` : t.mustRead;
 
-  // Rendered twice: as the 2xl side column, and inside the header Sheet below 2xl.
+  // Rendered twice: as the side column from a 95rem-wide Radar (R3 §2: its own width, not the viewport's), and inside the header Sheet below that.
   const panel = (
     <ReaderPanel
       language={language}
@@ -210,8 +210,8 @@ export function DigestDashboard(
   );
 
   return (
-    <div className="min-w-0 bg-cream text-ink">
-      <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
+    <div className="min-w-0 bg-cream text-ink @container">
+      <header className="radar-header sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {!archived && <span className="live-pulse shrink-0" />}
           <div className="min-w-0">
@@ -226,7 +226,7 @@ export function DigestDashboard(
               variant="outline"
               size="sm"
               aria-label={t.panel}
-              className="press h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:pointer-fine:h-9 2xl:hidden"
+              className="press h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:pointer-fine:h-9 @[95rem]:hidden"
             >
               <ListTodo /> {progress}%{openTodos > 0 && <span className="text-signal">· {openTodos}</span>}
             </Button>
@@ -254,13 +254,13 @@ export function DigestDashboard(
         </Sheet>
       </header>
 
-      <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_330px]">
-        {/* The chip bar belongs to this column, so the 2xl panel beside it is not covered. */}
+      <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 @[95rem]:grid-cols-[minmax(0,1fr)_330px]">
+        {/* The chip bar belongs to this column, so the panel beside it is not covered. */}
         <div className="min-w-0">
           {!companies && (
             <nav
               aria-label={t.categories}
-              className="sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
+              className="radar-chips sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
             >
               {filters.map(({ id, icon: Icon }) => (
                 <button
@@ -358,7 +358,7 @@ export function DigestDashboard(
           </main>
         </div>
 
-        <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 2xl:sticky 2xl:top-16 2xl:block 2xl:h-[calc(100dvh-4rem)] 2xl:overflow-y-auto">
+        <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 @[95rem]:sticky @[95rem]:top-16 @[95rem]:block @[95rem]:h-[calc(100dvh-4rem)] @[95rem]:overflow-y-auto">
           {panel}
         </aside>
       </div>

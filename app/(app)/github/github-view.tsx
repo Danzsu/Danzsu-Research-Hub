@@ -53,7 +53,7 @@ export function GithubView({ repos, more, languages, filters }: { repos: GithubR
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="REPOS / REPÓK" title="GITHUB" lead={<LocalizedText value={copy.lead} />} />
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:px-10">
+      <section className="mx-auto grid max-w-[1600px] gap-6 px-4 py-10 sm:px-10">
         <div className="grid gap-3">
           <FilterChips label={copy.ratingLabel} chips={ratingChips} />
           <FilterChips label={copy.languageLabel} chips={languageChips} />

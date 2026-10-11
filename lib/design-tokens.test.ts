@@ -66,6 +66,11 @@ test("app/globals.css keeps one :root and a single fixed theme: no .dark block, 
   assert.doesNotMatch(css, /prefers-color-scheme/, "app/globals.css has a prefers-color-scheme query (DESIGN.md: one fixed theme)");
 });
 
+// R3 spec §1. Kills the Radar header staying sticky on a short viewport (a landscape phone would keep a third of it).
+test("app/globals.css lets the Radar header and chip bar scroll on a short viewport", () => {
+  assert.match(readRepoFile("app/globals.css"), /max-height: 31\.25rem/);
+});
+
 function sourceFiles(dir: URL): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     if (entry.isDirectory()) return sourceFiles(new URL(`${entry.name}/`, dir));

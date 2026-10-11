@@ -153,6 +153,11 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .story-card:hover { transform: translateX(3px); box-shadow: -6px 0 0 var(--signal); }
 }
 .lift:focus-visible { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
+/* R3 §1: on a short viewport (a landscape phone) the Radar's sticky header and chip bar scroll with the page; only
+   the bottom bar stays. */
+@media (max-height: 31.25rem) {
+  .radar-header, .radar-chips { position: static; }
+}
 /* The pressed state (R2 spec 3): 2px down-right into the page, at once, easing back on release. `.press`
    turns ink, for light surfaces; `.press-ink` turns signal, for ink ones, where ink wouldn't show. :active
    needs no hover, so a tap shows it too. Unlayered, so it wins over the utilities' hover and aria-pressed

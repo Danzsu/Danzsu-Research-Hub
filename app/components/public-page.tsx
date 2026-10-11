@@ -20,7 +20,7 @@ export function PublicPage({ language, children }: { language: Language; childre
   return (
     <LanguageProvider initial={language}>
       <div className="min-h-dvh bg-ink text-paper">
-        <header className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-10">
+        <header className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-4 sm:px-10">
           <Link href="/about" className="focus-ring flex min-h-10 items-center gap-2 font-display text-lg sm:text-2xl">
             <Radar className="shrink-0 text-signal" /> NEON NEWS RADAR
           </Link>
@@ -32,7 +32,7 @@ export function PublicPage({ language, children }: { language: Language; childre
           </div>
         </header>
         {children}
-        <footer className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 border-t border-paper/20 px-4 py-6 font-mono text-xs text-paper/60 sm:px-10">
+        <footer className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-6 border-t border-paper/20 px-4 py-6 font-mono text-xs text-paper/60 sm:px-10">
           <span><LocalizedText value={copy.footer} /></span>
           <Link href="/about" className={linkClass}><LocalizedText value={copy.about} /></Link>
           <Link href="/privacy" className={linkClass}><LocalizedText value={copy.privacy} /></Link>

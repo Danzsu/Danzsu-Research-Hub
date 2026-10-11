@@ -37,7 +37,7 @@ export function CollectionView({ favorites, kind }: { favorites: Favorite[]; kin
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="FAVOURITES / KEDVENCEK" title="GYŰJTEMÉNY" lead={<LocalizedText value={copy.lead} />} />
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:px-10">
+      <section className="mx-auto grid max-w-[1600px] gap-6 px-4 py-10 sm:px-10">
         <FilterChips label={copy.label} chips={chips} />
         {!shown.length && (
           <p className="font-mono text-sm text-paper/55">
