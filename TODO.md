@@ -165,7 +165,7 @@
   5. **az élő próbák:** a Google-belépés 5. lépése, az R2 élő próbája, az R1 utólagos mérése, a taiyaki élő próbái (lent).
 - [ ] **A Google-belépés beállítása** (a tulajdonosé, ebben a sorrendben, **a push előtt**: a belépő oldal első gombja ezt használja, és beállítás nélkül a Supabase nyers hibaoldalára visz; a terv: [docs/superpowers/specs/2026-10-02-google-sign-in-design.md](docs/superpowers/specs/2026-10-02-google-sign-in-design.md)):
   1. **Google Cloud Console → Google Auth Platform:**
-     - *Branding*: az app neve „NEON NEWS RADAR”, egy támogatási e-mail-cím;
+     - *Branding*: az app neve „NEON NEWS RADAR”, egy támogatási e-mail-cím, az *Application home page* `https://<production-domain>/about` és a *Privacy policy link* `https://<production-domain>/privacy` (a kettő a `/about` és `/privacy` nyilvános oldal; az éles módhoz kötelező, és csak a deploy után érhető el);
      - *Audience*: External, majd *Publish app* → **In production**. Csak alap scope-okat kér (név, e-mail, profil), ezért nem kell hozzá Google-ellenőrzés; *Testing* módban viszont csak a felvett teszt-felhasználók léphetnének be;
      - *Data access*: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`;
      - *Clients → Create client*: Web application; *Authorized redirect URIs*: `https://<projekt-ref>.supabase.co/auth/v1/callback` (a `<projekt-ref>` a Supabase projekt azonosítója, a Supabase URL-jében látszik);
