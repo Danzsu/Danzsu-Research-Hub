@@ -72,7 +72,8 @@ export function UndoToast() {
       data-toast-presence
       className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
     >
-      <AnimatePresence>
+      {/* popLayout: a toast that replaces another pops the leaving one out of the lane's flow, so the two never share the width. */}
+      <AnimatePresence mode="popLayout">
         {toast && (
           <motion.div
             key={toast.id}

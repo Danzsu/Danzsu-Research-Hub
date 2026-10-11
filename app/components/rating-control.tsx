@@ -44,7 +44,9 @@ function useRating(target: RatingTarget, initial: RatingValue | null) {
 export function RatingControl({ target, initial, className = "" }: { target: RatingTarget; initial: RatingValue | null; className?: string }) {
   const { language } = useLanguage();
   const { store, value } = useRating(target, initial);
-  // The last press, so only that button springs (2a spec D7); the count keys a fresh spring on a repeat.
+  // The last press, so only that button springs (2a spec D7): the count keys a fresh span that mounts pressed
+  // (0.88) and springs back to 1. A spring takes two keyframes only, and `initial={false}` would skip the mount
+  // animation, so the other spans get that and stay at 1.
   const [press, setPress] = useState<{ name: string; count: number }>({ name: "", count: 0 });
   const t = copy[language];
   return (
@@ -66,8 +68,8 @@ export function RatingControl({ target, initial, className = "" }: { target: Rat
           <motion.span
             data-press-motion
             key={press.name === name ? press.count : 0}
-            initial={false}
-            animate={press.name === name && press.count ? { scale: [1, 0.88, 1] } : { scale: 1 }}
+            initial={press.name === name && press.count ? { scale: 0.88 } : false}
+            animate={{ scale: 1 }}
             transition={{ type: "spring", duration: 0.18, bounce: 0.4 }}
             className="grid place-items-center"
           >

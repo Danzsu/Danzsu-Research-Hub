@@ -30,6 +30,11 @@ export function isEditableTarget(element: { tagName?: string; isContentEditable?
   return element.isContentEditable === true || ["INPUT", "TEXTAREA", "SELECT"].includes(element.tagName ?? "");
 }
 
+/** True inside an open dialog or menu (the reader panel, the help, the link chat, the account menu): only `z` fires there. */
+export function inOverlay(element: { closest?: (selector: string) => unknown } | null): boolean {
+  return Boolean(element?.closest?.('[role="dialog"], [role="alertdialog"], [role="menu"]'));
+}
+
 /**
  * The action a key press asks for, or null. Nothing fires while typing or mid-composition, and only `z`
  * fires inside an open dialog: the reader panel is a non-modal one, and its undo toast stays usable.

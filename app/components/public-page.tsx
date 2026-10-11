@@ -14,7 +14,7 @@ const copy = {
 
 const linkClass = "focus-ring inline-flex min-h-10 items-center hover:text-signal";
 
-/** The frame of the public pages (/about, /privacy): an ink page with the wordmark, the language pill and the
+/** The frame of the public pages (/about, /privacy, /login): an ink page with the wordmark, the language pill and the
  *  footer links, in the visitor's language cookie but switchable in place. No app shell: nobody is signed in. */
 export function PublicPage({ language, notice, children }: { language: Language; /** A one-line status under the header: "You're signed out." */ notice?: Localized; children: ReactNode }) {
   return (

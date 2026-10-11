@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isSendKey } from "@/lib/keymap";
-import { createLinkChat, httpTransport, memoryTransport } from "@/lib/link-chat";
+import { createLinkChat, focusIsIdle, httpTransport, memoryTransport } from "@/lib/link-chat";
 import type { MySource } from "@/lib/my-sources";
 import { busyClass, ChatThread } from "./chat-thread";
 import { useLanguage } from "./language-context";
@@ -232,8 +232,10 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           // Radix also runs this when the window crosses md with the panel open (the Dialog remounts, modal
-          // or not): the panel keeps the focus then, and only a real close hands it back.
-          if (!open) shownOpener(opener.current)?.focus();
+          // or not): the panel keeps the focus then, and only a real close hands it back. And only when nothing
+          // else took it: the reader panel that closed this chat already holds the focus, and being non-modal,
+          // it would read the hand-back as focus outside and close too.
+          if (!open && focusIsIdle(document)) shownOpener(opener.current)?.focus();
         }}
         onInteractOutside={(event) => {
           if (!isMobile || isUndoToast(event.target)) event.preventDefault();

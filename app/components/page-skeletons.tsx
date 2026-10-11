@@ -67,10 +67,13 @@ export function ListSkeleton({ form = false }: { form?: boolean }) {
           <Skeleton className="mt-2 h-5 w-2/3 max-w-xl rounded-none" />
         </div>
       </HeroBand>
-      <div className="skeleton-fill mx-auto grid max-w-[1600px] gap-5 px-4 py-10 @container sm:px-10 @[48rem]:grid-cols-2 @[72rem]:grid-cols-3 @[96rem]:grid-cols-4">
-        {[0, 1, 2, 3].map((card) => (
-          <Skeleton key={card} className="h-56 rounded-none bg-paper/10" />
-        ))}
+      {/* The container and the grid that queries it are two elements: a container can't query its own size. */}
+      <div className="mx-auto max-w-[1600px] px-4 py-10 @container sm:px-10">
+        <div className="skeleton-fill grid gap-5 @[48rem]:grid-cols-2 @[72rem]:grid-cols-3 @[96rem]:grid-cols-4">
+          {[0, 1, 2, 3].map((card) => (
+            <Skeleton key={card} className="h-56 rounded-none bg-paper/10" />
+          ))}
+        </div>
       </div>
     </main>
   );

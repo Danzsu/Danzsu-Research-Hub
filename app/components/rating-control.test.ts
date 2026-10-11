@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createElement, type ComponentProps, type ReactNode } from "react";
 import { render } from "../../lib/test/render.ts";
@@ -46,9 +47,17 @@ test("dislikedClass only dashes the frame", async () => {
   assert.equal(dislikedClass, "has-[[data-rating=down]]:border-dashed");
 });
 
-// 2a spec D7. Kills a press with no motion wrapper (the spring answers the tap): the wrapper is what the
-// shell's MotionConfig turns off under reduced motion.
-test("each rating button wraps its icon in a motion span that answers the press", () => {
+// 2a spec D7, final review #2. Kills a press with no motion wrapper (the wrapper is what the shell's
+// MotionConfig turns off under reduced motion), and a spring that never plays: a press keys a fresh span, and
+// motion skips the mount animation of a span with a plain `initial={false}`; a spring also takes two keyframes
+// only, so the pressed span mounts at 0.88 and springs to 1. The static markup can't show the spring (every
+// span reads scale 1 or nothing), so the second half pins the source.
+test("each rating button wraps its icon in a motion span that springs back from the press", () => {
   const doc = inShell(createElement(RatingControl, { target: { kind: "item", id: "a" }, initial: null }));
   assert.equal(doc.querySelectorAll('[role="group"] button [data-press-motion]').length, 3);
+  const source = readFileSync(new URL("./rating-control.tsx", import.meta.url), "utf8");
+  const span = source.slice(source.indexOf("<motion.span"), source.indexOf("</motion.span>"));
+  assert.match(span, /data-press-motion/);
+  assert.match(span, /initial=\{[^}]*\{ scale: 0\.88 \}/);
+  assert.doesNotMatch(span, /initial=\{false\}|scale: \[/);
 });

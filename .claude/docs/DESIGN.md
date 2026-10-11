@@ -74,7 +74,7 @@ typography:
     letterSpacing: 0.2em
   label:
     fontFamily: '"Courier New", Courier, ui-monospace, monospace'
-    fontSize: 10px
+    fontSize: 11px
     fontWeight: 400
     letterSpacing: 0.15em
   control:
@@ -315,11 +315,11 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 |   Library |  +----------------------------------------------+  |
 |   Search  |  TOP 3 · MUST READ                                 |
 |   Archive |  +-01-----------+ +-02-----------+ +-03-----------+|  @3xl: three across
-|   (soon)  |  +--------------+ +--------------+ +--------------+|
+|   GitHub  |  +--------------+ +--------------+ +--------------+|
 +-----------+  THE WEEK'S LIVE SIGNAL                            |
-| HU    ?   |  +meta+-----------------------------------------+  |  story cards
-| user    > |  +----+-----------------------------------------+  |
-| << Coll.  |                                                    |
+|   Archive |  +meta+-----------------------------------------+  |  story cards
+| (D) user@ |  +----+-----------------------------------------+  |  account menu
+| <<        |                                                    |  collapse
 +-----------+----------------------------------------------------+
   w-64 ink   cream content column (@container)
 ```
@@ -366,7 +366,7 @@ Shadows are hard offsets with zero blur:
 
 - **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. Every Sheet and Dialog opens and closes in 160ms. The toast slides in from 8px and fades out over 160ms. A press moves 2px at once and eases back on release. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. Nothing moves on hover or press either: the shadows and colours still change. The `.live-pulse` dot (9px, signal) pulses a ring every 2s. Loading feedback waits before it shows, so a fast answer flashes nothing: the pending dot and the refresh bar appear 100ms in, at once, and leave at once; the skeletons' placeholders fade in over 160ms after 150ms. The bar runs a third-wide segment across itself every 1.2s. Under reduced motion the dot's ring stops, the skeletons don't pulse and their placeholders appear without the fade, still after 150ms, and the bar stands still at full width.
 - **One overlay at a time** (R3 §4): the Radar's reader panel and the link chat never show together; opening one closes the other (`createShellLayers`, `app-shell.tsx`, which both read through `PanelContext` and the chat's open state). The panel's column keeps `pb-24` at its foot, so the corner taiyaki covers no to-do.
-- **The `motion` library** (`motion/react`, pinned; `MotionConfig reducedMotion="user"` in the shell) runs the three motions CSS can't (2a spec D7): the rating press (a 180ms spring to 0.88 and back, on the pressed button alone, `rating-control.tsx`), the toast's enter and exit (`AnimatePresence`, 160ms, `undo-toast.tsx`), and the taiyaki's turn when its panel opens (`link-chat.tsx`). Sheets and dialogs keep their Radix 160ms CSS animations. Nothing else animates on its own, and under reduced motion all three stand still.
+- **The `motion` library** (`motion/react`, pinned; `MotionConfig reducedMotion="user"` in the shell) runs the three motions CSS can't (2a spec D7): the rating press (the pressed button's icon alone mounts at 0.88 and springs back to 1 in 180ms, `rating-control.tsx`; a spring takes two keyframes only), the toast's enter and exit (`AnimatePresence` in `popLayout` mode, 160ms, `undo-toast.tsx`), and the taiyaki's turn when its panel opens (`link-chat.tsx`). Sheets and dialogs keep their Radix 160ms CSS animations. Nothing else animates on its own. Under reduced motion the press and the turn stand still; the toast's fade is opacity, which `reducedMotion="user"` leaves alone, so it still fades over 160ms.
 - **Layering.** From bottom to top:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
@@ -456,7 +456,7 @@ Each page then sets its own surface. The Radar uses `<div className="min-w-0 bg-
 
 - **The column:** ink, sticky and full height, with a `border-paper/15` right rule. At the top sit the round signal logo badge and the stacked NEON / NEWS / RADAR wordmark, with RADAR in signal.
 - **Entries:** 40px mono rows. The active one gets a 2px signal left border, a `bg-signal/10` wash and signal text.
-- **The foot** (2a spec D5): the account menu (`account-menu.tsx`). The avatar (the address's first letter in a signal circle) and the whole address open a cream dropdown with a 2px ink frame and a signal hard shadow, holding the account rows: the language toggle, the shortcuts help and a POST sign-out. In the rail only the avatar shows, named in a tooltip. The collapse toggle sits under it.
+- **The foot** (2a spec D5): the account menu (`account-menu.tsx`). The avatar (the address's first letter in a signal circle) and the whole address, named "Account: <address>", open a cream dropdown menu with a 2px ink frame and a signal hard shadow: Magyar / English as radio items, the shortcuts help and a POST sign-out, each a real menu item (`AccountMenuItems`), so arrows move between them, Enter picks one and Esc closes; a Radix menu swallows Tab, which is why the rows aren't nested controls here. In the rail only the avatar shows, named in a tooltip. The collapse toggle sits under it.
 - **The rail:** only the icons stay. Each one shows its name in a `NavTooltip` on hover and on keyboard focus. The rail's nav has no overflow, because a scroll container would clip the tooltips. On viewports under 32rem tall, the whole aside scrolls instead.
 
 ```tsx app/components/desktop-nav.tsx
@@ -733,6 +733,12 @@ className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain
 
 ```tsx app/components/undo-toast.tsx
 className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
+```
+
+A toast that replaces another pops the leaving one out of the lane's flow, so the two never share the width for the 160ms of its fade:
+
+```tsx app/components/undo-toast.tsx
+<AnimatePresence mode="popLayout">
 ```
 
 ```tsx app/components/undo-toast.tsx

@@ -26,6 +26,19 @@ test("each of the six loading.tsx says Betöltés… / Loading… once, to assis
   }
 });
 
+// Final review #6. Kills the list skeleton's grid on its @container element: a container can't query its own
+// size, so the skeleton stayed one column while the list has up to four, and the page jumped when it loaded.
+test("the list skeletons' grid sits inside a container, not on it", () => {
+  for (const route of ["/library", "/archive"]) {
+    const Loading = loadings.find(([path]) => path === route)![1];
+    const doc = render(createElement(LanguageProvider, { initial: "en" } as ComponentProps<typeof LanguageProvider>, createElement(Loading)));
+    const grid = doc.querySelector('[class*="grid-cols-2"]');
+    assert.ok(grid, route);
+    assert.equal(grid.className.includes("@container"), false, route);
+    assert.ok(grid.parentElement?.closest('[class*="@container"]'), `${route}: an ancestor container`);
+  }
+});
+
 // Kills /companies painting the Radar's chip band: it has no category bar, so its hero would jump up.
 test("the companies skeleton is the Radar's without the chip band", () => {
   const root = (Loading: ComponentType) =>

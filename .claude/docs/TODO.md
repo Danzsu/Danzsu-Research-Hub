@@ -213,6 +213,13 @@
     - egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik;
     - a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
     - a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban.
+  - **2a vizuális audit (záró review, 2026-10-11):**
+    - csökkentett mozgás alatt a toast még 160 ms-ot halványul (az opacity-t a `reducedMotion="user"` nem állítja le): `useReducedMotion` → 0 időtartam, ha zavar;
+    - a panel kontextusa (`app-shell.tsx`) minden rendernél új objektum: `useMemo`;
+    - a panel nyitott állapota túléli az oldalt (Back után újranyílik): zárás útvonalváltáskor;
+    - az archívum üres sora még nem `EmptyState`;
+    - a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja);
+    - a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel; a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül.
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Az R1 Gyors és az R2 Visszajelzés kész; hátra van az **R3 Elrendezés** (a mobil fekvő keret, a széles képernyő, a panel és a chat takarása, a taiyaki kerete ink oldalon). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
