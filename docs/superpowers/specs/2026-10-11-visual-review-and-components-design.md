@@ -73,7 +73,7 @@ A DESIGN.md „must-card and story-card” szakasza ezt a táblázatot kapja, a 
 
 ### D5. Oldalsáv: fiók-menü, a halott sorok ki
 
-- **Fiók-menü** az oldalsáv alján: egy sor az avatárral (a név első betűje signal körben) és a teljes e-mail-címmel (csonkolás helyett `[overflow-wrap:anywhere]`, 11 px mono), kattintásra egy `Popover` (a házi `components/ui/popover.tsx`): a cím, **Nyelv** (HU/EN kapcsoló), **Súgó** (a billentyűparancsok), **Kilépés →**. Ugyanez a rail módban az avatár gombon. Mobilon a „Több” sheet alján ugyanez a három sor.
+- **Fiók-menü** az oldalsáv alján: egy sor az avatárral (a név első betűje signal körben) és a teljes e-mail-címmel (csonkolás helyett `[overflow-wrap:anywhere]`, 11 px mono), kattintásra egy lenyíló menü (a házi `components/ui/dropdown-menu.tsx`, Radix, billentyűzettel bejárható): a cím, **Nyelv** (HU/EN kapcsoló), **Súgó** (a billentyűparancsok), **Kilépés →**. Ugyanez a rail módban az avatár gombon. Mobilon a „Több” sheet alján ugyanez a három sor.
 - A **„Statistics soon”** és **„Chat soon”** sorok kikerülnek a menüből: a Statisztika a 2c dashboardjával tér vissza élőként, a Chat a taiyaki. A `soon` jelölő a `NavItem`-ben marad a jövőre.
 - Az összecsukás gombja marad az oldalsáv alján, a fiók-sor alatt.
 - Minta: Untitled UI „account menu / user dropdown” és FlexyUI navbar-mintái, házi stílusban újraírva (nem függőség).

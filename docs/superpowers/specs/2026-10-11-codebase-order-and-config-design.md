@@ -91,7 +91,7 @@ A `docs/` mappa és a gyökérbeli `CLAUDE.md`, `.env.example` megszűnik. A kö
 ### 2.3 Önálló GitHub menüpont
 
 - **Útvonal:** `/github`. Fájlok: `app/(app)/github/page.tsx` (a mai `archive/(list)/github/page.tsx`), `app/(app)/github/github-view.tsx` (a mai `archive/github-view.tsx`), `app/(app)/github/loading.tsx` (`ListSkeleton`). A `(list)` route group itt nem kell, mert a `/github` alatt nincs aloldal.
-- **Menü (`lib/nav.ts`):** új sor `{ id: "github", href: "/github", mobileMore: true, label: { hu: "GitHub repók", en: "GitHub repos" } }` a Library után. A `NavId` bővül. Ikon: `Github`-stílusú a lucide-ból (`GitFork` marad, ha a `Github` ikon nincs a csomagban). Az `IN_PLACE_LANGUAGE` kap egy `/^\/github\/?$/` mintát. Mobilon a „Több” alatt (AI cégek, GitHub repók, Archívum, Gyűjtemény).
+- **Menü (`lib/nav.ts`):** új sor `{ id: "github", href: "/github", mobileMore: true, label: { hu: "GitHub repók", en: "GitHub repos" } }` a Library után. A `NavId` bővül. Ikon: `GitFork` (a lucide 1.46-ban nincs `Github` ikon). Az `IN_PLACE_LANGUAGE` kap egy `/^\/github\/?$/` mintát. Mobilon a „Több” alatt (AI cégek, GitHub repók, Archívum, Gyűjtemény).
 - **Az archívum:** az `ArchiveTabs` komponens megszűnik, az `ArchiveView` ismét csak a hetek listája. A `FilterChips` marad (a GitHub szűrői és a Gyűjtemény).
 - **URL-ek:** a `githubHref` `/github?…`-t ad. A régi `/archive/github` egy állandó redirect a `next.config.ts` `redirects()`-ében (`/archive/github` → `/github`, a query-vel együtt).
 - **Hero:** eyebrow `REPOS / REPÓK`, cím `GITHUB`, a lead marad.
