@@ -5,7 +5,7 @@ import { PageHero } from "@/app/components/page-header";
 import { RepoCard } from "@/app/components/repo-card";
 import type { GithubRepo } from "@/lib/content";
 import { RATING_FILTERS, type RatingFilter } from "@/lib/ratings";
-import { formatStars, weekSpan } from "@/lib/repo-format";
+import { repoStats, weekSpan } from "@/lib/repo-format";
 
 const copy = {
   lead: {
@@ -72,7 +72,7 @@ export function GithubView({ repos, more, languages, filters }: { repos: GithubR
                 focus={repo.focus}
                 meta={
                   <>
-                    {repo.language ?? "—"} · ★ {formatStars(repo.stars)} · {repo.score === null ? "—" : `${repo.score}/100`} · {weekSpan(repo.firstWeek, repo.lastWeek)} ·{" "}
+                    {repoStats(repo.language, repo.stars, repo.score)} · {weekSpan(repo.firstWeek, repo.lastWeek)} ·{" "}
                     {repo.weekCount} <LocalizedText value={copy.weeks} /> · <LocalizedText value={copy.best} /> #{repo.bestRank}
                   </>
                 }

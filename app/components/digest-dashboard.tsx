@@ -18,7 +18,7 @@ import type { CurrentIssue, DigestItem, GithubTopEntry } from "@/data/digest-typ
 import { useIsMobile } from "@/hooks/use-mobile";
 import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
 import { ratingKey, type Ratings } from "@/lib/ratings";
-import { formatStars } from "@/lib/repo-format";
+import { repoStats } from "@/lib/repo-format";
 import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
 import { useLanguage } from "./language-context";
 import { RepoCard } from "./repo-card";
@@ -387,7 +387,7 @@ export function GithubTopList({ entries, ratings }: { entries: GithubTopEntry[];
           repo={repo}
           url={url}
           focus={focus}
-          meta={`${language ?? "—"} · ★ ${formatStars(stars)} · ${score === null ? "—" : `${score}/100`}`}
+          meta={repoStats(language, stars, score)}
           target={{ kind: "repo", id: repo }}
           initial={ratings?.[ratingKey({ kind: "repo", id: repo })] ?? null}
         />
