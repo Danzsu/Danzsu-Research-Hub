@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
@@ -30,6 +30,45 @@ function persistNavMode(mode: NavMode) {
   document.cookie = `nav=${mode}; path=/; max-age=31536000; samesite=lax`;
 }
 
+/** The two overlays that never show together (R3 §4): the reader panel and the link chat. Framework-free, so
+ *  the rule is tested on its own; the shell reads it through useSyncExternalStore. */
+export function createShellLayers() {
+  let panel = false;
+  let chat = false;
+  const listeners = new Set<() => void>();
+  const notify = () => listeners.forEach((listener) => listener());
+  return {
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    panelOpen: () => panel,
+    chatOpen: () => chat,
+    setPanelOpen(open: boolean) {
+      panel = open;
+      if (open) chat = false;
+      notify();
+    },
+    setChatOpen(open: boolean) {
+      chat = open;
+      if (open) panel = false;
+      notify();
+    },
+  };
+}
+
+type Panel = { open: boolean; setOpen: (open: boolean) => void };
+/** The Radar's reader panel (digest-dashboard.tsx) reads its open state from the shell, which closes it when the chat opens. */
+export const PanelContext = createContext<Panel | null>(null);
+
+export function usePanel(): Panel {
+  const panel = useContext(PanelContext);
+  if (!panel) throw new Error("usePanel must be used inside AppShell (app/components/app-shell.tsx)");
+  return panel;
+}
+
 /** Every signed-in page: the desktop nav or the mobile bottom bar around the page, the link chat, plus the shell-wide dialogs. */
 export function AppShell({
   language,
@@ -48,7 +87,11 @@ export function AppShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [navMode, setNavMode] = useState<NavMode>(initialNavMode);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [layers] = useState(createShellLayers);
+  const chatOpen = useSyncExternalStore(layers.subscribe, layers.chatOpen, layers.chatOpen);
+  const panelOpen = useSyncExternalStore(layers.subscribe, layers.panelOpen, layers.panelOpen);
+  const setChatOpen = layers.setChatOpen;
+  const panel: Panel = { open: panelOpen, setOpen: layers.setPanelOpen };
   // Whichever taiyaki opened the panel gets the focus back when it closes.
   const chatOpener = useRef<HTMLButtonElement>(null);
   const toggleChat = (event: MouseEvent<HTMLButtonElement>) => {
@@ -87,12 +130,14 @@ export function AppShell({
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
           <ReadHereContext value={readHere}>
+            <PanelContext value={panel}>
             <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
               {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
                   so none of them covers the end of the page. The corner one's goes inside the page's own last element,
                   so that page's surface runs on under it. */}
               <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
             </DesktopNav>
+            </PanelContext>
           </ReadHereContext>
           <MobileNav
             email={email}
@@ -108,7 +153,7 @@ export function AppShell({
           <TaiyakiButton
             open={chatOpen}
             onClick={toggleChat}
-            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--signal)] md:grid"
           />
           {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
           <LinkChat

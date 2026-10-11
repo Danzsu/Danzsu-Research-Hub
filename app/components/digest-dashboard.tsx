@@ -20,6 +20,7 @@ import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
 import { ratingKey, type Ratings } from "@/lib/ratings";
 import { repoStats } from "@/lib/repo-format";
 import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
+import { usePanel } from "./app-shell";
 import { useLanguage } from "./language-context";
 import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
@@ -194,6 +195,7 @@ export function DigestDashboard(
   const emptyFeed = companies ? companiesEmpty : radarEmpty;
   const topLabel = companies && top.length ? `${t.dailyTop} · ${addedDayLabel(top[0].addedAt)}` : t.mustRead;
 
+  const panelLayer = usePanel();
   // Rendered twice: as the side column from a 95rem-wide Radar (R3 §2: its own width, not the viewport's), and inside the header Sheet below that.
   const panel = (
     <ReaderPanel
@@ -220,7 +222,7 @@ export function DigestDashboard(
           </div>
         </div>
         {/* Non-modal, so the undo toast above it stays clickable, reachable by Tab and announced. */}
-        <Sheet modal={false}>
+        <Sheet modal={false} open={panelLayer.open} onOpenChange={panelLayer.setOpen}>
           <SheetTrigger asChild>
             <Button
               variant="outline"
@@ -358,7 +360,7 @@ export function DigestDashboard(
           </main>
         </div>
 
-        <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 @[95rem]:sticky @[95rem]:top-16 @[95rem]:block @[95rem]:h-[calc(100dvh-4rem)] @[95rem]:overflow-y-auto">
+        <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 @[95rem]:sticky @[95rem]:top-16 @[95rem]:block @[95rem]:h-[calc(100dvh-4rem)] @[95rem]:overflow-y-auto @[95rem]:pb-24">
           {panel}
         </aside>
       </div>

@@ -365,6 +365,7 @@ Shadows are hard offsets with zero blur:
 `.lift` (`globals.css`) gives the taiyaki the Top 3 cards' "come forward" state, whose rules `.must-card` shares, on hover and also on keyboard focus. Under `prefers-reduced-motion` its shadow still lifts, without the translate.
 
 - **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. Every Sheet and Dialog opens and closes in 160ms. The toast slides in from 8px and fades out over 160ms. A press moves 2px at once and eases back on release. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. Nothing moves on hover or press either: the shadows and colours still change. The `.live-pulse` dot (9px, signal) pulses a ring every 2s. Loading feedback waits before it shows, so a fast answer flashes nothing: the pending dot and the refresh bar appear 100ms in, at once, and leave at once; the skeletons' placeholders fade in over 160ms after 150ms. The bar runs a third-wide segment across itself every 1.2s. Under reduced motion the dot's ring stops, the skeletons don't pulse and their placeholders appear without the fade, still after 150ms, and the bar stands still at full width.
+- **One overlay at a time** (R3 §4): the Radar's reader panel and the link chat never show together; opening one closes the other (`createShellLayers`, `app-shell.tsx`, which both read through `PanelContext` and the chat's open state). The panel's column keeps `pb-24` at its foot, so the corner taiyaki covers no to-do.
 - **Layering.** From bottom to top:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
@@ -397,12 +398,14 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
           <ReadHereContext value={readHere}>
+            <PanelContext value={panel}>
             <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
               {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
                   so none of them covers the end of the page. The corner one's goes inside the page's own last element,
                   so that page's surface runs on under it. */}
               <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
             </DesktopNav>
+            </PanelContext>
           </ReadHereContext>
           <MobileNav
             email={email}
@@ -418,7 +421,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
           <TaiyakiButton
             open={chatOpen}
             onClick={toggleChat}
-            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--signal)] md:grid"
           />
           {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
           <LinkChat

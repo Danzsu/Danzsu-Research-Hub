@@ -24,7 +24,7 @@ import { render } from "../../lib/test/render.ts";
 // throw "Too many re-renders" (see the report for the before/after repro) — not full interaction
 // coverage; clicks and state changes are checked in the browser (TESTING.md, Test layers).
 
-const { AppShell } = await import("./app-shell.tsx");
+const { AppShell, createShellLayers, PanelContext } = await import("./app-shell.tsx");
 const { LanguageProvider } = await import("./language-context.tsx");
 const { toasts, UndoToast } = await import("./undo-toast.tsx");
 const { ReaderPanel } = await import("./reader-panel.tsx");
@@ -52,7 +52,15 @@ const withShellProviders = <P extends object>(Component: ComponentType<P>, props
     createElement(
       LanguageProvider,
       { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-      createElement(RatingsProvider, sendNothing, createElement(RefreshProvider, null, createElement(ReadHereContext, { value: noop }, createElement(Component, props)))),
+      createElement(
+        RatingsProvider,
+        sendNothing,
+        createElement(
+          RefreshProvider,
+          null,
+          createElement(ReadHereContext, { value: noop }, createElement(PanelContext, { value: { open: false, setOpen: () => {} } }, createElement(Component, props))),
+        ),
+      ),
     ),
   );
 /** Renders DigestDashboard from a real seed (never preview) and returns its body text. */
@@ -481,4 +489,15 @@ test("each Top 10 card links the repo by name, shows its score and holds its rat
   assert.equal(rows[0].querySelector('[role="group"]')?.getAttribute("data-rating"), "down");
   assert.match(rows[0].textContent ?? "", /92\/100/);
   assert.match(rows[1].textContent ?? "", /— · ★ — · —/);
+});
+
+// R3 spec §4. Kills the to-do panel and the link chat open at once: opening one closes the other.
+test("opening the link chat closes the reader panel, and opening the panel closes the chat", async () => {
+  const { createShellLayers } = await import("./app-shell.tsx");
+  const layers = createShellLayers();
+  layers.setPanelOpen(true);
+  layers.setChatOpen(true);
+  assert.deepEqual([layers.panelOpen(), layers.chatOpen()], [false, true]);
+  layers.setPanelOpen(true);
+  assert.deepEqual([layers.panelOpen(), layers.chatOpen()], [true, false]);
 });
