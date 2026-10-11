@@ -771,11 +771,7 @@ How they behave is in CLAUDE.md → App shell and navigation; their timing is in
 `app/components/reader-panel.tsx`:
 
 ```tsx app/components/reader-panel.tsx
-      <section className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
-        <div className="flex items-center justify-between">
-          <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
-          <span className="font-display text-3xl text-signal">{progress}%</span>
-        </div>
+      <StatTile label={t.progress} value={`${progress}%`} detail={`${readCount} / ${total} · ${syncing ? t.syncing : t.synced}`}>
         <Progress value={progress} aria-label={t.progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
 ```
 
@@ -809,24 +805,16 @@ A multi-line field, from `app/(app)/library/[id]/post-editor.tsx`:
 
 ### Empty states
 
-An empty view says what to do next. On cream (`digest-dashboard.tsx`), a dashed box holds the note and, when a filter is on, a `brutal` "All stories" button:
+An empty view says what to do next, in one component (`EmptyState`, `app/components/empty-state.tsx`, 2a spec D8): a dashed box, an optional signal icon, a sentence at most 75ch wide and, where there is one, a 40px link or `brutal` button. Two tones, `cream` (the Radar) and `ink` (the Library, the GitHub page, the collection):
 
-```tsx app/components/digest-dashboard.tsx
-function EmptyNote({ children }: { children: ReactNode }) {
-  return <div className="border-2 border-dashed border-ink/35 p-10 text-center font-mono text-sm text-ink/55">{children}</div>;
-}
+```tsx app/components/empty-state.tsx
+    <div className={`flex flex-col items-center gap-3 border-2 border-dashed p-10 text-center font-mono text-sm ${frame}`}>
 ```
 
-On ink (`library-view.tsx`), a mono line is followed by a 40px signal link:
+### Small kit pieces
 
-```tsx app/(app)/library/library-view.tsx
-          <p className="font-mono text-sm text-paper/55">
-            <LocalizedText value={copy.empty} />{" "}
-            <a href="#submit" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
-              <LocalizedText value={copy.toForm} />
-            </a>
-          </p>
-```
+- **`StatTile`** (`stat-tile.tsx`): one number with its label on a paper card with the ink hard shadow, an optional detail line and children (the reader panel's progress bar sits in one; the dashboard's tiles will).
+- **`Kbd`** (`kbd.tsx`): a key badge in the text colour's 40% frame, for the shortcuts help, the Keresés row's ⌘K and the account menu's ?.
 
 ## Do's and Don'ts
 

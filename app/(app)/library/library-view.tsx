@@ -1,6 +1,7 @@
 import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
 import { LocalizedText } from "@/app/components/language-context";
 import { PendingDot } from "@/app/components/nav-parts";
+import { EmptyState } from "@/app/components/empty-state";
 import { PageHero } from "@/app/components/page-header";
 import { dislikedClass } from "@/app/components/rating-classes";
 import { RatingBadge } from "@/app/components/rating-control";
@@ -64,12 +65,12 @@ export function LibraryView({
         )}
 
         {!posts.length && (
-          <p className="font-mono text-sm text-paper/55">
+          <EmptyState tone="ink" icon={BookOpen}>
             <LocalizedText value={copy.empty} />{" "}
             <a href="#submit" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
               <LocalizedText value={copy.toForm} />
             </a>
-          </p>
+          </EmptyState>
         )}
         <div className="grid gap-5 @[48rem]:grid-cols-2 @[72rem]:grid-cols-3 @[96rem]:grid-cols-4">
           {posts.map((post) => {

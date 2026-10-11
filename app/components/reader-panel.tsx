@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { StatTile } from "./stat-tile";
 import type { Language } from "@/data/digest-types";
 import type { Todo } from "@/lib/reader-store";
 
@@ -54,16 +55,9 @@ export function ReaderPanel({ language, progress, readCount, total, syncing, tod
 
   return (
     <>
-      <section className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
-        <div className="flex items-center justify-between">
-          <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
-          <span className="font-display text-3xl text-signal">{progress}%</span>
-        </div>
+      <StatTile label={t.progress} value={`${progress}%`} detail={`${readCount} / ${total} · ${syncing ? t.syncing : t.synced}`}>
         <Progress value={progress} aria-label={t.progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
-        <p className="mt-3 font-mono text-[11px] text-ink/55">
-          {readCount} / {total} · {syncing ? t.syncing : t.synced}
-        </p>
-      </section>
+      </StatTile>
 
       <section className="mt-7">
         <div className="mb-4 flex items-center justify-between border-b-2 border-ink pb-3">

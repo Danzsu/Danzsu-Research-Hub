@@ -8,6 +8,7 @@ import { activeNavId, PRIMARY_NAV } from "@/lib/nav";
 import type { NavMode } from "@/lib/nav-mode";
 import { useLanguage } from "./language-context";
 import { AccountMenu } from "./account-menu";
+import { Kbd } from "./kbd";
 import { NavEntry, NavTooltip } from "./nav-parts";
 
 // Desktop navigation, variant A: a sidebar, collapsible to a ~56px icon rail (spec 1.2). Variants B
@@ -91,7 +92,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
                   labelClass={rail ? "sr-only" : "flex-1 text-left"}
                   dotOnIcon={rail}
                 >
-                  {!rail && !item.href && <kbd className="font-mono text-[11px] text-paper/45">⌘K</kbd>}
+                  {!rail && !item.href && <Kbd className="text-paper/45">⌘K</Kbd>}
                 </NavEntry>
               );
               return <li key={item.id}>{rail ? <NavTooltip label={item.label[language]}>{entry}</NavTooltip> : entry}</li>;

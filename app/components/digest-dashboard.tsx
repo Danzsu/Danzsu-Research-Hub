@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import {
   Bookmark,
   Building2,
@@ -21,6 +21,7 @@ import { ratingKey, type Ratings } from "@/lib/ratings";
 import { repoStats } from "@/lib/repo-format";
 import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
 import { usePanel } from "./app-shell";
+import { EmptyState } from "./empty-state";
 import { useLanguage } from "./language-context";
 import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
@@ -321,7 +322,7 @@ export function DigestDashboard(
                 {githubTop10.length ? (
                   <GithubTopList entries={githubTop10} ratings={props.ratings} />
                 ) : (
-                  <EmptyNote>{t.emptyGithub}</EmptyNote>
+                  <EmptyState tone="cream" icon={GitFork}>{t.emptyGithub}</EmptyState>
                 )}
               </section>
             ) : (
@@ -344,14 +345,14 @@ export function DigestDashboard(
                       <StoryCard key={item.id} {...cardProps(item)} />
                     ))}
                     {!feed.length && emptyFeed && (
-                      <EmptyNote>
+                      <EmptyState tone="cream" icon={Newspaper}>
                         <p>{emptyFeed}</p>
                         {filter !== "all" && (
                           <Button variant="brutal" className="mt-4 min-h-10" onClick={() => setFilter("all")}>
                             {t.showAll}
                           </Button>
                         )}
-                      </EmptyNote>
+                      </EmptyState>
                     )}
                   </div>
                 </section>
@@ -377,11 +378,6 @@ function SectionLabel({ icon: Icon, label }: { icon: LucideIcon; label: string }
       <h2 className="font-mono text-xs font-bold tracking-[0.15em]">{label}</h2>
     </div>
   );
-}
-
-/** An empty view says what to do next (spec 1.4.10). */
-function EmptyNote({ children }: { children: ReactNode }) {
-  return <div className="border-2 border-dashed border-ink/35 p-10 text-center font-mono text-sm text-ink/55">{children}</div>;
 }
 
 /** The week's GitHub Top 10 (the "github" chip): each row a link to the repo with its score, and its rating

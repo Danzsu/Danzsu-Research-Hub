@@ -2,6 +2,7 @@
 
 import { Keyboard, LogOut, UserRound } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Kbd } from "./kbd";
 import { useLanguage } from "./language-context";
 import { LanguageToggle } from "./language-toggle";
 import { NavTooltip } from "./nav-parts";
@@ -31,7 +32,7 @@ export function AccountRows({ email, onHelp }: { email: string; onHelp: () => vo
         <span className="flex items-center gap-2">
           <Keyboard className="size-4" aria-hidden="true" /> {t.shortcuts}
         </span>
-        <kbd className="border border-current/40 px-1.5 text-[11px]">?</kbd>
+        <Kbd>?</Kbd>
       </button>
       <form action="/auth/signout" method="post">
         <button type="submit" className={`press-shift focus-ring ${rowClass} hover:text-signal`}>
