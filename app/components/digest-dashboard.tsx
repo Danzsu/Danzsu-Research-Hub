@@ -4,7 +4,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   Bookmark,
   Building2,
-  ExternalLink,
   FlaskConical,
   GitFork,
   ListTodo,
@@ -19,10 +18,10 @@ import type { CurrentIssue, DigestItem, GithubTopEntry } from "@/data/digest-typ
 import { useIsMobile } from "@/hooks/use-mobile";
 import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
 import { ratingKey, type Ratings } from "@/lib/ratings";
+import { formatStars } from "@/lib/repo-format";
 import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
 import { useLanguage } from "./language-context";
-import { dislikedClass } from "./rating-classes";
-import { RatingControl } from "./rating-control";
+import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
 import { useReadHere } from "./link-chat";
@@ -381,24 +380,17 @@ function EmptyNote({ children }: { children: ReactNode }) {
 export function GithubTopList({ entries, ratings }: { entries: GithubTopEntry[]; ratings?: Ratings }) {
   return (
     <div className="grid gap-3 @2xl:grid-cols-2">
-      {entries.map(({ repo, focus, url, score }, index) => (
-        <div key={repo} className={`flex min-w-0 flex-wrap items-center gap-2 ${dislikedClass}`}>
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="press focus-ring group flex min-w-0 grow basis-80 items-center gap-4 border-2 border-ink bg-paper p-4 transition motion-safe:hover:-translate-y-0.5 hover:bg-signal"
-          >
-            <span className="font-display text-3xl text-signal group-hover:text-ink">{String(index + 1).padStart(2, "0")}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-mono text-sm font-bold">{repo}</span>
-              <span className="block text-sm text-ink/55 group-hover:text-ink/75">{focus}</span>
-            </span>
-            <span className="border border-ink px-2 py-1 font-mono text-[10px]">{score === null ? "—" : `${score}/100`}</span>
-            <ExternalLink className="size-4" />
-          </a>
-          <RatingControl target={{ kind: "repo", id: repo }} initial={ratings?.[ratingKey({ kind: "repo", id: repo })] ?? null} />
-        </div>
+      {entries.map(({ repo, focus, url, stars, language, score }, index) => (
+        <RepoCard
+          key={repo}
+          rank={index + 1}
+          repo={repo}
+          url={url}
+          focus={focus}
+          meta={`${language ?? "—"} · ★ ${formatStars(stars)} · ${score === null ? "—" : `${score}/100`}`}
+          target={{ kind: "repo", id: repo }}
+          initial={ratings?.[ratingKey({ kind: "repo", id: repo })] ?? null}
+        />
       ))}
     </div>
   );

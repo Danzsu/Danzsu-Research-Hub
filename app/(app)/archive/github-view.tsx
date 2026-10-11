@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 import { FilterChips } from "@/app/components/filter-chips";
 import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
-import { dislikedClass } from "@/app/components/rating-classes";
-import { RatingControl } from "@/app/components/rating-control";
+import { RepoCard } from "@/app/components/repo-card";
 import type { GithubRepo } from "@/lib/content";
 import { RATING_FILTERS, type RatingFilter } from "@/lib/ratings";
+import { formatStars, weekSpan } from "@/lib/repo-format";
 import { ArchiveTabs } from "./archive-tabs";
 
 const copy = {
@@ -39,11 +38,6 @@ export function githubHref(filters: { rating?: RatingFilter; language?: string; 
   return query ? `/archive/github?${query}` : "/archive/github";
 }
 
-const weekLabel = (week: string) => week.slice(5);
-const orDash = (value: string | null) => value ?? "—";
-// "152K" reads the same in both languages, so the server can render it without knowing the reader's.
-const compact = new Intl.NumberFormat("en", { notation: "compact" });
-
 /** The archive's GitHub tab (G1 spec 4): every repo the weekly Top 10s held, with the reader's rating. */
 export function GithubView({ repos, more, languages, filters }: { repos: GithubRepo[]; more: boolean; languages: string[]; filters: GithubFilters }) {
   const { rating, language } = filters;
@@ -73,25 +67,20 @@ export function GithubView({ repos, more, languages, filters }: { repos: GithubR
         )}
         <ul className="grid gap-3">
           {repos.map((repo) => (
-            <li key={repo.key} className={`flex flex-wrap items-center gap-4 border-2 border-paper/30 bg-[#1c1c1c] p-4 ${dislikedClass}`}>
-              <div className="min-w-48 flex-1">
-                <a
-                  href={repo.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="focus-ring inline-flex min-h-10 items-center gap-2 font-mono text-sm font-bold [overflow-wrap:anywhere] hover:text-signal"
-                >
-                  {repo.repo}
-                  <ExternalLink className="size-4 shrink-0" />
-                </a>
-                <p className="text-sm text-paper/65">{repo.focus}</p>
-                <p className="mt-2 font-mono text-xs text-paper/55">
-                  {orDash(repo.language)} · ★ {repo.stars === null ? "—" : compact.format(repo.stars)} · {repo.score === null ? "—" : `${repo.score}/100`} ·{" "}
-                  {repo.firstWeek === repo.lastWeek ? weekLabel(repo.lastWeek) : `${weekLabel(repo.firstWeek)}–${weekLabel(repo.lastWeek)}`} ·{" "}
-                  {repo.weekCount} <LocalizedText value={copy.weeks} /> · <LocalizedText value={copy.best} /> #{repo.bestRank}
-                </p>
-              </div>
-              <RatingControl target={{ kind: "repo", id: repo.key }} initial={repo.rating} />
+            <li key={repo.key}>
+              <RepoCard
+                repo={repo.repo}
+                url={repo.url}
+                focus={repo.focus}
+                meta={
+                  <>
+                    {repo.language ?? "—"} · ★ {formatStars(repo.stars)} · {repo.score === null ? "—" : `${repo.score}/100`} · {weekSpan(repo.firstWeek, repo.lastWeek)} ·{" "}
+                    {repo.weekCount} <LocalizedText value={copy.weeks} /> · <LocalizedText value={copy.best} /> #{repo.bestRank}
+                  </>
+                }
+                target={{ kind: "repo", id: repo.key }}
+                initial={repo.rating}
+              />
             </li>
           ))}
         </ul>
