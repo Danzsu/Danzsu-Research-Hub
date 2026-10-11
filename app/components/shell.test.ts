@@ -24,7 +24,7 @@ import { render } from "../../lib/test/render.ts";
 // throw "Too many re-renders" (see the report for the before/after repro) — not full interaction
 // coverage; clicks and state changes are checked in the browser (TESTING.md, Test layers).
 
-const { AppShell, createShellLayers, PanelContext } = await import("./app-shell.tsx");
+const { AppShell, PanelContext } = await import("./app-shell.tsx");
 const { LanguageProvider } = await import("./language-context.tsx");
 const { toasts, UndoToast } = await import("./undo-toast.tsx");
 const { ReaderPanel } = await import("./reader-panel.tsx");

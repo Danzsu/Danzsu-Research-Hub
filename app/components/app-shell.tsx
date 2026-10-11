@@ -105,7 +105,7 @@ export function AppShell({
     chatOpener.current = opener;
     setQueuedLink(url);
     setChatOpen(true);
-  }, []);
+  }, [setChatOpen]);
   const openSearch = () => setSearchOpen(true);
   const openHelp = () => setHelpOpen(true);
   const toggleNav = () => {
