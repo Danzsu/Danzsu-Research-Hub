@@ -91,7 +91,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
                   labelClass={rail ? "sr-only" : "flex-1 text-left"}
                   dotOnIcon={rail}
                 >
-                  {!rail && !item.href && <kbd className="font-mono text-[10px] text-paper/45">⌘K</kbd>}
+                  {!rail && !item.href && <kbd className="font-mono text-[11px] text-paper/45">⌘K</kbd>}
                 </NavEntry>
               );
               return <li key={item.id}>{rail ? <NavTooltip label={item.label[language]}>{entry}</NavTooltip> : entry}</li>;

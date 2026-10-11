@@ -88,7 +88,7 @@ export function LibraryView({
                   </span>
                   <span className="flex items-center gap-3">
                     <RatingBadge target={{ kind: "post", id: String(post.id) }} initial={ratings[ratingKey({ kind: "post", id: String(post.id) })] ?? null} />
-                    <span className="font-mono text-[10px] opacity-60">{post.createdAt.slice(0, 10)}</span>
+                    <span className="font-mono text-[11px] opacity-60">{post.createdAt.slice(0, 10)}</span>
                   </span>
                 </div>
                 <p className="mt-6 font-mono text-xs tracking-[0.15em] opacity-60">{post.author ?? hostOf(post.url)}</p>
@@ -103,7 +103,7 @@ export function LibraryView({
                     <Tag key={tag} tag={tag} />
                   ))}
                   {post.meta.mirrored && (
-                    <span className="ml-auto flex items-center gap-1 font-mono text-[10px] opacity-60">
+                    <span className="ml-auto flex items-center gap-1 font-mono text-[11px] opacity-60">
                       <BookOpen className="size-3" /> <LocalizedText value={copy.mirrored} />
                     </span>
                   )}

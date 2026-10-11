@@ -243,7 +243,7 @@ Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-pape
 | `text-ink/72` on paper | 6.9 | card summaries |
 | `text-paper/55` on ink | 5.5 | secondary text on ink |
 | `text-paper/45` on ink / on `#1c1c1c` | 4.1 / 4.0 | the Library's error line, the ⌘K hint |
-| `text-ink/55` on paper | 3.9 | 10px meta labels, empty notes |
+| `text-ink/55` on paper | 3.9 | 11px meta labels, empty notes |
 | signal on paper / cream | 2.86 / 2.69 | large text / non-text only: the `//`, the rank numerals, rules, the focus outline. Today it also sets eyebrows, source labels and inline post links, which is the known gap |
 
 WCAG AA asks 4.5:1 of small text, and 3:1 of large text and of non-text UI. The last three rows miss the first bar. `text-paper/45` and `text-ink/55` still clear 3:1, so they suit large or incidental text. Signal on a light surface sits just under 3:1 as well, so it is meant for large text and non-text marks only. Its small-text uses are the gap tracked in TODO.md (a brand decision: a darker signal for small text, or large and decorative use only). An inline link at least carries an underline, but a label does not. The link chat (`chat-thread.tsx`) adds no new case: its action links are ink with a signal underline instead, and its status labels are `text-ink/70`.
@@ -276,9 +276,9 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 | Post body | `text-[17px]` | 1.7 | post blocks |
 | Card body | `text-base` (16px) | `leading-7` | story summaries |
 | Small body | `text-sm` (14px) | `leading-6` | "why it matters", dialog text |
-| Eyebrow | `text-xs` (12px), mono | `tracking-[0.2em]` | `PageHero`, `StatusCard` (the Radar header's is 10px) |
+| Eyebrow | `text-xs` (12px), mono | `tracking-[0.2em]` | `PageHero`, `StatusCard` (the Radar header's is 11px, `tracking-[0.18em]`) |
 | Control | `text-xs`, mono | none | buttons, chips, the toast |
-| Label | `text-[11px]` / `text-[10px]`, mono | `tracking-[0.12em]` / `[0.15em]` | source labels, "why it matters", meta, tags |
+| Label | `text-[11px]`, mono | `tracking-[0.12em]` / `[0.15em]` | source labels, "why it matters", meta, tags. **Never under 11px:** `lib/design-tokens.test.ts` fails on a `text-[10px]` (2a spec D3) |
 
 ## Layout
 
@@ -475,7 +475,7 @@ className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-sign
 
 ```tsx app/components/app-shell.tsx
 const slotClass =
-  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 ```
 
 "Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek, Archívum and Gyűjtemény (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
@@ -617,7 +617,7 @@ Every control shows a press, and it needs no hover, so a tap shows it too, even 
 
 ```tsx app/components/tag.tsx
 export function Tag({ tag }: { tag: string }) {
-  return <span className="border border-current/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>;
+  return <span className="border border-current/30 px-2 py-1 font-mono text-[11px]">#{tag}</span>;
 }
 ```
 

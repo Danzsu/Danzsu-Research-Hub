@@ -133,7 +133,7 @@ export function AppShell({
 const MORE_HREFS = MOBILE_MORE_NAV.flatMap((item) => (item.href ? [item.href] : []));
 
 const slotClass =
-  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 
 /** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds AI cégek and
  *  Archívum, the language, the coming views and sign-out; on their pages its slot carries the active mark. */

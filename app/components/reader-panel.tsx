@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ListTodo, Plus, Trash2 } from "lucide-react";
+import { ListTodo, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,6 @@ const copy = {
     add: "Hozzáadás",
     delete: "Törlés",
     empty: "(づ ◕‿◕ )づ Még üres. Írj be egy teendőt fent, vagy egy hír „+ teendő” gombjával tedd ide.",
-    invite: "CSAK MEGHÍVÓVAL",
-    daily: "NAPI FUTÁS · 05:00 UTC",
-    freeze: "HETI ZÁRÁS · VAS 24:00",
   },
   en: {
     progress: "Weekly progress",
@@ -30,9 +27,6 @@ const copy = {
     add: "Add",
     delete: "Delete",
     empty: "(づ ◕‿◕ )づ Nothing yet. Type one above, or use + to-do on a story.",
-    invite: "INVITE-ONLY PROFILES",
-    daily: "DAILY RUN · 05:00 UTC",
-    freeze: "WEEKLY FREEZE · SUN 24:00",
   },
 };
 
@@ -126,14 +120,6 @@ export function ReaderPanel({ language, progress, readCount, total, syncing, tod
           ))}
           {!todos.length && <li className="py-7 text-center font-mono text-xs leading-5 text-ink/55">{t.empty}</li>}
         </ul>
-      </section>
-
-      <section className="mt-8 border-t-2 border-ink pt-5 font-mono text-[11px] leading-5 text-ink/55">
-        <p className="flex items-center gap-2 text-signal">
-          <Check className="size-3" /> {t.invite}
-        </p>
-        <p>{t.daily}</p>
-        <p>{t.freeze}</p>
       </section>
     </>
   );

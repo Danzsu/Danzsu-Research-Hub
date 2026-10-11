@@ -73,7 +73,7 @@ export function PostArticle({ post, language, query, canEdit, rating }: { post: 
         <p className="mt-8 max-w-[75ch] text-lg leading-8">{post.summary[language]}</p>
         {post.keyPoints[language].length > 0 && (
           <div className="mt-8 max-w-[75ch] border-l-4 border-signal pl-5">
-            <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{labels.keyPoints}</p>
+            <p className="font-mono text-[11px] tracking-[0.15em] text-signal">{labels.keyPoints}</p>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7">
               {post.keyPoints[language].map((point) => <li key={point}>{point}</li>)}
             </ul>
@@ -100,7 +100,7 @@ export function PostArticle({ post, language, query, canEdit, rating }: { post: 
           )
         )}
 
-        <p className="mt-12 border-t-2 border-ink pt-4 font-mono text-[10px] tracking-[0.15em] text-ink/55 [overflow-wrap:anywhere]">
+        <p className="mt-12 border-t-2 border-ink pt-4 font-mono text-[11px] tracking-[0.15em] text-ink/55 [overflow-wrap:anywhere]">
           © {post.author ?? post.siteName ?? hostOf(post.url)} · {post.url}
         </p>
       </div>

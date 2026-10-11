@@ -73,7 +73,7 @@ export function StoryCard(props: CardProps) {
     >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
         {/* A row of meta on narrow screens, the 96px gutter from lg up. */}
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[10px] leading-5 text-ink/55 lg:block">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[11px] leading-5 text-ink/55 lg:block">
           <p className="text-signal">{item.publishedLabel}</p>
           <p className="lg:mt-2">
             {t.score} <span className="font-display text-xl text-ink lg:block lg:text-3xl">{item.score}</span>
@@ -101,7 +101,7 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
     >
       <div className="mb-6 flex items-start justify-between">
         <span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
-        <span className="border border-ink px-2 py-1 font-mono text-[10px]">{item.score}/100</span>
+        <span className="border border-ink px-2 py-1 font-mono text-[11px]">{item.score}/100</span>
       </div>
       <CardText {...props} titleClassName="text-2xl leading-[1.02]" />
       <CardFooter {...props} />
@@ -117,7 +117,7 @@ function CardText({ item, language, titleClassName }: CardProps & { titleClassNa
       <h2 className={`mt-3 font-display [overflow-wrap:anywhere] ${titleClassName}`}>{item.title[language]}</h2>
       <p className="mt-4 max-w-3xl text-base leading-7 text-ink/72">{item.summary[language]}</p>
       <div className="mt-5 border-l-4 border-signal pl-4">
-        <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{t.why}</p>
+        <p className="font-mono text-[11px] tracking-[0.15em] text-signal">{t.why}</p>
         <p className="mt-1 text-sm leading-6">{item.why[language]}</p>
       </div>
       {item.tags.length > 0 && (

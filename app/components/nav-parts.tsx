@@ -90,7 +90,7 @@ export function SoonList({ className = "" }: { className?: string }) {
           <li key={item.id} className="flex min-h-10 items-center gap-3 font-mono text-sm opacity-40">
             <Icon className="size-4" />
             <span className="flex-1">{item.label[language]}</span>
-            <span className="text-[10px] tracking-[0.12em]">{t.soon}</span>
+            <span className="text-[11px] tracking-[0.12em]">{t.soon}</span>
           </li>
         );
       })}

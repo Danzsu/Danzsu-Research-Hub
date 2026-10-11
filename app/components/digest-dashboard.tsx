@@ -37,6 +37,7 @@ const copy = {
     categories: "Kategóriák",
     panel: "Haladás és to-do",
     updated: "Napi frissítés",
+    schedule: "NAPI 05:00 UTC · ZÁRÁS VAS 24:00",
     archive: "Heti zárás",
     status: "ÁLLAPOT",
     frozen: "LEZÁRVA",
@@ -70,6 +71,7 @@ const copy = {
     categories: "Categories",
     panel: "Progress & to-do",
     updated: "Daily refresh",
+    schedule: "DAILY 05:00 UTC · FREEZE SUN 24:00",
     archive: "Weekly close",
     status: "STATUS",
     frozen: "FROZEN",
@@ -213,7 +215,7 @@ export function DigestDashboard(
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {!archived && <span className="live-pulse shrink-0" />}
           <div className="min-w-0">
-            <p className="truncate font-mono text-[10px] tracking-[0.2em] text-signal">{archived ? t.archived : t.live}</p>
+            <p className="truncate font-mono text-[11px] tracking-[0.18em] text-signal">{archived ? t.archived : t.live}</p>
             <p className="font-display text-lg leading-none">{issue.label}</p>
           </div>
         </div>
@@ -285,6 +287,7 @@ export function DigestDashboard(
                     <span>
                       {t.updated}: {issue.updated}
                     </span>
+                    <span>{t.schedule}</span>
                   </div>
                   <h1 className="max-w-4xl font-display text-[clamp(2.6rem,15cqi,8rem)] leading-[0.77] tracking-[-0.07em]">
                     {companies ? t.companiesTitle : "AI WEEKLY"}
