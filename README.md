@@ -186,13 +186,14 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the rating group (`rating-control`) and the filter chips, the title band, the language toggle, `post-blocks` (the block renderer), `page-skeletons` (each page shape's loading fallback) and `refresh-bar` (the top bar during a reader-started refresh) |
 | [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
 | [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron |
-| [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link and Google sign-in, the callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login` |
+| [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link and Google sign-in, the callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login`, and from the home to `/about` |
 | [`app/media/`](app/media/) | Serves mirrored images to signed-in readers |
 | [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |
-| [`lib/pipeline/`](lib/pipeline/) | The daily run, the feed list, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
+| [`config/`](config/) | The daily sources (`sources.ts`), the env template, and `README.md`: where every setting lives |
+| [`lib/pipeline/`](lib/pipeline/) | The daily run, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
 | [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, translation, the model client, content queries and their caches, the link chat's logic and your own submissions, the ratings store (`ratings`), the language cookie, Supabase clients, and `idle-prefetch` (the mobile "More" sheet's idle prefetch) |
-| [`lib/test/`](lib/test/) | The offline render harness for component tests, the route-handler stubs (`route-hooks.ts`), the sign-in routes' Supabase auth stub (`fake-auth.ts`), and a `Post` fixture (`testPost`) |
+| [`lib/test/`](lib/test/) | The offline render harness for component tests, `doc-file.ts` (reads a guide under `.claude/docs/` for the doc tests), the route-handler stubs (`route-hooks.ts`), the sign-in routes' Supabase auth stub (`fake-auth.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [DESIGN.md](.claude/docs/DESIGN.md#dos-and-donts)) |
 | [`supabase/migrations/`](supabase/migrations/) | Schema, RLS, database functions, model seeds |
@@ -265,7 +266,7 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 
 ## Testing
 
-`npm test` runs `node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts"`. There is no test framework: tests use `node:test` and `node:assert`, and TypeScript runs through Node's type stripping. Nothing touches the network or Supabase.
+`npm test` runs `node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts" next.config.test.ts`. There is no test framework: tests use `node:test` and `node:assert`, and TypeScript runs through Node's type stripping. Nothing touches the network or Supabase.
 
 **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the five pre-commit checks (`npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, `npm run dup`) on every push and pull request, with no secrets. Branch protection on `main` is the owner's setting (see [TODO.md](.claude/docs/TODO.md)).
 

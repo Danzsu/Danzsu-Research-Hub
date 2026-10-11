@@ -25,9 +25,9 @@ npm run dev        # next dev on :3000
 npm run build
 npm run start
 npm run lint       # eslint .
-npm test           # node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts"
+npm test           # node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts" next.config.test.ts
 npx tsc --noEmit
-npm run dup        # jscpd app lib proxy.ts scripts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console
+npm run dup        # jscpd app lib config proxy.ts scripts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console
 ```
 
 Before every commit, all five checks must pass, in this order: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`.

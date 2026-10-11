@@ -59,7 +59,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 - `lib/test/`, `lib/pipeline/fake-db.ts` and `lib/pipeline/mock-fetch.ts` are the test harnesses and fakes (TESTING.md).
 - `data/digest-types.ts` is the Radar content contract and the tag vocabulary.
 - `config/` holds the daily sources (`sources.ts`: the feeds, the Hacker News queries, the GitHub topics), the env template (`.env.example`) and `README.md`, the note on where every setting lives.
-- `proxy.ts` refreshes the session and redirects signed-out requests to sign-in, on every request.
+- `proxy.ts` refreshes the session and redirects signed-out requests to sign-in (the home to the `/about` landing page), on every request.
 - `supabase/migrations/` has the schema, RLS, the RPCs, the `model_settings` seeds and the `media` bucket.
 - `scripts/ingest-url.mts` is `npm run ingest`, which ingests one link without the UI.
 - `vendor/` is the shadcn Tailwind 4 utility pack that `globals.css` imports.
