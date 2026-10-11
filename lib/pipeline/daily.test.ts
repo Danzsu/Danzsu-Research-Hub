@@ -115,6 +115,8 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
   assert.deepEqual(upserted.digest_items.options, { onConflict: "url", ignoreDuplicates: true }); // ids are never rewritten
   assert.deepEqual(upserted.github_top.values, [{ issue_id: "2026-W39", rank: 1, repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool", stars: 42, language: "Rust", score: 88 }]);
   assert.deepEqual(upserted.github_top.options, { onConflict: "issue_id,rank" }); // a re-run replaces the week's ranking
+  // The week's Top 10 is rewritten by rank; a shorter day must not leave yesterday's ranks 9–10 behind.
+  assert.deepEqual(db.deletes, [{ table: "github_top", filters: [["issue_id", "2026-W39"], ["rank", 1, "gt"]] }]);
   // "Known" means stored in the last 14 days, by creation time.
   assert.deepEqual(db.gteCalls, [{ table: "digest_items", column: "created_at", value: "2026-09-09T05:00:00.000Z" }]);
   assert.deepEqual(db.rpcCalls, [{ name: "refresh_must_read", args: { p_issue: "2026-W39" } }]);
@@ -167,4 +169,19 @@ test("runDaily skips the shortlist call at exactly 40 candidates, curating all o
 // G1 spec 2. Kills the score dropped from the prompt (the model would answer without one and fail the schema).
 test("curatePrompt asks for a 0–100 score on every repo, on the news' scale", () => {
   assert.match(curatePrompt([], repos), /"github" with a focus line of at most 8 English words and a score from 0 to 100/);
+});
+
+// Review Focus 3. Kills a run with no repos wiping the week's ranking (a model hiccup would empty the Top 10).
+test("runDaily with no repos leaves the week's github_top rows alone", async (t) => {
+  withGeminiKey(t);
+  t.mock.method(console, "warn", () => {});
+  mockFetch(t, async (url) => {
+    if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits: hnHits(1) });
+    if (url.startsWith("https://generativelanguage.googleapis.com/")) return geminiResponse({ items: [], github: [] });
+    return new Response("", { status: 404 });
+  });
+  const db = fakeDb();
+  await runDaily(db, new Date("2026-09-23T05:00:00Z"));
+  assert.deepEqual(db.deletes, []);
+  assert.equal(db.upserts.some((u) => u.table === "github_top"), false);
 });
