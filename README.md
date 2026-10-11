@@ -95,7 +95,7 @@ pnpm is called through corepack directly, because `corepack enable` fails with E
 
 ### Environment
 
-Copy [config/.env.example](config/.env.example) to `.env.local` and fill it in. Every variable is server-only.
+Copy [config/.env.example](config/.env.example) to `.env.local` and fill it in. Every variable is server-only. [config/README.md](config/README.md) says which file reads each one, where it is set, and what else is configured outside the code (models, crons, sign-in).
 
 | Variable | Needed | What for |
 | --- | --- | --- |

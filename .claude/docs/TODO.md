@@ -84,6 +84,7 @@
 ## B. Funkciók (fontossági sorrendben)
 
 ### Kész
+- [x] **Kódbázis-rend és config** (2026-10-11): a dokumentáció a `.claude/` alatt, a források és az env-leírás a `config/` alatt; belépés nélkül a `/` a landingre visz; az értékelés a repó kártyáján belül; a GitHub repók saját `/github` menüpontja; a napi futás törli a régi rangokat. Terv: [plans/2026-10-11-codebase-order-and-config.md](plans/2026-10-11-codebase-order-and-config.md). A 2a vizuális audit specje: [specs/2026-10-11-visual-review-and-components-design.md](specs/2026-10-11-visual-review-and-components-design.md).
 - [x] **Reszponzív UX:** mobilos chip-sáv a kategóriákhoz, a haladás és a to-do lenyíló panelben (`2xl` alatt), 360 px-en sincs vízszintes görgetés, legalább 40 px-es érintési felületek, betöltési, hiba- és 404-oldal, `manifest` (kezdőképernyőre tehető)
 - [x] **Sidebar-hiba:** a Tailwind 3-as szintaxis miatt asztali nézetben hibás volt a sidebar szélessége
 - [x] **Archívum részletoldal:** `/archive/2026-W38`, ugyanazzal az olvasó felülettel
@@ -156,8 +157,9 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
-- [ ] **A G1 élesítése** (a `github-ratings` branch, a `google-sso` PR merge-e után): a `supabase/migrations/20261003000000_ratings_github_repos.sql` futtatása az SQL Editorban **a deploy előtt** (a Radar lekérdezése az új oszlopokat olvassa), utána a merge. Élő próba: egy ❤ a Radaron megjelenik a Gyűjteményben, és a GitHub-fül listázza a korábbi hetek repóit.
-- [ ] **A kiadás: a `google-sso` PR** (2026-10-03). A PR mindent visz, ami még nincs fent (az R1 és a Hírek csomag már él): „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés, az R3 spec. A merge élesít (production deploy), ezért ebben a sorrendben:
+- [ ] **A kiadás: a `codebase-order` PR** (2026-10-11). Migráció nincs. A merge után élő próba: a `/` kijelentkezve az `/about`-ra visz; a menüben a GitHub repók és a `/github` listázza a korábbi hetek repóit (ha üres marad, a Supabase-ben a `github_repos` nézet lekérdezése a következő lépés); a Top 10 kártyáin a gombcsoport a kártyán belül; a másnapi futás után a pontszámok látszanak.
+- [x] **A G1 élesítése** (a `github-ratings` branch, a `google-sso` PR merge-e után): a `supabase/migrations/20261003000000_ratings_github_repos.sql` futtatása az SQL Editorban **a deploy előtt** (a Radar lekérdezése az új oszlopokat olvassa), utána a merge. Élő próba: egy ❤ a Radaron megjelenik a Gyűjteményben, és a GitHub-fül listázza a korábbi hetek repóit.
+- [x] **A kiadás: a `google-sso` PR** (2026-10-03; mindkét PR beolvasztva 2026-10-11, a migrációk lefuttatva, élesben megy). Ami nyitva maradt belőle: a Google-belépés beállítása (lent) és az élő próbák. A PR mindent visz, ami még nincs fent (az R1 és a Hírek csomag már él): „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés, az R3 spec. A merge élesít (production deploy), ezért ebben a sorrendben:
   1. **push:** `git push -u origin google-sso`, majd a PR megnyitása a GitHubon (a Vercel ekkor csak preview-t épít, a production nem változik);
   2. **SQL Editor:** a `supabase/migrations/20260930000000_source_claims.sql` futtatása (lent, „Az „Olvasd itt” élesítése” 1. pont);
   3. **a Google-belépés beállítása** (a következő pont 1–4. lépése);
