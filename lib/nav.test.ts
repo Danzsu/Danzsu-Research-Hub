@@ -19,7 +19,7 @@ test("activeNavId goes by path prefix at segment boundaries", () => {
   assert.equal(activeNavId("/companies"), "companies");
   assert.equal(activeNavId("/archive"), "archive");
   assert.equal(activeNavId("/archive/2026-W38"), "archive");
-  assert.equal(activeNavId("/archive/github"), "archive");
+  assert.equal(activeNavId("/github"), "github");
   assert.equal(activeNavId("/collection"), "collection");
   assert.equal(activeNavId("/library/42"), "library");
   assert.equal(activeNavId("/library/"), "library");
@@ -45,6 +45,7 @@ test("the mobile bar holds three page slots, Több holds every other primary ite
   assert.equal(inMobileMore(activeNavId("/archive/2026-W38")), true);
   assert.equal(inMobileMore(activeNavId("/companies")), true);
   assert.equal(inMobileMore(activeNavId("/collection")), true);
+  assert.equal(inMobileMore(activeNavId("/github")), true);
   assert.equal(inMobileMore(activeNavId("/library/42")), false);
   assert.equal(inMobileMore(null), false);
 });
@@ -54,4 +55,11 @@ test("the collection is a live page in the mobile Több sheet", () => {
   const collection = NAV_ITEMS.find((item) => item.id === "collection");
   assert.deepEqual([collection?.href, collection?.soon, collection?.mobileMore], ["/collection", undefined, true]);
   assert.equal(switchesLanguageInPlace("/collection"), true);
+});
+
+// Spec 2.3. Kills the GitHub list left under the archive, or kept off the mobile Több.
+test("the github repos are a live page in the mobile Több sheet, switching language in place", () => {
+  const github = NAV_ITEMS.find((item) => item.id === "github");
+  assert.deepEqual([github?.href, github?.soon, github?.mobileMore], ["/github", undefined, true]);
+  assert.equal(switchesLanguageInPlace("/github"), true);
 });

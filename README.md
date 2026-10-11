@@ -182,7 +182,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | Path | What is there |
 | --- | --- |
 | [`app/`](app/) | `/login`, the public `/about` and `/privacy` pages, the error and 404 pages, the manifest, and the route group below |
-| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), the AI companies page (`/companies`), `/archive`, `/archive/[week]`, the archive's GitHub tab (`/archive/github`), `/library`, `/library/[id]`, the collection of favourites (`/collection`), each with its loading skeleton |
+| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), the AI companies page (`/companies`), `/archive`, `/archive/[week]`, the GitHub repos page (`/github`), `/library`, `/library/[id]`, the collection of favourites (`/collection`), each with its loading skeleton |
 | [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the rating group (`rating-control`) and the filter chips, the title band, the language toggle, `post-blocks` (the block renderer), `page-skeletons` (each page shape's loading fallback) and `refresh-bar` (the top bar during a reader-started refresh) |
 | [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
 | [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron |

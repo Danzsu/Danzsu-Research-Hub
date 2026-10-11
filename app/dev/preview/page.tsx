@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { ArchiveView } from "@/app/(app)/archive/archive-view";
-import { GithubView } from "@/app/(app)/archive/github-view";
+import { GithubView } from "@/app/(app)/github/github-view";
 import { CollectionView } from "@/app/(app)/collection/collection-view";
 import { LibraryView } from "@/app/(app)/library/library-view";
 import { AppShell } from "@/app/components/app-shell";
