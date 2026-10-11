@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, Bookmark, BookmarkCheck, Check, Clock3, ExternalLink, ListChecks, ListPlus } from "lucide-react";
+import { BookOpen, Check, Clock3, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DigestItem, Language } from "@/data/digest-types";
 import { nextCardIndex } from "@/lib/keymap";
@@ -7,8 +7,8 @@ import { parseSubmittedUrl } from "@/lib/pipeline/util";
 import type { RatingValue } from "@/lib/ratings";
 import type { Flag, ItemState } from "@/lib/reader-store";
 import { PendingDot } from "./nav-parts";
+import { CardToolbar } from "./card-toolbar";
 import { dislikedClass, pressedClass } from "./rating-classes";
-import { RatingControl } from "./rating-control";
 import { Tag } from "./tag";
 
 const copy = {
@@ -16,22 +16,16 @@ const copy = {
     score: "PONT",
     min: "PERC",
     why: "MIÉRT FONTOS",
-    open: "Megnyitás",
+    open: "Forrás, új lapon",
     readHere: "Olvasd itt",
-    later: "Később",
-    addTodo: "Teendőhöz adás",
-    hasTodo: "Már a teendők között",
     read: "Olvasott",
   },
   en: {
     score: "SCORE",
     min: "MIN",
     why: "WHY IT MATTERS",
-    open: "Open source",
+    open: "Source, in a new tab",
     readHere: "Read here",
-    later: "Later",
-    addTodo: "Add to to-dos",
-    hasTodo: "Already a to-do",
     read: "Read",
   },
 };
@@ -109,11 +103,25 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
   );
 }
 
-function CardText({ item, language, titleClassName }: CardProps & { titleClassName: string }) {
+function CardText({ item, language, actions, titleClassName }: CardProps & { titleClassName: string }) {
   const t = copy[language];
   return (
     <>
-      <p className="font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere]">{item.source}</p>
+      {/* The source is the meta row's link (2a spec D1), and the `o` shortcut's target (data-card-open). */}
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noreferrer"
+        data-card-open
+        onClick={() => actions.onOpen(item)}
+        onAuxClick={(event) => {
+          if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
+        }}
+        className="focus-ring inline-flex min-h-10 items-center gap-1 font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere] hover:underline"
+      >
+        {item.source} <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+        <span className="sr-only">({t.open})</span>
+      </a>
       <h2 className={`mt-3 font-display [overflow-wrap:anywhere] ${titleClassName}`}>{item.title[language]}</h2>
       <p className="mt-4 max-w-3xl text-base leading-7 text-ink/72">{item.summary[language]}</p>
       <div className="mt-5 border-l-4 border-signal pl-4">
@@ -131,26 +139,12 @@ function CardText({ item, language, titleClassName }: CardProps & { titleClassNa
   );
 }
 
-/** [Open] [Olvasd itt] [👎 👍 ❤] [Later] [+ to-do] … [Read]: every action in one row at the bottom, in thumb reach. */
+/** [Olvasd itt] [👎 👍 ❤ 🔖 ☑] … [✓ Elolvastam] (2a spec D1): one primary action, one tool unit, the Read toggle
+ *  last; the source link sits in the meta row above. */
 function CardFooter({ item, state, hasTodo, language, actions, postId, rating }: CardProps) {
   const t = copy[language];
-  const todoLabel = hasTodo ? t.hasTodo : t.addTodo;
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
-      <Button asChild variant="ink" className="min-h-10">
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noreferrer"
-          data-card-open
-          onClick={() => actions.onOpen(item)}
-          onAuxClick={(event) => {
-            if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
-          }}
-        >
-          {t.open} <ExternalLink />
-        </a>
-      </Button>
       {/* Read-here spec 1: our own post when there is one; otherwise the chat sends the link, unless a submission would refuse it. */}
       {postId !== undefined ? (
         <Button asChild variant="brutal" className="min-h-10">
@@ -172,29 +166,15 @@ function CardFooter({ item, state, hasTodo, language, actions, postId, rating }:
           </Button>
         )
       )}
-      <RatingControl target={{ kind: "item", id: item.id }} initial={rating} />
-      <Button
-        variant="brutal"
-        size="icon-lg"
-        aria-pressed={state.saved}
-        aria-label={t.later}
-        title={t.later}
-        onClick={() => actions.onToggle(item.id, "saved")}
-        className={`size-10 sm:pointer-fine:size-8 ${pressedClass}`}
-      >
-        {state.saved ? <BookmarkCheck /> : <Bookmark />}
-      </Button>
-      <Button
-        variant="brutal"
-        size="icon-lg"
-        disabled={hasTodo}
-        aria-label={todoLabel}
-        title={todoLabel}
-        onClick={() => actions.onAddTodo(item)}
-        className="size-10 sm:pointer-fine:size-8"
-      >
-        {hasTodo ? <ListChecks /> : <ListPlus />}
-      </Button>
+      <CardToolbar
+        itemId={item.id}
+        saved={state.saved}
+        hasTodo={hasTodo}
+        rating={rating}
+        language={language}
+        onToggleSaved={() => actions.onToggle(item.id, "saved")}
+        onAddTodo={() => actions.onAddTodo(item)}
+      />
       <Button
         variant="brutal"
         aria-pressed={state.read}

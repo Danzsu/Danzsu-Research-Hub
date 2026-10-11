@@ -219,14 +219,20 @@ test("useReaderState routes a preview source's writes through createSourceStore,
   assert.equal(fetchCalls, 0);
 });
 
-test("StoryCard renders an unread feed card with its full action row", () => {
+// 2a spec D1 and Review Focus 2. Kills the source link gone from the meta row (and with it the `o` shortcut's
+// target), two primary buttons, and a Read toggle anywhere but last.
+test("StoryCard puts the source in its meta row, one Read here button, the toolbar, then Read last", () => {
   const item = previewItems.find((candidate) => !candidate.mustRead)!;
   const doc = withShellProviders(StoryCard, { item, state: { read: false, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: null });
   const article = doc.querySelector("article.story-card")!;
   assert.equal(article.getAttribute("data-card-id"), item.id);
   assert.equal(article.classList.contains("story-read"), false);
-  assert.equal(doc.querySelectorAll(`a[href="${item.url}"]`).length, 1);
-  assert.equal(doc.querySelectorAll("button[aria-pressed]").length, 5); // Later + Read + the three rating toggles
+  assert.equal(article.querySelector("[data-card-open]")?.getAttribute("href"), item.url);
+  assert.equal(article.querySelectorAll('a[href^="http"]').length, 1, "the source link, once, in the meta row");
+  assert.equal(article.querySelectorAll("[data-card-toolbar]").length, 1);
+  const buttons = [...article.querySelectorAll("button")];
+  assert.match(buttons.at(-1)?.textContent ?? "", /Read/);
+  assert.equal(article.querySelectorAll("button[aria-pressed]").length, 5); // Later + Read + the three rating toggles
 });
 
 test("MustReadCard dims once read and shows its rank", () => {

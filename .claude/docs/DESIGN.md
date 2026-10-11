@@ -567,10 +567,10 @@ In use (`app/(app)/library/library-view.tsx`):
         "icon-lg": "size-10",
 ```
 
-The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
+The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Olvasd itt button does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
 
 ```tsx app/components/story-card.tsx
-<Button asChild variant="ink" className="min-h-10">
+        <Button asChild variant="brutal" className="min-h-10">
 ```
 
 ```tsx app/components/rating-classes.ts
@@ -653,7 +653,7 @@ className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${disl
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
-- **story-card** has a 96px meta gutter from `lg`, and one row of actions at the bottom: Open (`ink`), Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link), Later and to-do (`brutal` icons), and Read on the right.
+- **story-card** has a 96px meta gutter from `lg`, the source as a link in its meta row (also the `o` shortcut's target, `data-card-open`), and one row of actions at the bottom (2a spec D1): Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link) as the one primary action, then the tool unit (`CardToolbar`, `card-toolbar.tsx`: 👎 👍 ❤, Later, to-do, one flex unit that wraps as a whole), and Read last on the right.
 - **Both** dim to 58% once read, and take focus for j/k (`tabIndex={-1}` plus `focus-ring`).
 
 ### `RatingControl` and the filter chips
