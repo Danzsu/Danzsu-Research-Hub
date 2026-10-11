@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { collectCandidates, collectRepos, dedupeCandidates, parseFeed, type Candidate } from "./collect.ts";
-import { feeds, githubTopics, hnNames, hnQueries } from "./feeds.ts";
+import { feeds, githubTopics, hnNames, hnQueries } from "../../config/sources.ts";
 import { mockFetch } from "./mock-fetch.ts";
 
 const since = new Date("2026-09-21T00:00:00Z");

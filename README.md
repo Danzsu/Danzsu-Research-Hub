@@ -95,7 +95,7 @@ pnpm is called through corepack directly, because `corepack enable` fails with E
 
 ### Environment
 
-Copy [.env.example](.env.example) to `.env.local` and fill it in. Every variable is server-only.
+Copy [config/.env.example](config/.env.example) to `.env.local` and fill it in. Every variable is server-only.
 
 | Variable | Needed | What for |
 | --- | --- | --- |
@@ -224,7 +224,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 
 ## Recipes
 
-**Add a news feed.** Check it against the criteria in [truthful_sites.md](truthful_sites.md), which lists every source the pipeline reads and the candidates. Then add an entry to `feeds` in [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts): `{ name, url, hint, limit?, exclude? }`, and move its row in `truthful_sites.md` to the "Bent van" table (`lib/truthful-sites.test.ts` fails until the two match). `hint` is the category the model starts from; `limit` caps a high-volume feed (25 by default); `exclude` is a title-or-link pattern for the feed's own promotions, or for pages that repeat its articles, dropped before the model sees them. The parser reads RSS 2.0 and Atom. A dead feed only logs a warning. Hacker News queries and GitHub topics are the two lists below it. If the feed has an unusual shape, add a case to [`collect.test.ts`](lib/pipeline/collect.test.ts).
+**Add a news feed.** Check it against the criteria in [truthful_sites.md](truthful_sites.md), which lists every source the pipeline reads and the candidates. Then add an entry to `feeds` in [`config/sources.ts`](config/sources.ts): `{ name, url, hint, limit?, exclude? }`, and move its row in `truthful_sites.md` to the "Bent van" table (`lib/truthful-sites.test.ts` fails until the two match). `hint` is the category the model starts from; `limit` caps a high-volume feed (25 by default); `exclude` is a title-or-link pattern for the feed's own promotions, or for pages that repeat its articles, dropped before the model sees them. The parser reads RSS 2.0 and Atom. A dead feed only logs a warning. Hacker News queries and GitHub topics are the two lists below it. If the feed has an unusual shape, add a case to [`collect.test.ts`](lib/pipeline/collect.test.ts).
 
 **Add a source extractor.**
 

@@ -37,7 +37,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - the hooks: `use-reader-state`, `use-shortcuts`, `use-model-context-tools`.
 - `components/ui/` holds vendored shadcn components on the unified `radix-ui` package. A few are hand-patched (CLAUDE.md → Hand-authored components). Most aren't used yet and are kept for the UI/UX milestones. `hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel and the link chat use it.
 - `lib/pipeline/` holds the two writers:
-  - the Radar: `daily.ts`, `collect.ts`, `feeds.ts`, and `mirror.ts`, which queues the week's best items for the Library;
+  - the Radar: `daily.ts`, `collect.ts` (its sources come from `config/sources.ts`), and `mirror.ts`, which queues the week's best items for the Library;
   - the Library: `ingest.ts` (`processSource`, `retryPendingSources`), and `extract/` with one extractor per source kind, where `index.ts` holds the fallback chain;
   - HTML to blocks: `html-to-blocks.ts`, plus `html-noise.ts` and `cleanup.ts` for the three noise layers;
   - images: `html-images.ts` and `images.ts` (mirroring);
@@ -58,6 +58,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `fixtures.ts`, the preview's data.
 - `lib/test/`, `lib/pipeline/fake-db.ts` and `lib/pipeline/mock-fetch.ts` are the test harnesses and fakes (TESTING.md).
 - `data/digest-types.ts` is the Radar content contract and the tag vocabulary.
+- `config/` holds the daily sources (`sources.ts`: the feeds, the Hacker News queries, the GitHub topics), the env template (`.env.example`) and `README.md`, the note on where every setting lives.
 - `proxy.ts` refreshes the session and redirects signed-out requests to sign-in, on every request.
 - `supabase/migrations/` has the schema, RLS, the RPCs, the `model_settings` seeds and the `media` bucket.
 - `scripts/ingest-url.mts` is `npm run ingest`, which ingests one link without the UI.

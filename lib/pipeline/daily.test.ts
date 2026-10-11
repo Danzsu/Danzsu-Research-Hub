@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { Candidate, Repo } from "./collect.ts";
 import { curatePrompt, runDaily, toDigestRows } from "./daily.ts";
 import { fakeDb } from "./fake-db.ts";
-import { feeds } from "./feeds.ts";
+import { feeds } from "../../config/sources.ts";
 import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockFetch, withGeminiKey } from "./mock-fetch.ts";
 import { isoWeek } from "./util.ts";
 

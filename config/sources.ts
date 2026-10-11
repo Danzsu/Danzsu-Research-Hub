@@ -1,7 +1,7 @@
-import type { DigestCategory } from "../../data/digest-types.ts";
+import type { DigestCategory } from "../data/digest-types.ts";
 
 // Checked live on 2026-09-23. A dead feed only logs a warning; the run continues.
-// truthful_sites.md documents these lists, with the candidates; lib/truthful-sites.test.ts keeps them equal.
+// The daily run's sources: truthful_sites.md documents these lists, with the candidates; lib/truthful-sites.test.ts keeps them equal.
 // `limit` caps high-volume feeds (arXiv publishes hundreds a day).
 /** The items a feed contributes when it sets no `limit`. */
 export const DEFAULT_FEED_LIMIT = 25;

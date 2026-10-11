@@ -47,7 +47,7 @@
 - [ ] **CRON_SECRET**: egy hosszú, véletlen szöveg, pl. `openssl rand -hex 32`
 
 ### 3. Helyi próba
-- [ ] `cp .env.example .env.local`, majd a kulcsok beírása
+- [ ] `cp config/.env.example .env.local`, majd a kulcsok beírása
 - [ ] `corepack pnpm@11.25.0 install --frozen-lockfile`, majd `npm run dev`
 - [ ] Belépés a `http://localhost:3000/login` oldalon a meghívott címeddel. Az emailben kapott link a Site URL-re (az éles címre) mutat: a link elejét cseréld `http://localhost:3000`-ra, a Site URL-t ne írd át.
 - [ ] Az első kiadás elindítása:
@@ -59,7 +59,7 @@
 
 ### 4. Vercel
 - [ ] [vercel.com](https://vercel.com) → *Add New → Project* → a GitHub repó importálása. A Next.js-t és a pnpm-et magától felismeri.
-- [ ] *Settings → Environment Variables*: minden változó a `.env.example`-ből (Production és Preview; a Development is, ha a sima `vercel env pull`-nak is működnie kell, különben `vercel env pull --environment=production .env.local`)
+- [ ] *Settings → Environment Variables*: minden változó a `config/.env.example`-ből (Production és Preview; a Development is, ha a sima `vercel env pull`-nak is működnie kell, különben `vercel env pull --environment=production .env.local`)
 - [x] Deploy
 - [ ] A projekt átnevezése `neon-news-radar`-ra (*Settings → General*), és a cím átírása `neon-news-radar.vercel.app`-ra (*Settings → Domains*)
 - [ ] **Lockfile-védelem ellenőrzése:** *Settings → Build and Deployment → Install Command*. A kívánt állapot: a Vercel a `pnpm-lock.yaml` szerint, frozen módban telepít, és pnpm 11-et használ, hogy a `pnpm-workspace.yaml` 7 napos korhatára (`minimumReleaseAge`) érvényesüljön. Ha a mező üres, a pnpm CI-ban alapból frozen módban fut. Szólj, mit látsz ott, és ha kell, beállítom a `vercel.json`-ban.

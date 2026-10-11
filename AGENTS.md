@@ -17,7 +17,7 @@ NEON NEWS RADAR (the repository is Danzsu Research Hub) is a private, invite-onl
 
 ```bash
 corepack pnpm@11.25.0 install --frozen-lockfile
-cp .env.example .env.local   # or: vercel env pull --environment=production .env.local
+cp config/.env.example .env.local   # or: vercel env pull --environment=production .env.local
 
 npm run dev        # next dev on :3000
 npm run build
