@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 import { FilterChips } from "@/app/components/filter-chips";
 import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
-import { dislikedClass } from "@/app/components/rating-classes";
-import { RatingControl } from "@/app/components/rating-control";
+import { RepoCard } from "@/app/components/repo-card";
 import type { GithubRepo } from "@/lib/content";
 import { RATING_FILTERS, type RatingFilter } from "@/lib/ratings";
-import { ArchiveTabs } from "./archive-tabs";
+import { repoStats, weekSpan } from "@/lib/repo-format";
 
 const copy = {
   lead: {
@@ -29,22 +27,17 @@ const copy = {
 
 export type GithubFilters = { rating?: RatingFilter; language?: string; page: number };
 
-/** The tab's link with `filters` merged in; page 1 and an empty filter stay out of the URL. */
+/** The page's link with `filters` merged in; page 1 and an empty filter stay out of the URL. */
 export function githubHref(filters: { rating?: RatingFilter; language?: string; page?: number }): string {
   const params = new URLSearchParams();
   if (filters.rating) params.set("rating", filters.rating);
   if (filters.language) params.set("lang", filters.language);
   if (filters.page && filters.page > 1) params.set("page", String(filters.page));
   const query = params.toString();
-  return query ? `/archive/github?${query}` : "/archive/github";
+  return query ? `/github?${query}` : "/github";
 }
 
-const weekLabel = (week: string) => week.slice(5);
-const orDash = (value: string | null) => value ?? "—";
-// "152K" reads the same in both languages, so the server can render it without knowing the reader's.
-const compact = new Intl.NumberFormat("en", { notation: "compact" });
-
-/** The archive's GitHub tab (G1 spec 4): every repo the weekly Top 10s held, with the reader's rating. */
+/** The GitHub page (G1 spec 4; its own menu item since the codebase-order spec): every repo the weekly Top 10s held, with the reader's rating. */
 export function GithubView({ repos, more, languages, filters }: { repos: GithubRepo[]; more: boolean; languages: string[]; filters: GithubFilters }) {
   const { rating, language } = filters;
   const ratingChips = [undefined, ...(Object.keys(RATING_FILTERS) as RatingFilter[])].map((value) => ({
@@ -60,7 +53,6 @@ export function GithubView({ repos, more, languages, filters }: { repos: GithubR
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="REPOS / REPÓK" title="GITHUB" lead={<LocalizedText value={copy.lead} />} />
-      <ArchiveTabs current="github" />
       <section className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:px-10">
         <div className="grid gap-3">
           <FilterChips label={copy.ratingLabel} chips={ratingChips} />
@@ -73,25 +65,20 @@ export function GithubView({ repos, more, languages, filters }: { repos: GithubR
         )}
         <ul className="grid gap-3">
           {repos.map((repo) => (
-            <li key={repo.key} className={`flex flex-wrap items-center gap-4 border-2 border-paper/30 bg-[#1c1c1c] p-4 ${dislikedClass}`}>
-              <div className="min-w-48 flex-1">
-                <a
-                  href={repo.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="focus-ring inline-flex min-h-10 items-center gap-2 font-mono text-sm font-bold [overflow-wrap:anywhere] hover:text-signal"
-                >
-                  {repo.repo}
-                  <ExternalLink className="size-4 shrink-0" />
-                </a>
-                <p className="text-sm text-paper/65">{repo.focus}</p>
-                <p className="mt-2 font-mono text-xs text-paper/55">
-                  {orDash(repo.language)} · ★ {repo.stars === null ? "—" : compact.format(repo.stars)} · {repo.score === null ? "—" : `${repo.score}/100`} ·{" "}
-                  {repo.firstWeek === repo.lastWeek ? weekLabel(repo.lastWeek) : `${weekLabel(repo.firstWeek)}–${weekLabel(repo.lastWeek)}`} ·{" "}
-                  {repo.weekCount} <LocalizedText value={copy.weeks} /> · <LocalizedText value={copy.best} /> #{repo.bestRank}
-                </p>
-              </div>
-              <RatingControl target={{ kind: "repo", id: repo.key }} initial={repo.rating} />
+            <li key={repo.key}>
+              <RepoCard
+                repo={repo.repo}
+                url={repo.url}
+                focus={repo.focus}
+                meta={
+                  <>
+                    {repoStats(repo.language, repo.stars, repo.score)} · {weekSpan(repo.firstWeek, repo.lastWeek)} ·{" "}
+                    {repo.weekCount} <LocalizedText value={copy.weeks} /> · <LocalizedText value={copy.best} /> #{repo.bestRank}
+                  </>
+                }
+                target={{ kind: "repo", id: repo.key }}
+                initial={repo.rating}
+              />
             </li>
           ))}
         </ul>

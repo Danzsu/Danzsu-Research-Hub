@@ -600,7 +600,7 @@ className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-ce
 
 ### Pressed state
 
-Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the GitHub rows, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
 
 ```css app/globals.css
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
@@ -666,7 +666,15 @@ export const dislikedClass = "has-[[data-rating=down]]:opacity-60 has-[[data-rat
 
 A Library card is one link, which can't hold a button, so it shows `RatingBadge` instead: the value's icon (the heart filled) with its name sr-only, and nothing when unrated.
 
-The filter chips (`FilterChips`, `app/components/filter-chips.tsx`) are the archive's tabs and the filter rows of the GitHub tab and the collection: 40px links on ink with a `border-paper/30` frame and `press-ink`, the current one `aria-current="page"` with a signal border and text, each with its pending dot.
+The filter chips (`FilterChips`, `app/components/filter-chips.tsx`) are the filter rows of the GitHub page and the collection: 40px links on ink with a `border-paper/30` frame and `press-ink`, the current one `aria-current="page"` with a signal border and text, each with its pending dot.
+
+### Repo card
+
+`app/components/repo-card.tsx`, the Radar's Top 10 and the GitHub page. The name is the link (a button can't sit in a link, so the card isn't one), the rating group sits inside at the foot, and a 👎 card dashes its own frame. The card sets its own ink text, because the GitHub page is an ink page with paper text, and carries no `press`: `:active` matches ancestors, so a press on a rating button would press the whole card. The hover lift stays:
+
+```tsx app/components/repo-card.tsx
+    <article className={`min-w-0 border-2 border-ink bg-paper p-4 text-ink transition motion-safe:hover:-translate-y-0.5 ${dislikedClass} ${className}`}>
+```
 
 ### Image frame
 

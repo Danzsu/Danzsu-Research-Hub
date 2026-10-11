@@ -149,6 +149,9 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
   if (top.length) {
     const { error } = await db.from("github_top").upsert(top, { onConflict: "issue_id,rank" });
     if (error) throw error;
+    // Yesterday's ranks past today's list would stay as stale rows: the upsert only touches ranks 1..N.
+    const { error: trimError } = await db.from("github_top").delete().eq("issue_id", week.id).gt("rank", top.length);
+    if (trimError) throw trimError;
   }
 
   const { error: rpcError } = await db.rpc("refresh_must_read", { p_issue: week.id });

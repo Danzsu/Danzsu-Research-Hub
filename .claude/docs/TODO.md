@@ -20,7 +20,7 @@
   - A sablonok szövegében a név legyen **NEON NEWS RADAR** (a kód már így hívja az oldalt)
 - [ ] Ajánlott: *Authentication → SMTP Settings*, saját SMTP (pl. Resend, ingyenes kerettel). A beépített levélküldés csak a Supabase-projekt csapatának tagjaihoz kézbesít, és óránként csak néhány emailt enged, ez meghívásnál gyorsan elfogy.
 - [ ] *Project Settings → API Keys*: a `Publishable` és a `Secret` kulcs kimásolása
-- [ ] A séma feltöltése: *SQL Editor*, a fájlokat egyenként, a [README migrációs táblázatának](README.md#migrations) sorrendjében, mindig csak az előző sikere után. A `…_drop_post_body.sql` csak az M1 deployja után jön, lásd lent.
+- [ ] A séma feltöltése: *SQL Editor*, a fájlokat egyenként, a [README migrációs táblázatának](../../README.md#migrations) sorrendjében, mindig csak az előző sikere után. A `…_drop_post_body.sql` csak az M1 deployja után jön, lásd lent.
   - ⚠️ **Ne futtasd a `supabase db push`-t:** idő előtt lefuttatná a drop migrációt, pedig az éles oldal még olvassa a `posts.body`-t. Ez a figyelmeztetés addig marad, amíg a lenti „Csak az M1 deployja után” pont kész nincs.
 - [ ] Ellenőrzés a *Table Editor*-ban: 8 tábla (a `model_settings`-szel együtt) és egy `archive_issues` view, mindegyik táblán „RLS enabled”
 - [ ] *Authentication → Users → Invite user*: meghívod magad
@@ -47,7 +47,7 @@
 - [ ] **CRON_SECRET**: egy hosszú, véletlen szöveg, pl. `openssl rand -hex 32`
 
 ### 3. Helyi próba
-- [ ] `cp .env.example .env.local`, majd a kulcsok beírása
+- [ ] `cp config/.env.example .env.local`, majd a kulcsok beírása
 - [ ] `corepack pnpm@11.25.0 install --frozen-lockfile`, majd `npm run dev`
 - [ ] Belépés a `http://localhost:3000/login` oldalon a meghívott címeddel. Az emailben kapott link a Site URL-re (az éles címre) mutat: a link elejét cseréld `http://localhost:3000`-ra, a Site URL-t ne írd át.
 - [ ] Az első kiadás elindítása:
@@ -59,7 +59,7 @@
 
 ### 4. Vercel
 - [ ] [vercel.com](https://vercel.com) → *Add New → Project* → a GitHub repó importálása. A Next.js-t és a pnpm-et magától felismeri.
-- [ ] *Settings → Environment Variables*: minden változó a `.env.example`-ből (Production és Preview; a Development is, ha a sima `vercel env pull`-nak is működnie kell, különben `vercel env pull --environment=production .env.local`)
+- [ ] *Settings → Environment Variables*: minden változó a `config/.env.example`-ből (Production és Preview; a Development is, ha a sima `vercel env pull`-nak is működnie kell, különben `vercel env pull --environment=production .env.local`)
 - [x] Deploy
 - [ ] A projekt átnevezése `neon-news-radar`-ra (*Settings → General*), és a cím átírása `neon-news-radar.vercel.app`-ra (*Settings → Domains*)
 - [ ] **Lockfile-védelem ellenőrzése:** *Settings → Build and Deployment → Install Command*. A kívánt állapot: a Vercel a `pnpm-lock.yaml` szerint, frozen módban telepít, és pnpm 11-et használ, hogy a `pnpm-workspace.yaml` 7 napos korhatára (`minimumReleaseAge`) érvényesüljön. Ha a mező üres, a pnpm CI-ban alapból frozen módban fut. Szólj, mit látsz ott, és ha kell, beállítom a `vercel.json`-ban.
@@ -84,22 +84,23 @@
 ## B. Funkciók (fontossági sorrendben)
 
 ### Kész
+- [x] **Kódbázis-rend és config** (2026-10-11): a dokumentáció a `.claude/` alatt, a források és az env-leírás a `config/` alatt; belépés nélkül a `/` a landingre visz; az értékelés a repó kártyáján belül; a GitHub repók saját `/github` menüpontja; a napi futás törli a régi rangokat. Terv: [plans/2026-10-11-codebase-order-and-config.md](plans/2026-10-11-codebase-order-and-config.md). A 2a vizuális audit specje: [specs/2026-10-11-visual-review-and-components-design.md](specs/2026-10-11-visual-review-and-components-design.md).
 - [x] **Reszponzív UX:** mobilos chip-sáv a kategóriákhoz, a haladás és a to-do lenyíló panelben (`2xl` alatt), 360 px-en sincs vízszintes görgetés, legalább 40 px-es érintési felületek, betöltési, hiba- és 404-oldal, `manifest` (kezdőképernyőre tehető)
 - [x] **Sidebar-hiba:** a Tailwind 3-as szintaxis miatt asztali nézetben hibás volt a sidebar szélessége
 - [x] **Archívum részletoldal:** `/archive/2026-W38`, ugyanazzal az olvasó felülettel
 - [x] **Nyelvválasztás megjegyzése:** `lang` cookie, minden oldal ezt használja
 - [x] **Márkanév:** NEON NEWS RADAR
 - [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon összecsukható oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (`/dev/preview`).
-- [x] **Teszt-keményítés és CI** (2026-09-25): route-tesztek a route-teszt réteggel, a `safeFetch` minden hívóhelye, a `fakeDb` szűrői, rögzített blokk-id-k, a `Progress` értéke a képernyőolvasónak, GitHub Actions CI az öt ellenőrzéssel. Terv: [docs/superpowers/plans/2026-09-25-test-hardening.md](docs/superpowers/plans/2026-09-25-test-hardening.md).
-- [x] **Taiyaki link-chat** (2026-09-27): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).
-- [x] **R1 „Gyors”** (2026-09-28): a függvények Dublinban futnak Fluid compute-tal, egy auth-ellenőrzés kérésenként, egy lekérdezés a Radarhoz, az olvasói állapot a nézett hétre szűkül, és `GET /api/state` csak Vissza után fut; a zárt hetek és az archívum-lista egy napig gyorsítótárban vannak. Oldalformájú vázak, függő pont a linkeken, felső sáv a frissítésekhez, a „Több” linkjeinek prefetchje; a zod kikerült a kliens csomagjából. Terv: [docs/superpowers/plans/2026-09-27-r1-speed.md](docs/superpowers/plans/2026-09-27-r1-speed.md).
+- [x] **Teszt-keményítés és CI** (2026-09-25): route-tesztek a route-teszt réteggel, a `safeFetch` minden hívóhelye, a `fakeDb` szűrői, rögzített blokk-id-k, a `Progress` értéke a képernyőolvasónak, GitHub Actions CI az öt ellenőrzéssel. Terv: [.claude/docs/plans/2026-09-25-test-hardening.md](plans/2026-09-25-test-hardening.md).
+- [x] **Taiyaki link-chat** (2026-09-27): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [.claude/docs/plans/2026-09-26-taiyaki-link-chat.md](plans/2026-09-26-taiyaki-link-chat.md).
+- [x] **R1 „Gyors”** (2026-09-28): a függvények Dublinban futnak Fluid compute-tal, egy auth-ellenőrzés kérésenként, egy lekérdezés a Radarhoz, az olvasói állapot a nézett hétre szűkül, és `GET /api/state` csak Vissza után fut; a zárt hetek és az archívum-lista egy napig gyorsítótárban vannak. Oldalformájú vázak, függő pont a linkeken, felső sáv a frissítésekhez, a „Több” linkjeinek prefetchje; a zod kikerült a kliens csomagjából. Terv: [.claude/docs/plans/2026-09-27-r1-speed.md](plans/2026-09-27-r1-speed.md).
 - [x] **Hírek csomag** (2026-09-30): hat új forrás (Mistral, Microsoft Research, Meta AI Research, Anthropic Research, Recode China AI, ChinAI) és öt laborneves Hacker News-keresés (`Grok`, `DeepSeek`, `Qwen`, `Kimi`, `MiniMax`, pontos egyezéssel, csak a címben). Új menüpont: **AI cégek** (`/companies`), fent a legutóbbi napi futás öt legjobb céges hírével, alatta a hét többi céges hírével. Az xAI és a LinkedIn géppel nem olvasható ([truthful_sites.md](truthful_sites.md) → Kizárva).
-- [x] **„Olvasd itt” és automatikus tükör** (2026-09-30): minden hírkártyán „Olvasd itt”: ha a cikkből már van Library-poszt, oda visz, ha nincs, a taiyaki chatben beküldi. A napi futás a hét 85 pont feletti híreit és a Top 3-at a rendszer-fiók nevén sorba teszi, a `/api/cron/mirror` 07, 08 és 09 UTC-kor feldolgozza őket. Egy forráson egyszerre egy futás dolgozik (`claimed_at` lease). Terv: [docs/superpowers/plans/2026-09-30-read-here-mirror.md](docs/superpowers/plans/2026-09-30-read-here-mirror.md).
-- [x] **G1 „Értékelés, GitHub-fül és Gyűjtemény”** (2026-10-03): 👎 👍 ❤ a hírkártyákon, a Top 10 repóin, a Library-posztokon és a GitHub-fülön; a 👎-os sor halvány, és a Libraryben és a GitHub-fülön a lista végére kerül. A napi futás a repókat is pontozza, és elmenti a csillagszámukat és a nyelvüket. Új: az archívum **GitHub-füle** (`/archive/github`, minden heti Top 10 repója egy listában, értékelés és nyelv szerint szűrve) és a **Gyűjtemény** (`/collection`, a ❤-es hírek, posztok és repók, hetektől függetlenül). Terv: [docs/superpowers/plans/2026-10-03-g1-ratings-github-collection.md](docs/superpowers/plans/2026-10-03-g1-ratings-github-collection.md).
-- [x] **R2 „Visszajelzés”** (2026-10-01): a chat saját buboréka azonnal megjelenik, a hibás küldés és teendő visszaadja a szövegét, az ismételt válasz nem halmozódik; a felső sáv a teljes Mentés, Fordítás és beküldés alatt fut; egy közös, jól olvasható hibasor; a Library olvasási hibája hibaoldalt mutat; a poszt oldala követi az újrakinyerést; benyomódás minden kattintható elemen, 160 ms-os sheetek és toast, csökkentett mozgásnál semmi nem mozdul, érintőképernyőn 40 px. Terv: [docs/superpowers/plans/2026-10-01-r2-feedback.md](docs/superpowers/plans/2026-10-01-r2-feedback.md).
+- [x] **„Olvasd itt” és automatikus tükör** (2026-09-30): minden hírkártyán „Olvasd itt”: ha a cikkből már van Library-poszt, oda visz, ha nincs, a taiyaki chatben beküldi. A napi futás a hét 85 pont feletti híreit és a Top 3-at a rendszer-fiók nevén sorba teszi, a `/api/cron/mirror` 07, 08 és 09 UTC-kor feldolgozza őket. Egy forráson egyszerre egy futás dolgozik (`claimed_at` lease). Terv: [.claude/docs/plans/2026-09-30-read-here-mirror.md](plans/2026-09-30-read-here-mirror.md).
+- [x] **G1 „Értékelés, GitHub-fül és Gyűjtemény”** (2026-10-03): 👎 👍 ❤ a hírkártyákon, a Top 10 repóin, a Library-posztokon és a GitHub-fülön; a 👎-os sor halvány, és a Libraryben és a GitHub-fülön a lista végére kerül. A napi futás a repókat is pontozza, és elmenti a csillagszámukat és a nyelvüket. Új: az archívum **GitHub-füle** (`/archive/github`, minden heti Top 10 repója egy listában, értékelés és nyelv szerint szűrve) és a **Gyűjtemény** (`/collection`, a ❤-es hírek, posztok és repók, hetektől függetlenül). Terv: [.claude/docs/plans/2026-10-03-g1-ratings-github-collection.md](plans/2026-10-03-g1-ratings-github-collection.md).
+- [x] **R2 „Visszajelzés”** (2026-10-01): a chat saját buboréka azonnal megjelenik, a hibás küldés és teendő visszaadja a szövegét, az ismételt válasz nem halmozódik; a felső sáv a teljes Mentés, Fordítás és beküldés alatt fut; egy közös, jól olvasható hibasor; a Library olvasási hibája hibaoldalt mutat; a poszt oldala követi az újrakinyerést; benyomódás minden kattintható elemen, 160 ms-os sheetek és toast, csökkentett mozgásnál semmi nem mozdul, érintőképernyőn 40 px. Terv: [.claude/docs/plans/2026-10-01-r2-feedback.md](plans/2026-10-01-r2-feedback.md).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
-- [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
+- [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [.claude/docs/specs/2026-09-24-unified-post-template-design.md](specs/2026-09-24-unified-post-template-design.md).
   - [x] **M1:** blokkok, kinyerők, zajszűrés, képek, fordítás, kis javítások.
   - [ ] **M2 olvasóeszközök** — terv szükséges. Kiemelés és komment, Key insights, Fogalmak.
     - A teszt-keményítés törölte a `post-article.test.ts`-t (osztálynév-tesztek voltak). Az M2 terv 7. és 10. feladata ezt a fájlt bővíti, ezért ott a fájl újra létrejön a fejlécével: a `testPost` és a `render` importja, és a `renderArticle` segéd.
@@ -124,9 +125,9 @@
 
 ### Új ötletek (2026-09-24), a tervezés sorrendjében
 - [x] **Asztali navigáció** (döntés: 2026-09-25): az **A** (oldalsáv) az alap, és egy gombbal vagy a `[` billentyűvel keskeny ikonsávvá csukható, mint a C változat. A választást egy cookie jegyzi meg.
-  - A spec: [docs/superpowers/specs/2026-09-24-ux-signals-search-design.md](docs/superpowers/specs/2026-09-24-ux-signals-search-design.md)
+  - A spec: [.claude/docs/specs/2026-09-24-ux-signals-search-design.md](specs/2026-09-24-ux-signals-search-design.md)
   - Most az **A** van bent, 2026-09-25-től ~56 px-es ikonsávvá csukható (`[`, vagy a lábléc gombja). A csere egyetlen fájl: `app/components/desktop-nav.tsx`.
-- [ ] **UI/UX és keresés:** az A mérföldkő kész (terv: [docs/superpowers/plans/2026-09-24-ux-a-app-shell.md](docs/superpowers/plans/2026-09-24-ux-a-app-shell.md)); hátra van a B (értékelés, GitHub-fül) és a C (keresés, lapozás).
+- [ ] **UI/UX és keresés:** az A mérföldkő kész (terv: [.claude/docs/plans/2026-09-24-ux-a-app-shell.md](plans/2026-09-24-ux-a-app-shell.md)); hátra van a B (értékelés, GitHub-fül) és a C (keresés, lapozás).
   - okos keresés a címekben: elgépelés-tűrő, jelentés szerint is talál, szűrők
   - lapozás
 - [ ] **Olvasási jelzések:**
@@ -156,14 +157,15 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
-- [ ] **A G1 élesítése** (a `github-ratings` branch, a `google-sso` PR merge-e után): a `supabase/migrations/20261003000000_ratings_github_repos.sql` futtatása az SQL Editorban **a deploy előtt** (a Radar lekérdezése az új oszlopokat olvassa), utána a merge. Élő próba: egy ❤ a Radaron megjelenik a Gyűjteményben, és a GitHub-fül listázza a korábbi hetek repóit.
-- [ ] **A kiadás: a `google-sso` PR** (2026-10-03). A PR mindent visz, ami még nincs fent (az R1 és a Hírek csomag már él): „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés, az R3 spec. A merge élesít (production deploy), ezért ebben a sorrendben:
+- [ ] **A kiadás: a `codebase-order` PR** (2026-10-11). Migráció nincs. A merge után élő próba: a `/` kijelentkezve az `/about`-ra visz; a menüben a GitHub repók és a `/github` listázza a korábbi hetek repóit (ha üres marad, a Supabase-ben a `github_repos` nézet lekérdezése a következő lépés); a Top 10 kártyáin a gombcsoport a kártyán belül; a másnapi futás után a pontszámok látszanak.
+- [x] **A G1 élesítése** (a `github-ratings` branch, a `google-sso` PR merge-e után): a `supabase/migrations/20261003000000_ratings_github_repos.sql` futtatása az SQL Editorban **a deploy előtt** (a Radar lekérdezése az új oszlopokat olvassa), utána a merge. Élő próba: egy ❤ a Radaron megjelenik a Gyűjteményben, és a GitHub-fül listázza a korábbi hetek repóit.
+- [x] **A kiadás: a `google-sso` PR** (2026-10-03; mindkét PR beolvasztva 2026-10-11, a migrációk lefuttatva, élesben megy). Ami nyitva maradt belőle: a Google-belépés beállítása (lent) és az élő próbák. A PR mindent visz, ami még nincs fent (az R1 és a Hírek csomag már él): „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés, az R3 spec. A merge élesít (production deploy), ezért ebben a sorrendben:
   1. **push:** `git push -u origin google-sso`, majd a PR megnyitása a GitHubon (a Vercel ekkor csak preview-t épít, a production nem változik);
   2. **SQL Editor:** a `supabase/migrations/20260930000000_source_claims.sql` futtatása (lent, „Az „Olvasd itt” élesítése” 1. pont);
   3. **a Google-belépés beállítása** (a következő pont 1–4. lépése);
   4. **a PR merge-e** a GitHubon; utána helyben `git checkout main && git pull`;
   5. **az élő próbák:** a Google-belépés 5. lépése, az R2 élő próbája, az R1 utólagos mérése, a taiyaki élő próbái (lent).
-- [ ] **A Google-belépés beállítása** (a tulajdonosé, ebben a sorrendben, **a push előtt**: a belépő oldal első gombja ezt használja, és beállítás nélkül a Supabase nyers hibaoldalára visz; a terv: [docs/superpowers/specs/2026-10-02-google-sign-in-design.md](docs/superpowers/specs/2026-10-02-google-sign-in-design.md)):
+- [ ] **A Google-belépés beállítása** (a tulajdonosé, ebben a sorrendben, **a push előtt**: a belépő oldal első gombja ezt használja, és beállítás nélkül a Supabase nyers hibaoldalára visz; a terv: [.claude/docs/specs/2026-10-02-google-sign-in-design.md](specs/2026-10-02-google-sign-in-design.md)):
   1. **Google Cloud Console → Google Auth Platform:**
      - *Branding*: az app neve „NEON NEWS RADAR”, egy támogatási e-mail-cím, az *Application home page* `https://<production-domain>/about` és a *Privacy policy link* `https://<production-domain>/privacy` (a kettő a `/about` és `/privacy` nyilvános oldal; az éles módhoz kötelező, és csak a deploy után érhető el);
      - *Audience*: External, majd *Publish app* → **In production**. Csak alap scope-okat kér (név, e-mail, profil), ezért nem kell hozzá Google-ellenőrzés; *Testing* módban viszont csak a felvett teszt-felhasználók léphetnének be;

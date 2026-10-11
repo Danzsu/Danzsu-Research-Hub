@@ -10,9 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --no-warnings --test \"lib/**/*.test.ts\" \"app/**/*.test.ts\"",
+    "test": "node --experimental-strip-types --no-warnings --test \"lib/**/*.test.ts\" \"app/**/*.test.ts\" next.config.test.ts",
     "ingest": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/ingest-url.mts",
-    "dup": "jscpd app lib proxy.ts scripts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console"
+    "dup": "jscpd app lib config proxy.ts scripts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

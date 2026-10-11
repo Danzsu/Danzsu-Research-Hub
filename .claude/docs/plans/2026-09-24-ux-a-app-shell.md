@@ -12,7 +12,7 @@
 
 **Tech Stack:** Next.js 16.3.4 App Router (route group, `usePathname`, `notFound`), React 19.2.6 (`useSyncExternalStore`, `useEffectEvent`), Tailwind 4, a meglévő `radix-ui` Dialog és Sheet, `lucide-react`, Supabase (`item_states`, `todos`, séma-változás nélkül), `node --test`.
 
-**Spec:** `docs/superpowers/specs/2026-09-24-ux-signals-search-design.md`. Ez a terv az 1. fejezetet (A mérföldkő) valósítja meg, a 4. és 5. fejezet A-ra vonatkozó részével együtt. A B (értékelés, GitHub-fül) és a C (keresés, lapozás) külön tervet kap. Ez a terv csak a helyüket hagyja meg: a kártya láblécében az értékelő skála helyét, és a ⌘K-palettát egy „hamarosan” párbeszédablakként.
+**Spec:** `.claude/docs/specs/2026-09-24-ux-signals-search-design.md`. Ez a terv az 1. fejezetet (A mérföldkő) valósítja meg, a 4. és 5. fejezet A-ra vonatkozó részével együtt. A B (értékelés, GitHub-fül) és a C (keresés, lapozás) külön tervet kap. Ez a terv csak a helyüket hagyja meg: a kártya láblécében az értékelő skála helyét, és a ⌘K-palettát egy „hamarosan” párbeszédablakként.
 
 **Háttér:** `.superpowers/brainstorm/ux-audit.md` (16 ergonómiai pont, fájl- és sorhivatkozással) és `.superpowers/brainstorm/codebase-audit.md`, amelynek 11–13. javaslata ide tartozik.
 
@@ -4578,7 +4578,7 @@ git commit -m "feat: add keyboard shortcuts and a shortcut help dialog"
 - Consumes: `PostArticle` (a 4. feladat `app/(app)/library/[id]/post-article.tsx`-je), `mediaSources`, `isValidPlaceholder` (`lib/post-view.ts`), `safeHref`, `type Block`, `type ImageBlock` (`lib/blocks.ts`), `testPost` (`lib/test/fixtures.ts`), `render` (`lib/test/render.ts`)
 - Produces: `PostImage(props: { src: string; srcSet: string; sizes: string; alt: string; width?: number; height?: number; priority: boolean; placeholder?: string })` (`app/components/post-image.tsx`)
 
-A spec 1.4.11–12. pontja (`docs/superpowers/specs/2026-09-24-ux-signals-search-design.md`) két ergonómiai javítást kér a poszt-oldalon: szélesebb keret, olvasható sorhosszal, és egységes képkeret. Ez a feladat a 2. feladat utáni útvonalakon dolgozik: a poszt-oldal törzse a 4. feladat óta `app/(app)/library/[id]/post-article.tsx`-ben van (`PostArticle`), a blokkok renderelője változatlanul `app/components/post-blocks.tsx` (`PostBlocks`, benne az `ImageView`). **Olvasd újra mindkét fájlt**, mert a 4., a 6. és a 7. feladat is módosítja őket (a 7. a `repo` blokk `topics`-felsorolását cseréli `Tag`-re, és a `BlockView` helyi `Tag` konstansait `HeadingTag`-re és `ListTag`-re nevezi át) — a lenti kódrészletek a pontosan idézett „előtte” szöveget keresik, a körülöttük lévő sorok a korábbi feladatoktól függően már mások lehetnek.
+A spec 1.4.11–12. pontja (`.claude/docs/specs/2026-09-24-ux-signals-search-design.md`) két ergonómiai javítást kér a poszt-oldalon: szélesebb keret, olvasható sorhosszal, és egységes képkeret. Ez a feladat a 2. feladat utáni útvonalakon dolgozik: a poszt-oldal törzse a 4. feladat óta `app/(app)/library/[id]/post-article.tsx`-ben van (`PostArticle`), a blokkok renderelője változatlanul `app/components/post-blocks.tsx` (`PostBlocks`, benne az `ImageView`). **Olvasd újra mindkét fájlt**, mert a 4., a 6. és a 7. feladat is módosítja őket (a 7. a `repo` blokk `topics`-felsorolását cseréli `Tag`-re, és a `BlockView` helyi `Tag` konstansait `HeadingTag`-re és `ListTag`-re nevezi át) — a lenti kódrészletek a pontosan idézett „előtte” szöveget keresik, a körülöttük lévő sorok a korábbi feladatoktól függően már mások lehetnek.
 
 A blokkséma (`lib/blocks.ts`) ma nem ismer „táblázat” blokktípust, a spec „táblázatok” szava ellenére — ez a feladat ezért csak a ténylegesen létező típusokra vonatkozik: a kép, a kód és a videó blokk lesz teljes szélességű, a többi (bekezdés, lista, cím, idézet, fejezetlista, repó, elválasztó) a 75ch-s olvasási szélességben marad.
 
@@ -5016,13 +5016,13 @@ Az M1 15. feladata onboarding-README-t ír. A „Project tour” szakaszba (ha n
 > Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (collapsible to an icon rail), a five-slot bottom bar on phones. Desktop shortcuts: `j`/`k` move between cards, `o` opens (and marks read), `r` read, `l` later, `[` collapses the sidebar, `?` lists them.
 
 A „Project tour” táblázat sorai a költözés után:
-- az `app/` sor: ``| [`app/`](app/) | `/login`, the error and 404 pages, the manifest, and the route group below |``;
-- új sor utána: ``| [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, plus their loading page |``;
-- az `app/components/` sor: ``| [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast), the Radar dashboard and its cards, the title band, the language toggle, and `post-blocks`, the block renderer |``;
-- az `app/library/` sor: ``| [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |``;
-- új sor: ``| [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |``.
+- az `app/` sor: ``| [`app/`](../../../app/) | `/login`, the error and 404 pages, the manifest, and the route group below |``;
+- új sor utána: ``| [`app/(app)/`](<../../../app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), `/archive`, `/archive/[week]`, `/library`, `/library/[id]`, plus their loading page |``;
+- az `app/components/` sor: ``| [`app/components/`](../../../app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast), the Radar dashboard and its cards, the title band, the language toggle, and `post-blocks`, the block renderer |``;
+- az `app/library/` sor: ``| [`app/(app)/library/`](<../../../app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |``;
+- új sor: ``| [`app/dev/preview/`](../../../app/dev/preview/) | The offline preview on fixtures (development only) |``.
 
-A „Where to start reading” 6. pontjában a link célja a poszt törzse lesz: ``[`app/(app)/library/[id]/post-article.tsx`](<app/(app)/library/[id]/post-article.tsx>)``.
+A „Where to start reading” 6. pontjában a link célja a poszt törzse lesz: ``[`app/(app)/library/[id]/post-article.tsx`](<../../../app/(app)/library/[id]/post-article.tsx>)``.
 
 A „Testing” szakaszban a komponens-teszt példájának importja `"../../../lib/test/render.ts"` helyett `"../../../../lib/test/render.ts"` (a `post-toolbar.test.ts` az `(app)` csoportba költözött). Az egy-fájlos példa két útvonala `"app/library/[id]/post-editor.test.ts"` és `"app/library/[[]id]/post-editor.test.ts"` helyett `"app/(app)/library/[id]/post-editor.test.ts"` és `"app/(app)/library/[[]id]/post-editor.test.ts"`: a régi útvonal a költözés után semmire nem illeszkedik, és 0 tesztet futtatna. Ugyanide kerül ez:
 
@@ -5031,7 +5031,7 @@ A „Testing” szakaszban a komponens-teszt példájának importja `"../../../l
 - [ ] **Step 3: `TODO.md`**
 
 - A „Kész” alá új pont: `- [x] **App-keret és ergonómia (UI/UX A):** közös navigáció (asztalon összecsukható oldalsáv, mobilon alsó sáv), a Megnyitás olvasottnak jelöl visszavonással, olvasatlanok elöl, a Top 3 teljes kártya, teendő a hírhez kötve, olvasott Library-posztok, élő frissítés beküldés közben, billentyűparancsok, nyelvváltás frissítés nélkül, offline előnézet (\`/dev/preview\`).`
-- Az „UI/UX és keresés” pont első sora: `- [ ] **UI/UX és keresés:** az A mérföldkő kész (terv: [docs/superpowers/plans/2026-09-24-ux-a-app-shell.md](docs/superpowers/plans/2026-09-24-ux-a-app-shell.md)); hátra van a B (értékelés, GitHub-fül) és a C (keresés, lapozás).` Az alpontjai közül az egységes navigáció, a mobilos ergonómia és az offline előnézet kikerül, mert kész.
+- Az „UI/UX és keresés” pont első sora: `- [ ] **UI/UX és keresés:** az A mérföldkő kész (terv: [.claude/docs/plans/2026-09-24-ux-a-app-shell.md](2026-09-24-ux-a-app-shell.md)); hátra van a B (értékelés, GitHub-fül) és a C (keresés, lapozás).` Az alpontjai közül az egységes navigáció, a mobilos ergonómia és az offline előnézet kikerül, mert kész.
 - Az „Új ötletek” alatti `- [x] **Asztali navigáció** (döntés: 2026-09-25)` pont alá (a korábbi „Neked: az asztali navigáció kiválasztása” pont már nincs meg): `  - Most az **A** van bent, 2026-09-25-től ~56 px-es ikonsávvá csukható (\`[\`, vagy a lábléc gombja). A csere egyetlen fájl: \`app/components/desktop-nav.tsx\`.`
 - A „Kényelmi funkciók” alatt a meglévő `- [ ] **Todo cikkhez kötése.** …` sor nem duplikálódik, hanem átvált erre: `- [x] **Todo cikkhez kötése.** A hírkártya „+ teendő” gombja (UI/UX A).`
 - A „Technikai adósság” alá új pont: `- [ ] **Egy getClaims() kérésenként.** A \`getReader\`-t React \`cache()\`-be csomagolni (\`lib/supabase/server.ts\`), hogy az \`(app)\` layout és az oldal egyetlen \`getClaims()\`-hívást osszon meg. A UI/UX A óta kérésenként kettő fut: a layout \`getViewer()\`-e és az oldal \`getReader()\`-e.`

@@ -16,7 +16,7 @@
 
 **Tech Stack:** Next.js 16.3.4, React 19.2 (`useSyncExternalStore`), supabase-js 2.116.0, zod v4, Tailwind 4.2.1, `node --test` (`fakeDb`, route-hooks, render harness), Playwright MCP.
 
-**Spec:** `docs/superpowers/specs/2026-10-03-g1-ratings-github-collection-design.md` (alapja: `docs/superpowers/specs/2026-09-24-ux-signals-search-design.md` → 2. fejezet)
+**Spec:** `.claude/docs/specs/2026-10-03-g1-ratings-github-collection-design.md` (alapja: `.claude/docs/specs/2026-09-24-ux-signals-search-design.md` → 2. fejezet)
 
 ## Global Constraints
 
@@ -323,7 +323,7 @@ git commit -m "feat: add the ratings logic with click-order writes and rollback"
 - [ ] **Step 1: A migráció.** `supabase/migrations/20261003000000_ratings_github_repos.sql`:
 
 ```sql
--- G1 (docs/superpowers/specs/2026-10-03-g1-ratings-github-collection-design.md): a reader's 👎 👍 ❤ on Radar
+-- G1 (.claude/docs/specs/2026-10-03-g1-ratings-github-collection-design.md): a reader's 👎 👍 ❤ on Radar
 -- items, Library posts and GitHub repos; each repo's stars, language and score; the archive's GitHub tab.
 -- Only adds. Run it BEFORE deploying the G1 code: the Radar's query reads the new github_top columns.
 

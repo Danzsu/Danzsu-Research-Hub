@@ -5,7 +5,7 @@ Innen húz be tartalmat a Radar napi futása. Ez a lista két dolgot rögzít:
 - a **Bent van** rész azt, amit a pipeline ma olvas;
 - a **Jelöltek** rész azt, amit még fel akarunk venni.
 
-A kód a [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts)-ből dolgozik. A [`lib/truthful-sites.test.ts`](lib/truthful-sites.test.ts) mindkét irányban összeveti a kettőt: ha itt vagy ott hiányzik egy csatorna, egy Hacker News-lekérdezés vagy egy GitHub-téma, a teszt elbukik.
+A kód a [`config/sources.ts`](../../config/sources.ts)-ből dolgozik. A [`lib/truthful-sites.test.ts`](../../lib/truthful-sites.test.ts) mindkét irányban összeveti a kettőt: ha itt vagy ott hiányzik egy csatorna, egy Hacker News-lekérdezés vagy egy GitHub-téma, a teszt elbukik.
 
 ## Mitől megbízható egy forrás
 
@@ -135,6 +135,6 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
    - van-e `noarchive` vagy fizetőfal;
    - mennyi a promóció.
    Írd a dátumot az Állapot oszlopba.
-3. **Kód.** Vedd fel a [`lib/pipeline/feeds.ts`](lib/pipeline/feeds.ts)-be: `{ name, url, hint, limit?, exclude? }`. A nagy forgalmú csatorna kapjon `limit`-et. Ha a csatorna saját hirdetéseket vagy a cikkeit ismétlő lapokat is küld, azokat egy címre vagy linkre illő `exclude` minta szűrje. Ha a csatorna szerkezete szokatlan, kerüljön egy eset a [`collect.test.ts`](lib/pipeline/collect.test.ts)-be is.
-4. **Lista.** Tedd át a sorát a Jelöltek közül a Bent van táblába, a `feeds.ts` értékeivel.
+3. **Kód.** Vedd fel a [`config/sources.ts`](../../config/sources.ts)-be: `{ name, url, hint, limit?, exclude? }`. A nagy forgalmú csatorna kapjon `limit`-et. Ha a csatorna saját hirdetéseket vagy a cikkeit ismétlő lapokat is küld, azokat egy címre vagy linkre illő `exclude` minta szűrje. Ha a csatorna szerkezete szokatlan, kerüljön egy eset a [`collect.test.ts`](../../lib/pipeline/collect.test.ts)-be is.
+4. **Lista.** Tedd át a sorát a Jelöltek közül a Bent van táblába, a `config/sources.ts` értékeivel.
 5. **Teszt.** Futtasd: `npm test`. A `lib/truthful-sites.test.ts` elbukik, ha a két lista eltér.

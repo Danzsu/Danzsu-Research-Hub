@@ -4,28 +4,30 @@ NEON NEWS RADAR (the repository is Danzsu Research Hub) is a private, invite-onl
 
 ## Read next
 
-- [ARCHITECTURE.md](ARCHITECTURE.md): how the parts fit together, with the codemap, the invariants and the boundaries.
-- [DESIGN.md](DESIGN.md): the design system, with tokens, layout, the UI kit, and do's and don'ts. Read it before any UI work.
-- [TESTING.md](TESTING.md): the test layers, how to run tests, the helpers, the conventions and the pitfalls.
+- [ARCHITECTURE.md](.claude/docs/ARCHITECTURE.md): how the parts fit together, with the codemap, the invariants and the boundaries.
+- [DESIGN.md](.claude/docs/DESIGN.md): the design system, with tokens, layout, the UI kit, and do's and don'ts. Read it before any UI work.
+- [TESTING.md](.claude/docs/TESTING.md): the test layers, how to run tests, the helpers, the conventions and the pitfalls.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability, the security model, and the supply-chain rules.
-- [CODE_STYLE.md](CODE_STYLE.md): naming, imports, TypeScript, React, the copy objects, error handling, the shared helpers and commits.
-- [CLAUDE.md](CLAUDE.md): the deep reference for the pipeline, auth, the app shell, the database, the routes and the data contract.
+- [CODE_STYLE.md](.claude/docs/CODE_STYLE.md): naming, imports, TypeScript, React, the copy objects, error handling, the shared helpers and commits.
+- [CLAUDE.md](.claude/CLAUDE.md): the deep reference for the pipeline, auth, the app shell, the database, the routes and the data contract.
 - [README.md](README.md): onboarding for humans, covering setup, environment, deploy, recipes and troubleshooting.
-- [truthful_sites.md](truthful_sites.md): the trusted sources the Radar reads, the candidates, and the criteria for adding one.
+- [truthful_sites.md](.claude/docs/truthful_sites.md): the trusted sources the Radar reads, the candidates, and the criteria for adding one.
+
+Specs and plans live in `.claude/docs/specs/` and `.claude/docs/plans/`; `config/` holds the daily sources, the env template and the note on where every setting lives.
 
 ## Commands
 
 ```bash
 corepack pnpm@11.25.0 install --frozen-lockfile
-cp .env.example .env.local   # or: vercel env pull --environment=production .env.local
+cp config/.env.example .env.local   # or: vercel env pull --environment=production .env.local
 
 npm run dev        # next dev on :3000
 npm run build
 npm run start
 npm run lint       # eslint .
-npm test           # node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts"
+npm test           # node --experimental-strip-types --no-warnings --test "lib/**/*.test.ts" "app/**/*.test.ts" next.config.test.ts
 npx tsc --noEmit
-npm run dup        # jscpd app lib proxy.ts scripts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console
+npm run dup        # jscpd app lib config proxy.ts scripts --min-lines 6 --min-tokens 60 --threshold 1 --reporters console
 ```
 
 Before every commit, all five checks must pass, in this order: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`.

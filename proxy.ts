@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isDevPreviewPath, isPublicPath } from "@/lib/public-paths";
+import { isDevPreviewPath, isPublicPath, signedOutTarget } from "@/lib/public-paths";
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -25,10 +25,7 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
 
   if (!data?.claims && !isPublicPath(pathname)) {
-    const login = request.nextUrl.clone();
-    login.pathname = "/login";
-    login.search = `?next=${encodeURIComponent(pathname + search)}`;
-    return NextResponse.redirect(login);
+    return NextResponse.redirect(new URL(signedOutTarget(pathname, search), request.nextUrl));
   }
 
   return response;

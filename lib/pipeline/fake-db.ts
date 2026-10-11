@@ -83,8 +83,8 @@ export type FakeIngestDb = SupabaseClient & {
   rpcCalls: { name: string; args: Record<string, unknown> }[];
   /** Every UPSERT into a table other than `posts` (issues, digest_items, github_top), in call order. */
   upserts: { table: string; values: unknown; options: Record<string, unknown> }[];
-  /** Every other table's delete, in call order: the table and its `.eq(...)` filters. */
-  deletes: { table: string; filters: [column: string, value: unknown][] }[];
+  /** Every other table's delete, in call order: the table and its `.eq(...)` filters, a `.gt(...)` one marked. */
+  deletes: { table: string; filters: [column: string, value: unknown, op?: "gt"][] }[];
   /** Every `select().gte(column, value)` against a table other than `posts`/`sources`, in call order. */
   gteCalls: { table: string; column: string; value: unknown }[];
   /** Every select chain against a table other than `model_settings`/`sources`/`posts`, in call order:
@@ -491,11 +491,15 @@ export function fakeDb(
       },
       // Chainable `.eq(...)` filters, awaitable like the real builder.
       delete: () => {
-        const filters: [string, unknown][] = [];
+        const filters: [string, unknown, "gt"?][] = [];
         deletes.push({ table, filters });
         const chain = {
           eq: (column: string, value: unknown) => {
             filters.push([column, value]);
+            return chain;
+          },
+          gt: (column: string, value: unknown) => {
+            filters.push([column, value, "gt"]);
             return chain;
           },
           then: (onFulfilled: (result: UpdateResult) => unknown, onRejected?: (reason: unknown) => unknown) =>

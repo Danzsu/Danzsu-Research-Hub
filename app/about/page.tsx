@@ -62,10 +62,10 @@ const features: { icon: LucideIcon; title: Localized; text: Localized }[] = [
   },
   {
     icon: Archive,
-    title: { hu: "Archívum és GitHub-fül", en: "Archive and GitHub tab" },
+    title: { hu: "Archívum és GitHub repók", en: "Archive and GitHub repos" },
     text: {
-      hu: "A lezárt hetek változatlanok maradnak. A GitHub-fül minden heti Top 10 repót egy listában mutat, értékelés és nyelv szerint szűrhetően.",
-      en: "Closed weeks stay as they were. The GitHub tab lists every weekly Top 10 repo in one place, filterable by rating and language.",
+      hu: "A lezárt hetek változatlanok maradnak. A GitHub repók oldala minden heti Top 10 repót egy listában mutat, értékelés és nyelv szerint szűrhetően.",
+      en: "Closed weeks stay as they were. The GitHub repos page lists every weekly Top 10 repo in one place, filterable by rating and language.",
     },
   },
   {

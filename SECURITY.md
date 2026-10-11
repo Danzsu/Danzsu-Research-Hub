@@ -41,7 +41,7 @@ After sign-in, the redirect target goes through `safeNext`. It accepts only same
 
 ### Secrets
 
-Every environment variable is server-only, and none is `NEXT_PUBLIC_` (`.env.example`), so none reaches the browser bundle. That includes the publishable key: data reaches the browser only through server components and the API routes. `SUPABASE_SECRET_KEY` bypasses RLS on every table and in Storage. A pulled `.env.local` holds the production secret key, so keep it private (README.md → Environment).
+Every environment variable is server-only, and none is `NEXT_PUBLIC_` (`config/.env.example`), so none reaches the browser bundle. That includes the publishable key: data reaches the browser only through server components and the API routes. `SUPABASE_SECRET_KEY` bypasses RLS on every table and in Storage. A pulled `.env.local` holds the production secret key, so keep it private (README.md → Environment).
 
 ### Reader vs admin client
 

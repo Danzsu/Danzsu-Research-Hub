@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { fakeDb, pgError } from "../../../../lib/pipeline/fake-db.ts";
-import { feeds } from "../../../../lib/pipeline/feeds.ts";
+import { feeds } from "../../../../config/sources.ts";
 import { geminiResponse, mockFetch, TEST_HOST, withBudgetGone, withEnv, withGeminiKey } from "../../../../lib/pipeline/mock-fetch.ts";
 import { isoWeek } from "../../../../lib/pipeline/util.ts";
 import { resetRoute, routeStub } from "../../../../lib/test/route-hooks.ts";

@@ -11,3 +11,7 @@ export const isPublicPath = (pathname: string): boolean =>
 /** The offline preview (app/dev/preview) skips sign-in in development only; in production the page itself is a 404. */
 export const isDevPreviewPath = (pathname: string, nodeEnv: string | undefined): boolean =>
   nodeEnv === "development" && pathname.startsWith("/dev/");
+
+/** Where a signed-out request goes: the landing page for the home, otherwise sign-in with the way back. */
+export const signedOutTarget = (pathname: string, search: string): string =>
+  pathname === "/" ? "/about" : `/login?next=${encodeURIComponent(pathname + search)}`;

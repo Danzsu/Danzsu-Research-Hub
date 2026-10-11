@@ -344,22 +344,20 @@ test("every nav link carries one hidden pending dot, the search button none, and
     navigationStub.linkPending = false;
   });
   const doc = shell("en");
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1, 1]); // Radar, AI companies, Library, Archive, Collection
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1, 1, 1]); // Radar, AI companies, Library, GitHub, Archive, Collection
   assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
   const searchButtons = [...doc.querySelectorAll("aside nav button, #mobile-nav > button")].filter((button) => button.textContent?.startsWith("Search"));
   assert.deepEqual(hiddenSpanCounts(searchButtons), [0, 0]);
   assert.equal(doc.querySelectorAll("[data-pending]").length, 0);
   navigationStub.linkPending = true;
-  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 7);
+  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 8);
 });
 
-// Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too, and
-// from the archive's tabs (G1).
-test("every archive week card, archive tab and Library post card carries one hidden pending dot", () => {
+// Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.
+test("every archive week card and Library post card carries one hidden pending dot", () => {
   const perCard = (doc: Document, selector: string) => hiddenSpanCounts([...doc.querySelectorAll(selector)]);
   const archive = withShellProviders(ArchiveView, { issues: previewArchive });
   assert.deepEqual(perCard(archive, previewArchive.map((issue) => `a[href="/archive/${issue.id}"]`).join(", ")), previewArchive.map(() => 1));
-  assert.deepEqual(perCard(archive, 'nav a[href^="/archive"]'), [1, 1]);
   const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, ratings: {}, preview: { failWrites: false } });
   assert.deepEqual(perCard(library, 'a[href^="/library/"]'), previewPosts.map(() => 1));
 });
@@ -442,14 +440,14 @@ test("every Radar card carries a rating group, pressed by the page's ratings", (
 
 // G1 spec 3. Kills a Top 10 row without its rating group or score, the group put inside the repo link (a
 // button in a link), a pre-G1 row shown with "null/100", and a repo looked up in its casing.
-test("each Top 10 row links the repo with its score and keeps its rating group beside the link", () => {
+test("each Top 10 card links the repo by name, shows its score and holds its rating group", () => {
   // A repo shown in its own casing, rated under its lowercase name (Review Focus 1).
   const entries = [{ ...previewGithub[0], repo: "GGML-org/Llama.cpp" }, previewGithub[1]];
   const doc = withShellProviders(GithubTopList, { entries, ratings: { "repo:ggml-org/llama.cpp": -1 } });
-  const rows = [...doc.querySelectorAll('[role="group"][aria-label="Rating"]')].map((group) => group.parentElement!);
+  const rows = [...doc.querySelectorAll("article")];
   assert.equal(rows.length, previewGithub.length);
   assert.equal(doc.querySelectorAll('a [role="group"]').length, 0);
   assert.equal(rows[0].querySelector('[role="group"]')?.getAttribute("data-rating"), "down");
-  assert.match(rows[0].querySelector("a")?.textContent ?? "", /92\/100/);
-  assert.match(rows[1].querySelector("a")?.textContent ?? "", /—/);
+  assert.match(rows[0].textContent ?? "", /92\/100/);
+  assert.match(rows[1].textContent ?? "", /— · ★ — · —/);
 });

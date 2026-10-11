@@ -6,7 +6,7 @@
 
 - a 2026-09-27-i reszponzív audit megállapításai: minden bejelentkezett oldal soros Supabase-körökre vár; navigációnál nincs visszajelzés, egyetlen közös ink váz szolgál ki minden oldalt, és a mobil Archívum-link a „Több” panelben nincs előtöltve; a `router.refresh()`-es műveletek jelzés nélkül várnak; a zod a `/`, az `/archive/[week]` és a `/library/[id]` kliens csomagjában van; és a lassú `/archive` elemzése;
 - a 2026-09-27-i élő és helyi alapmérés (Kontextus, Célok);
-- a [TODO.md](../../../TODO.md) „Responzívabb UI/UX”, „Lassú archívum”, „Kevesebb getClaims() kérésenként” és „Apró rendrakás a taiyaki után” pontja; az ütemterv: [TODO.md → Következő lépések](../../../TODO.md).
+- a [TODO.md](../TODO.md) „Responzívabb UI/UX”, „Lassú archívum”, „Kevesebb getClaims() kérésenként” és „Apró rendrakás a taiyaki után” pontja; az ütemterv: [TODO.md → Következő lépések](../TODO.md).
 
 ## Kontextus
 
@@ -57,7 +57,7 @@ Célok:
   - a hibaállapotok;
   - a nyomás-effektek.
 - **R3 Elrendezés:** a mobil és a széles képernyős elrendezés.
-- A [TODO.md](../../../TODO.md) „Responzívabb UI/UX” pontja alatt parkolt tételek.
+- A [TODO.md](../TODO.md) „Responzívabb UI/UX” pontja alatt parkolt tételek.
 - **A Next 16 Cache Components** (statikus héj, `use cache`): lehetséges későbbi mérföldkő. Csak az utólagos élő mérés után dönthető el.
 - **A hideg indulás további karjai.** A Fluid compute-ot az R1 bekapcsolja (1.1). A többit csak megnevezzük, terv nélkül, arra az esetre, ha az utólagos mérés még mindig hideg akadást mutat:
   - „ébren tartó” pingek: nem illenek ide, mert a Hobby cron csak naponta fut;

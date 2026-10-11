@@ -13,7 +13,7 @@
 
 **Tech Stack:** Next.js 16.3.4 (App Router, route handlers, `after()`), React 19.2 (`useEffectEvent`), Supabase (PostgREST, supabase-js), Vercel Cron (Hobby), `node --test` a `fakeDb`-vel és a render harness-szel.
 
-**Spec:** `docs/superpowers/specs/2026-09-30-read-here-mirror-design.md`
+**Spec:** `.claude/docs/specs/2026-09-30-read-here-mirror-design.md`
 
 ## Global Constraints
 

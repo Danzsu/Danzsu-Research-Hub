@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
 import { apiFetch, ensureOk, githubHeaders } from "./fetch.ts";
-import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "./feeds.ts";
+import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "../../config/sources.ts";
 import { list, publishedDate, settledValues, xmlText } from "./util.ts";
 
 export type Candidate = {

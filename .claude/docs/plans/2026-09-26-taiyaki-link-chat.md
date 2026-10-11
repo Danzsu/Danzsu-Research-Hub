@@ -29,7 +29,7 @@
 **Tech Stack:** Node 24.16.0 (`node:test`, `t.mock.timers`, type stripping), Next.js 16.3.4 (route handlerek, `after()`), React 19.2.6 (`useSyncExternalStore`), radix-ui 1.6.7 (Dialog a `components/ui/sheet.tsx`-en át), Tailwind 4.2.1, lucide-react 1.46.0 (`SendHorizontal`), linkedom 0.18.13, Playwright MCP.
 
 **Spec:**
-- `docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md` — kötelező.
+- `.claude/docs/specs/2026-09-25-taiyaki-link-chat-design.md` — kötelező.
 - `.superpowers/brainstorm/decisions.md`, a „Chat bubble” és a „Taiyaki link-chat design APPROVED” pontok.
 - Az ikon: `.superpowers/brainstorm/4489-1790347439/content/taiyaki-icon.html`, `#ty-a` („A — Klasszikus”). Saját rajz, az albumborítóról semmi nem kerül át.
 - **A tulajdonos kiegészítése (2026-09-26), kötelező:** a taiyaki-gomb hoverre pontosan úgy „jön előre”, mint a Top 3 kártyák (`globals.css`: `translate(-2px, -2px)` és `8px 8px 0 var(--signal)`). A nyugalmi árnyék `4px 4px 0 var(--ink)` marad. A `transform` és a `box-shadow` 160ms ease-szel vált, a hover `@media (hover: hover)`-ban. Ugyanez `:focus-visible`-re is. `prefers-reduced-motion` mellett az árnyék vált, eltolás nincs. Az asztali gombra és a mobil középső helyre is vonatkozik. Nem másoljuk a kártya osztálylistáját, és a `npm run dup` 0 klón. Playwright-próba kell hozzá: hover és Tab.
@@ -223,7 +223,7 @@ Nincs. Az egyetlen kérdésre (nullázza-e az „Újra” az `attempts`-et) a tu
 | `app/components/app-shell.tsx`, `undo-toast.tsx`, `app/dev/preview/page.tsx`, `app/dev/preview/post/page.tsx`, `app/components/shell.test.ts` | bekötés, a csík sávja, az előnézet | 7, 8 |
 | `lib/nav.ts` (+ teszt), `app/components/nav-parts.tsx` | `mobileMore`, `MOBILE_BAR_NAV`, `MOBILE_CHAT_SLOT`, `MOBILE_MORE_NAV`, `inMobileMore`; `NavEntry` `onClick` | 8 |
 | `DESIGN.md` | a megváltozott forrású részletek újramásolása (Page shell, must-card and story-card, Bottom bar, Undo toast); a próza | 7, 8; 9 |
-| `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md`, `docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md` (fejléc) | dokumentáció | 9 |
+| `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md`, `.claude/docs/specs/2026-09-25-taiyaki-link-chat-design.md` (fejléc) | dokumentáció | 9 |
 
 **Nem része ennek a tervnek** (spec, „Nem része a v1-nek”): szabad chat, „Törlés”, Android share target, jelzés zárt panel mellett, billentyűparancs.
 
@@ -3516,7 +3516,7 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
 
 **Files:**
 - Modify: `README.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `DESIGN.md` (csak próza), `TESTING.md`, `SECURITY.md`, `CODE_STYLE.md`, `TODO.md`
-- Modify: `docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md` (csak a fejléc `Állapot` mezője)
+- Modify: `.claude/docs/specs/2026-09-25-taiyaki-link-chat-design.md` (csak a fejléc `Állapot` mezője)
 
 **Interfaces:**
 - Consumes: az 1–8. feladat nevei.
@@ -3583,17 +3583,17 @@ git commit -m "feat: put the taiyaki in the mobile bar and move the archive into
 - **Project tour**, a keret-bekezdés végére: „The taiyaki button opens the link chat.” A táblában:
   - az `app/components/` sora: „The app shell (desktop nav, mobile bottom bar, dialogs, undo toast)” → „The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat)”;
   - az `app/api/` sora: „JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron”.
-- **Recipes → Add a source extractor**, 5. lépés: „Add the kind's name, in both languages, to `SOURCE_KIND_LABELS` in [`lib/source-kinds.ts`](lib/source-kinds.ts) (the post page's badge and the link chat), and its icon to `kindIcons` in the Library page; `tsc` reports a missing entry.”
-- **Troubleshooting → Submissions are stuck after three failed attempts:** a „There is no button to reset them yet (the TODO item "Hibás beküldések kezelése" in [TODO.md](TODO.md)).” mondat helyett: „The submitter can send a failed one through again with ÚJRA in the taiyaki link chat, which also resets its attempts; a stuck source of another member, or many at once, still needs the SQL below.”
-- **Roadmap:** új sor: „- [Taiyaki link chat](docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md) (spec) and its [plan](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md)”.
+- **Recipes → Add a source extractor**, 5. lépés: „Add the kind's name, in both languages, to `SOURCE_KIND_LABELS` in [`lib/source-kinds.ts`](../../../lib/source-kinds.ts) (the post page's badge and the link chat), and its icon to `kindIcons` in the Library page; `tsc` reports a missing entry.”
+- **Troubleshooting → Submissions are stuck after three failed attempts:** a „There is no button to reset them yet (the TODO item "Hibás beküldések kezelése" in [TODO.md](../TODO.md)).” mondat helyett: „The submitter can send a failed one through again with ÚJRA in the taiyaki link chat, which also resets its attempts; a stuck source of another member, or many at once, still needs the SQL below.”
+- **Roadmap:** új sor: „- [Taiyaki link chat](../specs/2026-09-25-taiyaki-link-chat-design.md) (spec) and its [plan](2026-09-26-taiyaki-link-chat.md)”.
 
 - [ ] **Step 3: `TODO.md` és a spec fejléce**
 
-- A „Következő lépések” alól a `- [ ] **Taiyaki link-chat** …` pont átkerül a „Kész” alá, pipálva: `- [x] **Taiyaki link-chat** (2026-09-2x): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).` (A dátum a beolvasztás napja.)
+- A „Következő lépések” alól a `- [ ] **Taiyaki link-chat** …` pont átkerül a „Kész” alá, pipálva: `- [x] **Taiyaki link-chat** (2026-09-2x): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [.claude/docs/plans/2026-09-26-taiyaki-link-chat.md](2026-09-26-taiyaki-link-chat.md).` (A dátum a beolvasztás napja.)
 - A „Hibás beküldések kezelése” alpontja: `  - [x] A saját beküldés „Újra” gombja kész: a taiyaki link-chatben (\`POST /api/sources/[id]/retry\`). A „Törlés” és az admin-rész marad itt.`
 - A „Következő lépések” alá új pont: `- [ ] **Élő próbák a taiyaki link-chat deployja után** (a kontroller futtatja, ha a felhasználó engedélyez egy bejelentkezett munkamenetet): egy valódi link beküldése a chatből, és a szál „FELDOLGOZÁS…” → „KÉSZ · MEGNYITÁS →” váltása a poszt címével (a \`posts(...)\` beágyazás objektumként jön-e); egy hibás beküldés „Újra”-ja (a sor `attempts` értéke 0 lesz, aztán 1); egy már bent lévő link 409-e a „MEGNYITÁS →”-sal; az \`/archive\` oldalon a „Több” aktív jelölése mobilon; a lekérdezés leáll a panel bezárása után (\`browser_network_requests\`).`
 - Az M2 pont alá: `    - A taiyaki link-chat óta a \`post-article.tsx\` \`copy\`-jában nincs \`kind\`: a forrástípus jelvénye a \`SOURCE_KIND_LABELS\`-ből jön (\`lib/source-kinds.ts\`). A \`labels.keyPoints\` megmaradt.`
-- A spec (`docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md`) fejlécében: `**Állapot:** jóváhagyásra vár` → `**Állapot:** jóváhagyva (2026-09-25), kiegészítve 2026-09-26`. A spec szövegén más nem változik.
+- A spec (`.claude/docs/specs/2026-09-25-taiyaki-link-chat-design.md`) fejlécében: `**Állapot:** jóváhagyásra vár` → `**Állapot:** jóváhagyva (2026-09-25), kiegészítve 2026-09-26`. A spec szövegén más nem változik.
 
 - [ ] **Step 4: Végső ellenőrzés**
 
@@ -3606,7 +3606,7 @@ Elvárt: üres kimenet (nincs függőség- és sémaváltozás).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add README.md CLAUDE.md ARCHITECTURE.md DESIGN.md TESTING.md SECURITY.md CODE_STYLE.md TODO.md docs/superpowers/specs/2026-09-25-taiyaki-link-chat-design.md
+git add README.md CLAUDE.md ARCHITECTURE.md DESIGN.md TESTING.md SECURITY.md CODE_STYLE.md TODO.md .claude/docs/specs/2026-09-25-taiyaki-link-chat-design.md
 git commit -m "docs: document the taiyaki link chat"
 ```
 

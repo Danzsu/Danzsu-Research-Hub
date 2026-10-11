@@ -12,7 +12,7 @@
 
 **Tech Stack:** Next.js 16.3.4 route handlers, @supabase/ssr 0.12.7 / supabase-js 2.116.0 (PKCE), `node --test` a route-teszt réteggel (`lib/test/route-hooks.ts`) és a render harness-szel (`lib/test/render.ts`), Playwright MCP.
 
-**Spec:** `docs/superpowers/specs/2026-10-02-google-sign-in-design.md`
+**Spec:** `.claude/docs/specs/2026-10-02-google-sign-in-design.md`
 
 ## Global Constraints
 
