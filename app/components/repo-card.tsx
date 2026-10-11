@@ -5,7 +5,9 @@ import { dislikedClass } from "./rating-classes";
 import { RatingControl } from "./rating-control";
 
 /** A repo on paper: the Radar's Top 10 row and the GitHub page's row. The name is the link (a button can't sit
- *  in a link, so the card itself isn't one); the rating group sits inside, at the foot (spec 2.2). */
+ *  in a link, so the card itself isn't one); the rating group sits inside, at the foot (spec 2.2). The card sets
+ *  its own ink text (the GitHub page is an ink page with paper text) and has no press of its own: :active
+ *  matches ancestors, so a press on a rating button would press the whole card. */
 export function RepoCard({ rank, repo, url, focus, meta, target, initial, className = "" }: {
   rank?: number;
   repo: string;
@@ -18,7 +20,7 @@ export function RepoCard({ rank, repo, url, focus, meta, target, initial, classN
   className?: string;
 }) {
   return (
-    <article className={`press min-w-0 border-2 border-ink bg-paper p-4 transition motion-safe:hover:-translate-y-0.5 ${dislikedClass} ${className}`}>
+    <article className={`min-w-0 border-2 border-ink bg-paper p-4 text-ink transition motion-safe:hover:-translate-y-0.5 ${dislikedClass} ${className}`}>
       <div className="flex items-start gap-4">
         {rank !== undefined && <span className="font-display text-3xl leading-none text-signal">{String(rank).padStart(2, "0")}</span>}
         <div className="min-w-0 flex-1">

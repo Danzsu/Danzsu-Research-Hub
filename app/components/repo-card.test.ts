@@ -30,3 +30,12 @@ test("a repo card holds its rating group inside, links only its name, and shows 
   const plain = card({ repo: "a/b", url: "https://github.com/a/b", focus: "", meta: "—", target: { kind: "repo", id: "a/b" }, initial: null });
   assert.doesNotMatch(plain.querySelector("article")?.textContent ?? "", /0\d/);
 });
+
+// Final review. Kills the card inheriting the ink page's paper text (the names on /github were invisible on the
+// paper card), and a press effect on the article itself: :active matches ancestors, so a tap on a rating
+// button pressed the whole card.
+test("a repo card sets its own ink text and leaves the press effect to its buttons", () => {
+  const article = card({ repo: "a/b", url: "https://github.com/a/b", focus: "", meta: "—", target: { kind: "repo", id: "a/b" }, initial: null }).querySelector("article")!;
+  assert.match(article.className, /\btext-ink\b/);
+  assert.doesNotMatch(article.className, /\bpress\b/);
+});
