@@ -293,7 +293,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 - **Touch targets are at least 40px** (`min-h-10`, or `size-10 sm:size-8` for icon buttons, which may shrink to 32px from `sm` up).
 - **Use `dvh`, not `vh`.**
 - **Hover styles only for pointers.** Custom `:hover` effects in `globals.css` sit inside `@media (hover: hover)`, because touch screens keep `:hover` after a tap. Tailwind's `hover:` variant already does this.
-- **Widths.** Page content is capped at `max-w-6xl`, post text blocks at `max-w-[75ch]`, card text at `max-w-3xl` and leads at `max-w-2xl`. Images, code and video take the full column.
+- **Widths.** Page content is capped at `max-w-6xl`, post text blocks at `max-w-[75ch]`, card text at `max-w-3xl` and leads at `max-w-2xl`. Images, code and video take the full column. A `PageHero` title is sized to its own column (`12cqi`, 2a spec D2) and never breaks inside a word from `sm`; the band is `py-8 sm:py-10`, so a list page starts within the first screen. The Radar's own hero keeps its size, and on a phone shows one status line instead of its lead and close box (R3 §1).
 - **Gutters.** `px-4` (16px) everywhere at 360px. From `sm` it is `px-7` in the Radar (its main column widens to `px-10` from `lg`) and `px-10` on the other pages.
 - **Rhythm.** Radar sections are `mt-9` apart, each opening with a `SectionLabel` (a signal icon square and a mono title over a 2px ink rule). Feed cards are `space-y-4`, the must-read grid is `gap-4`, and the Library grid is `gap-5`.
 
@@ -510,9 +510,10 @@ The Sheet's close button, and the one in dialogs, is a 40px square with a 2px in
 `app/components/page-header.tsx`. `PageHero` is the cream title band of the secondary pages. It has a signal mono eyebrow, a display title ending in a signal `//`, and an optional side panel that moves beside the text at `@4xl`. The band itself is `HeroBand`, which the list pages' loading skeleton shares:
 
 ```tsx app/components/page-header.tsx
-    <section className="@container border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
+    <section className="@container border-b-2 border-signal bg-cream px-4 py-8 text-ink sm:px-10 sm:py-10">
       <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
-        <div className="min-w-0">{children}</div>
+        {/* The title's own column is the container (2a spec D2): on the Library the form sits beside it. */}
+        <div className="min-w-0 @container">{children}</div>
         {aside}
       </div>
     </section>
@@ -524,11 +525,13 @@ export function PageHero({ eyebrow, title, lead, aside }: { eyebrow: string; tit
   return (
     <HeroBand aside={aside}>
       <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
-      <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em] [overflow-wrap:anywhere]">
+      {/* 12cqi: GYŰJTEMÉNY fits one line beside the Library form at 1280. Below sm the screen is narrower than the
+          word, so it may break anywhere there; from sm it never breaks inside a word. */}
+      <h1 className="mt-3 font-display text-[clamp(2.4rem,12cqi,7rem)] leading-[0.8] tracking-[-0.06em] [overflow-wrap:anywhere] [hyphens:manual] sm:[overflow-wrap:normal]">
         {title}
         <span className="text-signal">{"//"}</span>
       </h1>
-      <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
+      <p className="mt-4 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
     </HeroBand>
 ```
 

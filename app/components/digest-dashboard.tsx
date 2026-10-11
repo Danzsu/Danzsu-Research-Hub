@@ -277,7 +277,7 @@ export function DigestDashboard(
           )}
 
           <main className="min-w-0 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
-            <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-7 text-paper sm:px-8 sm:py-9">
+            <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-6 text-paper sm:px-8 sm:py-9">
               <div className="signal-grid" aria-hidden="true" />
               <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
                 {/* Sized in cqi, not vw: the nav and the panel make this column much narrower than the viewport. */}
@@ -293,9 +293,13 @@ export function DigestDashboard(
                     {companies ? t.companiesTitle : "AI WEEKLY"}
                     <span className="text-signal">{"//"}</span>
                   </h1>
-                  <p className="mt-5 max-w-2xl font-mono text-sm leading-6 text-paper/65">{companies ? t.companiesLead : t.lead}</p>
+                  {/* R3 §1: on a phone the lead and the close box give way to one status line under the title. */}
+                  <p className="mt-5 hidden max-w-2xl font-mono text-sm leading-6 text-paper/65 sm:block">{companies ? t.companiesLead : t.lead}</p>
+                  <p className="mt-3 font-mono text-xs text-paper/60 sm:hidden">
+                    {t.archive}: {issue.archiveAt} · {archived ? t.frozen : t.collecting}
+                  </p>
                 </div>
-                <div className="border-l border-paper/25 pl-5 font-mono text-xs leading-6 text-paper/60">
+                <div className="hidden border-l border-paper/25 pl-5 font-mono text-xs leading-6 text-paper/60 sm:block">
                   <p className="text-signal">{t.archive}</p>
                   <p className="text-lg font-bold text-paper">{issue.archiveAt}</p>
                   <p>

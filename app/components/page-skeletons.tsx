@@ -63,7 +63,7 @@ export function ListSkeleton({ form = false }: { form?: boolean }) {
         <div className="skeleton-fill">
           <Skeleton className="h-3 w-48 rounded-none" />
           <Skeleton className="mt-4 h-16 w-3/4 rounded-none sm:h-24" />
-          <Skeleton className="mt-7 h-5 max-w-2xl rounded-none" />
+          <Skeleton className="mt-4 h-5 max-w-2xl rounded-none" />
           <Skeleton className="mt-2 h-5 w-2/3 max-w-xl rounded-none" />
         </div>
       </HeroBand>
