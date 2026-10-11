@@ -1,17 +1,17 @@
 import type { Localized } from "../data/digest-types.ts";
 import { parseBlocks, plainText, type Block } from "./blocks.ts";
 import { readHiddenBlocks, readOverrides } from "./overrides.ts";
-import type { SourceKind } from "./pipeline/util.ts";
+import { claimHeld, type SourceKind } from "./pipeline/util.ts";
 import { shownTitle, type Post, type PostMeta } from "./post-view.ts";
 
 // A posts row as the page's Post. It parses the row's jsonb through the zod schemas (parseBlocks,
 // readOverrides), so only the server imports it: lib/content.ts, post-article.tsx and lib/translate.ts.
 // lib/client-bundle.test.ts fails if a client component ever reaches it.
 
-/** A `posts` row (optionally with its `sources(submitted_by, error)` embed) as the page's Post. */
+/** A `posts` row (optionally with its `sources(submitted_by, error, claimed_at)` embed) as the page's Post. */
 export function toPost(row: Record<string, unknown>): Post {
   const overrides = readOverrides(row.overrides);
-  const source = row.sources as { submitted_by: string; error?: string | null } | null | undefined;
+  const source = row.sources as { submitted_by: string; error?: string | null; claimed_at?: string | null } | null | undefined;
   return {
     id: row.id as number,
     sourceId: row.source_id as number,
@@ -33,6 +33,7 @@ export function toPost(row: Record<string, unknown>): Post {
     hiddenBlocks: readHiddenBlocks(row.hidden_blocks),
     submittedBy: source?.submitted_by ?? null,
     lastError: source?.error ?? null,
+    processing: claimHeld(source?.claimed_at, Date.now()),
     extractedAt: row.extracted_at as string | null,
     createdAt: row.created_at as string,
   };

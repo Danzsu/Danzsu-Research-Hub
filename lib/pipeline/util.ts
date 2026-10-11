@@ -137,6 +137,15 @@ export function detectSource(url: URL): SourceKind {
  *  `cooldownRemaining`'s own default and `requestReextract`'s explicit claim window. */
 export const REEXTRACT_COOLDOWN_MINUTES = 10;
 
+// A run's claim on its source (processSource). Twice the routes' 300 s maxDuration: a claim older than
+// this belongs to a run the platform killed, and the next run takes the source over.
+export const CLAIM_LEASE_MS = 10 * 60_000;
+
+/** True while a run holds the source: its `claimed_at` is younger than CLAIM_LEASE_MS. */
+export function claimHeld(claimedAt: string | null | undefined, now: number): boolean {
+  return Boolean(claimedAt) && now - Date.parse(claimedAt as string) < CLAIM_LEASE_MS;
+}
+
 /** Seconds until a post may be re-extracted again. */
 export function cooldownRemaining(extractedAt: string | null, now: Date, minutes = REEXTRACT_COOLDOWN_MINUTES): number {
   if (!extractedAt) return 0;
@@ -285,6 +294,23 @@ export function safeNext(value: unknown): string {
   } catch {
     return "/";
   }
+}
+
+/** Where a sign-in comes back to: /auth/callback with the post-login target (already through safeNext).
+ *  `via` marks a Google round trip, so the callback can tell Google's refusals from a refused magic link. */
+export function authCallback(origin: string, next: string, via?: "google"): string {
+  const callback = new URL("/auth/callback", origin);
+  callback.searchParams.set("next", next);
+  if (via) callback.searchParams.set("via", via);
+  return callback.toString();
+}
+
+/** The login page after a failed sign-in: the reason the page explains (app/login/page.tsx), and the target kept. */
+export function loginWithError(origin: string, reason: "1" | "google" | "not_invited", next: string): string {
+  const login = new URL("/login", origin);
+  login.searchParams.set("error", reason);
+  login.searchParams.set("next", next);
+  return login.toString();
 }
 
 /** `raw` resolved against `base`, kept only when it is an http(s) URL: the gate every rendered href

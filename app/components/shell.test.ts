@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement, type ComponentProps, type ComponentType } from "react";
 import {
+  digestItem,
   previewArchive,
   previewGithub,
   previewIssue,
@@ -13,7 +14,7 @@ import {
   previewSources,
 } from "../../lib/fixtures.ts";
 import { mockFetch } from "../../lib/pipeline/mock-fetch.ts";
-import { createSeededStore, memorySend, revalidateSeed, type ReaderSeed, type ReaderStore } from "../../lib/reader-store.ts";
+import { createSeededStore, EMPTY_ITEM_STATE, memorySend, revalidateSeed, type ReaderSeed, type ReaderStore } from "../../lib/reader-store.ts";
 import { navigationStub } from "../../lib/test/next-stub.ts";
 import { render } from "../../lib/test/render.ts";
 
@@ -33,23 +34,23 @@ const { PostImage } = await import("./post-image.tsx");
 const { Progress } = await import("../../components/ui/progress.tsx");
 const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
-const { CHAT_PANEL_ID, LinkChat, TaiyakiButton } = await import("./link-chat.tsx");
+const { CHAT_PANEL_ID, LinkChat, ReadHereContext, TaiyakiButton } = await import("./link-chat.tsx");
 const { RefreshBar, RefreshProvider } = await import("./refresh-bar.tsx");
 const { PostToolbar } = await import("../(app)/library/[id]/post-toolbar.tsx");
 const { useReaderState } = await import("./use-reader-state.ts");
 
 const noop = () => {};
-const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop };
+const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop, onReadHere: noop };
 /** Each element's own count of `span[aria-hidden="true"]` descendants (the pending dot). */
 const hiddenSpanCounts = (elements: Element[]) => elements.map((element) => element.querySelectorAll('span[aria-hidden="true"]').length);
-/** Wraps a component in the two providers the shell gives it: the language (LocalizedText, SubmitForm,
- *  DigestDashboard) and the refresh bar (SubmitForm, LinkChat). */
+/** Wraps a component in the providers the shell gives it: the language (LocalizedText, SubmitForm,
+ *  DigestDashboard), the refresh bar (SubmitForm, LinkChat) and "Olvasd itt" (DigestDashboard). */
 const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P) =>
   render(
     createElement(
       LanguageProvider,
       { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-      createElement(RefreshProvider, null, createElement(Component, props)),
+      createElement(RefreshProvider, null, createElement(ReadHereContext, { value: noop }, createElement(Component, props))),
     ),
   );
 /** Renders DigestDashboard from a real seed (never preview) and returns its body text. */
@@ -377,4 +378,44 @@ test("the refresh bar is absent at rest, in the shell too, and hidden from assis
 test("useRefresh outside RefreshProvider throws, naming where the provider lives", () => {
   const props = { postId: 7, language: "en", hasTranslation: false, showingTranslation: false, canEdit: false, hasTranslatable: true } as const;
   assert.throws(() => render(createElement(PostToolbar, props)), /RefreshProvider \(app\/components\/app-shell\.tsx\)/);
+});
+
+// Read-here spec 1. Kills the link to the post missing (the reader would be sent through the chat for
+// a post that exists), the chat button offered for a URL a submission refuses (its send would only
+// say "invalid_url"), and the button missing for a public link.
+test("a card's Read here opens the Library post when there is one, asks the chat for a public link, and is absent otherwise", () => {
+  const card = (url: string, postId?: number) =>
+    render(createElement(StoryCard, { item: digestItem("local-2026w40-x-1", { url }), state: EMPTY_ITEM_STATE, hasTodo: false, language: "en", actions: cardActions, postId }));
+  assert.equal(card("https://blog.test/a", 7).querySelector('a[href="/library/7"]')?.textContent?.trim(), "Read here");
+  const buttons = [...card("https://blog.test/a").querySelectorAll("button")].filter((button) => button.textContent?.trim() === "Read here");
+  assert.equal(buttons.length, 1);
+  assert.equal(card("http://10.0.0.1/a").body.textContent?.includes("Read here"), false);
+});
+
+// Read-here spec 1. Kills `posts` not reaching the cards, or reaching the wrong one.
+test("DigestDashboard gives each card its Library post from `posts`", () => {
+  const item = previewItems.find((candidate) => !candidate.mustRead)!;
+  const doc = withShellProviders(DigestDashboard, {
+    issue: previewIssue,
+    items: previewItems,
+    githubTop10: previewGithub,
+    preview: { data: previewReader, failWrites: false },
+    posts: { [item.id]: 42 },
+  });
+  assert.equal(doc.querySelector(`[data-card-id="${item.id}"] a[href="/library/42"]`)?.textContent?.trim(), "Read here");
+  assert.equal(doc.querySelectorAll('a[href^="/library/"]').length, 1);
+});
+
+// Like useRefresh. Kills a useReadHere that quietly does nothing without the shell: the button would
+// mark the story read and open nothing.
+test("useReadHere outside AppShell throws, naming where the provider lives", () => {
+  const bare = () =>
+    render(
+      createElement(
+        LanguageProvider,
+        { initial: "en" } as ComponentProps<typeof LanguageProvider>,
+        createElement(RefreshProvider, null, createElement(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } })),
+      ),
+    );
+  assert.throws(bare, /useReadHere must be used inside AppShell \(app\/components\/app-shell\.tsx\)/);
 });

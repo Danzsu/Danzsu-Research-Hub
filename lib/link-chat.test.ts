@@ -10,11 +10,12 @@ import {
   toThread,
   type Answer,
   type ChatNotice,
+  type ChatSnapshot,
   type ChatTransport,
 } from "./link-chat.ts";
 import type { MySource } from "./my-sources.ts";
 import { mockFetch } from "./pipeline/mock-fetch.ts";
-import { MINE_LIMIT } from "./pipeline/util.ts";
+import { MINE_LIMIT, safeHref } from "./pipeline/util.ts";
 
 const linkOf = (text: string) => {
   const message = parseLinkMessage(text);
@@ -430,6 +431,7 @@ test("send: every refusal, offline included, becomes a reply and keeps the text"
     [answer(400, { error: "invalid_url" }), { kind: "invalid_url" }],
     [answer(409, { error: "already_submitted", postId: 9 }), { kind: "already_submitted", postId: 9 }],
     [answer(409, { error: "already_submitted" }), { kind: "already_submitted", postId: null }],
+    [answer(409, { error: "already_submitted", queued: true }), { kind: "already_submitted", postId: null, queued: true }],
     [answer(401, { error: "unauthorized" }), { kind: "signed_out" }],
     [answer(500, { error: "insert_failed" }), { kind: "network" }],
     [offline, { kind: "network" }],
@@ -523,6 +525,60 @@ test("send: sending stays true until the reload lands, not just until submit ans
   resolveMine({ status: 200, body: { sources: [] } });
   assert.equal(await sendResult, true);
   assert.equal(chat.getSnapshot().sending, false);
+});
+
+// R2 spec 1. Kills the bubble set only once submit answers (the wait it removes), the bubble left behind
+// after the reload, and a list landing beside a still-shown bubble (the message twice in one snapshot).
+test("send: the reader's message shows at once, and the reloaded list replaces it in the same snapshot", async () => {
+  let answerSubmit: (value: Answer) => void = () => {};
+  const { transport } = fakeTransport([source(5, "pending")], {
+    submit: () => new Promise((resolve) => (answerSubmit = resolve)),
+  });
+  const chat = createLinkChat(transport, () => true);
+  const seen: ChatSnapshot[] = [];
+  chat.subscribe(() => seen.push(chat.getSnapshot()));
+  const sent = chat.send("https://blog.test/5 nézd meg");
+  assert.deepEqual(chat.getSnapshot().outgoing, { url: "https://blog.test/5", href: safeHref("https://blog.test/5", "https://blog.test/5"), note: "nézd meg" });
+  answerSubmit({ status: 202, body: { ok: true, id: 5 } });
+  assert.equal(await sent, true);
+  assert.equal(chat.getSnapshot().outgoing, null);
+  assert.ok(seen.every((snapshot) => !(snapshot.outgoing && snapshot.sources?.length)), "never the bubble and the landed entry together");
+});
+
+// R2 spec 1. Kills a bubble that outlives a refused or offline send (the panel would keep the field
+// empty), and one set before the message is parsed (a no-link message would flash a bubble).
+test("send: no link shows no bubble, and a refused or offline send takes its bubble back", async () => {
+  const chat = createLinkChat(fakeTransport([]).transport, () => true);
+  assert.equal(await chat.send("csak szöveg"), false);
+  assert.equal(chat.getSnapshot().outgoing, null);
+  for (const submit of [answer(500, { error: "insert_failed" }), offline]) {
+    const refused = createLinkChat(fakeTransport([], { submit }).transport, () => true);
+    const sent = refused.send("https://blog.test/a");
+    assert.notEqual(refused.getSnapshot().outgoing, null);
+    assert.equal(await sent, false);
+    assert.equal(refused.getSnapshot().outgoing, null);
+  }
+});
+
+// R2 spec 1 and Review Focus 1. Kills `say` stacking a repeat, comparing by kind alone (two different
+// "already sent" links would merge into one), and a repeat kept as the old object (ChatThread keys
+// each reply by its object, so the same object would not be announced again).
+test("say: a reply equal to the last one replaces it with a new object; any other reply still stacks", async () => {
+  const submit = inTurn(
+    answer(500, { error: "insert_failed" }),
+    answer(500, { error: "insert_failed" }),
+    answer(409, { error: "already_submitted", postId: 9 }),
+    answer(409, { error: "already_submitted", postId: 10 }),
+  );
+  const chat = createLinkChat(fakeTransport([], { submit }).transport, () => true);
+  await chat.send("https://blog.test/a");
+  const first = chat.getSnapshot().notices[0];
+  await chat.send("https://blog.test/a");
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "network" }]);
+  assert.notEqual(chat.getSnapshot().notices[0], first, "a new object, so the thread keys it anew");
+  await chat.send("https://blog.test/9");
+  await chat.send("https://blog.test/10");
+  assert.deepEqual(chat.getSnapshot().notices, [{ kind: "network" }, { kind: "already_submitted", postId: 9 }, { kind: "already_submitted", postId: 10 }]);
 });
 
 // Review Focus 1, the browser's half. Kills the in-flight guard (a double click sends two retries) and
@@ -653,13 +709,13 @@ test("memoryTransport: answers like the real routes, only the targeted retry fli
   await assert.rejects(offlinePreview.retry(-1), TypeError);
 });
 
-// Kills a duplicate submission that's missing its postId when the matching source has no post yet
-// (Minor 5): the real route's `existingPostId` omits the key entirely, not `postId: null`.
-test("memoryTransport: a duplicate of a postless source answers already_submitted with no postId key", async () => {
+// Kills the preview answering a queued duplicate unlike the real route (Minor 5 of the taiyaki plan:
+// the route omits postId entirely, and says `queued` for a pending source).
+test("memoryTransport: a duplicate of a pending source with no post answers queued, with no postId key", async () => {
   const preview = memoryTransport([source(-1, "pending", { url: "https://blog.test/dup" })], false);
   const { status, body } = await preview.submit("https://blog.test/dup", null);
   assert.equal(status, 409);
-  assert.deepEqual(body, { error: "already_submitted" });
+  assert.deepEqual(body, { error: "already_submitted", queued: true });
   assert.ok(!("postId" in body));
 });
 

@@ -6,7 +6,7 @@ import { resetRoute, routeStub, signedIn } from "./test/route-hooks.ts";
 
 // lib/content.ts is a Next-only server module (`@/` imports, `server-only`, `next/cache`): route-hooks.ts
 // registers the loader that resolves them, and stands in for lib/supabase/server.ts and next/cache.
-const { archivedWeek, archiveList, getRadar, getReaderState, getReaderSeed } = await import("./content.ts");
+const { archivedWeek, archiveList, getOpenSources, getPost, getPosts, getRadar, getReadPostIds, getReaderState, getReaderSeed } = await import("./content.ts");
 
 const text = (en: string) => ({ hu: `${en} (hu)`, en });
 /** A digest_items row as the embed selects it. */
@@ -96,6 +96,26 @@ test("getRadar throws on a failed query instead of answering an empty week", asy
   const failsWithCause = (e: unknown) => e instanceof Error && /radar query failed: connection failure/.test(e.message) && e.cause === error;
   await assert.rejects(getRadar(db), failsWithCause);
   await assert.rejects(getRadar(db, "2026-W38"), failsWithCause);
+});
+
+// R2 spec 2. Kills `data ?? []` / `data ? … : null` coming back on the Library's reads: a failed query
+// would show an empty Library, or a 404 for a post that exists. Also kills a list mapped to nothing.
+test("the Library's content reads throw on a failed query, with the PostgREST error as the cause", async () => {
+  const error = pgError("08006", "connection failure");
+  const withCause = (what: string) => (e: unknown) => e instanceof Error && e.message === `${what} query failed: connection failure` && e.cause === error;
+  await assert.rejects(getPosts(fakeDb(undefined, { tableErrors: { posts: error } })), withCause("posts"));
+  await assert.rejects(getPost(fakeDb(undefined, { postError: error }), 7), withCause("post"));
+  await assert.rejects(getOpenSources(fakeDb(undefined, { sourceSelectError: error })), withCause("open sources"));
+  assert.equal(await getPost(fakeDb(), 7), null, "no row is still a 404");
+  assert.deepEqual((await getPosts(fakeDb(undefined, { rows: { posts: [{ id: 3 }] } }))).map((post) => post.id), [3]);
+});
+
+// R2 spec 2. Kills the reader's own marks failing the page: the dimming is all their failure costs.
+test("getReadPostIds logs a failed query and answers none, so the Library still renders", async (t) => {
+  const logged = t.mock.method(console, "error", () => {});
+  const ids = await getReadPostIds(fakeDb(undefined, { tableErrors: { item_states: pgError("08006", "connection failure") } }));
+  assert.equal(ids.size, 0);
+  assert.equal(logged.mock.callCount(), 1);
 });
 
 // Spec 1.3. Kills the week filter dropped (every week's flags and every `post:<id>` key would ride

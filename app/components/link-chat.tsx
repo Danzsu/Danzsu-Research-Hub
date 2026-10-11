@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -101,17 +101,33 @@ function tabPastPanel(event: KeyboardEvent<HTMLDivElement>, openedBy: HTMLElemen
   if (document.activeElement === next) event.preventDefault();
 }
 
+/** A card's "Olvasd itt" for an article with no post yet (read-here spec 1): opens the chat and sends
+ *  `url`; the button that asked gets the focus back when the chat closes, like a taiyaki. */
+export type ReadHere = (url: string, opener: HTMLButtonElement) => void;
+
+/** Given by the app shell, which owns the chat's open state. */
+export const ReadHereContext = createContext<ReadHere | null>(null);
+
+export function useReadHere(): ReadHere {
+  const readHere = useContext(ReadHereContext);
+  if (!readHere) throw new Error("useReadHere must be used inside AppShell (app/components/app-shell.tsx)");
+  return readHere;
+}
+
 /**
  * The link chat. Desktop: a non-modal panel above the corner button; only Esc and its close button
  * close it, so a link can be copied from the page behind. Mobile: a bottom Sheet. Focus goes to the
  * field on open and back to `opener` on close.
  */
-export function LinkChat({ open, onOpenChange, opener, preview }: {
+export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQueuedLinkTaken }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The button that opened the panel. */
   opener: RefObject<HTMLButtonElement | null>;
   preview?: ChatPreview;
+  /** A card's "Olvasd itt" link, sent once the panel is open. */
+  queuedLink?: string | null;
+  onQueuedLinkTaken?: () => void;
 }) {
   const { language } = useLanguage();
   const pathname = usePathname();
@@ -125,6 +141,9 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
   );
   const snapshot = useSyncExternalStore(chat.subscribe, chat.getSnapshot, chat.getSnapshot);
   const [text, setText] = useState("");
+  // The field's own send: while it is on its way, its text shows as the thread's bubble and the field is
+  // empty; a refused send gives it back. A card's queued link never hides what the reader is typing (R2 spec 1).
+  const [fieldSending, setFieldSending] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   // The reader is at the thread's end (within 40px, as of their last scroll): only then does it follow
   // what grows, so someone who scrolled up to read stays where they are.
@@ -159,8 +178,9 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
     };
   }, []);
 
-  async function send() {
-    const sent = await chat.send(text);
+  /** Sends `message` (the field's text, or a card's "Olvasd itt" link); true when it went in. */
+  async function submit(message: string): Promise<boolean> {
+    const sent = await chat.send(message);
     // The reader's own send ends at its answer, even for a reader who scrolled up. Pinned directly once it
     // has settled, in the next frame, after React has committed it, rather than armed for the observer: a
     // send that changes no size (a deduped signed_out, a full thread whose dropped entry was as tall) would
@@ -168,14 +188,32 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
     requestAnimationFrame(() => {
       if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
     });
+    // The Library list shows the new submission too, as it does after its own form's. The preview has one
+    // path for all its views, so there every view refreshes.
+    if (sent && (pathname === "/library" || pathname === "/dev/preview")) refresh();
+    return sent;
+  }
+
+  async function send() {
+    setFieldSending(true);
+    const sent = await submit(text);
+    setFieldSending(false);
     if (!sent) return;
     setText("");
     // Send pressed from the keyboard has the focus; the next link goes in the field.
     input.current?.focus();
-    // The Library list shows the new submission too, as it does after its own form's. The preview has one
-    // path for all its views, so there every view refreshes.
-    if (pathname === "/library" || pathname === "/dev/preview") refresh();
   }
+
+  // A card's "Olvasd itt" (read-here spec 1): its link goes in once the panel is open, as if the reader
+  // had pasted it. The field keeps whatever the reader was typing. It waits for a send still on its way
+  // (chat.send refuses a second one), so a second card clicked right after the first still goes in.
+  const takeQueuedLink = useEffectEvent((link: string) => {
+    onQueuedLinkTaken?.();
+    void submit(link);
+  });
+  useEffect(() => {
+    if (open && queuedLink && !snapshot.sending) takeQueuedLink(queuedLink);
+  }, [open, queuedLink, snapshot.sending]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={isMobile}>
@@ -197,8 +235,7 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
           if (!isMobile || isUndoToast(event.target)) event.preventDefault();
         }}
         onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, opener.current)}
-        // The house 160ms, not the stock Sheet's 500ms in and 300ms out.
-        className="max-h-[75dvh] gap-0 data-[state=closed]:duration-160 data-[state=open]:duration-160 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
+        className="max-h-[75dvh] gap-0 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
       >
         <SheetHeader className="flex-row items-center gap-2 bg-ink py-3 pr-14 pl-4">
           <TaiyakiIcon className="size-6 shrink-0" />
@@ -231,7 +268,7 @@ export function LinkChat({ open, onOpenChange, opener, preview }: {
         >
           <Textarea
             ref={input}
-            value={text}
+            value={fieldSending && snapshot.outgoing ? "" : text}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
               if (isSendKey(event.nativeEvent)) {

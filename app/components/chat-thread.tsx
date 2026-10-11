@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { Language } from "@/data/digest-types";
-import { toThread, type ChatEntry, type ChatNotice, type ChatSnapshot } from "@/lib/link-chat";
+import { toThread, type ChatEntry, type ChatNotice, type ChatSnapshot, type OutgoingMessage } from "@/lib/link-chat";
 import { SOURCE_KIND_LABELS } from "@/lib/source-kinds";
 import { TaiyakiIcon } from "./taiyaki-icon";
 
@@ -19,6 +19,7 @@ const copy = {
     received: "Megkaptam,",
     processing: "FELDOLGOZÁS…",
     loading: "BETÖLTÉS…",
+    sending: "KÜLDÉS…",
     done: "KÉSZ · MEGNYITÁS →",
     failed: "Nem sikerült feldolgozni.",
     retry: "ÚJRA",
@@ -28,6 +29,7 @@ const copy = {
     more_links: "Egyszerre egy linket tudok fogadni, az elsőt küldtem be.",
     invalid_url: "Ezt nem tudom megnyitni: csak nyilvános http(s) linket fogadok.",
     already_submitted: "Ezt már beküldte valaki.",
+    queued: "Már sorban van, pár perc és kész.",
     signed_out: "Lejárt a belépésed.",
     signIn: "BELÉPÉS →",
     network: "Nem ment át, próbáld újra.",
@@ -40,6 +42,7 @@ const copy = {
     received: "Got it:",
     processing: "PROCESSING…",
     loading: "LOADING…",
+    sending: "SENDING…",
     done: "DONE · OPEN →",
     failed: "I couldn't process it.",
     retry: "RETRY",
@@ -49,6 +52,7 @@ const copy = {
     more_links: "I take one link at a time, so I sent in the first one.",
     invalid_url: "I can't open that: I only take public http(s) links.",
     already_submitted: "Someone already sent this in.",
+    queued: "It's already in the queue; give it a few minutes.",
     signed_out: "Your sign-in has expired.",
     signIn: "SIGN IN →",
     network: "That didn't go through, try again.",
@@ -61,7 +65,7 @@ const bubble = "max-w-[85%] border-2 border-ink px-3 py-2 text-sm leading-6 [ove
 // links are ink, and the signal goes into their underline.
 const signalUnderline = "text-ink underline decoration-signal decoration-2 underline-offset-4";
 const microLabel = "font-mono text-[11px] tracking-[0.14em]";
-const action = `focus-ring inline-flex min-h-10 items-center ${microLabel} ${signalUnderline} hover:decoration-ink`;
+const action = `press focus-ring inline-flex min-h-10 items-center ${microLabel} ${signalUnderline} hover:decoration-ink`;
 /** Send and ÚJRA while their request is on its way: aria-disabled, not disabled, so they keep the focus,
  *  but dimmed and deaf to the pointer. */
 export const busyClass = "aria-disabled:pointer-events-none aria-disabled:opacity-50";
@@ -88,12 +92,12 @@ function Taiyaki({ language, children }: { language: Language; children: ReactNo
   );
 }
 
-function Mine({ entry, language }: { entry: ChatEntry; language: Language }) {
+function Mine({ entry, language }: { entry: OutgoingMessage; language: Language }) {
   return (
     <div className={`${bubble} ml-auto w-fit bg-ink text-paper shadow-[3px_3px_0_var(--signal)]`}>
       <span className="sr-only">{`${copy[language].me} `}</span>
       {entry.href ? (
-        <a href={entry.href} target="_blank" rel="noreferrer" className="focus-ring underline">
+        <a href={entry.href} target="_blank" rel="noreferrer" className="press-ink focus-ring underline">
           {entry.url}
           <ExternalLink aria-hidden="true" className="ml-1 inline size-4 align-text-bottom" />
         </a>
@@ -117,6 +121,16 @@ type ThreadActions = {
 /** A refused ÚJRA's reply scrolls just far enough to show when it lands out of view (ÚJRA clicked at the
  *  scroller's edge). Module-level, so React calls it once, when the reply mounts, not on every render. */
 const revealRefusal = (reply: HTMLDivElement | null) => reply?.scrollIntoView({ block: "nearest" });
+
+// Each local reply keeps the key of its own object: a repeat replaces the last one with a new object
+// (`say` in lib/link-chat.ts), and the new key makes a screen reader announce it again.
+const noticeKeys = new WeakMap<ChatNotice, number>();
+let nextNoticeKey = 0;
+function noticeKey(notice: ChatNotice): number {
+  let key = noticeKeys.get(notice);
+  if (key === undefined) noticeKeys.set(notice, (key = nextNoticeKey++));
+  return key;
+}
 
 function Reply({ entry, retrying, refusal, ...actions }: ThreadActions & { entry: ChatEntry; retrying: boolean; refusal?: ChatNotice }) {
   const { language, onRetry, onOpenPost } = actions;
@@ -169,7 +183,7 @@ function NoticeText({ notice, language, loginHref, onOpenPost }: ThreadActions &
   if (notice.kind === "already_submitted") {
     return (
       <>
-        <p>{t.already_submitted}</p>
+        <p>{notice.queued ? t.queued : t.already_submitted}</p>
         {notice.postId !== null && (
           <Link href={`/library/${notice.postId}`} onClick={onOpenPost} className={action}>
             {t.open}
@@ -192,7 +206,7 @@ function NoticeText({ notice, language, loginHref, onOpenPost }: ThreadActions &
 }
 
 /** The thread: the greeting, the reader's own submissions (oldest first) with the taiyaki's replies, then the local replies. */
-export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "retrying" | "retryNotices"> }) {
+export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "outgoing" | "retrying" | "retryNotices"> }) {
   const { language } = actions;
   const t = copy[language];
   // Nothing has answered yet, and no local reply or the unreachable line already covers it: one
@@ -222,9 +236,8 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
           </Taiyaki>
         </li>
       ))}
-      {snapshot.notices.map((notice, index) => (
-        // Append-only while the panel is open, so the position is a stable key.
-        <li key={index}>
+      {snapshot.notices.map((notice) => (
+        <li key={noticeKey(notice)}>
           <Taiyaki language={language}>
             <NoticeText notice={notice} {...actions} />
           </Taiyaki>
@@ -234,6 +247,14 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
         <li>
           <Taiyaki language={language}>
             <p>{t.unreachable}</p>
+          </Taiyaki>
+        </li>
+      )}
+      {snapshot.outgoing && (
+        <li className="space-y-2">
+          <Mine entry={snapshot.outgoing} language={language} />
+          <Taiyaki language={language}>
+            <InProgress label={t.sending} />
           </Taiyaki>
         </li>
       )}

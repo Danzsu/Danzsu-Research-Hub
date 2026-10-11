@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { authCallback } from "@/lib/pipeline/util";
 import { createClient, safeNext } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
@@ -8,12 +9,10 @@ export async function POST(request: NextRequest) {
 
   if (email.includes("@")) {
     const supabase = await createClient();
-    const callback = new URL("/auth/callback", request.nextUrl.origin);
-    callback.searchParams.set("next", next);
     // shouldCreateUser: false — sign-ups are off; only invited addresses get a link.
     await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: false, emailRedirectTo: callback.toString() },
+      options: { shouldCreateUser: false, emailRedirectTo: authCallback(request.nextUrl.origin, next) },
     });
   }
 

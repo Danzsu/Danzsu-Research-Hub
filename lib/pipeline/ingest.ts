@@ -5,9 +5,10 @@ import { aiCleanup } from "./cleanup.ts";
 import { extract } from "./extract/index.ts";
 import { IMAGE_BUDGET_MS, mirrorImages, unusedMediaPaths } from "./images.ts";
 import { summarize, writeNotes } from "./summary.ts";
-import { errorMessage, type SourceKind } from "./util.ts";
+import { claimHeld, errorMessage, type SourceKind } from "./util.ts";
 
-const MAX_ATTEMPTS = 3;
+/** The runs a source gets before the queue gives up on it (a reader's "Újra" resets the count). */
+export const MAX_ATTEMPTS = 3;
 
 // The cleanup prompt targets web-page chrome (nav, ads, share buttons); pdf (a Gemini
 // transcription), x (post text) and youtube (the video block) have none of that to strip,
@@ -27,7 +28,7 @@ export const START_GATE_RESERVE_MS = 120_000;
 // does hit the worst case can still outlive the deadline (see retryPendingSources' own comment).
 export const SUMMARY_RESERVE_MS = 30_000;
 
-type Source = { id: number; url: string; kind: SourceKind; note: string | null; attempts: number };
+type Source = { id: number; url: string; kind: SourceKind; note: string | null; attempts: number; claimed_at?: string | null };
 
 /** A failed re-extraction must not unpublish a post that already exists. */
 export function failureUpdate(hasPrevious: boolean, message: string): { status?: "failed"; error: string } {
@@ -99,14 +100,30 @@ async function buildPost(db: SupabaseClient, source: Source, previous: Block[], 
 }
 
 /**
- * Turns a submitted source into a post, or refreshes an existing one.
- * Only machine fields are written: `overrides` and `hidden_blocks` belong to
- * the submitter and are never touched here. Replaces only on success.
+ * Turns a submitted source into a post, or refreshes an existing one, and answers whether this run
+ * did the work. Only machine fields are written: `overrides` and `hidden_blocks` belong to the
+ * submitter and are never touched here. Replaces only on success.
+ *
+ * It claims the source first (spec 3): a lease on `claimed_at` stops a run that reads the source
+ * while another works on it, and a compare-and-swap on `attempts` stops two that read it at once.
+ * A finished run releases the lease; one older than CLAIM_LEASE_MS is a dead run's and is taken over.
+ * `expectedAttempts` is the value a queue listing saw: a run that claimed (and maybe finished) the source
+ * since then has moved it, so the queue leaves the source to that run instead of doing its work again.
+ * ponytail: a run that dies after its posts lookup throws keeps the lease for its full 10 minutes.
  */
-export async function processSource(db: SupabaseClient, id: number, options: { deadline?: number } = {}): Promise<void> {
-  const { data: source, error } = await db.from("sources").select("id, url, kind, note, attempts").eq("id", id).single<Source>();
+export async function processSource(db: SupabaseClient, id: number, options: { deadline?: number; expectedAttempts?: number } = {}): Promise<boolean> {
+  const { data: source, error } = await db.from("sources").select("id, url, kind, note, attempts, claimed_at").eq("id", id).single<Source>();
   if (error || !source) throw error ?? new Error(`source ${id} not found`);
-  await updateSource(db, id, { attempts: source.attempts + 1 });
+  const now = Date.now();
+  if (claimHeld(source.claimed_at, now)) return false;
+  const { data: claimed, error: claimError } = await db
+    .from("sources")
+    .update({ attempts: source.attempts + 1, claimed_at: new Date(now).toISOString() })
+    .eq("id", id)
+    .eq("attempts", options.expectedAttempts ?? source.attempts)
+    .select("id");
+  if (claimError) throw claimError;
+  if (!claimed?.length) return false;
   // A transient lookup error is not "no existing post" — treating it as one would let a failed
   // re-extraction below mark an already-published post `failed` instead of leaving it alone.
   const { data: existing, error: existingError } = await db.from("posts").select("id, blocks").eq("source_id", id).maybeSingle();
@@ -123,7 +140,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
     if (saveError) throw saveError;
     saved = true;
     await removeUnusedMedia(db, source.id, post.blocks);
-    await updateSource(db, id, { status: "done", error: null });
+    await updateSource(db, id, { status: "done", error: null, claimed_at: null });
   } catch (failure) {
     const message = errorMessage(failure);
     // Once the upsert itself has succeeded, the new post's images are live and referenced — nothing
@@ -143,8 +160,9 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
     // `saved` counts too: a post that this very run just wrote is exactly as "already published" as
     // one written earlier — a failure after that point (e.g. the trailing media cleanup or status
     // write) must not flip a live post's source row to `failed`.
-    await updateSource(db, id, failureUpdate(saved || Boolean(existing), message));
+    await updateSource(db, id, { ...failureUpdate(saved || Boolean(existing), message), claimed_at: null });
   }
+  return true;
 }
 
 /**
@@ -155,13 +173,12 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
  * summarize() each have their own fallback route, so a single model task can take up to 2×120s,
  * and a pdf needs two such tasks (transcription, then summary). When that happens the platform
  * kills the function mid-flight, this attempt is spent, and the source is retried on the next
- * cron run. Upgrade path: a dedicated retry cron with its own 300s budget instead of sharing
- * runDaily's.
+ * cron run: the mirror crons (`/api/cron/mirror`) give the queue three more 300 s budgets a day.
  */
 export async function retryPendingSources(db: SupabaseClient, deadline?: number): Promise<number> {
   const { data, error } = await db
     .from("sources")
-    .select("id")
+    .select("id, attempts")
     .neq("status", "done")
     .lt("attempts", MAX_ATTEMPTS)
     .order("id")
@@ -171,8 +188,8 @@ export async function retryPendingSources(db: SupabaseClient, deadline?: number)
   let processed = 0;
   for (const row of data ?? []) {
     if (deadline !== undefined && deadline - Date.now() < START_GATE_RESERVE_MS) break;
-    await processSource(db, row.id as number, { deadline });
-    processed++;
+    // Counts the runs that claimed their source: one another run holds is skipped, not counted.
+    if (await processSource(db, row.id as number, { deadline, expectedAttempts: row.attempts as number })) processed++;
   }
   return processed;
 }

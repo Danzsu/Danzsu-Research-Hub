@@ -40,6 +40,8 @@ export type Post = {
   submittedBy: string | null;
   /** The source's last extraction error: a re-extraction failed and the post kept its content. A good run clears it. */
   lastError: string | null;
+  /** A run holds the post's source right now (`sources.claimed_at`, claimHeld): the page follows it until it is done. */
+  processing: boolean;
   extractedAt: string | null;
   createdAt: string;
 };
@@ -65,6 +67,13 @@ export function editPayload(
   const title = sameAs(draft.title, post.generatedTitle) ? undefined : draft.title;
   const summary = sameAs(draft.summary, post.generatedSummary) ? undefined : draft.summary;
   return { ...(title && { title }), ...(summary && { summary }), hidden };
+}
+
+/** The editor's draft after the text the page shows changed beneath it (a re-extraction the page followed):
+ *  each language still showing the old text moves to the new one, and one the reader edited stays. Without
+ *  this, Save would send the old model text back as an override over the new (R2 final review). */
+export function rebaseDrafts(draft: Localized, previous: Localized, next: Localized): Localized {
+  return { hu: draft.hu === previous.hu ? next.hu : draft.hu, en: draft.en === previous.en ? next.en : draft.en };
 }
 
 export const isValidVimeoId = (id: string): boolean => /^\d+$/.test(id);

@@ -2,5 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["dub1"],
   "fluid": true,
-  "crons": [{ "path": "/api/cron/daily", "schedule": "0 5 * * *" }]
+  "crons": [
+    { "path": "/api/cron/daily", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/mirror", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/mirror", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/mirror", "schedule": "0 9 * * *" }
+  ]
 }

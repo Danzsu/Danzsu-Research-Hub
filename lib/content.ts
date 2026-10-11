@@ -24,6 +24,12 @@ const budapest = new Intl.DateTimeFormat("hu-HU", {
 
 export type RadarData = { issue: CurrentIssue; items: DigestItem[]; githubTop10: GithubTopEntry[] };
 
+/** A failed query, as the error a page throws: app/error.tsx shows it with "Újra", never an empty list or
+ *  a 404 (R2 spec 2). The PostgREST error rides along as the cause, for the log. */
+function queryFailed(what: string, error: { message: string }): Error {
+  return new Error(`${what} query failed: ${error.message}`, { cause: error });
+}
+
 const RADAR_COLUMNS =
   "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url)";
 
@@ -42,7 +48,7 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
     .order("rank", { referencedTable: "github_top" });
   const query = issueId ? issues.eq("id", issueId) : issues.order("id", { ascending: false }).limit(1);
   const { data: latest, error } = await query.maybeSingle();
-  if (error) throw new Error(`radar query failed: ${error.message}`, { cause: error });
+  if (error) throw queryFailed("radar", error);
   if (issueId && !latest) return null;
 
   const weekId = latest?.id ?? isoWeek(new Date()).id;
@@ -84,7 +90,7 @@ async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
     .select("id, period, item_count, read_minutes, top_title")
     .neq("id", current)
     .order("id", { ascending: false });
-  if (error) throw new Error(`archive query failed: ${error.message}`, { cause: error });
+  if (error) throw queryFailed("archive", error);
 
   return data.map((row) => ({
     id: row.id,
@@ -134,10 +140,11 @@ export async function archiveList(reader: Reader): Promise<ArchiveIssue[]> {
 }
 
 const LIST_COLUMNS = "id, source_id, kind, url, author, source_site, published_at, title, summary, key_points, tags, meta, overrides, hidden_blocks, extracted_at, created_at";
-const POST_COLUMNS = `${LIST_COLUMNS}, blocks, blocks_hu, sources(submitted_by, error)`;
+const POST_COLUMNS = `${LIST_COLUMNS}, blocks, blocks_hu, sources(submitted_by, error, claimed_at)`;
 
 export async function getPosts(db: SupabaseClient): Promise<Post[]> {
-  const { data } = await db.from("posts").select(LIST_COLUMNS).order("created_at", { ascending: false }).limit(100);
+  const { data, error } = await db.from("posts").select(LIST_COLUMNS).order("created_at", { ascending: false }).limit(100);
+  if (error) throw queryFailed("posts", error);
   return (data ?? []).map(toPost);
 }
 
@@ -168,25 +175,29 @@ export async function getReaderSeed(db: SupabaseClient, issueId: string): Promis
   return { issueId, seededAt: Date.now(), data: await getReaderState(db, issueId) };
 }
 
-/** The reader's opened posts (item_states `post:<id>`, RLS: own rows only); the Library list dims them. */
+/** The reader's opened posts (item_states `post:<id>`, RLS: own rows only); the Library list dims them. A
+ *  failure only costs the dimming, so it logs and answers none instead of failing the page (R2 spec 2). */
 export async function getReadPostIds(db: SupabaseClient): Promise<Set<number>> {
-  const { data } = await db.from("item_states").select("item_id").like("item_id", `${POST_STATE_PREFIX}%`).eq("is_read", true);
+  const { data, error } = await db.from("item_states").select("item_id").like("item_id", `${POST_STATE_PREFIX}%`).eq("is_read", true);
+  if (error) console.error("read posts query failed", error);
   return readPostIds((data ?? []).map((row) => row.item_id as string));
 }
 
 export async function getPost(db: SupabaseClient, id: number): Promise<Post | null> {
-  const { data } = await db.from("posts").select(POST_COLUMNS).eq("id", id).maybeSingle();
+  const { data, error } = await db.from("posts").select(POST_COLUMNS).eq("id", id).maybeSingle();
+  if (error) throw queryFailed("post", error);
   return data ? toPost(data) : null;
 }
 
 export type SubmittedSource = { id: number; url: string; kind: string; status: string; error: string | null; createdAt: string };
 
 export async function getOpenSources(db: SupabaseClient): Promise<SubmittedSource[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from("sources")
     .select("id, url, kind, status, error, created_at")
     .neq("status", "done")
     .order("created_at", { ascending: false })
     .limit(20);
+  if (error) throw queryFailed("open sources", error);
   return (data ?? []).map((row) => ({ ...row, createdAt: row.created_at }));
 }

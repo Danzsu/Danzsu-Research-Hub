@@ -22,6 +22,7 @@ import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-sto
 import { useLanguage } from "./language-context";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
+import { useReadHere } from "./link-chat";
 import { isUndoToast, toasts } from "./undo-toast";
 import { useModelContextTools } from "./use-model-context-tools";
 import { useReaderState } from "./use-reader-state";
@@ -116,6 +117,8 @@ export function DigestDashboard(
     archived?: boolean;
     /** /companies: the week's company news only, the latest day's Top 5 first, no category bar. */
     scope?: "companies";
+    /** Item id → its Library post (readHerePosts): the cards' "Olvasd itt" opens it. */
+    posts?: Record<string, number>;
   } & ReaderSource,
 ) {
   const { issue, githubTop10, archived = false } = props;
@@ -125,6 +128,7 @@ export function DigestDashboard(
   const { language } = useLanguage();
   const [filter, setFilter] = useState<Filter>("all");
   const { store, states, loadedStates, todos, syncing } = useReaderState(props);
+  const readHere = useReadHere();
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
   useModelContextTools(store, itemIds);
   const isMobile = useIsMobile();
@@ -147,6 +151,7 @@ export function DigestDashboard(
       }
     },
     onToggle: (itemId, flag) => store.toggleFlag(itemId, flag),
+    onReadHere: (item, opener) => readHere(item.url, opener),
     onAddTodo(item) {
       if (store.addTodo(item.title[language], item.id)) toasts.show({ kind: "todoAdded" });
     },
@@ -174,6 +179,7 @@ export function DigestDashboard(
     item,
     state: states[item.id] ?? EMPTY_ITEM_STATE,
     hasTodo: itemsWithTodo.has(item.id),
+    postId: props.posts?.[item.id],
     language,
     actions,
   });
@@ -192,7 +198,7 @@ export function DigestDashboard(
       total={items.length}
       syncing={syncing}
       todos={todos}
-      onAdd={(text) => store.addTodo(text)}
+      onAdd={(text, onFailed) => store.addTodo(text, undefined, onFailed)}
       onToggle={(id, done) => store.setTodoDone(id, done)}
       onDelete={deleteTodo}
     />
@@ -215,7 +221,7 @@ export function DigestDashboard(
               variant="outline"
               size="sm"
               aria-label={t.panel}
-              className="h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:h-9 2xl:hidden"
+              className="press h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:pointer-fine:h-9 2xl:hidden"
             >
               <ListTodo /> {progress}%{openTodos > 0 && <span className="text-signal">· {openTodos}</span>}
             </Button>
@@ -257,7 +263,7 @@ export function DigestDashboard(
                   type="button"
                   aria-pressed={filter === id}
                   onClick={() => setFilter(id)}
-                  className="focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs aria-pressed:bg-signal"
+                  className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal"
                 >
                   <Icon className="size-3.5" /> {t[id]}
                 </button>
@@ -308,7 +314,7 @@ export function DigestDashboard(
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="focus-ring group flex min-w-0 items-center gap-4 border-2 border-ink bg-paper p-4 transition hover:-translate-y-0.5 hover:bg-signal"
+                        className="press focus-ring group flex min-w-0 items-center gap-4 border-2 border-ink bg-paper p-4 transition motion-safe:hover:-translate-y-0.5 hover:bg-signal"
                       >
                         <span className="font-display text-3xl text-signal group-hover:text-ink">{String(index + 1).padStart(2, "0")}</span>
                         <span className="min-w-0 flex-1">

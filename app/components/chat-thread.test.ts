@@ -17,7 +17,7 @@ const thread = (snapshot: Partial<Snapshot> = {}, language: "hu" | "en" = "hu") 
       language,
       loginHref: "/login?next=%2Flibrary",
       onRetry: () => {},
-      snapshot: { sources: previewMySources, notices: [], unreachable: false, retrying: [], retryNotices: {}, ...snapshot },
+      snapshot: { sources: previewMySources, notices: [], unreachable: false, outgoing: null, retrying: [], retryNotices: {}, ...snapshot },
     }),
   );
 
@@ -101,6 +101,7 @@ test("every local reply says what happened, with the post link and the sign-in l
     { kind: "invalid_url" },
     { kind: "already_submitted", postId: 9 },
     { kind: "already_submitted", postId: null },
+    { kind: "already_submitted", postId: null, queued: true },
     { kind: "signed_out" },
     { kind: "network" },
   ];
@@ -111,6 +112,7 @@ test("every local reply says what happened, with the post link and the sign-in l
     "Taiyaki: Ezt nem tudom megnyitni: csak nyilvános http(s) linket fogadok.",
     "Taiyaki: Ezt már beküldte valaki.MEGNYITÁS →",
     "Taiyaki: Ezt már beküldte valaki.",
+    "Taiyaki: Már sorban van, pár perc és kész.",
     "Taiyaki: Lejárt a belépésed.BELÉPÉS →",
     "Taiyaki: Nem ment át, próbáld újra.",
     "Taiyaki: Most nem érem el a beküldéseidet.",
@@ -146,4 +148,13 @@ test("a loading taiyaki shows only until the thread has actually loaded, never b
   assert.equal(items(thread({ sources: [] })).length, 1);
   assert.doesNotMatch(items(thread({ sources: null, notices: [{ kind: "signed_out" }] })).join(""), /BETÖLTÉS…/);
   assert.doesNotMatch(items(thread({ sources: null, unreachable: true })).join(""), /BETÖLTÉS…/);
+});
+
+// R2 spec 1. Kills the bubble dropped, put anywhere but the thread's end, or missing its sending line.
+test("a send on its way shows the reader's message at the thread's end, with the taiyaki's SENDING line", () => {
+  const outgoing = { url: "https://blog.test/new", href: "https://blog.test/new", note: "nézd meg" };
+  const all = items(thread({ outgoing, notices: [{ kind: "network" }] }));
+  assert.equal(all.at(-1), "Te: https://blog.test/newnézd megTaiyaki: KÜLDÉS…");
+  assert.equal(all.at(-2), "Taiyaki: Nem ment át, próbáld újra.");
+  assert.equal(items(thread({ outgoing }, "en")).at(-1), "You: https://blog.test/newnézd megTaiyaki: SENDING…");
 });

@@ -20,10 +20,10 @@ const copy = {
 };
 
 const itemClassFull =
-  "focus-ring flex min-h-10 w-full items-center gap-3 border-l-2 border-transparent px-3 font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
+  "press-ink focus-ring flex min-h-10 w-full items-center gap-3 border-l-2 border-transparent px-3 font-mono text-sm text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
 
 const itemClassRail =
-  "focus-ring flex min-h-10 w-full items-center justify-center border-l-2 border-transparent text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
+  "press-ink focus-ring flex min-h-10 w-full items-center justify-center border-l-2 border-transparent text-paper/70 hover:bg-paper/5 hover:text-paper aria-[current=page]:border-signal aria-[current=page]:bg-signal/10 aria-[current=page]:text-signal";
 
 export type DesktopNavProps = {
   email: string;
@@ -45,7 +45,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
       onClick={onToggle}
       aria-expanded={!rail}
       aria-label={rail ? t.expand : t.collapse}
-      className="focus-ring flex min-h-10 w-full items-center justify-center gap-2 border-t border-paper/15 pt-3 font-mono text-[11px] text-paper/55 hover:text-signal"
+      className="press-ink focus-ring flex min-h-10 w-full items-center justify-center gap-2 border-t border-paper/15 pt-3 font-mono text-[11px] text-paper/55 hover:text-signal"
     >
       {rail ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
       {!rail && t.collapse}
@@ -62,7 +62,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
         <Link
           href="/"
           aria-label="NEON NEWS RADAR"
-          className={`focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}
+          className={`press-ink focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}
         >
           <span className="grid size-10 shrink-0 place-items-center rounded-full border border-signal bg-signal text-ink">
             <Radar className="size-5" />
@@ -108,7 +108,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
                   type="button"
                   onClick={onHelp}
                   aria-label={t.shortcuts}
-                  className="focus-ring grid size-10 place-items-center text-paper/55 hover:text-signal"
+                  className="press-ink focus-ring grid size-10 place-items-center text-paper/55 hover:text-signal"
                 >
                   <Keyboard className="size-4" />
                 </button>
@@ -121,7 +121,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
                 type="button"
                 onClick={onHelp}
                 aria-label={t.shortcuts}
-                className="focus-ring flex min-h-10 items-center gap-2 px-2 font-mono text-[11px] text-paper/55 hover:text-signal"
+                className="press-ink focus-ring flex min-h-10 items-center gap-2 px-2 font-mono text-[11px] text-paper/55 hover:text-signal"
               >
                 <Keyboard className="size-4" /> ?
               </button>

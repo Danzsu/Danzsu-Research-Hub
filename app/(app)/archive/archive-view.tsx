@@ -38,7 +38,7 @@ export function ArchiveView({ issues }: { issues: ArchiveIssue[] }) {
           <Link
             key={issue.id}
             href={`/archive/${issue.id}`}
-            className="focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-6 transition hover:border-signal hover:bg-signal hover:text-ink"
+            className="press-ink focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-6 transition hover:border-signal hover:bg-signal hover:text-ink"
           >
             <div className="flex items-start justify-between">
               <span className="flex items-center gap-2">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Languages, PenLine } from "lucide-react";
+import { ErrorLine } from "@/app/components/error-line";
 import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
 import type { Language } from "@/data/digest-types";
@@ -26,18 +27,15 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
   const [failed, setFailed] = useState(false);
   const t = copy[language];
 
-  async function translate() {
+  function translate() {
     setBusy(true);
     setFailed(false);
-    try {
-      const response = await fetch(`/api/posts/${postId}/translate`, { method: "POST" });
-      if (!response.ok) throw new Error(String(response.status));
-      refresh(`/library/${postId}?text=hu`);
-    } catch {
-      setFailed(true);
-    } finally {
+    refresh(`/library/${postId}?text=hu`, async () => {
+      const response = await fetch(`/api/posts/${postId}/translate`, { method: "POST" }).catch(() => null);
       setBusy(false);
-    }
+      setFailed(!response?.ok);
+      return Boolean(response?.ok);
+    });
   }
 
   return (
@@ -52,7 +50,7 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
           </Button>
         </div>
       ) : hasTranslatable ? (
-        <Button variant="brutal" className="min-h-10" onClick={() => void translate()} disabled={busy}>
+        <Button variant="brutal" className="min-h-10" onClick={translate} disabled={busy}>
           <Languages /> {busy ? t.working : t.translate}
         </Button>
       ) : null}
@@ -62,7 +60,7 @@ export function PostToolbar({ postId, language, hasTranslation, showingTranslati
         </Button>
       )}
       {/* Always mounted, so the live region exists before the first failure — only its text changes. */}
-      <p role="status" className="font-mono text-xs text-signal">{failed ? t.failed : ""}</p>
+      <ErrorLine>{failed ? t.failed : null}</ErrorLine>
     </div>
   );
 }

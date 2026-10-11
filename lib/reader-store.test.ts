@@ -139,6 +139,22 @@ test("an added to-do shows at once and takes the server's id; a failed one disap
   assert.equal(errors, 1);
 });
 
+// R2 spec 1. Kills onFailed dropped (the panel would lose the text), called for a good write too, or
+// called before the failed row is gone.
+test("a failed to-do add calls its onFailed once, after its row is gone; a good one never does", async () => {
+  const send: SendState = async (write) => {
+    if (write.action === "add_todo" && write.text === "boom") throw new TypeError("Failed to fetch");
+    return { id: 7 };
+  };
+  const store = createReaderStore(send, () => {}, empty);
+  const failed: string[][] = [];
+  const onFailed = (label: string) => () => failed.push([label, ...store.getSnapshot().todos.map((item) => item.text)]);
+  store.addTodo("boom", undefined, onFailed("boom"));
+  store.addTodo("ok", undefined, onFailed("ok"));
+  await store.settled();
+  assert.deepEqual(failed, [["boom", "ok"]]);
+});
+
 test("a second to-do for the same item is refused", () => {
   const store = createReaderStore(memorySend(), noop, empty);
   assert.equal(store.addTodo("Title", "item-1"), true);

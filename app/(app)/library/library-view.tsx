@@ -73,7 +73,7 @@ export function LibraryView({
                 key={post.id}
                 postId={post.id}
                 read={readIds.has(post.id)}
-                className="focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6"
+                className="press-ink focus-ring group border-2 border-paper/30 bg-[#1c1c1c] p-5 transition hover:border-signal hover:bg-signal hover:text-ink sm:p-6"
               >
                 <div className="flex items-start justify-between">
                   <span className="flex items-center gap-2">

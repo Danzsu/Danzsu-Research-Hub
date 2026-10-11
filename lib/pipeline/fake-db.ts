@@ -30,6 +30,8 @@ export type FakeIngestTables = {
   pending?: Record<string, unknown>[];
   /** Forces `sources`' `insert(...).select().single()` to resolve with this error, e.g. `pgError("23505", …)`. */
   sourceInsertError?: PostgrestErrorShape;
+  /** Forces `sources`' `upsert(...).select()` (queueMirrors) to resolve with this error. */
+  sourceUpsertError?: PostgrestErrorShape;
   /** Forces every `sources` select (the listing, `single()`, `maybeSingle()`) to resolve with this error. */
   sourceSelectError?: PostgrestErrorShape;
   /** Forces `sources`' `update(...).eq(...)` to resolve with this error instead of applying the write
@@ -41,7 +43,8 @@ export type FakeIngestTables = {
    *  `pgError("42501", …)` for the `update_post_overrides` "not the submitter" case. */
   rpcError?: PostgrestErrorShape;
   /** Rows any other table's select chain answers from, by table name: `issues`, `item_states`, `todos`,
-   *  `archive_issues`, runDaily's recent-items lookup on `digest_items` (see `tableQuery`). */
+   *  `archive_issues`, runDaily's recent-items lookup on `digest_items`, the Library list on `posts`
+   *  (`getPosts`; see `tableQuery`). */
   rows?: Record<string, Record<string, unknown>[]>;
   /** Forces any other table's select, by table name, to resolve with this error instead of its rows. */
   tableErrors?: Record<string, PostgrestErrorShape>;
@@ -54,6 +57,8 @@ export type FakeIngestDb = SupabaseClient & {
   sourceUpdates: Record<string, unknown>[];
   /** Every `sources` INSERT payload, in call order. */
   sourceInserts: Record<string, unknown>[];
+  /** Every `sources` UPSERT (queueMirrors), in call order: its rows and options. */
+  sourceUpserts: { values: Record<string, unknown>[]; options: Record<string, unknown> }[];
   /** Every `posts` UPSERT payload, in call order. */
   postUpserts: Record<string, unknown>[];
   /** Every `posts` UPSERT's second (options) argument, same order as `postUpserts`. */
@@ -92,7 +97,7 @@ export type PostgrestErrorShape = { code: string; message: string; details: stri
 
 export const pgError = (code: string, message: string, details: string | null = null): PostgrestErrorShape => ({ code, message, details, hint: null });
 
-type Filter = { column: string; op: "eq" | "neq" | "lt"; value: unknown };
+type Filter = { column: string; op: "eq" | "neq" | "lt" | "in"; value: unknown };
 
 /** One call on a select chain, as `queries` records it: the method, then its arguments. */
 type ChainCall = [method: string, ...args: unknown[]];
@@ -105,6 +110,7 @@ type ChainCall = [method: string, ...args: unknown[]];
 function passes(row: Record<string, unknown>, { column, op, value }: Filter): boolean {
   if (!(column in row)) return true;
   if (value === null || row[column] === null) return false;
+  if (op === "in") return (value as unknown[]).includes(row[column]);
   if (op === "eq") return row[column] === value;
   if (op === "neq") return row[column] !== value;
   return (row[column] as number) < (value as number);
@@ -145,10 +151,15 @@ function sourcesQuery(
     eq: filter("eq"),
     neq: filter("neq"),
     lt: filter("lt"),
+    in: filter("in"),
     order: (column: string, { ascending = true }: { ascending?: boolean } = {}) => {
       sortBy = { column, ascending };
       return query;
     },
+    // Awaited without single() or limit(), as readHerePosts' `.in(...)` lookup is: every row of the
+    // one-row fixtures (`sources`/`source`) that passes the filters.
+    then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+      Promise.resolve(error ? { data: null, error } : { data: matching(lookedUp).map((row) => project(row, columns)), error: null }).then(resolve, reject),
     limit: async (n: number) =>
       error ? { data: null, error } : { data: sorted(matching(listed)).slice(0, n).map((row) => project(row, columns)), error: null },
     single: async () => {
@@ -309,7 +320,7 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * bytes, so a test can mirror an image and then see it (or its absence) in a later list.
  * `storage.from(bucket)` throws for any `bucket` other than `MEDIA_BUCKET` — every real caller
  * only ever names that one, so this catches a hardcoded wrong bucket rather than silently ignoring it.
- * Every write is recorded on `.sourceUpdates`/`.sourceInserts`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
+ * Every write is recorded on `.sourceUpdates`/`.sourceInserts`/`.sourceUpserts`/`.postUpserts`/`.postUpsertOptions`/`.postUpdates`/`.postUpdateFilters`/`.eqCalls`/`.removedMedia`/`.writes`.
  * Unlike `posts`' `upsert` above, a `sources` `insert` isn't written through: a later `sources`
  * `select()` in the same test still only sees `tables.source`/`tables.sources`, never the row
  * `insert()` just recorded.
@@ -321,6 +332,7 @@ export function fakeDb(
   const tasks: string[] = [];
   const sourceUpdates: Record<string, unknown>[] = [];
   const sourceInserts: Record<string, unknown>[] = [];
+  const sourceUpserts: { values: Record<string, unknown>[]; options: Record<string, unknown> }[] = [];
   const postUpserts: Record<string, unknown>[] = [];
   const postUpsertOptions: Record<string, unknown>[] = [];
   const postUpdates: Record<string, unknown>[] = [];
@@ -334,6 +346,13 @@ export function fakeDb(
   const queries: FakeIngestDb["queries"] = [];
   const objects = new Set(tables.media ?? []);
   let postSelectCalls = 0;
+
+  // Any table's select chain over `rows` / `tableErrors` (see tableQuery).
+  const selectFrom = (table: string, columns: string) => {
+    const calls: ChainCall[] = [["select", columns]];
+    queries.push({ table, calls });
+    return tableQuery(tables.rows?.[table] ?? [], tables.tableErrors?.[table], calls, (column, value) => gteCalls.push({ table, column, value }), columns);
+  };
 
   const from = (table: string) => {
     if (table === "model_settings") {
@@ -358,6 +377,17 @@ export function fakeDb(
               return tables.sourceInsertError ? { data: null, error: tables.sourceInsertError } : { data: { id: lookedUp.length + 1 }, error: null };
             },
           }),
+        }),
+        // queueMirrors' insert-or-skip. Like PostgREST's ignoreDuplicates (ON CONFLICT DO NOTHING), a row
+        // whose `url` is already in `sources` is skipped, and `.select()` answers only the rows it inserted.
+        upsert: (values: Record<string, unknown>[], options?: Record<string, unknown>) => ({
+          select: async () => {
+            sourceUpserts.push({ values, options: options ?? {} });
+            if (tables.sourceUpsertError) return { data: null, error: tables.sourceUpsertError };
+            const known = new Set(lookedUp.map((row) => row.url));
+            const fresh = values.filter((row) => !known.has(row.url));
+            return { data: fresh.map((_, index) => ({ id: lookedUp.length + index + 1 })), error: null };
+          },
         }),
         // Written through, like `posts`' update below: only the rows every `.eq` filter matches change,
         // and a later `sources` select sees them, so a second compare-and-swap on a column the first
@@ -385,6 +415,8 @@ export function fakeDb(
     if (table === "posts") {
       return {
         select: (columns = "*") => ({
+          // The Library list (getPosts): `rows.posts` and `tableErrors.posts`, like any other table.
+          order: (...args: unknown[]) => selectFrom("posts", columns).order(...args),
           eq: (column: string, value: unknown) => {
             eqCalls.push({ table: "posts", column, value });
             postSelectCalls++;
@@ -443,11 +475,7 @@ export function fakeDb(
         upserts.push({ table, values, options: options ?? {} });
         return { data: null, error: null };
       },
-      select: (columns = "*") => {
-        const calls: ChainCall[] = [["select", columns]];
-        queries.push({ table, calls });
-        return tableQuery(tables.rows?.[table] ?? [], tables.tableErrors?.[table], calls, (column, value) => gteCalls.push({ table, column, value }), columns);
-      },
+      select: (columns = "*") => selectFrom(table, columns),
     };
   };
 
@@ -497,6 +525,7 @@ export function fakeDb(
     tasks,
     sourceUpdates,
     sourceInserts,
+    sourceUpserts,
     postUpserts,
     postUpsertOptions,
     postUpdates,

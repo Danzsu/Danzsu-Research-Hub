@@ -81,7 +81,7 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
   - `lib/media.ts`: image paths;
   - `lib/api.ts`: `jsonError`, `postRoute`;
   - `lib/supabase/server.ts`: `getReader` / `getViewer`;
-  - `lib/pipeline/util.ts`: `hostOf`, `parseId`, `detectSource`, `safeHref`, `errorMessage`, `settledValues`, `publishedDate`…, and the limits client and server share (`TODO_TEXT_MAX`, `TITLE_MAX`, `SUMMARY_MAX`, `MINE_LIMIT`, `REEXTRACT_COOLDOWN_MINUTES`);
+  - `lib/pipeline/util.ts`: `hostOf`, `parseId`, `detectSource`, `safeHref`, `errorMessage`, `settledValues`, `publishedDate`…, and the limits client and server share (`TODO_TEXT_MAX`, `TITLE_MAX`, `SUMMARY_MAX`, `MINE_LIMIT`, `REEXTRACT_COOLDOWN_MINUTES`), and a run's claim on a source (`CLAIM_LEASE_MS`, `claimHeld`);
   - `lib/pipeline/fetch.ts`: `safeFetch`, `apiFetch`, `ensureOk`, `readText`;
   - `lib/blocks.ts`: `localizedSchema`, `parseBlocks`;
   - `lib/post-view.ts`: `shownTitle`, the title readers see, and `editPayload`, the editor's save;

@@ -94,6 +94,8 @@
 - [x] **Taiyaki link-chat** (2026-09-27): taiyaki-gomb asztalon a sarokban, mobilon az alsó sáv közepén (az Archívum a „Több”-be került), mini chat a saját 10 legutóbbi beküldéssel és élő állapottal, „Újra” a hibás beküldésen. Terv: [docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md](docs/superpowers/plans/2026-09-26-taiyaki-link-chat.md).
 - [x] **R1 „Gyors”** (2026-09-28): a függvények Dublinban futnak Fluid compute-tal, egy auth-ellenőrzés kérésenként, egy lekérdezés a Radarhoz, az olvasói állapot a nézett hétre szűkül, és `GET /api/state` csak Vissza után fut; a zárt hetek és az archívum-lista egy napig gyorsítótárban vannak. Oldalformájú vázak, függő pont a linkeken, felső sáv a frissítésekhez, a „Több” linkjeinek prefetchje; a zod kikerült a kliens csomagjából. Terv: [docs/superpowers/plans/2026-09-27-r1-speed.md](docs/superpowers/plans/2026-09-27-r1-speed.md).
 - [x] **Hírek csomag** (2026-09-30): hat új forrás (Mistral, Microsoft Research, Meta AI Research, Anthropic Research, Recode China AI, ChinAI) és öt laborneves Hacker News-keresés (`Grok`, `DeepSeek`, `Qwen`, `Kimi`, `MiniMax`, pontos egyezéssel, csak a címben). Új menüpont: **AI cégek** (`/companies`), fent a legutóbbi napi futás öt legjobb céges hírével, alatta a hét többi céges hírével. Az xAI és a LinkedIn géppel nem olvasható ([truthful_sites.md](truthful_sites.md) → Kizárva).
+- [x] **„Olvasd itt” és automatikus tükör** (2026-09-30): minden hírkártyán „Olvasd itt”: ha a cikkből már van Library-poszt, oda visz, ha nincs, a taiyaki chatben beküldi. A napi futás a hét 85 pont feletti híreit és a Top 3-at a rendszer-fiók nevén sorba teszi, a `/api/cron/mirror` 07, 08 és 09 UTC-kor feldolgozza őket. Egy forráson egyszerre egy futás dolgozik (`claimed_at` lease). Terv: [docs/superpowers/plans/2026-09-30-read-here-mirror.md](docs/superpowers/plans/2026-09-30-read-here-mirror.md).
+- [x] **R2 „Visszajelzés”** (2026-10-01): a chat saját buboréka azonnal megjelenik, a hibás küldés és teendő visszaadja a szövegét, az ismételt válasz nem halmozódik; a felső sáv a teljes Mentés, Fordítás és beküldés alatt fut; egy közös, jól olvasható hibasor; a Library olvasási hibája hibaoldalt mutat; a poszt oldala követi az újrakinyerést; benyomódás minden kattintható elemen, 160 ms-os sheetek és toast, csökkentett mozgásnál semmi nem mozdul, érintőképernyőn 40 px. Terv: [docs/superpowers/plans/2026-10-01-r2-feedback.md](docs/superpowers/plans/2026-10-01-r2-feedback.md).
 
 ### Kutatási dashboard — ütemterv (5 alprojekt)
 - [ ] **1. Egységes poszt-sablon és olvasóeszközök.** Specifikáció: [docs/superpowers/specs/2026-09-24-unified-post-template-design.md](docs/superpowers/specs/2026-09-24-unified-post-template-design.md).
@@ -153,6 +155,28 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **A kiadás: a `google-sso` PR** (2026-10-03). A PR mindent visz, ami még nincs fent (az R1 és a Hírek csomag már él): „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés, az R3 spec. A merge élesít (production deploy), ezért ebben a sorrendben:
+  1. **push:** `git push -u origin google-sso`, majd a PR megnyitása a GitHubon (a Vercel ekkor csak preview-t épít, a production nem változik);
+  2. **SQL Editor:** a `supabase/migrations/20260930000000_source_claims.sql` futtatása (lent, „Az „Olvasd itt” élesítése” 1. pont);
+  3. **a Google-belépés beállítása** (a következő pont 1–4. lépése);
+  4. **a PR merge-e** a GitHubon; utána helyben `git checkout main && git pull`;
+  5. **az élő próbák:** a Google-belépés 5. lépése, az R2 élő próbája, az R1 utólagos mérése, a taiyaki élő próbái (lent).
+- [ ] **A Google-belépés beállítása** (a tulajdonosé, ebben a sorrendben, **a push előtt**: a belépő oldal első gombja ezt használja, és beállítás nélkül a Supabase nyers hibaoldalára visz; a terv: [docs/superpowers/specs/2026-10-02-google-sign-in-design.md](docs/superpowers/specs/2026-10-02-google-sign-in-design.md)):
+  1. **Google Cloud Console → Google Auth Platform:**
+     - *Branding*: az app neve „NEON NEWS RADAR”, egy támogatási e-mail-cím;
+     - *Audience*: External, majd *Publish app* → **In production**. Csak alap scope-okat kér (név, e-mail, profil), ezért nem kell hozzá Google-ellenőrzés; *Testing* módban viszont csak a felvett teszt-felhasználók léphetnének be;
+     - *Data access*: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`;
+     - *Clients → Create client*: Web application; *Authorized redirect URIs*: `https://<projekt-ref>.supabase.co/auth/v1/callback` (a `<projekt-ref>` a Supabase projekt azonosítója, a Supabase URL-jében látszik);
+     - a *Client ID*-t és a *Client secret*-et csak a Supabase-be másold, sehova máshova.
+  2. **Supabase → Authentication → Sign In / Providers → Google:** bekapcsolás, a Client ID és a Client secret beillesztése, mentés. Az *Allow new users to sign up* maradjon **kikapcsolva** (ez a meghívásos kapu), és az *Email* szolgáltató maradjon bekapcsolva (a magic link tartalék).
+  3. **Supabase → Authentication → URL Configuration:** a *Site URL* marad a production domain (soha ne írd át); a *Redirect URLs* közé vedd fel a `http://localhost:3000/**`-ot a helyi próbához.
+  4. **A tagok címe:** minden tag Gmail- vagy Google Workspace-címen legyen meghívva, és az legyen a Google-fiókja elsődleges címe. Más szolgáltatónál lévő címen meghívott tag a magic linket használja (a Google csak a Gmail- és Workspace-címekért kezeskedik; SECURITY.md → Auth and the invite gate).
+  5. **A deploy után három próba:** egy tag belép Google-lel (egy másik tag fiókjával is, nem csak a tiédével); egy nem meghívott Google-fiók a „Ez a Google-fiók nincs meghívva.” üzenetet kapja; egy megszakított Google-belépés az általános hibaüzenetet hozza.
+- [ ] **Élő próba az R2 deploy után** (a tulajdonos, bejelentkezve): egy hibás Mentés és Fordítás hibasora; egy újrakinyerés követése a poszt oldalán, nyitott szerkesztővel is; egy menükattintás egy futó Fordítás alatt (azonnal navigál); a lenyomott állapot egy valódi telefonon.
+- [ ] **Az „Olvasd itt” élesítése** (a tulajdonosé, ebben a sorrendben):
+  1. *SQL Editor*: a `supabase/migrations/20260930000000_source_claims.sql` futtatása, **a push előtt** (a kód olvassa az oszlopot; az R2 óta a poszt oldala is, így nélküle minden poszt oldala hibaoldalt mutat);
+  2. [x] a rendszer-fiók (*Authentication → Users → Add user*, Auto Confirm) és a `RADAR_MIRROR_USER_ID` a Vercelben (2026-09-30);
+  3. a `google-sso` PR merge-e (fent, „A kiadás”).
 - [ ] **Az R1 utólagos élő mérése** (a tulajdonosé, a deploy után; a terv 12. feladata):
   - a válasz `x-vercel-id` fejléce `…::dub1`-re végződik, a deployment adatlapján a függvények Fluid compute-tal futnak, és a napi cron lefut;
   - `node --env-file=.env.local --experimental-strip-types --no-warnings .superpowers/ux-audit/measure-live.mts after`, az egyszeri, csak olvasó, jóváhagyott munkamenettel; a számok a `live-before.json` mellé kerülnek, ígéret nélkül;
@@ -166,27 +190,29 @@
   - az `/archive` oldalon a „Több” aktív jelölése mobilon;
   - a lekérdezés leáll a panel bezárása után (`browser_network_requests`);
   - a `/library` oldalon a chatből beküldött link megjelenik a listában (`router.refresh()`; az előnézet listája fixture, ott nem látszik).
-- [ ] **Olvasás a saját oldalunkon a Radarból is** (döntve 2026-09-27, az R1 „Gyors” után, az R2 előtt; saját rövid tervezés kell). A Library már most a saját felületén mutatja a beküldött cikkeket, tükrözött ábrákkal (M1), a Radar-kártyák viszont az eredeti oldalra visznek. Két rész:
-  - **„Olvasd itt” gomb minden Radar-kártyán:** a cikk bemegy a Library-pipeline-ba, és amint kész, a saját oldalunkon nyílik meg. Ha már bent van, azonnal nyílik.
-  - **Automatikus tükör a legjobbakról:** a napi futás a legjobb híreket magától beteszi a Library-be.
-  - Eldöntendő a tervezéskor:
-    - mi számít „legjobbnak” (a Top 3, vagy egy pontszám felett minden);
-    - kinek a nevén fut az automatikus beküldés (`sources.submitted_by`);
-    - a cron 300 mp-es kerete: a cron csak sorba állít, a feldolgozás külön fut;
-    - a Radar kétnyelvű összefoglalója újrahasznosítható-e, hogy ne fizessünk kétszer a modellért;
-    - a `noarchive` oldalak továbbra is csak AI-jegyzetet kapnak.
-  - **Döntések (2026-09-29), a tervezés félúton áll** (az 1. rész, a kártya, jóváhagyásra vár):
-    - a tükörbe minden 85 pont feletti hír és a hét Top 3-a kerül;
-    - külön rendszer-fiók a beküldő (meghívott fiók, az azonosítója környezeti változóban);
-    - új összefoglaló a teljes cikkből, nem a Radaré;
-    - ha a cikk még nincs bent, az „Olvasd itt” a taiyaki chatet nyitja meg a linkkel; ha bent van, egy link a posztra;
-    - a napi futás sorba állít (`pending` források), a feldolgozást a napi cron maradék ideje és 2–3 külön napi cron végzi, egy összehasonlító frissítéssel lefoglalva a forrást.
-- [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Mindkét értelemben:
+- [ ] **GitHub-radar** (ötlet, 2026-09-30; **ez következik**, a tulajdonos sorrendje 2026-10-03: GitHub-rész → keresés → olvasás a saját oldalon; az R3 Elrendezés speckel kész, és utánuk jön):
+  - a heti Top 10 marad, és hetente archiválódik (ma is: `/archive/<hét>`);
+  - **pontszám a repóknak is:** a napi válogatás a repókat is pontozza (0–100), a Top 10 és a kedvencek mellett látszik;
+  - **szívecske (kedvenc)** repón és hírön, hogy hosszú távon megmaradjon: egy hetekre átívelő „Kedvencek” lista (az „Olvasási jelzések” pont szíve);
+  - **a chatbe dobott GitHub-link:** ha a pontszáma eléri a heti Top 10 legalját, jelölve bekerül a Top 10-be, ha nem, szívecskét kap;
+  - **„A hónap repói” (Top 3) a Top 10 felett:** a régóta vagy nagyon gyorsan növő, releváns repók, havi nézetben. Ehhez napi csillagszám-mentés kell (a „Valódi GitHub trending” pont);
+  - forrás: a Star History Monthly hírlevél és a star-history.com chart-linkje ([truthful_sites.md](truthful_sites.md) → Jelöltek).
+- [ ] **Halasztott apróságok** (a záró reviewk „Minor” pontjai, egyik sem sürgős):
+  - **R2:**
+    - lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni;
+    - a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön;
+    - a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön).
+  - **Google-belépés:**
+    - kézzel gyártott `?error=constructor` / `toString` / `__proto__` cím a belépő oldalon „undefined / undefined”-et mutat: `Object.hasOwn`, és a hibakódok közös `LoginError` típusa;
+    - egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik;
+    - a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
+    - a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban.
+- [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Az R1 Gyors és az R2 Visszajelzés kész; hátra van az **R3 Elrendezés** (a mobil fekvő keret, a széles képernyő, a panel és a chat takarása, a taiyaki kerete ink oldalon). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
   Emellett jobb visszajelző effektek és további javítások. Előbb egy átvilágítás az egész appon: Playwright-mérések 360/768/1280 px-en és a lassú pontok felmérése. Ebből lesz egy jóváhagyandó terv.
   - A taiyaki link-chatből ide parkolt tételek:
-    - lassú küldésnél azonnal jelenjen meg egy „küldés…” buborék (optimista);
+    - [x] lassú küldésnél azonnal jelenjen meg egy „küldés…” buborék (optimista) (R2, 2026-10-01);
     - ink oldalon (Library, Archívum) a sarokgomb ink kerete és árnyéka eltűnik;
     - ha a gomb után semmi nem kapható fókuszba, az előre Tab a gomb és a panel között körbejár;
     - a Radar olvasópanelje saját Tab-hurkot tart; ha ezt javítjuk, a `tabPastPanel` közös helyre költözik;
@@ -195,7 +221,7 @@
     - iOS safe area: nincs `viewport-fit=cover`, ezért a Safariban minden `env(safe-area-inset-bottom)` 0;
     - az sr-only beszélő-előtag szóköze nem jut el a Chrome akadálymentességi fájába (a csomópontok amúgy is külön vannak);
     - a chat mezőjén a stock `Textarea` `shadow-xs`-e: a lenti fix(ui) pont része;
-    - több sikertelen küldés egyforma „Nem ment át, próbáld újra.” buborékokat halmoz a szál végére (csak a `signed_out` van összevonva);
+    - [x] több sikertelen küldés egyforma „Nem ment át, próbáld újra.” buborékokat halmoz a szál végére (csak a `signed_out` van összevonva) (R2, 2026-10-01);
     - egy másik beküldés sikeres „Újra”-ja nem törli a többi bejegyzés saját `signed_out` válaszát (`retryNotices`), az csak a saját „Újra”-ig vagy a panel bezárásáig marad;
     - a retry 403-a és 404-e „Nem ment át, próbáld újra.”-ként jelenik meg (ma egyik sem fordulhat elő);
     - [x] a zod kikerült a kliens csomagjából (R1); a `lib/client-bundle.test.ts` őrzi.

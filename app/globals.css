@@ -153,6 +153,18 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .story-card:hover { transform: translateX(3px); box-shadow: -6px 0 0 var(--signal); }
 }
 .lift:focus-visible { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--signal); }
+/* The pressed state (R2 spec 3): 2px down-right into the page, at once, easing back on release. `.press`
+   turns ink, for light surfaces; `.press-ink` turns signal, for ink ones, where ink wouldn't show. :active
+   needs no hover, so a tap shows it too. Unlayered, so it wins over the utilities' hover and aria-pressed
+   fills. A control already ink (a switched-on toggle, a ticked box) turns signal instead, so a touch press
+   shows even with no move. `.press-shift` only moves, for a control that sits on both surfaces and brings
+   its own colours. The taiyaki sits into its shadow. */
+.press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
+.press-ink:active, .press[aria-pressed="true"]:active, .press[data-state="checked"]:active { background-color: var(--signal); color: var(--ink); transition-duration: 0ms; }
+.lift:active { transform: translate(3px, 3px); box-shadow: none; transition-duration: 0ms; }
+@media (prefers-reduced-motion: no-preference) {
+  .press:active, .press-ink:active, .press-shift:active { transform: translate(2px, 2px); }
+}
 .story-read { opacity: 0.58; }
 
 /* The loading skeletons' placeholders (page-skeletons.tsx): in after 150ms, in the house 160ms, so a fast
@@ -168,14 +180,15 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
   /* The taiyaki's shadow still lifts; it just doesn't move. */
-  .lift:focus-visible { transform: none; }
+  .lift:focus-visible, .lift:active { transform: none; }
   /* The bar stands still, the whole width: the rule above would stop its segment at the end, off screen. */
   .refresh-bar > span { width: 100%; animation: none; }
 }
 
-/* The same for hover, which stays pointer-only like every custom :hover here. */
+/* Under reduced motion nothing moves on hover either; the shadows still change. Pointer-only, like every
+   custom :hover here. */
 @media (hover: hover) and (prefers-reduced-motion: reduce) {
-  .lift:hover { transform: none; }
+  .lift:hover, .must-card:hover, .story-card:hover { transform: none; }
 }
 
 @media (max-width: 640px) {

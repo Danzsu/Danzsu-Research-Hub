@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
+import { ErrorLine } from "@/app/components/error-line";
 import { PostBlocks } from "@/app/components/post-blocks";
 import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Language } from "@/data/digest-types";
 import { SUMMARY_MAX, TITLE_MAX } from "@/lib/pipeline/util";
-import { editPayload, type Post, type PostQuery } from "@/lib/post-view";
+import { editPayload, rebaseDrafts, type Post, type PostQuery } from "@/lib/post-view";
+import { RefreshWhileProcessing } from "../refresh-while-processing";
 
 const copy = {
   hu: {
@@ -47,6 +49,8 @@ const copy = {
   },
 };
 
+const AWAIT_CLAIM_MS = 30_000;
+
 /** A field with its label and its reset-to-the-model's-text button. */
 function FieldRow({ htmlFor, label, resetLabel, resetText, onReset, children }: {
   htmlFor: string;
@@ -78,10 +82,29 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
   const summaryId = (lang: "hu" | "en") => `${fieldId}-summary-${lang}`;
   const [title, setTitle] = useState(post.title);
   const [summary, setSummary] = useState(post.summary);
+  // The text the drafts started from. The page refreshes beneath an open editor while a re-extraction runs,
+  // so a new title or summary moves every untouched draft onto it (rebaseDrafts).
+  const [shown, setShown] = useState({ title: post.title, summary: post.summary });
+  const changed = (a: Post["title"], b: Post["title"]) => a.hu !== b.hu || a.en !== b.en;
+  if (changed(shown.title, post.title) || changed(shown.summary, post.summary)) {
+    setShown({ title: post.title, summary: post.summary });
+    setTitle(rebaseDrafts(title, shown.title, post.title));
+    setSummary(rebaseDrafts(summary, shown.summary, post.summary));
+  }
   const [hidden, setHidden] = useState(() => new Set(post.hiddenBlocks));
   const [busy, setBusy] = useState(false);
   const [reextracting, setReextracting] = useState(false);
   const [status, setStatus] = useState<{ text: string; failed: boolean } | null>(null);
+  // After a 202, until the server shows the run's claim (post.processing, which the page then follows
+  // itself): the run may not have claimed the source by the first refresh, or may already be done.
+  // At most AWAIT_CLAIM_MS (R2 spec 1).
+  const [awaitingClaim, setAwaitingClaim] = useState(false);
+  if (awaitingClaim && post.processing) setAwaitingClaim(false);
+  useEffect(() => {
+    if (!awaitingClaim) return;
+    const timer = setTimeout(() => setAwaitingClaim(false), AWAIT_CLAIM_MS);
+    return () => clearTimeout(timer);
+  }, [awaitingClaim]);
 
   const toggle = (id: string) =>
     setHidden((current) => {
@@ -91,36 +114,45 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
       return next;
     });
 
-  async function save() {
+  function save() {
     setBusy(true);
-    const response = await fetch(`/api/posts/${post.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(editPayload(post, { title, summary }, [...hidden])),
-    }).catch(() => null);
-    setBusy(false);
-    if (!response?.ok) return setStatus({ text: response?.status === 400 ? t.invalid : t.failed, failed: true });
-    refresh(`/library/${post.id}`);
+    setStatus(null);
+    refresh(`/library/${post.id}`, async () => {
+      const response = await fetch(`/api/posts/${post.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(editPayload(post, { title, summary }, [...hidden])),
+      }).catch(() => null);
+      setBusy(false);
+      if (response?.ok) return true;
+      setStatus({ text: response?.status === 400 ? t.invalid : t.failed, failed: true });
+      return false;
+    });
   }
 
   async function reextract() {
+    setStatus(null);
     setReextracting(true);
     const response = await fetch(`/api/posts/${post.id}/reextract`, { method: "POST" }).catch(() => null);
     const data = (await response?.json().catch(() => ({}))) as { retryAfter?: number };
     setReextracting(false);
     if (response?.status === 429 && data.retryAfter) setStatus({ text: t.cooldown(data.retryAfter), failed: false });
-    else if (response?.ok) setStatus({ text: t.started, failed: false });
+    else if (response?.ok) {
+      setStatus({ text: t.started, failed: false });
+      setAwaitingClaim(true);
+    }
     else setStatus({ text: t.failed, failed: true });
   }
 
   return (
     <div className="space-y-8">
+      <RefreshWhileProcessing active={awaitingClaim} />
       {/* A real form, so Enter in a title field saves and the browser enforces required / maxLength. */}
       <form
         className="space-y-8"
         onSubmit={(event) => {
           event.preventDefault();
-          void save();
+          save();
         }}
       >
         <div className="grid gap-4 border-2 border-ink bg-paper p-5 sm:grid-cols-2">
@@ -170,7 +202,8 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
           <Button type="button" variant="brutal" className="min-h-10" onClick={() => void reextract()} disabled={reextracting}><RefreshCw /> {t.reextract}</Button>
           {/* Always mounted: a live region must already be in the accessibility tree before its text
               changes, or screen readers may not announce the change at all. */}
-          <p role="status" className={`font-mono text-xs ${status?.failed ? "text-signal" : "text-ink/70"}`}>{status?.text ?? ""}</p>
+          <p role="status" className="font-mono text-xs text-ink/70">{status && !status.failed ? status.text : ""}</p>
+          <ErrorLine>{status?.failed ? status.text : null}</ErrorLine>
         </div>
       </form>
       <PostBlocks

@@ -107,3 +107,11 @@ export function withEnv(t: TestContext, name: string, value: string | undefined)
 
 /** Sets `GEMINI_API_KEY` for the rest of test `t`, so `generate()` takes its Gemini route. */
 export const withGeminiKey = (t: TestContext, value = "test") => withEnv(t, "GEMINI_API_KEY", value);
+
+/** For the rest of test `t`, `Date.now()` answers a fixed start once, then `goneMs` later: a cron
+ *  route's own `start`, then its start gate's check, as if that much of its 300 s budget had gone. */
+export function withBudgetGone(t: TestContext, goneMs: number): void {
+  const start = 1_000_000;
+  let calls = 0;
+  t.mock.method(Date, "now", () => (calls++ === 0 ? start : start + goneMs));
+}

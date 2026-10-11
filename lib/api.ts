@@ -4,6 +4,13 @@ import { parseId } from "./pipeline/util.ts";
 export const jsonError = (status: number, error: string, extra: Record<string, unknown> = {}) =>
   Response.json({ ...extra, error }, { status });
 
+/** Vercel Cron's `Authorization: Bearer $CRON_SECRET`, which a manual run sends too. With the secret
+ *  unset or empty no header can match, so a missing secret never opens a cron route. */
+export function isCronRequest(request: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
+}
+
 export type ErrorAnswer = { status: number; error: string };
 
 /** The answers the `[id]` routes' result maps share (the post routes and `sources/[id]/retry`); each route adds its own. */

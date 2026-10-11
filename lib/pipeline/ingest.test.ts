@@ -13,6 +13,7 @@ import {
   SUMMARY_RESERVE_MS,
 } from "./ingest.ts";
 import { fakeDb, pgError } from "./fake-db.ts";
+import { CLAIM_LEASE_MS } from "./util.ts";
 import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockDns, mockFetch, TEST_HOST, withGeminiKey, youtubeUrl } from "./mock-fetch.ts";
 
 test("failureUpdate keeps a published post when re-extraction fails", () => {
@@ -122,7 +123,8 @@ test("processSource() success: upserts blocks with mirrored meta and the generat
   assert.ok(db.sourceUpdates.some((u) => u.status === "done" && u.error === null));
   // attempts is bumped before the post is upserted, not after
   assert.ok(db.writes.indexOf("sources.update") < db.writes.indexOf("posts.upsert"));
-  assert.deepEqual(db.sourceUpdates[0], { attempts: 1 });
+  assert.equal(db.sourceUpdates[0].attempts, 1);
+  assert.equal(typeof db.sourceUpdates[0].claimed_at, "string");
 });
 
 test("processSource(): the post upsert uses onConflict: source_id and writes exactly these keys, and the existing post is looked up by source_id", async (t) => {
@@ -217,12 +219,12 @@ test("processSource() failure: re-extraction that fails writes only { error } wh
   const dbWithPost = fakeDb(undefined, { source, post: { id: 9, blocks: [] } });
   await processSource(dbWithPost, source.id);
   assert.equal(dbWithPost.postUpserts.length, 0);
-  assert.deepEqual(dbWithPost.sourceUpdates.at(-1), { error: "fetch 404" });
+  assert.deepEqual(dbWithPost.sourceUpdates.at(-1), { error: "fetch 404", claimed_at: null });
 
   const dbNoPost = fakeDb(undefined, { source, post: null });
   await processSource(dbNoPost, source.id);
   assert.equal(dbNoPost.postUpserts.length, 0);
-  assert.deepEqual(dbNoPost.sourceUpdates.at(-1), { status: "failed", error: "fetch 404" });
+  assert.deepEqual(dbNoPost.sourceUpdates.at(-1), { status: "failed", error: "fetch 404", claimed_at: null });
 });
 
 test("processSource(): a failure with an existing post leaves its mirrored images alone, removing only the true orphan", async (t) => {
@@ -239,7 +241,7 @@ test("processSource(): a failure with an existing post leaves its mirrored image
   mockFetch(t, async () => new Response("", { status: 404 }));
   await processSource(db, source.id);
   assert.deepEqual(db.removedMedia, ["8/orphanbbbbbbbbbb-640.avif"]); // the still-referenced image is left alone
-  assert.deepEqual(db.sourceUpdates.at(-1), { error: "fetch 404" }); // an existing post -> only { error }, status untouched
+  assert.deepEqual(db.sourceUpdates.at(-1), { error: "fetch 404", claimed_at: null }); // an existing post -> only { error }, status untouched
 });
 
 test("processSource(): the failure-path media cleanup swallows its own errors, never masking the real failure message", async (t) => {
@@ -248,7 +250,7 @@ test("processSource(): the failure-path media cleanup swallows its own errors, n
   const db = fakeDb(undefined, { source, post: null, storageError: true });
   mockFetch(t, async () => new Response("", { status: 404 }));
   await processSource(db, source.id);
-  assert.deepEqual(db.sourceUpdates.at(-1), { status: "failed", error: "fetch 404" });
+  assert.deepEqual(db.sourceUpdates.at(-1), { status: "failed", error: "fetch 404", claimed_at: null });
 });
 
 test("processSource(): a failure after an image upload removes the orphaned upload without masking the original error (orphaned uploads)", async (t) => {
@@ -283,7 +285,7 @@ test("processSource(): the failure-path media cleanup never re-runs once the pos
   await processSource(db, source.id);
   assert.equal(db.postUpserts.length, 1); // the upsert itself succeeded
   assert.equal(db.writes.filter((w) => w === "storage.list").length, 1); // only the success-path attempt — no repeat from the catch
-  assert.deepEqual(db.sourceUpdates.at(-1), { error: "storage down" }); // saved: status is left alone, only the error is recorded
+  assert.deepEqual(db.sourceUpdates.at(-1), { error: "storage down", claimed_at: null }); // saved: status is left alone, only the error is recorded
 });
 
 test("processSource(): a failure-time re-read that itself errors skips cleanup, removing nothing", async (t) => {
@@ -306,7 +308,7 @@ test("processSource(): a failure-time re-read that itself errors skips cleanup, 
   mockFetch(t, async () => new Response("", { status: 404 }));
   await processSource(db, source.id);
   assert.deepEqual(db.removedMedia, []); // the re-read failed: cleanup is skipped entirely, nothing removed
-  assert.deepEqual(db.sourceUpdates.at(-1), { error: "fetch 404" }); // the real failure is still recorded
+  assert.deepEqual(db.sourceUpdates.at(-1), { error: "fetch 404", claimed_at: null }); // the real failure is still recorded
 });
 
 test("processSource(): the failure-path cleanup re-reads the current post right before running, not the start-of-run snapshot (concurrency window)", async (t) => {
@@ -556,6 +558,80 @@ test("processSource(): the image budget is computed after extraction, reflecting
   assert.ok(images.some((b) => !b.path)); // the second wave (past concurrency 4) misses the already-shrunk budget
 });
 
+// Spec 3, Review Focus 2. Kills the claim dropped or made unconditional: both runs would extract,
+// both would upsert the post and spend the model twice, and one's media cleanup could delete the
+// other's images.
+test("two processSource runs on one source at once: exactly one claims it and builds the post", async (t) => {
+  mockDns(t);
+  withGeminiKey(t);
+  const db = fakeDb(undefined, { source: newSource(40), post: null });
+  mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
+  const results = await Promise.all([processSource(db, 40), processSource(db, 40)]);
+  assert.deepEqual([...results].sort(), [false, true]);
+  assert.equal(db.postUpserts.length, 1);
+  assert.equal(db.sourceUpdates.filter((update) => "attempts" in update).length, 2); // both tried; one matched
+});
+
+// Review Focus 2. Kills a run that reads after another's claim and takes it anyway (the compare-and-
+// swap alone can't see it: the attempts it reads are already the new ones), and a dead run's claim
+// that is never taken over.
+test("a fresh claim leaves the source to its run; one older than CLAIM_LEASE_MS is taken over", async (t) => {
+  const fetched: string[] = [];
+  mockFetch(t, async (url) => {
+    fetched.push(url);
+    return new Response("", { status: 404 });
+  });
+  const held = fakeDb(undefined, { source: { ...newSource(41), attempts: 1, claimed_at: new Date(Date.now() - 60_000).toISOString() }, post: null });
+  assert.equal(await processSource(held, 41), false);
+  assert.deepEqual([held.sourceUpdates, fetched], [[], []]);
+
+  const dead = fakeDb(undefined, { source: { ...newSource(42), attempts: 1, claimed_at: new Date(Date.now() - CLAIM_LEASE_MS - 1_000).toISOString() }, post: null });
+  assert.equal(await processSource(dead, 42), true);
+  assert.equal(dead.sourceUpdates[0].attempts, 2);
+});
+
+// Kills the claim never released: every finished source would look held for 10 minutes, so a reader's
+// "Újra" right after a failure would do nothing. (Two tests: mockFetch once per test body.)
+test("a run that succeeds releases its claim", async (t) => {
+  const done = await processArticle(t, 43);
+  assert.equal(done.sourceUpdates.at(-1)?.claimed_at, null);
+});
+
+test("a run that fails releases its claim too", async (t) => {
+  mockFetch(t, async () => new Response("", { status: 404 }));
+  const failed = fakeDb(undefined, { source: newSource(44), post: null });
+  assert.equal(await processSource(failed, 44), true);
+  assert.equal(failed.sourceUpdates.at(-1)?.claimed_at, null);
+});
+
+// Kills retryPendingSources counting a source another run holds: the mirror cron's `processed` would
+// report work it never did.
+test("retryPendingSources() counts only the sources it claimed, not one another run holds", async (t) => {
+  mockFetch(t, async () => new Response("", { status: 404 }));
+  const held = { ...newSource(51), claimed_at: new Date(Date.now() - 60_000).toISOString() };
+  const sources = [held, newSource(52)];
+  const db = fakeDb(undefined, { sources, post: null, pending: sources });
+  assert.equal(await retryPendingSources(db), 1);
+});
+
+// Final review I1. Kills a queue run that takes over a source another run finished after the listing:
+// the listing's attempts are stale by then, and the finished post would be rebuilt (a second model
+// bill, and a translation thrown away).
+test("retryPendingSources() leaves a source that another run finished since the listing", async (t) => {
+  const fetched: string[] = [];
+  mockFetch(t, async (url) => {
+    fetched.push(url);
+    return new Response("", { status: 404 });
+  });
+  const db = fakeDb(undefined, {
+    pending: [{ id: 60, attempts: 0 }],
+    source: { ...newSource(60), attempts: 1, status: "done", claimed_at: null },
+    post: { id: 9, blocks: [] },
+  });
+  assert.equal(await retryPendingSources(db), 0);
+  assert.deepEqual([db.postUpserts, fetched], [[], []]);
+});
+
 test("retryPendingSources(): forwards its deadline into processSource, so a tight one shrinks the image budget mirrorImages actually receives", async (t) => {
   withGeminiKey(t);
   const html = manyImagesHtml(6);
@@ -661,5 +737,5 @@ test("processSource(): a plain-object upsert error (PostgREST shape) is stored a
   mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
   await processSource(db, source.id);
   assert.equal(db.postUpserts.length, 1); // the attempt was recorded even though it errored
-  assert.deepEqual(db.sourceUpdates.at(-1), { status: "failed", error: "duplicate key value violates unique constraint" });
+  assert.deepEqual(db.sourceUpdates.at(-1), { status: "failed", error: "duplicate key value violates unique constraint", claimed_at: null });
 });

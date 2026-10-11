@@ -35,6 +35,8 @@ Only `main` and the production deployment built from it get security fixes. Othe
 
 The invite gate, sign-in and session handling are in CLAUDE.md → Auth. What each table lets a reader do is in CLAUDE.md → Database.
 
+**Google sign-in.** Sign-ups stay off, so a Google account with no invited user is refused and nothing is created. Supabase links a Google identity to an invited user whenever Google says the email is verified and it matches. Google vouches only for `@gmail.com` addresses and Google Workspace accounts; for any other address `email_verified` can be stale, because the address may have changed hands. So members are invited only at their Gmail or Workspace address, the one their Google account uses; a member invited at another address signs in with the magic link. The mirror's system account is a `+radar` alias, never a Google account's primary address, so Google can't reach it. Removing a member means deleting or banning the user, which ends every way they sign in.
+
 After sign-in, the redirect target goes through `safeNext`. It accepts only same-site paths, and it checks them on the parsed URL, because the parser turns `/\t/evil.com` into `//evil.com`.
 
 ### Secrets
@@ -46,7 +48,8 @@ Every environment variable is server-only, and none is `NEXT_PUBLIC_` (`.env.exa
 `lib/supabase/server.ts` creates both clients.
 
 - **`createClient()`** acts as the reader, so RLS applies. Use it, through `getReader()`, everywhere except the pipeline.
-- **`createAdminClient()`** bypasses RLS. It is for the pipeline: the cron route, and the `processSource` runs that the sources, reextract and `sources/[id]/retry` routes schedule in `after()`. The translate, reextract, `sources/[id]/retry` (its compare-and-swap, after the reader-side read) and `/media` routes may also use it, each after its own check. Never pass its results to a reader unfiltered.
+- **`createAdminClient()`** bypasses RLS. It is for the pipeline: the two cron routes (the daily one also queues the Library mirror with it, `queueMirrors`), and the `processSource` runs that the sources, reextract and `sources/[id]/retry` routes schedule in `after()`. The translate, reextract, `sources/[id]/retry` (its compare-and-swap, after the reader-side read) and `/media` routes may also use it, each after its own check. Never pass its results to a reader unfiltered.
+- **The mirror's system account** (`RADAR_MIRROR_USER_ID`) is an ordinary user, made with *Add user* (not invited), that nobody signs in with; the pipeline only stamps its id on the sources it queues. The id is not a secret, but like every variable here it stays server-side.
 - **The content caches** in `lib/content.ts` use it too, because a cached function can't read the reader's cookies: a closed week's Radar and the `/archive` list. They read only the three content tables (`issues`, `digest_items`, `github_top`) and the `archive_issues` view, which every member may read through RLS anyway. They run only after a successful `getReader()` (`archivedWeek` and `archiveList` take its `Reader`), and what they return is cached. The rules are in ARCHITECTURE.md → Invariants.
 - **`scripts/ingest-url.mts`** is a dev tool, and it builds its own secret-key client.
 

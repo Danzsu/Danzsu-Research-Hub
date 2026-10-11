@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Localized } from "../data/digest-types.ts";
 import { readOverrides } from "./overrides.ts";
-import { MINE_LIMIT, type SourceKind } from "./pipeline/util.ts";
+import { MINE_LIMIT, parseSubmittedUrl, type SourceKind } from "./pipeline/util.ts";
 import { shownTitle } from "./post-view.ts";
 
 // The reader's own submissions, for the taiyaki link chat: GET /api/sources/mine lists them, and
@@ -23,7 +23,7 @@ export type MySource = {
 /** A source's embedded `posts(...)` join, cast from PostgREST's untyped shape — shared by every
  *  caller that reads one, since `posts.source_id` is unique and `select` always embeds it as one
  *  object, or null. `title`/`overrides` are only ever present when the caller's own select asked
- *  for them (`existingPostId` doesn't); reading either off a value that lacks them answers
+ *  for them (`duplicateSource` doesn't); reading either off a value that lacks them answers
  *  `undefined`, same as a column the fixture never set. */
 type EmbeddedPost = { id: number; title?: unknown; overrides?: unknown };
 const embeddedPost = (value: unknown): EmbeddedPost | null => (value as EmbeddedPost | null | undefined) ?? null;
@@ -58,20 +58,25 @@ export async function listMySources(db: SupabaseClient, viewerId: string): Promi
   });
 }
 
+/** The source a duplicate submission ran into (`sources.url` is unique), with its post once there is one. */
+export type DuplicateSource = { id: number; status: string; attempts: number; postId?: number };
+
 /**
- * The post already made from `url`, once a duplicate submission's insert fails on `sources.url`'s
- * unique constraint (`POST /api/sources`) — so the reader's "already in" answer can point at it
- * (the link chat's "MEGNYITÁS →"). `undefined` both when there's no post yet and when the lookup
- * itself fails; a lookup failure is logged, never thrown, so the 409 the caller already decided on
- * still goes out, just without a postId.
+ * The source already holding `url`, once a duplicate submission's insert fails on `sources.url`'s
+ * unique constraint (`POST /api/sources`): the reader's "already in" answer points at its post (the
+ * link chat's "MEGNYITÁS →"), and a pending one with no post yet gets started (read-here spec 3).
+ * `undefined` when there is no row or the lookup itself fails; a failure is logged, never thrown, so
+ * the 409 the caller already decided on still goes out, just plain.
  */
-export async function existingPostId(db: SupabaseClient, url: string): Promise<number | undefined> {
-  const { data, error } = await db.from("sources").select("posts(id)").eq("url", url).maybeSingle();
+export async function duplicateSource(db: SupabaseClient, url: string): Promise<DuplicateSource | undefined> {
+  const { data, error } = await db.from("sources").select("id, status, attempts, posts(id)").eq("url", url).maybeSingle();
   if (error) {
-    console.warn("duplicate source's post lookup failed", error);
+    console.warn("duplicate source lookup failed", error);
     return undefined;
   }
-  return embeddedPost(data?.posts)?.id;
+  if (!data) return undefined;
+  const postId = embeddedPost(data.posts)?.id;
+  return { id: data.id as number, status: data.status as string, attempts: (data.attempts as number | undefined) ?? 0, ...(postId === undefined ? {} : { postId }) };
 }
 
 export type RetryResult = "accepted" | "forbidden" | "not_found" | "not_failed" | "failed";
@@ -94,13 +99,10 @@ export async function retrySource(db: SupabaseClient, admin: SupabaseClient, vie
   if (source.submitted_by !== viewerId) return "forbidden";
   if (source.status !== "failed") return "not_failed";
 
-  // ponytail: the status CAS stops two overlapping clicks, not a click during the daily cron's own
-  // run of this same failed source — retryPendingSources picks up `failed` rows under 3 attempts
-  // without changing their status, so a second run can start, and in the worst case the cron's
-  // failureUpdate writes `failed` back onto a source that already has a post. Upgrade path: a
-  // "processing" status, which spec §3.3 doesn't have yet. The window is at most 300 s a day and
-  // self-heals on the next run. The attempts reset below also gives the retry a fresh 3-attempt
-  // cron budget.
+  // The status CAS below stops two overlapping clicks. A click during a cron's own run of this same
+  // failed source is stopped by processSource's claim: the run holds `claimed_at`, so the retry's own
+  // processSource finds the lease fresh and leaves it (read-here spec 3). The attempts reset still gives
+  // the retry a fresh 3-attempt cron budget.
   const { data: claimed, error: claimError } = await admin
     .from("sources")
     .update({ status: "pending", error: null, attempts: 0 })
@@ -113,4 +115,37 @@ export async function retrySource(db: SupabaseClient, admin: SupabaseClient, vie
     return "failed";
   }
   return claimed?.length ? "accepted" : "not_failed";
+}
+
+/** URLs per `.in(...)` lookup: a week's hundred or so stay far under PostgREST's URL-length limit. */
+const LOOKUP_CHUNK = 30;
+
+/**
+ * Item id → the Library post already made from its URL: a card's "Olvasd itt" opens it (read-here
+ * spec 1). The URLs go through parseSubmittedUrl, as a submission's and the mirror's do, so both sides
+ * compare the same string. A failed lookup answers {} and is logged: the card then offers the chat,
+ * whose 409 still points at the post. Never cached: a post can appear any day, for an open week or a
+ * closed one.
+ */
+export async function readHerePosts(db: SupabaseClient, items: { id: string; url: string }[]): Promise<Record<string, number>> {
+  const idsByUrl = new Map<string, string[]>();
+  for (const item of items) {
+    const url = parseSubmittedUrl(item.url)?.toString();
+    if (url) idsByUrl.set(url, [...(idsByUrl.get(url) ?? []), item.id]);
+  }
+  const urls = [...idsByUrl.keys()];
+  const chunks = Array.from({ length: Math.ceil(urls.length / LOOKUP_CHUNK) }, (_, index) => urls.slice(index * LOOKUP_CHUNK, (index + 1) * LOOKUP_CHUNK));
+  const answers = await Promise.all(chunks.map((chunk) => db.from("sources").select("url, posts(id)").in("url", chunk)));
+  const posts: Record<string, number> = {};
+  for (const { data, error } of answers) {
+    if (error) {
+      console.warn("read-here post lookup failed", error);
+      return {};
+    }
+    for (const row of data ?? []) {
+      const post = embeddedPost(row.posts);
+      if (post) for (const id of idsByUrl.get(row.url as string) ?? []) posts[id] = post.id;
+    }
+  }
+  return posts;
 }

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  authCallback,
+  CLAIM_LEASE_MS,
+  claimHeld,
   archiveLabel,
   arxivId,
   cooldownRemaining,
@@ -13,6 +16,7 @@ import {
   isPrivateAddress,
   isoWeek,
   isoWeekMonday,
+  loginWithError,
   itemId,
   list,
   mapLimited,
@@ -412,4 +416,20 @@ test("archiveLabel names the Sunday that closes the week, across month and year 
   assert.equal(archiveLabel(isoWeekMonday("2026-W39")!), "09. 27.");
   assert.equal(archiveLabel(isoWeekMonday("2026-W40")!), "10. 04.");
   assert.equal(archiveLabel(isoWeekMonday("2026-W53")!), "01. 03.");
+});
+
+// R2 spec 1. Kills a lease that never expires, one that expires a moment early, and a missing claim read as held.
+test("claimHeld: a claim holds for CLAIM_LEASE_MS, and none is held without one", () => {
+  const now = Date.parse("2026-10-01T08:00:00Z");
+  assert.equal(claimHeld(null, now), false);
+  assert.equal(claimHeld(undefined, now), false);
+  assert.equal(claimHeld(new Date(now - CLAIM_LEASE_MS + 1_000).toISOString(), now), true);
+  assert.equal(claimHeld(new Date(now - CLAIM_LEASE_MS).toISOString(), now), false);
+});
+
+// Google sign-in spec. Kills `next` dropped, not encoded (a `?` or `#` in it would end the callback's own
+// query), or the origin ignored (a local sign-in would come back to production).
+test("authCallback and loginWithError carry the post-login target, encoded once", () => {
+  assert.equal(authCallback("http://localhost:3000", "/library/12?text=hu#b-3"), "http://localhost:3000/auth/callback?next=%2Flibrary%2F12%3Ftext%3Dhu%23b-3");
+  assert.equal(loginWithError("https://radar.test", "not_invited", "/library"), "https://radar.test/login?error=not_invited&next=%2Flibrary");
 });

@@ -182,6 +182,11 @@ export const previewReader: ReaderData = {
 /** Post -2 was opened before: the Library list dims it. */
 export const previewReadPostIds = new Set([-2]);
 
+/** The preview's "Olvasd itt" links: this item already has a post (a fixture's negative id, so the real
+ *  /library/-1 route 404s before any query); every other readable card asks the chat, whose preview
+ *  transport never reaches the API. */
+export const previewReadHerePosts: Record<string, number> = { "local-2026-W39-read": -1 };
+
 /** The link chat's thread, newest first as GET /api/sources/mine answers it: one submission in each
  *  state, a long link and a long note. Negative ids, like the posts: the retry route 404s them, and
  *  the done one opens preview post -1's real page, which 404s too. */

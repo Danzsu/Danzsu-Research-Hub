@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft } from "./blocks.ts";
+import { CLAIM_LEASE_MS } from "./pipeline/util.ts";
 import { parseTranslatedBlocks, readMinutes, toPost } from "./post-row.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
@@ -89,4 +90,13 @@ test("toPost carries the source's last extraction error, and null when there is 
   assert.equal(toPost(postRow({ sources: { submitted_by: "user-1", error: "fetch 404" } })).lastError, "fetch 404");
   assert.equal(toPost(postRow({ sources: { submitted_by: "user-1", error: null } })).lastError, null);
   assert.equal(toPost(postRow()).lastError, null); // the list query has no embed
+});
+
+// R2 spec 1. Kills processing read from anything but the source's claim.
+test("toPost: processing only while the source's claim holds", () => {
+  const withClaim = (claimed_at: string | null) => toPost({ id: 1, sources: { submitted_by: "u", error: null, claimed_at } }).processing;
+  assert.equal(withClaim(new Date().toISOString()), true);
+  assert.equal(withClaim(new Date(Date.now() - CLAIM_LEASE_MS - 1_000).toISOString()), false);
+  assert.equal(withClaim(null), false);
+  assert.equal(toPost({ id: 1 }).processing, false);
 });

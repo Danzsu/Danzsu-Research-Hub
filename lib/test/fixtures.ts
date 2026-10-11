@@ -26,6 +26,7 @@ export const testPost = (overrides: Partial<Post> = {}): Post => ({
   hiddenBlocks: [],
   submittedBy: "owner",
   lastError: null,
+  processing: false,
   extractedAt: null,
   createdAt: "2026-09-22T10:00:00Z",
   ...overrides,

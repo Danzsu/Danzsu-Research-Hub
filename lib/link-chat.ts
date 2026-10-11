@@ -48,6 +48,9 @@ export type ChatReply =
 /** One submission in the thread: the reader's message (`href` already through safeHref) and the taiyaki's reply. */
 export type ChatEntry = { id: number; url: string; href: string | undefined; note: string | null; reply: ChatReply };
 
+/** The reader's own message while its send is on its way (R2 spec 1). */
+export type OutgoingMessage = Pick<ChatEntry, "url" | "href" | "note">;
+
 function replyTo(source: MySource): ChatReply {
   if (source.status === "failed") return { state: "failed", error: source.error };
   if (source.status === "done" && source.post) return { state: "done", postId: source.post.id, title: source.post.title };
@@ -69,7 +72,7 @@ export function toThread(sources: MySource[]): ChatEntry[] {
  *  the panel stays open, and is never saved. */
 export type ChatNotice =
   | { kind: "no_link" | "more_links" | "invalid_url" | "network" | "signed_out" }
-  | { kind: "already_submitted"; postId: number | null };
+  | { kind: "already_submitted"; postId: number | null; queued?: true };
 
 /** What a route answered: its status and its JSON body (`{}` when the body isn't a JSON object). */
 export type Answer = { status: number; body: Record<string, unknown> };
@@ -97,7 +100,7 @@ export const httpTransport: ChatTransport = {
  * The offline preview's stand-in (local dev points at the production project): the seed is the
  * thread, a submission joins it as pending, and "Újra" sends a failed one back to pending. Nothing
  * is ever processed. Answers like the real routes: a URL already in the thread is `already_submitted`
- * (`postId` present only when that source already has a post, same as `existingPostId`), a retry of
+ * (`postId` present only when that source already has a post, `queued` when it is pending without one, as the real route answers), a retry of
  * an id not in the thread is `not_found`, and a retry of a source that isn't `failed` is `not_failed`;
  * the thread is the latest MINE_LIMIT, newest first. `fail` rejects every write the way an offline
  * fetch does; reads still answer. `delayMs` (the preview's slow=1) holds every answer that long, so
@@ -122,7 +125,10 @@ export function memoryTransport(seed: MySource[], fail: boolean, delayMs = 0): C
         const parsed = parseSubmittedUrl(url);
         if (!parsed) return { status: 400, body: { error: "invalid_url" } };
         const existing = sources.find((source) => source.url === parsed.toString());
-        if (existing) return { status: 409, body: { error: "already_submitted", ...(existing.post ? { postId: existing.post.id } : {}) } };
+        if (existing) {
+          const extra = existing.post ? { postId: existing.post.id } : existing.status === "pending" ? { queued: true } : {};
+          return { status: 409, body: { error: "already_submitted", ...extra } };
+        }
         const source: MySource = {
           id: nextId--,
           url: parsed.toString(),
@@ -159,6 +165,8 @@ export type ChatSnapshot = {
   /** The last GET /api/sources/mine failed; the next good one clears it. */
   unreachable: boolean;
   sending: boolean;
+  /** Shown at the thread's end from the moment Send is pressed until the answer lands (R2 spec 1). */
+  outgoing: OutgoingMessage | null;
   /** Sources whose "Újra" is on its way. */
   retrying: number[];
   /** Each source's refused "Újra", shown in its own entry under the button: the reader who clicked it may
@@ -166,14 +174,15 @@ export type ChatSnapshot = {
   retryNotices: Record<number, ChatNotice>;
 };
 
-const INITIAL: ChatSnapshot = { sources: null, notices: [], unreachable: false, sending: false, retrying: [], retryNotices: {} };
+const INITIAL: ChatSnapshot = { sources: null, notices: [], unreachable: false, sending: false, outgoing: null, retrying: [], retryNotices: {} };
 
 /** A refused submission or retry, as the reply the thread shows. */
 function noticeFor({ status, body }: Answer): ChatNotice {
   if (status === 401) return { kind: "signed_out" };
   if (status === 400 && body.error === "invalid_url") return { kind: "invalid_url" };
   if (status === 409 && body.error === "already_submitted") {
-    return { kind: "already_submitted", postId: typeof body.postId === "number" ? body.postId : null };
+    const postId = typeof body.postId === "number" ? body.postId : null;
+    return body.queued === true ? { kind: "already_submitted", postId, queued: true } : { kind: "already_submitted", postId };
   }
   return { kind: "network" };
 }
@@ -200,10 +209,14 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
   };
   // `signed_out` is deduped here, not just in `load()`'s own 401 branch: a second retry or send can
   // also land its own 401 straight through `noticeFor`, once the session has actually expired — the
-  // dedupe has to hold for every caller of `say`, not only the polling GET's.
+  // dedupe has to hold for every caller of `say`, not only the polling GET's. Any other reply equal to
+  // the last one replaces it instead of stacking a copy (R2 spec 1); the new object gets a new key in
+  // ChatThread, so a screen reader hears it again.
   const say = (notice: ChatNotice) => {
     if (notice.kind === "signed_out" && snapshot.notices.some((existing) => existing.kind === "signed_out")) return;
-    set({ notices: [...snapshot.notices, notice] });
+    const last = snapshot.notices.at(-1);
+    const kept = last && JSON.stringify(last) === JSON.stringify(notice) ? snapshot.notices.slice(0, -1) : snapshot.notices;
+    set({ notices: [...kept, notice] });
   };
 
   function schedule() {
@@ -222,7 +235,9 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     }, POLL_MS);
   }
 
-  async function load() {
+  /** `sent`: this load follows the reader's own send, so the list it lands takes that send's bubble away
+   *  in the same snapshot, and the message never shows twice. */
+  async function load(sent = false) {
     const request = ++latest;
     // A fresh load supersedes whatever was scheduled before it. Cleared here, not left to
     // `schedule()`'s own `clearTimeout`, because the 401 branch below returns before reaching
@@ -237,7 +252,7 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     }
     if (request !== latest) return;
     if (answer?.status === 200 && Array.isArray(answer.body.sources)) {
-      set({ sources: answer.body.sources as MySource[], unreachable: false });
+      set({ sources: answer.body.sources as MySource[], unreachable: false, ...(sent ? { outgoing: null } : {}) });
     } else if (answer?.status === 401) {
       // Signed out: say so (deduped in `say`), clear `unreachable` so the two notices never sit side
       // by side, and stop — reopening (which reloads) is what restarts polling, not another tick.
@@ -250,9 +265,9 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     schedule();
   }
 
-  async function reload() {
+  async function reload(sent = false) {
     polls = 0;
-    await load();
+    await load(sent);
   }
 
   return {
@@ -284,7 +299,7 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         say({ kind: "no_link" });
         return false;
       }
-      set({ sending: true });
+      set({ sending: true, outgoing: { url: message.url, href: safeHref(message.url, message.url), note: message.note } });
       try {
         const answer = await transport.submit(message.url, message.note);
         if (answer.status !== 202) {
@@ -296,13 +311,13 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         // more_links notice, so that one still shows.
         set({ notices: [] });
         if (message.moreLinks) say({ kind: "more_links" });
-        await reload();
+        await reload(true);
         return true;
       } catch {
         say({ kind: "network" });
         return false;
       } finally {
-        set({ sending: false });
+        set({ sending: false, outgoing: null });
       }
     },
     /** "Újra": one request per source at a time. A 409 means another click already started it. A refusal

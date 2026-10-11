@@ -13,6 +13,7 @@ import {
   previewMySources,
   previewPosts,
   previewReader,
+  previewReadHerePosts,
   previewReadPostIds,
   previewSources,
 } from "@/lib/fixtures";
@@ -40,6 +41,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
           items={previewItems}
           githubTop10={previewGithub}
           preview={{ data: previewReader, failWrites }}
+          posts={previewReadHerePosts}
         />
       )}
       {view === "radar-empty" && (

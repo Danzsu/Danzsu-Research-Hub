@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
-import { existingPostId } from "@/lib/my-sources";
-import { processSource } from "@/lib/pipeline/ingest";
+import { duplicateSource } from "@/lib/my-sources";
+import { MAX_ATTEMPTS, processSource } from "@/lib/pipeline/ingest";
 import { detectSource, parseSubmittedUrl } from "@/lib/pipeline/util";
 import { createAdminClient, getReader } from "@/lib/supabase/server";
 
@@ -23,9 +23,17 @@ export async function POST(request: Request) {
     .select("id")
     .single();
   if (error?.code === "23505") {
+    const existing = await duplicateSource(reader.db, url.toString());
     // Already in: point the submitter at its post, once there is one (the chat's "MEGNYITÁS →").
-    const postId = await existingPostId(reader.db, url.toString());
-    return jsonError(409, "already_submitted", postId === undefined ? {} : { postId });
+    if (existing?.postId !== undefined) return jsonError(409, "already_submitted", { postId: existing.postId });
+    if (existing?.status === "pending" && existing.attempts < MAX_ATTEMPTS) {
+      // Still waiting for a run, like a mirror the daily cron queued: start it now instead of at the
+      // next cron (read-here spec 3). processSource's claim leaves it alone if a run already holds it; one
+      // that has spent its attempts is left too, as the cron leaves it.
+      after(() => processSource(createAdminClient(), existing.id));
+      return jsonError(409, "already_submitted", { queued: true });
+    }
+    return jsonError(409, "already_submitted");
   }
   if (error || !data) {
     console.error("source insert failed", error);

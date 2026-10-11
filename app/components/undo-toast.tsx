@@ -40,14 +40,19 @@ export function UndoToast() {
   const toast = useSyncExternalStore(toasts.subscribe, toasts.getSnapshot, noToast);
   // Paused while the pointer or focus is on it, so the Undo button can be reached in time.
   const [paused, setPaused] = useState(false);
-  const [prevToastId, setPrevToastId] = useState<number | undefined>(undefined);
-  const toastId = toast?.id;
-
-  if (toastId !== prevToastId) {
+  type Shown = NonNullable<typeof toast>;
+  // The toast that just went: kept for its 160ms fade-out, then dropped on its animationend, which also
+  // fires under reduced motion's 0.01ms (R2 spec 3).
+  const [leaving, setLeaving] = useState<Shown | null>(null);
+  const [prevToast, setPrevToast] = useState(toast);
+  if (toast?.id !== prevToast?.id) {
     // Browsers don't reliably fire pointerleave/blur on a removed node, so a toast that goes away clears the pause.
-    setPrevToastId(toastId);
-    if (toastId === undefined) setPaused(false);
+    setPrevToast(toast);
+    setLeaving(toast ? null : prevToast);
+    if (!toast) setPaused(false);
   }
+  const toastId = toast?.id;
+  const shown = toast ?? leaving;
 
   useEffect(() => {
     if (toastId === undefined || paused) return;
@@ -68,9 +73,13 @@ export function UndoToast() {
       aria-live="polite"
       className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
     >
-      {toast && (
+      {shown && (
         <div
+          key={shown.id}
           data-undo-toast
+          // The leaving toast is out of reach: its action is already final.
+          inert={!toast}
+          onAnimationEnd={toast ? undefined : () => setLeaving(null)}
           onPointerEnter={() => setPaused(true)}
           onPointerLeave={() => setPaused(false)}
           onFocus={() => setPaused(true)}
@@ -84,18 +93,18 @@ export function UndoToast() {
               setPaused(false);
             }
           }}
-          className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs ${
-            toast.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"
-          }`}
+          className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs duration-160 ${
+            toast ? "animate-in fade-in-0 slide-in-from-bottom-2" : "animate-out fade-out-0 [animation-fill-mode:forwards]"
+          } ${shown.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"}`}
         >
-          <span className="min-w-0 flex-1">{t[toast.kind]}</span>
-          {toast.undo && (
+          <span className="min-w-0 flex-1">{t[shown.kind]}</span>
+          {shown.undo && (
             <Button
               variant="signal"
               className="min-h-10"
               onClick={() => {
                 setPaused(false);
-                toasts.undo(toast.id);
+                toasts.undo(shown.id);
               }}
             >
               {t.undo}

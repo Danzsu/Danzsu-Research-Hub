@@ -26,8 +26,8 @@ export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}
       aria-label={label}
       className={
         iconOnly
-          ? "focus-ring grid size-10 place-items-center rounded-full border border-current/40 hover:border-signal hover:text-signal"
-          : "focus-ring min-h-10 rounded-full border border-current/40 px-4 font-mono text-xs hover:border-signal hover:text-signal"
+          ? "press-shift focus-ring grid size-10 place-items-center rounded-full border border-current/40 hover:border-signal hover:text-signal active:border-signal active:text-signal"
+          : "press-shift focus-ring min-h-10 rounded-full border border-current/40 px-4 font-mono text-xs hover:border-signal hover:text-signal active:border-signal active:text-signal"
       }
     >
       {iconOnly ? <Languages className="size-4" /> : language.toUpperCase()}
