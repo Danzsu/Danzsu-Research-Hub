@@ -546,7 +546,7 @@ In use (`app/(app)/library/library-view.tsx`):
 <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm preview={preview} />} />
 ```
 
-`StatusCard` is a lone cream card on ink, with an optional wordmark (`brand`). It is used for sign-in, error and not-found, the pages outside the app shell:
+`StatusCard` is a lone cream card on ink, with an optional wordmark (`brand`), for the error and not-found pages. Sign-in (`/login`) sits in the public landing frame instead (`PublicPage`, `public-page.tsx`), in the same `SignInCard` the landing page's own sign-in section uses (`sign-in-forms.tsx`):
 
 ```tsx app/components/page-header.tsx
     <main className="grid min-h-dvh place-items-center bg-ink px-4 text-paper">

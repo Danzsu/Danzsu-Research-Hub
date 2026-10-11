@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,12 @@ function GoogleMark() {
       <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
     </svg>
   );
+}
+
+/** The cream card the sign-in forms sit in, on /login and on the landing page: a 2px ink frame with the signal
+ *  hard shadow, at most 28rem wide. */
+export function SignInCard({ children }: { children: ReactNode }) {
+  return <div className="max-w-md border-2 border-ink bg-cream p-7 text-ink shadow-[8px_8px_0_var(--signal)] sm:p-9">{children}</div>;
 }
 
 /** The two ways in, Google first and the email link second, both carrying the safe `next` (/login and /about). */

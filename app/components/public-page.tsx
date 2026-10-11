@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Radar } from "lucide-react";
-import type { Language } from "@/data/digest-types";
+import type { Language, Localized } from "@/data/digest-types";
 import { LanguageProvider, LocalizedText } from "./language-context";
 import { PublicLanguageSwitch } from "./public-language-switch";
 
@@ -16,7 +16,7 @@ const linkClass = "focus-ring inline-flex min-h-10 items-center hover:text-signa
 
 /** The frame of the public pages (/about, /privacy): an ink page with the wordmark, the language pill and the
  *  footer links, in the visitor's language cookie but switchable in place. No app shell: nobody is signed in. */
-export function PublicPage({ language, children }: { language: Language; children: ReactNode }) {
+export function PublicPage({ language, notice, children }: { language: Language; /** A one-line status under the header: "You're signed out." */ notice?: Localized; children: ReactNode }) {
   return (
     <LanguageProvider initial={language}>
       <div className="min-h-dvh bg-ink text-paper">
@@ -31,6 +31,11 @@ export function PublicPage({ language, children }: { language: Language; childre
             <PublicLanguageSwitch />
           </div>
         </header>
+        {notice && (
+          <p role="status" className="mx-auto max-w-[1600px] px-4 pb-2 font-mono text-xs text-signal sm:px-10">
+            <LocalizedText value={notice} />
+          </p>
+        )}
         {children}
         <footer className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-6 border-t border-paper/20 px-4 py-6 font-mono text-xs text-paper/60 sm:px-10">
           <span><LocalizedText value={copy.footer} /></span>

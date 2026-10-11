@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 import { resetRoute, routeStub, signedIn } from "./route-hooks.ts";
 
-type AuthMethod = "signInWithOAuth" | "exchangeCodeForSession" | "verifyOtp" | "signInWithOtp";
+type AuthMethod = "signInWithOAuth" | "exchangeCodeForSession" | "verifyOtp" | "signInWithOtp" | "signOut";
 type AuthAnswer = { data?: unknown; error: { message: string } | null };
 
 const SUCCESS: Record<AuthMethod, AuthAnswer> = {
@@ -10,6 +10,7 @@ const SUCCESS: Record<AuthMethod, AuthAnswer> = {
   exchangeCodeForSession: { data: {}, error: null },
   verifyOtp: { data: {}, error: null },
   signInWithOtp: { data: {}, error: null },
+  signOut: { error: null },
 };
 
 /** The auth routes' Supabase client: every auth call lands in the returned log with its argument, and
