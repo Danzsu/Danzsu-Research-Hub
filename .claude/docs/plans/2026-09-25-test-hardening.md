@@ -59,7 +59,7 @@
    - A négy meglévő ilyen sor (`post-blocks.test.ts` 51., 57. és 94. sora, `post-editor.test.ts` 71. sora) darabszámra áll át (9. feladat).
 9. **A `post-article.test.ts` törlése, a `rpcError` típusa és az M2.**
    - Az M2 terv 7. és 10. feladata a `post-article.test.ts`-t bővíti. A törlés után ott a fájl újra létrejön a fejlécével (az importok és a `renderArticle` segéd).
-   - Az 1. feladat a `FakeIngestTables.rpcError`-t `PostgrestErrorShape`-re szűkíti. Az M2 terv `rpcError: { code: "XX000", message: "boom" }` fixture-je (`docs/superpowers/plans/2026-09-25-reader-tools-m2.md:4043`) ezért TS2739-cel bukna a `tsc`-n. Az M2-ben ez `rpcError: pgError("XX000", "boom")` lesz.
+   - Az 1. feladat a `FakeIngestTables.rpcError`-t `PostgrestErrorShape`-re szűkíti. Az M2 terv `rpcError: { code: "XX000", message: "boom" }` fixture-je (`.claude/docs/plans/2026-09-25-reader-tools-m2.md:4043`) ezért TS2739-cel bukna a `tsc`-n. Az M2-ben ez `rpcError: pgError("XX000", "boom")` lesz.
    - Mindkettő a TODO.md M2-sorába kerül (2. feladat).
 10. **A `Task` ↔ `model_settings_task_check` teszt** (az audit „next after these” listájának utolsó tétele) már az M2 terv 1. feladatában van (`TASKS`), ezért ez a terv csak a TODO-ban hivatkozik rá.
 
@@ -620,7 +620,7 @@ A `.github/workflows/ci.yml`-ben `actions/checkout@3d3c42e5aac5ba805825da76410c1
 - [ ] **Step 9: `README.md`**
 
 - **Testing**, az első bekezdés után:
-  > **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the five pre-commit checks (`npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, `npm run dup`) on every push and pull request, with no secrets. Branch protection on `main` is the owner's setting (see [TODO.md](TODO.md)).
+  > **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the five pre-commit checks (`npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`, `npm run dup`) on every push and pull request, with no secrets. Branch protection on `main` is the owner's setting (see [TODO.md](../TODO.md)).
 - **Project tour**, a táblázat `docs/` sora elé:
 
   ```markdown
@@ -2216,7 +2216,7 @@ A három fájlt a 2. feladat is szerkesztette. **Olvasd újra őket.** Ahol egy 
 - **Testing → Helpers**, a pont végére:
   > The fake applies `eq`, `neq` and `lt` filters to its fixture rows and answers PostgREST-shaped errors (`pgError`).
 - **Testing**, a **Components** pont után új pont:
-  > - **Routes:** [`lib/test/route-hooks.ts`](lib/test/route-hooks.ts) stands in for `@/lib/supabase/server` and `next/server`, so a route handler runs under `node --test` with no Next.js server. A route test looks like this:
+  > - **Routes:** [`lib/test/route-hooks.ts`](../../../lib/test/route-hooks.ts) stands in for `@/lib/supabase/server` and `next/server`, so a route handler runs under `node --test` with no Next.js server. A route test looks like this:
   >
   >   ```ts
   >   import { resetRoute, routeStub, signedIn } from "../../../lib/test/route-hooks.ts"; // first: it registers the loader
@@ -2235,7 +2235,7 @@ A három fájlt a 2. feladat is szerkesztette. **Olvasd újra őket.** Ahol egy 
 A „B. Funkciók → ### Kész” lista végére:
 
 ```markdown
-- [x] **Teszt-keményítés és CI** (2026-09-25): route-tesztek a route-teszt réteggel, a `safeFetch` minden hívóhelye, a `fakeDb` szűrői, rögzített blokk-id-k, a `Progress` értéke a képernyőolvasónak, GitHub Actions CI az öt ellenőrzéssel. Terv: [docs/superpowers/plans/2026-09-25-test-hardening.md](docs/superpowers/plans/2026-09-25-test-hardening.md).
+- [x] **Teszt-keményítés és CI** (2026-09-25): route-tesztek a route-teszt réteggel, a `safeFetch` minden hívóhelye, a `fakeDb` szűrői, rögzített blokk-id-k, a `Progress` értéke a képernyőolvasónak, GitHub Actions CI az öt ellenőrzéssel. Terv: [.claude/docs/plans/2026-09-25-test-hardening.md](2026-09-25-test-hardening.md).
 ```
 
 - [ ] **Step 4: Teljes ellenőrzés**

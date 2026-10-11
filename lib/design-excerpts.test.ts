@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
+import { docFile } from "./test/doc-file.ts";
 
 // DESIGN.md's UI kit quotes the real code. Each ```tsx / ```css block names its source on the fence
 // (```tsx app/components/tag.tsx) and must appear in that file verbatim, so an edited component whose
@@ -10,7 +11,7 @@ const repoRoot = new URL("../", import.meta.url);
 const normalize = (text: string) => text.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "");
 const readRepoFile = (path: string) => normalize(readFileSync(new URL(path, repoRoot), "utf8"));
 
-const blocks = [...readRepoFile("DESIGN.md").matchAll(/^```(tsx|css)(?: (\S+))?\n([\s\S]*?)^```$/gm)].map(([, lang, source, body]) => ({
+const blocks = [...normalize(docFile("DESIGN.md")).matchAll(/^```(tsx|css)(?: (\S+))?\n([\s\S]*?)^```$/gm)].map(([, lang, source, body]) => ({
   lang,
   source,
   body: body.replace(/\n$/, ""),

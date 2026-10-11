@@ -12,7 +12,7 @@
 
 **Tech Stack:** Next.js 16 App Router, React 19, Supabase (Postgres + Storage), zod/v4, linkedom, @mozilla/readability, sharp 0.35.4, fast-xml-parser, Gemini/Groq (a meglévő `lib/llm.ts`), `node --test`.
 
-**Spec:** `docs/superpowers/specs/2026-09-24-unified-post-template-design.md` (ez a terv az M1 mérföldkő; az M2, vagyis az olvasóeszközök, külön tervet kap).
+**Spec:** `.claude/docs/specs/2026-09-24-unified-post-template-design.md` (ez a terv az M1 mérföldkő; az M2, vagyis az olvasóeszközök, külön tervet kap).
 
 ## Global Constraints
 
@@ -3568,7 +3568,7 @@ git commit -m "feat: let submitters hide blocks, edit titles and re-extract"
 ### Task 14: Élő próba forrástípusonként, dokumentáció, a `body` oszlop törlése
 
 **Files:**
-- Modify: `CLAUDE.md`, `README.md`, `TODO.md`, `docs/superpowers/specs/2026-09-24-unified-post-template-design.md` (a `media/<post_id>` → `media/<source_id>` eltérés rögzítése)
+- Modify: `CLAUDE.md`, `README.md`, `TODO.md`, `.claude/docs/specs/2026-09-24-unified-post-template-design.md` (a `media/<post_id>` → `media/<source_id>` eltérés rögzítése)
 - Create: `supabase/migrations/20260925000000_drop_post_body.sql`
 
 - [ ] **Step 1: Élő próba mind a hat forrásra**
@@ -3638,7 +3638,7 @@ A felhasználó kérte (2026-09-24). A cél, hogy a projekt karbantartható legy
 A kiinduló lista a kódbázis-átnézés: `.superpowers/brainstorm/codebase-audit.md` (24 javaslat, fájl- és sorhivatkozással). Ebben a feladatban az ott „M1”-nek, illetve a lent felsorolt „Later” pontok készülnek el.
 
 Három dolog **nem része** a feladatnak:
-- **A `digest-dashboard.tsx` szétbontása** (az átnézés 11–13. pontja). Ezt a UI/UX A mérföldkő teljesen átírja, lásd `docs/superpowers/specs/2026-09-24-ux-signals-search-design.md` és `docs/superpowers/plans/2026-09-24-ux-a-app-shell.md`.
+- **A `digest-dashboard.tsx` szétbontása** (az átnézés 11–13. pontja). Ezt a UI/UX A mérföldkő teljesen átírja, lásd `.claude/docs/specs/2026-09-24-ux-signals-search-design.md` és `.claude/docs/plans/2026-09-24-ux-a-app-shell.md`.
 - **A nem használt vendored `components/ui` fájlok törlése.** A UI/UX mérföldkövek még használhatják őket. A listájuk bekerül a jelentésbe.
 - **Új funkció.**
 
@@ -3772,7 +3772,7 @@ Három dolog **nem része** a feladatnak:
       - Gemini-keret;
       - migrációs hibák;
       - lejárt GitHub-token.
-  11. **Roadmap:** hivatkozás a `TODO.md`-re és a `docs/superpowers/` specekre és tervekre.
+  11. **Roadmap:** hivatkozás a `TODO.md`-re és a `.claude/docs/` specekre és tervekre.
 - [ ] **Step 8: Végső ellenőrzés és commit.**
   - Futtasd: `npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup`. Elvárt: minden zöld, 0 klón.
   - A jelentésbe írd be az előtte és utána mért számokat: tesztszám, 4/35-ös klónok, a legnagyobb fájlok mérete.

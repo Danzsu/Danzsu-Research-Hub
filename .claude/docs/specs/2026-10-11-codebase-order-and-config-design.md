@@ -32,8 +32,8 @@ Dátum: 2026-10-11. Jóváhagyva a tervezés során (a tulajdonos: „Mehet”).
     TODO.md
     truthful_sites.md
     ARCHIVE-MAP.md         ← a mai docs/ARCHIVE-MAP.md
-    specs/                 ← a mai docs/superpowers/specs/
-    plans/                 ← a mai docs/superpowers/plans/
+    specs/                 ← a mai .claude/docs/specs/
+    plans/                 ← a mai .claude/docs/plans/
 config/
   sources.ts               ← a mai lib/pipeline/feeds.ts, változatlan exportokkal
   .env.example             ← a mai .env.example
@@ -49,8 +49,8 @@ A `docs/` mappa és a gyökérbeli `CLAUDE.md`, `.env.example` megszűnik. A kö
 - `README.md`: minden belső link az új útvonalra; a „Add a news feed” recept a `config/sources.ts`-t nevezi meg.
 - `.claude/CLAUDE.md`: az `AGENTS.md` importja `@../AGENTS.md`; a szövegben a `feeds.ts` → `config/sources.ts`.
 - `ARCHITECTURE.md` → Codemap: a `config/` és a `.claude/` új sorai; a `lib/pipeline/` sorából a `feeds.ts` kikerül.
-- A `docs/superpowers/` útvonalra mutató linkek (TODO.md, a specek és tervek egymásra) frissülnek. Egy `grep -rn "docs/superpowers\|lib/pipeline/feeds"` a végén üres.
-- A superpowers-skillek alapértelmezett helye a `docs/superpowers/`; a „User preferences for plan location override this default” alapján a továbbiakban a `.claude/docs/specs/` és `.claude/docs/plans/` a hely. Ezt az `AGENTS.md` egy sora rögzíti.
+- A `.claude/docs/` útvonalra mutató linkek (TODO.md, a specek és tervek egymásra) frissülnek. Egy `grep -rn "docs/superpowers\|lib/pipeline/feeds"` a végén üres.
+- A superpowers-skillek alapértelmezett helye a `.claude/docs/`; a „User preferences for plan location override this default” alapján a továbbiakban a `.claude/docs/specs/` és `.claude/docs/plans/` a hely. Ezt az `AGENTS.md` egy sora rögzíti.
 
 ### 1.3 Kód és eszközök
 

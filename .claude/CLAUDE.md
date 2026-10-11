@@ -1,4 +1,4 @@
-@AGENTS.md
+@../AGENTS.md
 
 # CLAUDE.md
 
@@ -6,7 +6,7 @@ The deep reference. AGENTS.md, imported above, has the overview, the commands an
 
 These sections used to live here:
 
-- What this repository is: AGENTS.md (the overview) and ARCHITECTURE.md → Bird's eye view. The provenance note is under ARCHITECTURE.md → Codemap, `docs/`.
+- What this repository is: AGENTS.md (the overview) and ARCHITECTURE.md → Bird's eye view. The provenance note is under ARCHITECTURE.md → Codemap, `.claude/`.
 - Commands: AGENTS.md → Commands.
 - Layout: ARCHITECTURE.md → Codemap.
 - UI text (HU/EN): CODE_STYLE.md → HU/EN copy, and ARCHITECTURE.md → Cross-cutting concerns.
@@ -137,7 +137,7 @@ AGENTS.md → Commands lists the URLs. The preview renders the real view compone
 
 ## Database
 
-The schema lives in `supabase/migrations/`. [README.md → Migrations](README.md#migrations) lists the files and what each one adds. README.md → Recipes says how to add and apply one. `20260925000000_drop_post_body.sql` runs only after the block-based code is live. It drops `posts.body`, which the current code no longer reads or writes.
+The schema lives in `supabase/migrations/`. [README.md → Migrations](../README.md#migrations) lists the files and what each one adds. README.md → Recipes says how to add and apply one. `20260925000000_drop_post_body.sql` runs only after the block-based code is live. It drops `posts.body`, which the current code no longer reads or writes.
 
 RLS is on for every table:
 

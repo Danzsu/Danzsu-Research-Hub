@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.3.4 (App Router), React 19.2, TypeScript, `node --test` + linkedom, Playwright MCP az előnézeten.
 
-**Spec:** `docs/superpowers/specs/2026-10-11-codebase-order-and-config-design.md` (a 6. feladat után: `.claude/docs/specs/2026-10-11-codebase-order-and-config-design.md`).
+**Spec:** `.claude/docs/specs/2026-10-11-codebase-order-and-config-design.md` (a 6. feladat után: `.claude/docs/specs/2026-10-11-codebase-order-and-config-design.md`).
 
 ## Global Constraints
 
@@ -447,7 +447,7 @@ git commit -m "refactor: move the daily sources and the env template into config
 ### Task 6: A dokumentáció a `.claude/` alá
 
 **Files:**
-- Move: `CLAUDE.md` → `.claude/CLAUDE.md`; `ARCHITECTURE.md`, `CODE_STYLE.md`, `DESIGN.md`, `TESTING.md`, `TODO.md`, `truthful_sites.md` → `.claude/docs/`; `docs/ARCHIVE-MAP.md` → `.claude/docs/ARCHIVE-MAP.md`; `docs/superpowers/specs/*` → `.claude/docs/specs/`; `docs/superpowers/plans/*` → `.claude/docs/plans/`
+- Move: `CLAUDE.md` → `.claude/CLAUDE.md`; `ARCHITECTURE.md`, `CODE_STYLE.md`, `DESIGN.md`, `TESTING.md`, `TODO.md`, `truthful_sites.md` → `.claude/docs/`; `docs/ARCHIVE-MAP.md` → `.claude/docs/ARCHIVE-MAP.md`; `.claude/docs/specs/*` → `.claude/docs/specs/`; `.claude/docs/plans/*` → `.claude/docs/plans/`
 - Create: `lib/test/doc-file.ts`
 - Modify: `lib/design-excerpts.test.ts`, `lib/design-tokens.test.ts`, `lib/truthful-sites.test.ts`, `AGENTS.md`, `README.md`, `SECURITY.md`, `.claude/CLAUDE.md`, és minden `.md`, ami a régi útvonalakra mutat
 
@@ -465,9 +465,9 @@ export const docFile = (name: string): string => readFileSync(new URL(`../../.cl
 
 - [ ] **Step 3: A költöztetés.** `mkdir -p .claude/docs/specs .claude/docs/plans`, majd `git mv` mindenre. A `.claude/CLAUDE.md` első sora `@../AGENTS.md`. A gyökérben nincs `CLAUDE.md`. Futtatás → PASS.
 
-- [ ] **Step 4: A linkek.** Egy szkript (`scratchpad`) cseréli minden `.md`-ben: `docs/superpowers/specs/` → `.claude/docs/specs/`, `docs/superpowers/plans/` → `.claude/docs/plans/`, `docs/ARCHIVE-MAP.md` → `.claude/docs/ARCHIVE-MAP.md`; a gyökérbeli fájlokban (`README.md`, `AGENTS.md`, `SECURITY.md`) a `](ARCHITECTURE.md`, `](DESIGN.md`, `](TESTING.md`, `](CODE_STYLE.md`, `](TODO.md`, `](truthful_sites.md`, `](CLAUDE.md` → `](.claude/docs/…` illetve `](.claude/CLAUDE.md`; a `.claude/docs/` fájlokban az egymásra mutató linkek relatívak maradnak (`DESIGN.md` → `DESIGN.md`), a gyökérre mutatók (`README.md`, `AGENTS.md`, `SECURITY.md`, `app/…`, `lib/…`) `../../`-t kapnak. A README Codemap táblája kap egy sort: ``| [`.claude/`](.claude/) | `CLAUDE.md`, the deep reference Claude Code loads, and `docs/`: architecture, design, testing, style, the TODO, the trusted sources, and the specs and plans |``. Az `AGENTS.md` „Read next” listája az új útvonalakkal, és egy sor: „Specs and plans live in `.claude/docs/specs/` and `.claude/docs/plans/`.” A `docs/` mappa üres, törölve.
+- [ ] **Step 4: A linkek.** Egy szkript (`scratchpad`) cseréli minden `.md`-ben: `.claude/docs/specs/` → `.claude/docs/specs/`, `.claude/docs/plans/` → `.claude/docs/plans/`, `docs/ARCHIVE-MAP.md` → `.claude/docs/ARCHIVE-MAP.md`; a gyökérbeli fájlokban (`README.md`, `AGENTS.md`, `SECURITY.md`) a `](../ARCHITECTURE.md`, `](../DESIGN.md`, `](../TESTING.md`, `](../CODE_STYLE.md`, `](../TODO.md`, `](../truthful_sites.md`, `](../../CLAUDE.md` → `](.claude/docs/…` illetve `](.claude/CLAUDE.md`; a `.claude/docs/` fájlokban az egymásra mutató linkek relatívak maradnak (`DESIGN.md` → `DESIGN.md`), a gyökérre mutatók (`README.md`, `AGENTS.md`, `SECURITY.md`, `app/…`, `lib/…`) `../../`-t kapnak. A README Codemap táblája kap egy sort: ``| [`.claude/`](.claude/) | `CLAUDE.md`, the deep reference Claude Code loads, and `docs/`: architecture, design, testing, style, the TODO, the trusted sources, and the specs and plans |``. Az `AGENTS.md` „Read next” listája az új útvonalakkal, és egy sor: „Specs and plans live in `.claude/docs/specs/` and `.claude/docs/plans/`.” A `docs/` mappa üres, törölve.
 
-- [ ] **Step 5: Ellenőrzés.** `grep -rn "docs/superpowers\|](ARCHITECTURE.md\|](DESIGN.md\|](TESTING.md\|](CODE_STYLE.md\|](TODO.md\|](truthful_sites.md\|](CLAUDE.md" --include=*.md . | grep -v node_modules | grep -v "^./.claude/docs/"` → üres. Az `AGENTS.md` és a `.claude/CLAUDE.md` betöltése: egy új Claude Code munkamenetben a `/context` a `.claude/CLAUDE.md`-t mutatja (a tulajdonos ellenőrzi; ha nem, a gyökérbe egy egysoros `CLAUDE.md`: `@.claude/CLAUDE.md`). Az öt ellenőrzés → zöld.
+- [ ] **Step 5: Ellenőrzés.** `grep -rn "docs/superpowers\|](../ARCHITECTURE.md\|](../DESIGN.md\|](../TESTING.md\|](../CODE_STYLE.md\|](../TODO.md\|](../truthful_sites.md\|](../../CLAUDE.md" --include=*.md . | grep -v node_modules | grep -v "^./.claude/docs/"` → üres. Az `AGENTS.md` és a `.claude/CLAUDE.md` betöltése: egy új Claude Code munkamenetben a `/context` a `.claude/CLAUDE.md`-t mutatja (a tulajdonos ellenőrzi; ha nem, a gyökérbe egy egysoros `CLAUDE.md`: `@.claude/CLAUDE.md`). Az öt ellenőrzés → zöld.
 
 - [ ] **Step 6: Commit.**
 

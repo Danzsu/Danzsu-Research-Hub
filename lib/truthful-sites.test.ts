@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { docFile } from "./test/doc-file.ts";
 import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "../config/sources.ts";
 
 // truthful_sites.md → "Bent van" documents config/sources.ts. This keeps the two equal, both ways:
 // it fails for a source added to or removed from either side, and for a changed URL, limit or category.
 
-const markdown = readFileSync(new URL("../truthful_sites.md", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const markdown = docFile("truthful_sites.md");
 
 /** The lines under the `### heading`, up to the next heading of any level. */
 function section(heading: string): string {

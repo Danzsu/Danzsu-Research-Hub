@@ -64,7 +64,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 - `scripts/ingest-url.mts` is `npm run ingest`, which ingests one link without the UI.
 - `vendor/` is the shadcn Tailwind 4 utility pack that `globals.css` imports.
 - `.github/` has the CI workflow and Dependabot.
-- `docs/` has the specs and plans (`superpowers/`) and `ARCHIVE-MAP.md`, the provenance record. The app was reconstructed from a flat archive that targeted OpenAI ChatGPT Sites / Cloudflare Workers via `vinext`, and then moved to Vercel so it can schedule its own work. The map still names files that no longer exist (`db/`, `drizzle/`, `build/`, and the old shell and `.mjs` scripts under `scripts/`).
+- `.claude/` holds `CLAUDE.md`, the deep reference Claude Code loads, and `docs/`: this file and the other guides, `specs/` and `plans/`, and `ARCHIVE-MAP.md`, the provenance record. The app was reconstructed from a flat archive that targeted OpenAI ChatGPT Sites / Cloudflare Workers via `vinext`, and then moved to Vercel so it can schedule its own work. The map still names files that no longer exist (`db/`, `drizzle/`, `build/`, and the old shell and `.mjs` scripts under `scripts/`).
 
 ## Invariants
 

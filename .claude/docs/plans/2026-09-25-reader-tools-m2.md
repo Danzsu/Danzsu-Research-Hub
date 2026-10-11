@@ -11,10 +11,10 @@
 
 **Tech Stack:** Next.js 16.3.4 App Router (route handler `POST`/`PATCH`/`DELETE`, `router.refresh()`), React 19.2.6 (`useState`, `useMemo`, `useEffect`, a `popover` / `popoverTarget` attribútum), Tailwind 4.2.1 (konténer-lekérdezések), zod 3.25.76 (`zod/v4`), Supabase (Postgres, RLS, egy `plpgsql` függvény), a meglévő `lib/llm.ts` (Gemini), a Web Animations API (`element.animate`), linkedom 0.18.13 a tesztekben, `node --test`.
 
-**Spec:** `docs/superpowers/specs/2026-09-24-unified-post-template-design.md`. Ez a terv az M2 mérföldkő: 5.1 (kiemelés és komment, „Jegyzeteim”, újrahorgonyzás), 5.2 (Key insights), 5.3 (Fogalmak és a `/glossary` oldal), valamint az 1.2 M2-es része, a 6. fejezet kérésre futó funkciókra vonatkozó szabálya és a 7. fejezet `applyMarks`- és újrahorgonyzás-tesztjei. A spec a kötelező mérvadó. Ahol a mai kód eltér tőle, az „Egyeztetés a kóddal” szakasz mondja meg, mit csinál a terv.
+**Spec:** `.claude/docs/specs/2026-09-24-unified-post-template-design.md`. Ez a terv az M2 mérföldkő: 5.1 (kiemelés és komment, „Jegyzeteim”, újrahorgonyzás), 5.2 (Key insights), 5.3 (Fogalmak és a `/glossary` oldal), valamint az 1.2 M2-es része, a 6. fejezet kérésre futó funkciókra vonatkozó szabálya és a 7. fejezet `applyMarks`- és újrahorgonyzás-tesztjei. A spec a kötelező mérvadó. Ahol a mai kód eltér tőle, az „Egyeztetés a kóddal” szakasz mondja meg, mit csinál a terv.
 
 **Előfeltétel és sorrend:**
-- A végrehajtás csak azután indul, hogy a UX-A (`docs/superpowers/plans/2026-09-24-ux-a-app-shell.md`, `ux-a-app-shell` ág) bekerült a `main`-be. Új ág: `git switch -c reader-tools-m2 main`.
+- A végrehajtás csak azután indul, hogy a UX-A (`.claude/docs/plans/2026-09-24-ux-a-app-shell.md`, `ux-a-app-shell` ág) bekerült a `main`-be. Új ág: `git switch -c reader-tools-m2 main`.
 - A terv a UX-A **utáni** kódra készült. A UX-A 1–5. feladata már commitolva van az `ux-a-app-shell` ágon (`92e7455`). Az általuk létrehozott neveket a commitolt fájlokon ellenőriztem:
   - `app/components/undo-toast.tsx`: `toasts` (`show` / `undo` / `dismiss` / `flush`), és `ToastKind = "markedRead" | "todoAdded" | "todoDeleted" | "failed"`;
   - `lib/fixtures.ts`: a `previewPosts` a `testPost`-ra épül, és **negatív id-jei** vannak (-1…-5);
@@ -4830,16 +4830,16 @@ lib/post-analysis.ts     buildInsights, buildGlossary: the on-demand model runs
 
 - **What it is**, a Library bekezdés végére: „Readers can highlight passages privately, in three colours and optionally with a comment; ask once per post for its key insights and its glossary terms; and browse every term collected so far at `/glossary`.”
 - **How it works:** a mermaid ábra `postPage` alcsoportjába két sor kerül: `insightsRoute["POST /api/posts/[id]/insights"]` és `glossaryRoute["POST /api/posts/[id]/glossary"]`. A lista végére két él: `insightsRoute -->|"buildInsights writes insights"| posts` és `glossaryRoute -->|"save_post_glossary"| glossary[("glossary_terms, glossary_occurrences")]`. A Translation bekezdés után ez az új bekezdés:
-  > **Reader tools** run on the post page. A reader can highlight a passage in one of three colours, optionally with a comment, and write notes on the whole post; only they see them (`annotations`, own rows by RLS). A highlight remembers its quote and up to 32 characters either side, so it finds its place again after a re-extraction, or is listed as unplaced rather than guessed. A highlight made in the Hungarian view usually doesn't survive a re-extraction: the translation is dropped, and a new one words the text differently, so the highlight lists as unplaced, with its comment. Key insights ([`lib/post-analysis.ts`](lib/post-analysis.ts)) and the glossary are made once per post, on request, for every reader; `/glossary` lists every term collected so far.
+  > **Reader tools** run on the post page. A reader can highlight a passage in one of three colours, optionally with a comment, and write notes on the whole post; only they see them (`annotations`, own rows by RLS). A highlight remembers its quote and up to 32 characters either side, so it finds its place again after a re-extraction, or is listed as unplaced rather than guessed. A highlight made in the Hungarian view usually doesn't survive a re-extraction: the translation is dropped, and a new one words the text differently, so the highlight lists as unplaced, with its comment. Key insights ([`lib/post-analysis.ts`](../../../lib/post-analysis.ts)) and the glossary are made once per post, on request, for every reader; `/glossary` lists every term collected so far.
 - **Project tour**: az `app/` sorba a `/glossary`; az `app/library/` sor az `(app)` alatti útra és az új fájlokra; a `lib/` sorba „highlights and their anchoring, key insights, the glossary”.
 - **Testing**, a „What the tests don't cover” lista végére: „highlighting and commenting in a real browser (selection, the note bar above the bottom bar, the panel's jump and flash), the glossary cards, and RLS on `annotations` with two accounts”.
 - **Troubleshooting**, a „Migrations fail.” pontba: „`model_settings has no row for "post_insights"` (or `"post_glossary"`), or a post page that answers 404 for every post after the M2 deploy: `20260925010000_reader_tools.sql` hasn't run.”
-- **Roadmap**: a spec sora után: „and its [M2 plan](docs/superpowers/plans/2026-09-25-reader-tools-m2.md) (reader tools)”.
+- **Roadmap**: a spec sora után: „and its [M2 plan](2026-09-25-reader-tools-m2.md) (reader tools)”.
 
 - [ ] **Step 3: `TODO.md`**
 
 - A „Kutatási dashboard” alatt az M2 pont: „- [ ] **M2 olvasóeszközök** — terv szükséges. Kiemelés és komment, Key insights, Fogalmak.” helyett:
-  „- [x] **M2 olvasóeszközök:** kiemelés és komment, Jegyzeteim, Key insights, Fogalmak és `/glossary`. Terv: [docs/superpowers/plans/2026-09-25-reader-tools-m2.md](docs/superpowers/plans/2026-09-25-reader-tools-m2.md).”
+  „- [x] **M2 olvasóeszközök:** kiemelés és komment, Jegyzeteim, Key insights, Fogalmak és `/glossary`. Terv: [.claude/docs/plans/2026-09-25-reader-tools-m2.md](2026-09-25-reader-tools-m2.md).”
 - A „Halasztott élő próbák” pontba: „M2 élesben: Key insights és Fogalmak egy valódi poszton; egy eredeti nézetbeli kiemelés újrakinyerés után is a helyén van; két fiókkal ellenőrizni, hogy a másik jegyzetei nem látszanak (RLS).”
 
 - [ ] **Step 4: Teljes ellenőrzés**

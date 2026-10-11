@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { docFile } from "./test/doc-file.ts";
 
 // DESIGN.md's front-matter colours document app/globals.css's :root. This keeps the two equal, both ways:
 // it fails for a changed hex, and for a colour added to or removed from either side.
@@ -41,7 +42,7 @@ function rootColors(css: string): Map<string, string> {
 }
 
 test("DESIGN.md's colour tokens equal app/globals.css's :root, and neither side has one the other lacks", () => {
-  const design = designColors(readRepoFile("DESIGN.md"));
+  const design = designColors(docFile("DESIGN.md"));
   const css = rootColors(readRepoFile("app/globals.css"));
   // Not vacuous: an empty parse on both sides would otherwise compare equal.
   for (const brand of ["ink", "paper", "cream", "signal", "cyan"]) {
