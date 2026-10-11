@@ -74,7 +74,7 @@ typography:
     letterSpacing: 0.2em
   label:
     fontFamily: '"Courier New", Courier, ui-monospace, monospace'
-    fontSize: 10px
+    fontSize: 11px
     fontWeight: 400
     letterSpacing: 0.15em
   control:
@@ -243,7 +243,7 @@ Secondary text is ink or paper at an opacity (`text-ink/55` to `/72`, `text-pape
 | `text-ink/72` on paper | 6.9 | card summaries |
 | `text-paper/55` on ink | 5.5 | secondary text on ink |
 | `text-paper/45` on ink / on `#1c1c1c` | 4.1 / 4.0 | the Library's error line, the ⌘K hint |
-| `text-ink/55` on paper | 3.9 | 10px meta labels, empty notes |
+| `text-ink/55` on paper | 3.9 | 11px meta labels, empty notes |
 | signal on paper / cream | 2.86 / 2.69 | large text / non-text only: the `//`, the rank numerals, rules, the focus outline. Today it also sets eyebrows, source labels and inline post links, which is the known gap |
 
 WCAG AA asks 4.5:1 of small text, and 3:1 of large text and of non-text UI. The last three rows miss the first bar. `text-paper/45` and `text-ink/55` still clear 3:1, so they suit large or incidental text. Signal on a light surface sits just under 3:1 as well, so it is meant for large text and non-text marks only. Its small-text uses are the gap tracked in TODO.md (a brand decision: a darker signal for small text, or large and decorative use only). An inline link at least carries an underline, but a label does not. The link chat (`chat-thread.tsx`) adds no new case: its action links are ink with a signal underline instead, and its status labels are `text-ink/70`.
@@ -276,9 +276,9 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 | Post body | `text-[17px]` | 1.7 | post blocks |
 | Card body | `text-base` (16px) | `leading-7` | story summaries |
 | Small body | `text-sm` (14px) | `leading-6` | "why it matters", dialog text |
-| Eyebrow | `text-xs` (12px), mono | `tracking-[0.2em]` | `PageHero`, `StatusCard` (the Radar header's is 10px) |
+| Eyebrow | `text-xs` (12px), mono | `tracking-[0.2em]` | `PageHero`, `StatusCard` (the Radar header's is 11px, `tracking-[0.18em]`) |
 | Control | `text-xs`, mono | none | buttons, chips, the toast |
-| Label | `text-[11px]` / `text-[10px]`, mono | `tracking-[0.12em]` / `[0.15em]` | source labels, "why it matters", meta, tags |
+| Label | `text-[11px]`, mono | `tracking-[0.12em]` / `[0.15em]` | source labels, "why it matters", meta, tags. **Never under 11px:** `lib/design-tokens.test.ts` fails on a `text-[10px]` (2a spec D3) |
 
 ## Layout
 
@@ -289,13 +289,13 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
   - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, with the taiyaki raised 16px out of its centre slot; the content column's bottom padding clears both (Components → Page shell).
   - From `md` up, the desktop nav takes its place: a 256px sidebar (`w-64`) or a 56px icon rail (`w-14`).
   - The Radar's categories are a sticky chip bar at every width.
-- **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md` to `2xl`, and a 330px column from `2xl`. It is non-modal, so the undo toast stays usable while it is open.
+- **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md`, and a 330px column once the Radar's own column is 95rem wide (`@[95rem]`, R3 §2: the nav and the viewport decide together). It is non-modal, so the undo toast stays usable while it is open.
 - **Touch targets are at least 40px** (`min-h-10`, or `size-10 sm:size-8` for icon buttons, which may shrink to 32px from `sm` up).
 - **Use `dvh`, not `vh`.**
 - **Hover styles only for pointers.** Custom `:hover` effects in `globals.css` sit inside `@media (hover: hover)`, because touch screens keep `:hover` after a tap. Tailwind's `hover:` variant already does this.
-- **Widths.** Page content is capped at `max-w-6xl`, post text blocks at `max-w-[75ch]`, card text at `max-w-3xl` and leads at `max-w-2xl`. Images, code and video take the full column.
+- **Widths.** Page content is capped at `max-w-[1600px]` (the hero and the grids line up), a story card at 900px, post text blocks, the post's notices, its © line and the Library's open-source rows at `max-w-[75ch]`, card text at `max-w-3xl` and leads at `max-w-2xl`. Images, code and video take the full column. A `PageHero` title is sized to its own column (`12cqi`, 2a spec D2) and never breaks inside a word from `sm`; the band is `py-8 sm:py-10`, so a list page starts within the first screen. The Radar's own hero keeps its size, and on a phone shows one status line instead of its lead and close box (R3 §1).
 - **Gutters.** `px-4` (16px) everywhere at 360px. From `sm` it is `px-7` in the Radar (its main column widens to `px-10` from `lg`) and `px-10` on the other pages.
-- **Rhythm.** Radar sections are `mt-9` apart, each opening with a `SectionLabel` (a signal icon square and a mono title over a 2px ink rule). Feed cards are `space-y-4`, the must-read grid is `gap-4`, and the Library grid is `gap-5`.
+- **Rhythm.** Radar sections are `mt-9` apart, each opening with a `SectionLabel` (a signal icon square and a mono title over a 2px ink rule). Feed cards are `space-y-4`, the must-read grid is `gap-4`, and the Library and archive grids are `gap-5` with 1, 2, 3 then 4 columns by their own width (`@[48rem]`, `@[72rem]`, `@[96rem]`, R3 §3).
 
 **Alignment.**
 
@@ -303,7 +303,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 - Centring is kept for a few things: a lone card (`StatusCard` on ink), empty-state notes, the bottom bar's slots, the rail's icons and the toast lane.
 - Secondary actions go to the right edge: the Radar header's panel pill, a card's Read button (`ml-auto`), the post page's Original link, and the hero's weekly-close block from `lg`.
 
-**Desktop, the Radar at `md` and up** (at `2xl` the panel becomes a 330px column on the right):
+**Desktop, the Radar at `md` and up** (from a 95rem-wide Radar the panel becomes a 330px column on the right):
 
 ```text
 +-----------+----------------------------------------------------+
@@ -315,11 +315,11 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 |   Library |  +----------------------------------------------+  |
 |   Search  |  TOP 3 · MUST READ                                 |
 |   Archive |  +-01-----------+ +-02-----------+ +-03-----------+|  @3xl: three across
-|   (soon)  |  +--------------+ +--------------+ +--------------+|
+|   GitHub  |  +--------------+ +--------------+ +--------------+|
 +-----------+  THE WEEK'S LIVE SIGNAL                            |
-| HU    ?   |  +meta+-----------------------------------------+  |  story cards
-| user    > |  +----+-----------------------------------------+  |
-| << Coll.  |                                                    |
+|   Archive |  +meta+-----------------------------------------+  |  story cards
+| (D) user@ |  +----+-----------------------------------------+  |  account menu
+| <<        |                                                    |  collapse
 +-----------+----------------------------------------------------+
   w-64 ink   cream content column (@container)
 ```
@@ -365,11 +365,13 @@ Shadows are hard offsets with zero blur:
 `.lift` (`globals.css`) gives the taiyaki the Top 3 cards' "come forward" state, whose rules `.must-card` shares, on hover and also on keyboard focus. Under `prefers-reduced-motion` its shadow still lifts, without the translate.
 
 - **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. Every Sheet and Dialog opens and closes in 160ms. The toast slides in from 8px and fades out over 160ms. A press moves 2px at once and eases back on release. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. Nothing moves on hover or press either: the shadows and colours still change. The `.live-pulse` dot (9px, signal) pulses a ring every 2s. Loading feedback waits before it shows, so a fast answer flashes nothing: the pending dot and the refresh bar appear 100ms in, at once, and leave at once; the skeletons' placeholders fade in over 160ms after 150ms. The bar runs a third-wide segment across itself every 1.2s. Under reduced motion the dot's ring stops, the skeletons don't pulse and their placeholders appear without the fade, still after 150ms, and the bar stands still at full width.
+- **One overlay at a time** (R3 §4): the Radar's reader panel and the link chat never show together; opening one closes the other (`createShellLayers`, `app-shell.tsx`, which both read through `PanelContext` and the chat's open state). The panel's column keeps `pb-24` at its foot, so the corner taiyaki covers no to-do.
+- **The `motion` library** (`motion/react`, pinned; `MotionConfig reducedMotion="user"` in the shell) runs the three motions CSS can't (2a spec D7): the rating press (the pressed button's icon alone mounts at 0.88 and springs back to 1 in 180ms, `rating-control.tsx`; a spring takes two keyframes only), the toast's enter and exit (`AnimatePresence` in `popLayout` mode, 160ms, `undo-toast.tsx`), and the taiyaki's turn when its panel opens (`link-chat.tsx`). Sheets and dialogs keep their Radix 160ms CSS animations. Nothing else animates on its own. Under reduced motion the press and the turn stand still; the toast's fade is opacity, which `reducedMotion="user"` leaves alone, so it still fades over 160ms.
 - **Layering.** From bottom to top:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
   - the desktop aside, `z-30`, so the rail's tooltips paint over both of those;
-  - the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel from `md` to `2xl`, covers the button until it closes);
+  - the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel below `@[95rem]`, covers the button until it closes);
   - sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;
   - the undo toast lane, `z-[60]`;
   - the refresh bar, `z-[70]`.
@@ -393,20 +395,25 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
 
 ```tsx app/components/app-shell.tsx
     <LanguageProvider initial={language}>
+      {/* reducedMotion="user": the three motions (the rating press, the toast, the taiyaki's turn) go still under prefers-reduced-motion (2a spec D7). */}
+      <MotionConfig reducedMotion="user">
       {/* The preview's ratings stay in memory, like its other writes. */}
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
           <ReadHereContext value={readHere}>
+            <PanelContext value={panel}>
             <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
               {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
                   so none of them covers the end of the page. The corner one's goes inside the page's own last element,
                   so that page's surface runs on under it. */}
               <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
             </DesktopNav>
+            </PanelContext>
           </ReadHereContext>
           <MobileNav
             email={email}
             onSearch={openSearch}
+            onHelp={openHelp}
             chat={
               <TaiyakiButton
                 open={chatOpen}
@@ -418,7 +425,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
           <TaiyakiButton
             open={chatOpen}
             onClick={toggleChat}
-            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--signal)] md:grid"
           />
           {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
           <LinkChat
@@ -435,6 +442,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
           <UndoToast />
         </RefreshProvider>
       </RatingsProvider>
+      </MotionConfig>
     </LanguageProvider>
 ```
 
@@ -447,7 +455,8 @@ Each page then sets its own surface. The Radar uses `<div className="min-w-0 bg-
 `app/components/desktop-nav.tsx` and `nav-parts.tsx`:
 
 - **The column:** ink, sticky and full height, with a `border-paper/15` right rule. At the top sit the round signal logo badge and the stacked NEON / NEWS / RADAR wordmark, with RADAR in signal.
-- **Entries:** 40px mono rows. The active one gets a 2px signal left border, a `bg-signal/10` wash and signal text. The coming views are listed at 40% opacity with a "soon" label.
+- **Entries:** 40px mono rows. The active one gets a 2px signal left border, a `bg-signal/10` wash and signal text.
+- **The foot** (2a spec D5): the account menu (`account-menu.tsx`). The avatar (the address's first letter in a signal circle) and the whole address, named "Account: <address>", open a cream dropdown menu with a 2px ink frame and a signal hard shadow: Magyar / English as radio items, the shortcuts help and a POST sign-out, each a real menu item (`AccountMenuItems`), so arrows move between them, Enter picks one and Esc closes; a Radix menu swallows Tab, which is why the rows aren't nested controls here. In the rail only the avatar shows, named in a tooltip. The collapse toggle sits under it.
 - **The rail:** only the icons stay. Each one shows its name in a `NavTooltip` on hover and on keyboard focus. The rail's nav has no overflow, because a scroll container would clip the tooltips. On viewports under 32rem tall, the whole aside scrolls instead.
 
 ```tsx app/components/desktop-nav.tsx
@@ -475,10 +484,10 @@ className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-sign
 
 ```tsx app/components/app-shell.tsx
 const slotClass =
-  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 ```
 
-"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek, Archívum and Gyűjtemény (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
+"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek, Archívum and Gyűjtemény (the primary items marked `mobileMore` in `lib/nav.ts`), and the account rows (the language, the shortcuts help, sign out: `AccountRows`, `account-menu.tsx`). It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
 
 ```tsx app/components/app-shell.tsx
         <SheetContent
@@ -510,9 +519,10 @@ The Sheet's close button, and the one in dialogs, is a 40px square with a 2px in
 `app/components/page-header.tsx`. `PageHero` is the cream title band of the secondary pages. It has a signal mono eyebrow, a display title ending in a signal `//`, and an optional side panel that moves beside the text at `@4xl`. The band itself is `HeroBand`, which the list pages' loading skeleton shares:
 
 ```tsx app/components/page-header.tsx
-    <section className="@container border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
-      <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
-        <div className="min-w-0">{children}</div>
+    <section className="@container border-b-2 border-signal bg-cream px-4 py-8 text-ink sm:px-10 sm:py-10">
+      <div className={`mx-auto max-w-[1600px] ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
+        {/* The title's own column is the container (2a spec D2): on the Library the form sits beside it. */}
+        <div className="min-w-0 @container">{children}</div>
         {aside}
       </div>
     </section>
@@ -524,11 +534,13 @@ export function PageHero({ eyebrow, title, lead, aside }: { eyebrow: string; tit
   return (
     <HeroBand aside={aside}>
       <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
-      <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em] [overflow-wrap:anywhere]">
+      {/* 12cqi: GYŰJTEMÉNY fits one line beside the Library form at 1280. Below sm the screen is narrower than the
+          word, so it may break anywhere there; from sm it never breaks inside a word. */}
+      <h1 className="mt-3 font-display text-[clamp(2.4rem,12cqi,7rem)] leading-[0.8] tracking-[-0.06em] [overflow-wrap:anywhere] [hyphens:manual] sm:[overflow-wrap:normal]">
         {title}
         <span className="text-signal">{"//"}</span>
       </h1>
-      <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
+      <p className="mt-4 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
     </HeroBand>
 ```
 
@@ -538,7 +550,7 @@ In use (`app/(app)/library/library-view.tsx`):
 <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm preview={preview} />} />
 ```
 
-`StatusCard` is a lone cream card on ink, with an optional wordmark (`brand`). It is used for sign-in, error and not-found, the pages outside the app shell:
+`StatusCard` is a lone cream card on ink, with an optional wordmark (`brand`), for the error and not-found pages. Sign-in (`/login`) sits in the public landing frame instead (`PublicPage`, `public-page.tsx`), in the same `SignInCard` the landing page's own sign-in section uses (`sign-in-forms.tsx`):
 
 ```tsx app/components/page-header.tsx
     <main className="grid min-h-dvh place-items-center bg-ink px-4 text-paper">
@@ -567,10 +579,10 @@ In use (`app/(app)/library/library-view.tsx`):
         "icon-lg": "size-10",
 ```
 
-The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Open link does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
+The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Olvasd itt button does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
 
 ```tsx app/components/story-card.tsx
-<Button asChild variant="ink" className="min-h-10">
+        <Button asChild variant="brutal" className="min-h-10">
 ```
 
 ```tsx app/components/rating-classes.ts
@@ -617,7 +629,7 @@ Every control shows a press, and it needs no hover, so a tap shows it too, even 
 
 ```tsx app/components/tag.tsx
 export function Tag({ tag }: { tag: string }) {
-  return <span className="border border-current/30 px-2 py-1 font-mono text-[10px]">#{tag}</span>;
+  return <span className="border border-current/30 px-2 py-1 font-mono text-[11px]">#{tag}</span>;
 }
 ```
 
@@ -649,19 +661,27 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClas
 ```
 
 ```tsx app/components/story-card.tsx
-className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+className={`focus-ring story-card max-w-[900px] border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
-- **story-card** has a 96px meta gutter from `lg`, and one row of actions at the bottom: Open (`ink`), Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link), Later and to-do (`brutal` icons), and Read on the right.
+- **Three states, three signs** (2a spec D4), which combine freely:
+
+  | State | Sign | Where |
+  | --- | --- | --- |
+  | Read | `story-read`: `opacity: 0.58`, and the card goes to the end of the feed | `globals.css` |
+  | 👎 | a dashed frame, nothing dimmer (`dislikedClass`, `rating-classes.ts`) | the card's `has-[[data-rating=down]]` |
+  | Saved for later | a 4px signal bar on the left edge (`data-saved`, `.story-card[data-saved]::before`) | `globals.css` |
+
+- **story-card** has a 96px meta gutter from `lg`, the source as a link in its meta row (also the `o` shortcut's target, `data-card-open`), and one row of actions at the bottom (2a spec D1): Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link) as the one primary action, then the tool unit (`CardToolbar`, `card-toolbar.tsx`: 👎 👍 ❤, Later, to-do, one flex unit that wraps as a whole), and Read last on the right.
 - **Both** dim to 58% once read, and take focus for j/k (`tabIndex={-1}` plus `focus-ring`).
 
 ### `RatingControl` and the filter chips
 
-`app/components/rating-control.tsx`. A `role="group"` of three `brutal` icon toggles, Nem hasznos 👎, Hasznos 👍 and Kedvenc ❤, each `aria-pressed` and painted with `pressedClass`: 40px, and 32px from `sm` with a fine pointer only (`Button`). The group carries its value as `data-rating` (`down`, `up`, `heart`), so the row around it styles itself: a 👎 row dims and its border turns dashed, and stays readable and clickable. Both class strings live in `rating-classes.ts`, a plain module, because server components use them:
+`app/components/rating-control.tsx`. A `role="group"` of three `brutal` icon toggles, Nem hasznos 👎, Hasznos 👍 and Kedvenc ❤, each `aria-pressed` and painted with `pressedClass`: 40px, and 32px from `sm` with a fine pointer only (`Button`). The group carries its value as `data-rating` (`down`, `up`, `heart`), so the row around it styles itself: a 👎 row turns its border dashed and stays as readable and clickable as the rest. Both class strings live in `rating-classes.ts`, a plain module, because server components use them:
 
 ```tsx app/components/rating-classes.ts
-export const dislikedClass = "has-[[data-rating=down]]:opacity-60 has-[[data-rating=down]]:border-dashed";
+export const dislikedClass = "has-[[data-rating=down]]:border-dashed";
 ```
 
 A Library card is one link, which can't hold a button, so it shows `RatingBadge` instead: the value's icon (the heart filled) with its name sr-only, and nothing when unrated.
@@ -715,10 +735,16 @@ className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain
 className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
 ```
 
+A toast that replaces another pops the leaving one out of the lane's flow, so the two never share the width for the 160ms of its fade:
+
 ```tsx app/components/undo-toast.tsx
-          className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs duration-160 ${
-            toast ? "animate-in fade-in-0 slide-in-from-bottom-2" : "animate-out fade-out-0 [animation-fill-mode:forwards]"
-          } ${shown.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"}`}
+<AnimatePresence mode="popLayout">
+```
+
+```tsx app/components/undo-toast.tsx
+            className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs ${
+              toast.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"
+            }`}
 ```
 
 Raise one from any event handler (`digest-dashboard.tsx`). The Undo button uses the `signal` variant:
@@ -755,16 +781,12 @@ How they behave is in CLAUDE.md → App shell and navigation; their timing is in
 `app/components/reader-panel.tsx`:
 
 ```tsx app/components/reader-panel.tsx
-      <section className="border-2 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--ink)]">
-        <div className="flex items-center justify-between">
-          <p className="font-mono text-xs tracking-[0.14em]">{t.progress}</p>
-          <span className="font-display text-3xl text-signal">{progress}%</span>
-        </div>
+      <StatTile label={t.progress} value={`${progress}%`} detail={`${readCount} / ${total} · ${syncing ? t.syncing : t.synced}`}>
         <Progress value={progress} aria-label={t.progress} className="mt-4 h-3 rounded-none bg-ink/15 [&_[data-slot=progress-indicator]]:bg-signal" />
 ```
 
 - **The to-do list:** a 40px field and a `signal` add button, then rows whose label is the 40px target (the 16px checkbox alone would be too small).
-- **Opening it:** below `2xl`, a round outline pill in the Radar header opens the panel. It shows `NN%`, plus the open to-do count in signal.
+- **Opening it:** below the column width (`@[95rem]`), a round outline pill in the Radar header opens the panel. It shows `NN%`, plus the open to-do count in signal.
 
 ### Form fields
 
@@ -793,24 +815,16 @@ A multi-line field, from `app/(app)/library/[id]/post-editor.tsx`:
 
 ### Empty states
 
-An empty view says what to do next. On cream (`digest-dashboard.tsx`), a dashed box holds the note and, when a filter is on, a `brutal` "All stories" button:
+An empty view says what to do next, in one component (`EmptyState`, `app/components/empty-state.tsx`, 2a spec D8): a dashed box, an optional signal icon, a sentence at most 75ch wide and, where there is one, a 40px link or `brutal` button. Two tones, `cream` (the Radar) and `ink` (the Library, the GitHub page, the collection):
 
-```tsx app/components/digest-dashboard.tsx
-function EmptyNote({ children }: { children: ReactNode }) {
-  return <div className="border-2 border-dashed border-ink/35 p-10 text-center font-mono text-sm text-ink/55">{children}</div>;
-}
+```tsx app/components/empty-state.tsx
+    <div className={`flex flex-col items-center gap-3 border-2 border-dashed p-10 text-center font-mono text-sm ${frame}`}>
 ```
 
-On ink (`library-view.tsx`), a mono line is followed by a 40px signal link:
+### Small kit pieces
 
-```tsx app/(app)/library/library-view.tsx
-          <p className="font-mono text-sm text-paper/55">
-            <LocalizedText value={copy.empty} />{" "}
-            <a href="#submit" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
-              <LocalizedText value={copy.toForm} />
-            </a>
-          </p>
-```
+- **`StatTile`** (`stat-tile.tsx`): one number with its label on a paper card with the ink hard shadow, an optional detail line and children (the reader panel's progress bar sits in one; the dashboard's tiles will).
+- **`Kbd`** (`kbd.tsx`): a key badge in the text colour's 40% frame, for the shortcuts help, the Keresés row's ⌘K and the account menu's ?.
 
 ## Do's and Don'ts
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import {
   Bookmark,
   Building2,
@@ -20,6 +20,8 @@ import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
 import { ratingKey, type Ratings } from "@/lib/ratings";
 import { repoStats } from "@/lib/repo-format";
 import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
+import { usePanel } from "./app-shell";
+import { EmptyState } from "./empty-state";
 import { useLanguage } from "./language-context";
 import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
@@ -37,6 +39,7 @@ const copy = {
     categories: "Kategóriák",
     panel: "Haladás és to-do",
     updated: "Napi frissítés",
+    schedule: "NAPI 05:00 UTC · ZÁRÁS VAS 24:00",
     archive: "Heti zárás",
     status: "ÁLLAPOT",
     frozen: "LEZÁRVA",
@@ -70,6 +73,7 @@ const copy = {
     categories: "Categories",
     panel: "Progress & to-do",
     updated: "Daily refresh",
+    schedule: "DAILY 05:00 UTC · FREEZE SUN 24:00",
     archive: "Weekly close",
     status: "STATUS",
     frozen: "FROZEN",
@@ -192,7 +196,8 @@ export function DigestDashboard(
   const emptyFeed = companies ? companiesEmpty : radarEmpty;
   const topLabel = companies && top.length ? `${t.dailyTop} · ${addedDayLabel(top[0].addedAt)}` : t.mustRead;
 
-  // Rendered twice: as the 2xl side column, and inside the header Sheet below 2xl.
+  const panelLayer = usePanel();
+  // Rendered twice: as the side column from a 95rem-wide Radar (R3 §2: its own width, not the viewport's), and inside the header Sheet below that.
   const panel = (
     <ReaderPanel
       language={language}
@@ -208,23 +213,23 @@ export function DigestDashboard(
   );
 
   return (
-    <div className="min-w-0 bg-cream text-ink">
-      <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
+    <div className="min-w-0 bg-cream text-ink @container">
+      <header className="radar-header sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {!archived && <span className="live-pulse shrink-0" />}
           <div className="min-w-0">
-            <p className="truncate font-mono text-[10px] tracking-[0.2em] text-signal">{archived ? t.archived : t.live}</p>
+            <p className="truncate font-mono text-[11px] tracking-[0.18em] text-signal">{archived ? t.archived : t.live}</p>
             <p className="font-display text-lg leading-none">{issue.label}</p>
           </div>
         </div>
         {/* Non-modal, so the undo toast above it stays clickable, reachable by Tab and announced. */}
-        <Sheet modal={false}>
+        <Sheet modal={false} open={panelLayer.open} onOpenChange={panelLayer.setOpen}>
           <SheetTrigger asChild>
             <Button
               variant="outline"
               size="sm"
               aria-label={t.panel}
-              className="press h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:pointer-fine:h-9 2xl:hidden"
+              className="press h-10 shrink-0 rounded-full border-ink bg-transparent font-mono text-xs hover:bg-ink hover:text-paper sm:pointer-fine:h-9 @[95rem]:hidden"
             >
               <ListTodo /> {progress}%{openTodos > 0 && <span className="text-signal">· {openTodos}</span>}
             </Button>
@@ -252,13 +257,13 @@ export function DigestDashboard(
         </Sheet>
       </header>
 
-      <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_330px]">
-        {/* The chip bar belongs to this column, so the 2xl panel beside it is not covered. */}
+      <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 @[95rem]:grid-cols-[minmax(0,1fr)_330px]">
+        {/* The chip bar belongs to this column, so the panel beside it is not covered. */}
         <div className="min-w-0">
           {!companies && (
             <nav
               aria-label={t.categories}
-              className="sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
+              className="radar-chips sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
             >
               {filters.map(({ id, icon: Icon }) => (
                 <button
@@ -275,7 +280,7 @@ export function DigestDashboard(
           )}
 
           <main className="min-w-0 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
-            <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-7 text-paper sm:px-8 sm:py-9">
+            <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-6 text-paper sm:px-8 sm:py-9">
               <div className="signal-grid" aria-hidden="true" />
               <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
                 {/* Sized in cqi, not vw: the nav and the panel make this column much narrower than the viewport. */}
@@ -285,14 +290,19 @@ export function DigestDashboard(
                     <span>
                       {t.updated}: {issue.updated}
                     </span>
+                    <span>{t.schedule}</span>
                   </div>
                   <h1 className="max-w-4xl font-display text-[clamp(2.6rem,15cqi,8rem)] leading-[0.77] tracking-[-0.07em]">
                     {companies ? t.companiesTitle : "AI WEEKLY"}
                     <span className="text-signal">{"//"}</span>
                   </h1>
-                  <p className="mt-5 max-w-2xl font-mono text-sm leading-6 text-paper/65">{companies ? t.companiesLead : t.lead}</p>
+                  {/* R3 §1: on a phone the lead and the close box give way to one status line under the title. */}
+                  <p className="mt-5 hidden max-w-2xl font-mono text-sm leading-6 text-paper/65 sm:block">{companies ? t.companiesLead : t.lead}</p>
+                  <p className="mt-3 font-mono text-xs text-paper/60 sm:hidden">
+                    {t.archive}: {issue.archiveAt} · {archived ? t.frozen : t.collecting}
+                  </p>
                 </div>
-                <div className="border-l border-paper/25 pl-5 font-mono text-xs leading-6 text-paper/60">
+                <div className="hidden border-l border-paper/25 pl-5 font-mono text-xs leading-6 text-paper/60 sm:block">
                   <p className="text-signal">{t.archive}</p>
                   <p className="text-lg font-bold text-paper">{issue.archiveAt}</p>
                   <p>
@@ -312,7 +322,7 @@ export function DigestDashboard(
                 {githubTop10.length ? (
                   <GithubTopList entries={githubTop10} ratings={props.ratings} />
                 ) : (
-                  <EmptyNote>{t.emptyGithub}</EmptyNote>
+                  <EmptyState tone="cream" icon={GitFork}>{t.emptyGithub}</EmptyState>
                 )}
               </section>
             ) : (
@@ -335,14 +345,14 @@ export function DigestDashboard(
                       <StoryCard key={item.id} {...cardProps(item)} />
                     ))}
                     {!feed.length && emptyFeed && (
-                      <EmptyNote>
+                      <EmptyState tone="cream" icon={Newspaper}>
                         <p>{emptyFeed}</p>
                         {filter !== "all" && (
                           <Button variant="brutal" className="mt-4 min-h-10" onClick={() => setFilter("all")}>
                             {t.showAll}
                           </Button>
                         )}
-                      </EmptyNote>
+                      </EmptyState>
                     )}
                   </div>
                 </section>
@@ -351,7 +361,7 @@ export function DigestDashboard(
           </main>
         </div>
 
-        <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 2xl:sticky 2xl:top-16 2xl:block 2xl:h-[calc(100dvh-4rem)] 2xl:overflow-y-auto">
+        <aside className="hidden border-l-2 border-ink bg-cream px-5 py-7 @[95rem]:sticky @[95rem]:top-16 @[95rem]:block @[95rem]:h-[calc(100dvh-4rem)] @[95rem]:overflow-y-auto @[95rem]:pb-24">
           {panel}
         </aside>
       </div>
@@ -368,11 +378,6 @@ function SectionLabel({ icon: Icon, label }: { icon: LucideIcon; label: string }
       <h2 className="font-mono text-xs font-bold tracking-[0.15em]">{label}</h2>
     </div>
   );
-}
-
-/** An empty view says what to do next (spec 1.4.10). */
-function EmptyNote({ children }: { children: ReactNode }) {
-  return <div className="border-2 border-dashed border-ink/35 p-10 text-center font-mono text-sm text-ink/55">{children}</div>;
 }
 
 /** The week's GitHub Top 10 (the "github" chip): each row a link to the repo with its score, and its rating

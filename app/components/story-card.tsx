@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, Bookmark, BookmarkCheck, Check, Clock3, ExternalLink, ListChecks, ListPlus } from "lucide-react";
+import { BookOpen, Check, Clock3, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DigestItem, Language } from "@/data/digest-types";
 import { nextCardIndex } from "@/lib/keymap";
@@ -7,8 +7,8 @@ import { parseSubmittedUrl } from "@/lib/pipeline/util";
 import type { RatingValue } from "@/lib/ratings";
 import type { Flag, ItemState } from "@/lib/reader-store";
 import { PendingDot } from "./nav-parts";
+import { CardToolbar } from "./card-toolbar";
 import { dislikedClass, pressedClass } from "./rating-classes";
-import { RatingControl } from "./rating-control";
 import { Tag } from "./tag";
 
 const copy = {
@@ -16,22 +16,16 @@ const copy = {
     score: "PONT",
     min: "PERC",
     why: "MIÉRT FONTOS",
-    open: "Megnyitás",
+    open: "Forrás, új lapon",
     readHere: "Olvasd itt",
-    later: "Később",
-    addTodo: "Teendőhöz adás",
-    hasTodo: "Már a teendők között",
     read: "Olvasott",
   },
   en: {
     score: "SCORE",
     min: "MIN",
     why: "WHY IT MATTERS",
-    open: "Open source",
+    open: "Source, in a new tab",
     readHere: "Read here",
-    later: "Later",
-    addTodo: "Add to to-dos",
-    hasTodo: "Already a to-do",
     read: "Read",
   },
 };
@@ -69,11 +63,12 @@ export function StoryCard(props: CardProps) {
   return (
     <article
       {...cardFocus(item.id)}
-      className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+      data-saved={state.saved || undefined}
+      className={`focus-ring story-card max-w-[900px] border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
         {/* A row of meta on narrow screens, the 96px gutter from lg up. */}
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[10px] leading-5 text-ink/55 lg:block">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[11px] leading-5 text-ink/55 lg:block">
           <p className="text-signal">{item.publishedLabel}</p>
           <p className="lg:mt-2">
             {t.score} <span className="font-display text-xl text-ink lg:block lg:text-3xl">{item.score}</span>
@@ -97,11 +92,12 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
   return (
     <article
       {...cardFocus(item.id)}
+      data-saved={state.saved || undefined}
       className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="mb-6 flex items-start justify-between">
         <span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
-        <span className="border border-ink px-2 py-1 font-mono text-[10px]">{item.score}/100</span>
+        <span className="border border-ink px-2 py-1 font-mono text-[11px]">{item.score}/100</span>
       </div>
       <CardText {...props} titleClassName="text-2xl leading-[1.02]" />
       <CardFooter {...props} />
@@ -109,15 +105,29 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
   );
 }
 
-function CardText({ item, language, titleClassName }: CardProps & { titleClassName: string }) {
+function CardText({ item, language, actions, titleClassName }: CardProps & { titleClassName: string }) {
   const t = copy[language];
   return (
     <>
-      <p className="font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere]">{item.source}</p>
+      {/* The source is the meta row's link (2a spec D1), and the `o` shortcut's target (data-card-open). */}
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noreferrer"
+        data-card-open
+        onClick={() => actions.onOpen(item)}
+        onAuxClick={(event) => {
+          if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
+        }}
+        className="focus-ring inline-flex min-h-10 items-center gap-1 font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere] hover:underline"
+      >
+        {item.source} <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+        <span className="sr-only">({t.open})</span>
+      </a>
       <h2 className={`mt-3 font-display [overflow-wrap:anywhere] ${titleClassName}`}>{item.title[language]}</h2>
       <p className="mt-4 max-w-3xl text-base leading-7 text-ink/72">{item.summary[language]}</p>
       <div className="mt-5 border-l-4 border-signal pl-4">
-        <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{t.why}</p>
+        <p className="font-mono text-[11px] tracking-[0.15em] text-signal">{t.why}</p>
         <p className="mt-1 text-sm leading-6">{item.why[language]}</p>
       </div>
       {item.tags.length > 0 && (
@@ -131,26 +141,12 @@ function CardText({ item, language, titleClassName }: CardProps & { titleClassNa
   );
 }
 
-/** [Open] [Olvasd itt] [👎 👍 ❤] [Later] [+ to-do] … [Read]: every action in one row at the bottom, in thumb reach. */
+/** [Olvasd itt] [👎 👍 ❤ 🔖 ☑] … [✓ Elolvastam] (2a spec D1): one primary action, one tool unit, the Read toggle
+ *  last; the source link sits in the meta row above. */
 function CardFooter({ item, state, hasTodo, language, actions, postId, rating }: CardProps) {
   const t = copy[language];
-  const todoLabel = hasTodo ? t.hasTodo : t.addTodo;
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
-      <Button asChild variant="ink" className="min-h-10">
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noreferrer"
-          data-card-open
-          onClick={() => actions.onOpen(item)}
-          onAuxClick={(event) => {
-            if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
-          }}
-        >
-          {t.open} <ExternalLink />
-        </a>
-      </Button>
       {/* Read-here spec 1: our own post when there is one; otherwise the chat sends the link, unless a submission would refuse it. */}
       {postId !== undefined ? (
         <Button asChild variant="brutal" className="min-h-10">
@@ -172,29 +168,15 @@ function CardFooter({ item, state, hasTodo, language, actions, postId, rating }:
           </Button>
         )
       )}
-      <RatingControl target={{ kind: "item", id: item.id }} initial={rating} />
-      <Button
-        variant="brutal"
-        size="icon-lg"
-        aria-pressed={state.saved}
-        aria-label={t.later}
-        title={t.later}
-        onClick={() => actions.onToggle(item.id, "saved")}
-        className={`size-10 sm:pointer-fine:size-8 ${pressedClass}`}
-      >
-        {state.saved ? <BookmarkCheck /> : <Bookmark />}
-      </Button>
-      <Button
-        variant="brutal"
-        size="icon-lg"
-        disabled={hasTodo}
-        aria-label={todoLabel}
-        title={todoLabel}
-        onClick={() => actions.onAddTodo(item)}
-        className="size-10 sm:pointer-fine:size-8"
-      >
-        {hasTodo ? <ListChecks /> : <ListPlus />}
-      </Button>
+      <CardToolbar
+        itemId={item.id}
+        saved={state.saved}
+        hasTodo={hasTodo}
+        rating={rating}
+        language={language}
+        onToggleSaved={() => actions.onToggle(item.id, "saved")}
+        onAddTodo={() => actions.onAddTodo(item)}
+      />
       <Button
         variant="brutal"
         aria-pressed={state.read}

@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { Languages } from "lucide-react";
+import type { Language } from "@/data/digest-types";
 import { switchesLanguageInPlace } from "@/lib/nav";
 import { useLanguage } from "./language-context";
 import { NavTooltip } from "./nav-parts";
@@ -10,19 +11,26 @@ import { useRefresh } from "./refresh-bar";
 // Each label names the switch in the language it switches to.
 const copy = { hu: { label: "Switch to English" }, en: { label: "Váltás magyarra" } };
 
-/** Switches the whole shell at once; only a page whose text the server rendered in one language is refreshed. `iconOnly` is the rail's ~40px version (desktop-nav.tsx). */
-export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}) {
-  const { language, setLanguage } = useLanguage();
+/** Switches the whole shell at once; only a page whose text the server rendered in one language is refreshed. */
+export function useSwitchLanguage() {
+  const { setLanguage } = useLanguage();
   const refresh = useRefresh();
   const pathname = usePathname();
+  return (next: Language) => {
+    setLanguage(next);
+    if (!switchesLanguageInPlace(pathname)) refresh();
+  };
+}
+
+/** The toggle button; `iconOnly` is the ~40px version for a rail. */
+export function LanguageToggle({ iconOnly = false }: { iconOnly?: boolean } = {}) {
+  const { language } = useLanguage();
+  const switchLanguage = useSwitchLanguage();
   const label = copy[language].label;
   const toggle = (
     <button
       type="button"
-      onClick={() => {
-        setLanguage(language === "hu" ? "en" : "hu");
-        if (!switchesLanguageInPlace(pathname)) refresh();
-      }}
+      onClick={() => switchLanguage(language === "hu" ? "en" : "hu")}
       aria-label={label}
       className={
         iconOnly

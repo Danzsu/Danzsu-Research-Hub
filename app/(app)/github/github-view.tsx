@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { GitFork } from "lucide-react";
+import { EmptyState } from "@/app/components/empty-state";
 import { FilterChips } from "@/app/components/filter-chips";
 import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
@@ -53,15 +55,15 @@ export function GithubView({ repos, more, languages, filters }: { repos: GithubR
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="REPOS / REPÓK" title="GITHUB" lead={<LocalizedText value={copy.lead} />} />
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:px-10">
+      <section className="mx-auto grid max-w-[1600px] gap-6 px-4 py-10 sm:px-10">
         <div className="grid gap-3">
           <FilterChips label={copy.ratingLabel} chips={ratingChips} />
           <FilterChips label={copy.languageLabel} chips={languageChips} />
         </div>
         {!repos.length && (
-          <p className="font-mono text-sm text-paper/55">
+          <EmptyState tone="ink" icon={GitFork}>
             <LocalizedText value={copy.empty} />
-          </p>
+          </EmptyState>
         )}
         <ul className="grid gap-3">
           {repos.map((repo) => (

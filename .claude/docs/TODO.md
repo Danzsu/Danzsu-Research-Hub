@@ -84,6 +84,7 @@
 ## B. Funkciók (fontossági sorrendben)
 
 ### Kész
+- [x] **2a „Vizuális audit és új komponensek”** (2026-10-11): a hírkártya egy elsődleges gombbal és egy eszközsorral, a forrás a meta sorban; 11 px-es betűpadló; a kártya három jele (olvasott halvány, 👎 szaggatott, Később signal sáv); a címek a saját oszlophoz méretezve, alacsonyabb másodlagos hero; az R3 elrendezés (alacsony képernyő, a panel oszlopa a Radar szélessége szerint, 900 px-es kártya, 75ch sorok, 1–4 oszlopos rácsok, egyszerre egy panel); fiók-menü, a „hamarosan” sorok ki; a belépés a landing keretében, a kilépés a landingre; `EmptyState`, `StatTile`, `Kbd`, `CardToolbar`, `AccountMenu`; a `motion` könyvtár az értékelés-nyomáson, a toaston és a taiyakin. Spec: [specs/2026-10-11-visual-review-and-components-design.md](specs/2026-10-11-visual-review-and-components-design.md), terv: [plans/2026-10-11-visual-review-and-components.md](plans/2026-10-11-visual-review-and-components.md).
 - [x] **Kódbázis-rend és config** (2026-10-11): a dokumentáció a `.claude/` alatt, a források és az env-leírás a `config/` alatt; belépés nélkül a `/` a landingre visz; az értékelés a repó kártyáján belül; a GitHub repók saját `/github` menüpontja; a napi futás törli a régi rangokat. Terv: [plans/2026-10-11-codebase-order-and-config.md](plans/2026-10-11-codebase-order-and-config.md). A 2a vizuális audit specje: [specs/2026-10-11-visual-review-and-components-design.md](specs/2026-10-11-visual-review-and-components-design.md).
 - [x] **Reszponzív UX:** mobilos chip-sáv a kategóriákhoz, a haladás és a to-do lenyíló panelben (`2xl` alatt), 360 px-en sincs vízszintes görgetés, legalább 40 px-es érintési felületek, betöltési, hiba- és 404-oldal, `manifest` (kezdőképernyőre tehető)
 - [x] **Sidebar-hiba:** a Tailwind 3-as szintaxis miatt asztali nézetben hibás volt a sidebar szélessége
@@ -157,6 +158,8 @@
   - A lista pontszám szerint rendezve jelenik meg.
 
 ### Következő lépések
+- [ ] **A kiadás: a `visual-review` PR** (2026-10-11, a `codebase-order` után). Migráció nincs; egy új függőség (`motion` 14.0.0). A merge után élő próba: a fiók-menü asztalon és a „Több” alatt telefonon; kilépés → landing a „Kijelentkeztél” sorral; a `/login` a landing keretében; a hírkártya eszközsora egy valódi telefonon; a Radar panel és a chat egyszerre sosem; `prefers-reduced-motion` mellett az értékelés-nyomás nem mozdul.
+- [ ] **2b Keresés** (a következő spec): Postgres teljes szövegű + trigram keresés a ⌘K palettában és a `/search` oldalon, a C-spec 3.4–3.5 szerint; utána 2c dashboard, 2d chat + embedding + G3.
 - [ ] **A kiadás: a `codebase-order` PR** (2026-10-11). Migráció nincs. A merge után élő próba: a `/` kijelentkezve az `/about`-ra visz; a menüben a GitHub repók és a `/github` listázza a korábbi hetek repóit (ha üres marad, a Supabase-ben a `github_repos` nézet lekérdezése a következő lépés); a Top 10 kártyáin a gombcsoport a kártyán belül; a másnapi futás után a pontszámok látszanak.
 - [x] **A G1 élesítése** (a `github-ratings` branch, a `google-sso` PR merge-e után): a `supabase/migrations/20261003000000_ratings_github_repos.sql` futtatása az SQL Editorban **a deploy előtt** (a Radar lekérdezése az új oszlopokat olvassa), utána a merge. Élő próba: egy ❤ a Radaron megjelenik a Gyűjteményben, és a GitHub-fül listázza a korábbi hetek repóit.
 - [x] **A kiadás: a `google-sso` PR** (2026-10-03; mindkét PR beolvasztva 2026-10-11, a migrációk lefuttatva, élesben megy). Ami nyitva maradt belőle: a Google-belépés beállítása (lent) és az élő próbák. A PR mindent visz, ami még nincs fent (az R1 és a Hírek csomag már él): „Olvasd itt” és tükör, R2, a Reddit kivétele, Google-belépés, az R3 spec. A merge élesít (production deploy), ezért ebben a sorrendben:
@@ -210,6 +213,13 @@
     - egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik;
     - a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
     - a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban.
+  - **2a vizuális audit (záró review, 2026-10-11):**
+    - csökkentett mozgás alatt a toast még 160 ms-ot halványul (az opacity-t a `reducedMotion="user"` nem állítja le): `useReducedMotion` → 0 időtartam, ha zavar;
+    - a panel kontextusa (`app-shell.tsx`) minden rendernél új objektum: `useMemo`;
+    - a panel nyitott állapota túléli az oldalt (Back után újranyílik): zárás útvonalváltáskor;
+    - az archívum üres sora még nem `EmptyState`;
+    - a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja);
+    - a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel; a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül.
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Az R1 Gyors és az R2 Visszajelzés kész; hátra van az **R3 Elrendezés** (a mobil fekvő keret, a széles képernyő, a panel és a chat takarása, a taiyaki kerete ink oldalon). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.

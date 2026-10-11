@@ -9,9 +9,10 @@ export function HeroBand({ aside, children }: { aside?: ReactNode; children: Rea
   return (
     // @container: the sidebar (256px full, 56px rail) makes this section's own width, not the
     // viewport, the thing the two-column switch below has to key off (spec: Design language → Responsive rules).
-    <section className="@container border-b-2 border-signal bg-cream px-4 py-10 text-ink sm:px-10 sm:py-16">
-      <div className={`mx-auto max-w-6xl ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
-        <div className="min-w-0">{children}</div>
+    <section className="@container border-b-2 border-signal bg-cream px-4 py-8 text-ink sm:px-10 sm:py-10">
+      <div className={`mx-auto max-w-[1600px] ${aside ? "grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)] @4xl:items-end" : ""}`}>
+        {/* The title's own column is the container (2a spec D2): on the Library the form sits beside it. */}
+        <div className="min-w-0 @container">{children}</div>
         {aside}
       </div>
     </section>
@@ -23,11 +24,13 @@ export function PageHero({ eyebrow, title, lead, aside }: { eyebrow: string; tit
   return (
     <HeroBand aside={aside}>
       <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>
-      <h1 className="mt-3 font-display text-[clamp(2.6rem,11vw,8.8rem)] leading-[0.78] tracking-[-0.07em] [overflow-wrap:anywhere]">
+      {/* 12cqi: GYŰJTEMÉNY fits one line beside the Library form at 1280. Below sm the screen is narrower than the
+          word, so it may break anywhere there; from sm it never breaks inside a word. */}
+      <h1 className="mt-3 font-display text-[clamp(2.4rem,12cqi,7rem)] leading-[0.8] tracking-[-0.06em] [overflow-wrap:anywhere] [hyphens:manual] sm:[overflow-wrap:normal]">
         {title}
         <span className="text-signal">{"//"}</span>
       </h1>
-      <p className="mt-7 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
+      <p className="mt-4 max-w-2xl text-lg leading-7 text-ink/65">{lead}</p>
     </HeroBand>
   );
 }

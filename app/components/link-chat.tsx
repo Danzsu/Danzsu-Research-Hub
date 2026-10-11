@@ -4,11 +4,12 @@ import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { motion } from "motion/react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isSendKey } from "@/lib/keymap";
-import { createLinkChat, httpTransport, memoryTransport } from "@/lib/link-chat";
+import { createLinkChat, focusIsIdle, httpTransport, memoryTransport } from "@/lib/link-chat";
 import type { MySource } from "@/lib/my-sources";
 import { busyClass, ChatThread } from "./chat-thread";
 import { useLanguage } from "./language-context";
@@ -54,7 +55,10 @@ export function TaiyakiButton({ open, onClick, className }: { open: boolean; onC
       aria-controls={CHAT_PANEL_ID}
       className={`focus-ring lift place-items-center border-2 border-ink bg-paper ${className}`}
     >
-      <TaiyakiIcon className="size-10" />
+      {/* The fish turns a little when its panel is open (2a spec D7); still under reduced motion. */}
+      <motion.span data-taiyaki-icon animate={{ rotate: open ? -12 : 0 }} transition={{ type: "spring", duration: 0.25, bounce: 0.3 }} className="grid">
+        <TaiyakiIcon className="size-10" />
+      </motion.span>
     </button>
   );
 }
@@ -228,8 +232,10 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           // Radix also runs this when the window crosses md with the panel open (the Dialog remounts, modal
-          // or not): the panel keeps the focus then, and only a real close hands it back.
-          if (!open) shownOpener(opener.current)?.focus();
+          // or not): the panel keeps the focus then, and only a real close hands it back. And only when nothing
+          // else took it: the reader panel that closed this chat already holds the focus, and being non-modal,
+          // it would read the hand-back as focus outside and close too.
+          if (!open && focusIsIdle(document)) shownOpener(opener.current)?.focus();
         }}
         onInteractOutside={(event) => {
           if (!isMobile || isUndoToast(event.target)) event.preventDefault();

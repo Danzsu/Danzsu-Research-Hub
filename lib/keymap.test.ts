@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isEditableTarget, isSendKey, nextCardIndex, shortcutFor, type KeyPress, type KeyTarget } from "./keymap.ts";
+import { parseHTML } from "linkedom";
+import { inOverlay, isEditableTarget, isSendKey, nextCardIndex, shortcutFor, type KeyPress, type KeyTarget } from "./keymap.ts";
 
 const press = (key: string, modifiers: Partial<KeyPress> = {}): KeyPress => ({ key, ctrlKey: false, metaKey: false, altKey: false, ...modifiers });
 const page: KeyTarget = { editable: false, inDialog: false };
@@ -17,6 +18,19 @@ test("nothing fires while typing, whatever the key", () => {
   for (const keyPress of [press("j"), press("r"), press("o"), press("?"), press("/"), press("["), press("k", { metaKey: true })]) {
     assert.equal(shortcutFor(keyPress, typing), null, keyPress.key);
   }
+});
+
+// Final review #9. Kills shortcuts firing inside the account menu (role=menu): `[` swapped the trigger from under
+// the open menu, and j/k moved the cards behind it while the menu's own typeahead ran.
+test("inOverlay covers a dialog, an alert dialog and a menu, and nothing else", () => {
+  const { document } = parseHTML(
+    '<div role="dialog"><button id="d"></button></div><div role="alertdialog"><button id="a"></button></div><div role="menu"><button id="m"></button></div><button id="p"></button>',
+  );
+  assert.deepEqual(
+    ["d", "a", "m", "p"].map((id) => inOverlay(document.getElementById(id))),
+    [true, true, true, false],
+  );
+  assert.equal(inOverlay(null), false);
 });
 
 test("an open dialog or an IME composition swallows shortcuts", () => {

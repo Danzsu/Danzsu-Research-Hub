@@ -24,7 +24,7 @@ import { render } from "../../lib/test/render.ts";
 // throw "Too many re-renders" (see the report for the before/after repro) — not full interaction
 // coverage; clicks and state changes are checked in the browser (TESTING.md, Test layers).
 
-const { AppShell } = await import("./app-shell.tsx");
+const { AppShell, PanelContext } = await import("./app-shell.tsx");
 const { LanguageProvider } = await import("./language-context.tsx");
 const { toasts, UndoToast } = await import("./undo-toast.tsx");
 const { ReaderPanel } = await import("./reader-panel.tsx");
@@ -52,7 +52,15 @@ const withShellProviders = <P extends object>(Component: ComponentType<P>, props
     createElement(
       LanguageProvider,
       { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-      createElement(RatingsProvider, sendNothing, createElement(RefreshProvider, null, createElement(ReadHereContext, { value: noop }, createElement(Component, props)))),
+      createElement(
+        RatingsProvider,
+        sendNothing,
+        createElement(
+          RefreshProvider,
+          null,
+          createElement(ReadHereContext, { value: noop }, createElement(PanelContext, { value: { open: false, setOpen: () => {} } }, createElement(Component, props))),
+        ),
+      ),
     ),
   );
 /** Renders DigestDashboard from a real seed (never preview) and returns its body text. */
@@ -82,6 +90,8 @@ test("UndoToast mounts its live region and survives an active toast with no rend
     const status = doc.querySelector('[role="status"]');
     assert.ok(status, "the toast's live region is always mounted");
     assert.equal(status.getAttribute("aria-live"), "polite");
+    // 2a spec D7: the toast itself is a motion element inside an AnimatePresence, so it can leave with a fade.
+    assert.ok(doc.querySelector("[data-toast-presence]"), "the toast's presence wrapper is always there");
     // useSyncExternalStore calls getServerSnapshot ("no toast") under renderToStaticMarkup, so the
     // toast's own text never reaches this static markup even with one showing — a harness gap, not
     // a bug (see the report). What this test still proves: 271d147's unconditional
@@ -219,14 +229,45 @@ test("useReaderState routes a preview source's writes through createSourceStore,
   assert.equal(fetchCalls, 0);
 });
 
-test("StoryCard renders an unread feed card with its full action row", () => {
+// 2a spec D1 and Review Focus 2. Kills the source link gone from the meta row (and with it the `o` shortcut's
+// target), two primary buttons, and a Read toggle anywhere but last.
+test("StoryCard puts the source in its meta row, one Read here button, the toolbar, then Read last", () => {
   const item = previewItems.find((candidate) => !candidate.mustRead)!;
   const doc = withShellProviders(StoryCard, { item, state: { read: false, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: null });
   const article = doc.querySelector("article.story-card")!;
   assert.equal(article.getAttribute("data-card-id"), item.id);
   assert.equal(article.classList.contains("story-read"), false);
-  assert.equal(doc.querySelectorAll(`a[href="${item.url}"]`).length, 1);
-  assert.equal(doc.querySelectorAll("button[aria-pressed]").length, 5); // Later + Read + the three rating toggles
+  assert.equal(article.querySelector("[data-card-open]")?.getAttribute("href"), item.url);
+  assert.equal(article.querySelectorAll('a[href^="http"]').length, 1, "the source link, once, in the meta row");
+  assert.equal(article.querySelectorAll("[data-card-toolbar]").length, 1);
+  const buttons = [...article.querySelectorAll("button")];
+  assert.match(buttons.at(-1)?.textContent ?? "", /Read/);
+  assert.equal(article.querySelectorAll("button[aria-pressed]").length, 5); // Later + Read + the three rating toggles
+});
+
+// 2a spec D4 and Review Focus 1. Kills a saved card with no mark of its own (only the toggle showed it), a 👎
+// that also dims (read and 👎 would look the same), and a read 👎 card losing either sign.
+test("a card shows saved, read and 👎 with three different signs that can combine", () => {
+  const item = previewItems.find((candidate) => !candidate.mustRead)!;
+  const saved = withShellProviders(StoryCard, { item, state: { read: false, saved: true }, hasTodo: false, language: "en", actions: cardActions, rating: null });
+  assert.equal(saved.querySelector("article")?.hasAttribute("data-saved"), true);
+  const readDown = withShellProviders(StoryCard, { item, state: { read: true, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: -1 });
+  const article = readDown.querySelector("article")!;
+  assert.ok(article.classList.contains("story-read"));
+  assert.equal(article.querySelector('[role="group"]')?.getAttribute("data-rating"), "down");
+  assert.equal(article.hasAttribute("data-saved"), false);
+});
+
+// R3 spec §2–3. Kills the panel column keyed to the viewport (2xl) instead of the Radar's own width, a story
+// card with no width cap on a wide screen, and the list grids stuck at two columns.
+test("the Radar's panel column and the list grids follow their own width, and a story card is capped", () => {
+  const radar = withShellProviders(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } });
+  const root = radar.querySelector("aside")!.parentElement!;
+  assert.match(root.className, /@\[95rem\]:grid-cols/);
+  assert.doesNotMatch(root.className, /2xl:grid-cols/);
+  assert.match(radar.querySelector("article.story-card")?.className ?? "", /max-w-\[900px\]/);
+  const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, ratings: {}, preview: { failWrites: false } });
+  assert.match(library.querySelector('a[href^="/library/"]')!.parentElement!.className, /@\[72rem\]:grid-cols-3/);
 });
 
 test("MustReadCard dims once read and shows its rank", () => {
@@ -298,6 +339,8 @@ test("TaiyakiButton names itself in the reader's language, and says which panel 
     ).querySelector("button");
     return [element?.getAttribute("aria-label"), element?.getAttribute("aria-expanded"), element?.getAttribute("aria-controls")];
   };
+  // 2a spec D7: the icon turns in a motion span when the panel opens.
+  assert.ok(render(createElement(LanguageProvider, { initial: "hu" } as ComponentProps<typeof LanguageProvider>, createElement(TaiyakiButton, { open: false, onClick: noop, className: "grid" }))).querySelector("button [data-taiyaki-icon]"));
   assert.deepEqual(button("hu", false), ["Link bedobása", "false", CHAT_PANEL_ID]);
   assert.deepEqual(button("en", true), ["Drop a link", "true", CHAT_PANEL_ID]);
 });
@@ -450,4 +493,15 @@ test("each Top 10 card links the repo by name, shows its score and holds its rat
   assert.equal(rows[0].querySelector('[role="group"]')?.getAttribute("data-rating"), "down");
   assert.match(rows[0].textContent ?? "", /92\/100/);
   assert.match(rows[1].textContent ?? "", /— · ★ — · —/);
+});
+
+// R3 spec §4. Kills the to-do panel and the link chat open at once: opening one closes the other.
+test("opening the link chat closes the reader panel, and opening the panel closes the chat", async () => {
+  const { createShellLayers } = await import("./app-shell.tsx");
+  const layers = createShellLayers();
+  layers.setPanelOpen(true);
+  layers.setChatOpen(true);
+  assert.deepEqual([layers.panelOpen(), layers.chatOpen()], [false, true]);
+  layers.setPanelOpen(true);
+  assert.deepEqual([layers.panelOpen(), layers.chatOpen()], [true, false]);
 });

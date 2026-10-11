@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { docFile } from "./test/doc-file.ts";
 
@@ -64,4 +64,22 @@ test("app/globals.css keeps one :root and a single fixed theme: no .dark block, 
   assert.equal(css.match(/:root\b/g)?.length ?? 0, 1, "app/globals.css must have exactly one :root");
   assert.doesNotMatch(css, /\.dark\b/, "app/globals.css has a .dark rule (DESIGN.md: one fixed theme)");
   assert.doesNotMatch(css, /prefers-color-scheme/, "app/globals.css has a prefers-color-scheme query (DESIGN.md: one fixed theme)");
+});
+
+// R3 spec §1. Kills the Radar header staying sticky on a short viewport (a landscape phone would keep a third of it).
+test("app/globals.css lets the Radar header and chip bar scroll on a short viewport", () => {
+  assert.match(readRepoFile("app/globals.css"), /max-height: 31\.25rem/);
+});
+
+function sourceFiles(dir: URL): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory()) return sourceFiles(new URL(`${entry.name}/`, dir));
+    return [new URL(entry.name, dir).href];
+  });
+}
+
+// 2a spec D3. Kills a 10px label creeping back: the floor for mono meta is 11px.
+test("no component sets text-[10px]: the typographic floor is 11px", () => {
+  const offenders = sourceFiles(new URL("app/", repoRoot)).filter((href) => /\.tsx$/.test(href) && readFileSync(new URL(href), "utf8").includes("text-[10px]"));
+  assert.deepEqual(offenders.map((href) => decodeURIComponent(href.slice(repoRoot.href.length))), []);
 });

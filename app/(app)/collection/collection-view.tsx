@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Heart } from "lucide-react";
+import { EmptyState } from "@/app/components/empty-state";
 import { FilterChips } from "@/app/components/filter-chips";
 import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
@@ -37,12 +38,12 @@ export function CollectionView({ favorites, kind }: { favorites: Favorite[]; kin
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="FAVOURITES / KEDVENCEK" title="GYŰJTEMÉNY" lead={<LocalizedText value={copy.lead} />} />
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:px-10">
+      <section className="mx-auto grid max-w-[1600px] gap-6 px-4 py-10 sm:px-10">
         <FilterChips label={copy.label} chips={chips} />
         {!shown.length && (
-          <p className="font-mono text-sm text-paper/55">
+          <EmptyState tone="ink" icon={Heart}>
             <LocalizedText value={copy.empty} />
-          </p>
+          </EmptyState>
         )}
         <ul className="grid gap-3">
           {shown.map((favorite) => {

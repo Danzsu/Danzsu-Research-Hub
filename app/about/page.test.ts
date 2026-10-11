@@ -3,12 +3,13 @@ import { test } from "node:test";
 import { render } from "../../lib/test/render.ts";
 
 const { default: AboutPage } = await import("./page.tsx");
+const about = async (query: Record<string, string> = {}) => render(await AboutPage({ searchParams: Promise.resolve(query) }));
 const { default: PrivacyPage } = await import("../privacy/page.tsx");
 
 // Kills the landing page without its sign-in (both forms, going home) or without the privacy link Google's
 // consent screen points at, and a feature card dropped from the list.
 test("the about page lists what the site does and carries both sign-in forms and the privacy link", async () => {
-  const doc = render(await AboutPage());
+  const doc = await about();
   assert.equal(doc.querySelector("h1")?.textContent, "NEON NEWS RADAR//");
   assert.equal(doc.querySelectorAll("main ul li").length, 9);
   const forms = [...doc.querySelectorAll("form")].map((form) => [form.getAttribute("action"), form.querySelector('input[name="next"]')?.getAttribute("value")]);
@@ -21,4 +22,13 @@ test("the privacy page states what is stored, in both languages", async () => {
   const doc = render(await PrivacyPage());
   assert.equal(doc.querySelectorAll("main section").length, 5);
   assert.match(doc.body.textContent ?? "", /openid, az e-mail és a profil/);
+});
+
+// 2a spec D6 and Review Focus 4. Kills the signed-out note missing, shown without the mark, or carried in the
+// landing's own links.
+test("the about page says you're signed out only on ?signed_out=1, and its links drop the mark", async () => {
+  const marked = await about({ signed_out: "1" });
+  assert.match(marked.querySelector('[role="status"]')?.textContent ?? "", /Kijelentkeztél/);
+  assert.equal([...marked.querySelectorAll("a")].some((a) => a.getAttribute("href")?.includes("signed_out")), false);
+  assert.equal((await about()).querySelector('[role="status"]'), null);
 });

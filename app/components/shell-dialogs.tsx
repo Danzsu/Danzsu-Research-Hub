@@ -3,6 +3,7 @@
 import { Fragment, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SHORTCUTS } from "@/lib/keymap";
+import { Kbd } from "./kbd";
 import { useLanguage } from "./language-context";
 
 const copy = {
@@ -63,9 +64,9 @@ export function ShortcutHelp({ open, onOpenChange }: DialogProps) {
           <Fragment key={action}>
             <dt className="flex flex-wrap gap-1">
               {keys.map((key) => (
-                <kbd key={key} className="border border-ink bg-paper px-1.5 py-0.5 text-xs">
+                <Kbd key={key} className="bg-paper text-xs">
                   {key}
-                </kbd>
+                </Kbd>
               ))}
             </dt>
             <dd>{label[language]}</dd>

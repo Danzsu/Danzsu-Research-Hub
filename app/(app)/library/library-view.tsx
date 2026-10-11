@@ -1,6 +1,7 @@
 import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCircle } from "lucide-react";
 import { LocalizedText } from "@/app/components/language-context";
 import { PendingDot } from "@/app/components/nav-parts";
+import { EmptyState } from "@/app/components/empty-state";
 import { PageHero } from "@/app/components/page-header";
 import { dislikedClass } from "@/app/components/rating-classes";
 import { RatingBadge } from "@/app/components/rating-control";
@@ -48,9 +49,9 @@ export function LibraryView({
       <RefreshWhileProcessing active={open.some((source) => source.status === "pending")} />
       <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm preview={preview} />} />
 
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-10">
+      <section className="mx-auto max-w-[1600px] px-4 py-10 @container sm:px-10">
         {open.length > 0 && (
-          <div className="mb-8 space-y-2 font-mono text-xs">
+          <div className="mb-8 max-w-[75ch] space-y-2 font-mono text-xs">
             {open.map((source) => (
               <p key={source.id} className="flex flex-wrap gap-3 border border-paper/20 px-4 py-3">
                 <span className={source.status === "failed" ? "text-signal" : "text-cyan"}>
@@ -64,14 +65,14 @@ export function LibraryView({
         )}
 
         {!posts.length && (
-          <p className="font-mono text-sm text-paper/55">
+          <EmptyState tone="ink" icon={BookOpen}>
             <LocalizedText value={copy.empty} />{" "}
             <a href="#submit" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
               <LocalizedText value={copy.toForm} />
             </a>
-          </p>
+          </EmptyState>
         )}
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-5 @[48rem]:grid-cols-2 @[72rem]:grid-cols-3 @[96rem]:grid-cols-4">
           {posts.map((post) => {
             const Icon = kindIcons[post.kind];
             return (
@@ -88,7 +89,7 @@ export function LibraryView({
                   </span>
                   <span className="flex items-center gap-3">
                     <RatingBadge target={{ kind: "post", id: String(post.id) }} initial={ratings[ratingKey({ kind: "post", id: String(post.id) })] ?? null} />
-                    <span className="font-mono text-[10px] opacity-60">{post.createdAt.slice(0, 10)}</span>
+                    <span className="font-mono text-[11px] opacity-60">{post.createdAt.slice(0, 10)}</span>
                   </span>
                 </div>
                 <p className="mt-6 font-mono text-xs tracking-[0.15em] opacity-60">{post.author ?? hostOf(post.url)}</p>
@@ -103,7 +104,7 @@ export function LibraryView({
                     <Tag key={tag} tag={tag} />
                   ))}
                   {post.meta.mirrored && (
-                    <span className="ml-auto flex items-center gap-1 font-mono text-[10px] opacity-60">
+                    <span className="ml-auto flex items-center gap-1 font-mono text-[11px] opacity-60">
                       <BookOpen className="size-3" /> <LocalizedText value={copy.mirrored} />
                     </span>
                   )}

@@ -12,6 +12,7 @@ test("the login page offers Google first, then the email link, both carrying the
   const doc = await page({ next: "/library?x=1" });
   const forms = [...doc.querySelectorAll("form")].map((form) => [form.getAttribute("action"), form.querySelector('input[name="next"]')?.getAttribute("value")]);
   assert.deepEqual(forms, [["/auth/google", "/library?x=1"], ["/auth/login", "/library?x=1"]]);
+  assert.ok(doc.querySelector('header a[href="/about"]'), "the login page sits in the public frame (2a spec D6)");
   assert.match(doc.querySelector('form[action="/auth/google"] button')?.textContent ?? "", /Belépés Google-lel \/ Continue with Google/);
   const evil = await page({ next: "//evil.test" });
   assert.deepEqual([...evil.querySelectorAll('input[name="next"]')].map((input) => input.getAttribute("value")), ["/", "/"]);

@@ -4,9 +4,10 @@ import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
 import { PublicPage } from "@/app/components/public-page";
 import { getLanguage } from "@/lib/language";
-import { SignInForms } from "@/app/components/sign-in-forms";
+import { SignInCard, SignInForms } from "@/app/components/sign-in-forms";
 
 const copy = {
+  signedOut: { hu: "Kijelentkeztél.", en: "You're signed out." },
   lead: {
     hu: "Privát, meghívásos AI-kutatási hub: minden nap összeválogatja a legfontosabb híreket, és a beküldött linkekből olvasható posztot csinál. Magyarul és angolul.",
     en: "A private, invite-only AI research hub: it curates the most important news every day and turns the links you send into readable posts. In Hungarian and English.",
@@ -94,12 +95,13 @@ const features: { icon: LucideIcon; title: Localized; text: Localized }[] = [
   },
 ];
 
-export default async function AboutPage() {
+export default async function AboutPage({ searchParams }: { searchParams: Promise<{ signed_out?: string }> }) {
+  const [{ signed_out }, language] = await Promise.all([searchParams, getLanguage()]);
   return (
-    <PublicPage language={await getLanguage()}>
+    <PublicPage language={language} notice={signed_out === "1" ? copy.signedOut : undefined}>
       <PageHero eyebrow="INVITE-ONLY / CSAK MEGHÍVÓVAL" title="NEON NEWS RADAR" lead={<LocalizedText value={copy.lead} />} />
       <main>
-        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-10">
+        <section className="mx-auto max-w-[1600px] px-4 py-12 sm:px-10">
           <h2 className="font-display text-3xl tracking-[-0.04em] sm:text-4xl">
             <LocalizedText value={copy.featuresTitle} />
             <span className="text-signal">{"//"}</span>
@@ -118,8 +120,8 @@ export default async function AboutPage() {
             ))}
           </ul>
         </section>
-        <section id="login" className="mx-auto max-w-6xl px-4 pb-16 sm:px-10">
-          <div className="max-w-md border-2 border-ink bg-cream p-7 text-ink shadow-[8px_8px_0_var(--signal)] sm:p-9">
+        <section id="login" className="mx-auto max-w-[1600px] px-4 pb-16 sm:px-10">
+          <SignInCard>
             <h2 className="font-display text-4xl leading-[0.9] tracking-[-0.04em]">
               <LocalizedText value={copy.signInTitle} />
               <span className="text-signal">{"//"}</span>
@@ -128,7 +130,7 @@ export default async function AboutPage() {
               <LocalizedText value={copy.signInNote} />
             </p>
             <SignInForms next="/" />
-          </div>
+          </SignInCard>
         </section>
       </main>
     </PublicPage>

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import {
   createLinkChat,
+  focusIsIdle,
   httpTransport,
   MAX_POLLS,
   memoryTransport,
@@ -800,4 +801,13 @@ test("httpTransport: a non-JSON error body becomes {} and keeps its status", asy
   const { status, body } = await httpTransport.mine();
   assert.equal(status, 500);
   assert.deepEqual(body, {});
+});
+
+// Final review #3. Kills the chat handing the focus back to the taiyaki while the panel that closed it already
+// holds the focus: the non-modal panel reads that as focus outside and closes too, so the pill seemed dead.
+test("focusIsIdle is true only with the focus on the body or nowhere", () => {
+  const body = {};
+  assert.equal(focusIsIdle({ activeElement: null, body }), true);
+  assert.equal(focusIsIdle({ activeElement: body, body }), true);
+  assert.equal(focusIsIdle({ activeElement: {}, body }), false);
 });

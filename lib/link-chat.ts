@@ -349,3 +349,9 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
 }
 
 export type LinkChat = ReturnType<typeof createLinkChat>;
+
+/** True while nothing holds the focus: the panel hands it back to its opener only then, never from under
+ *  another overlay that took it (the reader panel, which closed the chat). */
+export function focusIsIdle(doc: { activeElement: unknown; body: unknown }): boolean {
+  return doc.activeElement === null || doc.activeElement === doc.body;
+}

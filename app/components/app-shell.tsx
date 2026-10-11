@@ -1,7 +1,8 @@
 "use client";
 
+import { MotionConfig } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
@@ -11,9 +12,9 @@ import { activeNavId, inMobileMore, MOBILE_BAR_NAV, MOBILE_CHAT_SLOT, MOBILE_MOR
 import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
-import { LanguageToggle } from "./language-toggle";
 import { LinkChat, ReadHereContext, TaiyakiButton, type ChatPreview, type ReadHere } from "./link-chat";
-import { AccountActions, NavEntry, SoonList } from "./nav-parts";
+import { AccountRows } from "./account-menu";
+import { NavEntry } from "./nav-parts";
 import { RatingsProvider } from "./rating-control";
 import { RefreshProvider } from "./refresh-bar";
 import { SearchSoon, ShortcutHelp } from "./shell-dialogs";
@@ -21,13 +22,52 @@ import { toasts, UndoToast } from "./undo-toast";
 import { useShortcuts } from "./use-shortcuts";
 
 const copy = {
-  hu: { nav: "Menü", more: "Több", language: "Nyelv", close: "Bezárás" },
-  en: { nav: "Menu", more: "More", language: "Language", close: "Close" },
+  hu: { nav: "Menü", more: "Több", close: "Bezárás" },
+  en: { nav: "Menu", more: "More", close: "Close" },
 };
 
 /** Mirrors persistLanguage (language-context.tsx): same cookie shape, read back on the server by getNavMode (lib/language.ts). */
 function persistNavMode(mode: NavMode) {
   document.cookie = `nav=${mode}; path=/; max-age=31536000; samesite=lax`;
+}
+
+/** The two overlays that never show together (R3 §4): the reader panel and the link chat. Framework-free, so
+ *  the rule is tested on its own; the shell reads it through useSyncExternalStore. */
+export function createShellLayers() {
+  let panel = false;
+  let chat = false;
+  const listeners = new Set<() => void>();
+  const notify = () => listeners.forEach((listener) => listener());
+  return {
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    panelOpen: () => panel,
+    chatOpen: () => chat,
+    setPanelOpen(open: boolean) {
+      panel = open;
+      if (open) chat = false;
+      notify();
+    },
+    setChatOpen(open: boolean) {
+      chat = open;
+      if (open) panel = false;
+      notify();
+    },
+  };
+}
+
+type Panel = { open: boolean; setOpen: (open: boolean) => void };
+/** The Radar's reader panel (digest-dashboard.tsx) reads its open state from the shell, which closes it when the chat opens. */
+export const PanelContext = createContext<Panel | null>(null);
+
+export function usePanel(): Panel {
+  const panel = useContext(PanelContext);
+  if (!panel) throw new Error("usePanel must be used inside AppShell (app/components/app-shell.tsx)");
+  return panel;
 }
 
 /** Every signed-in page: the desktop nav or the mobile bottom bar around the page, the link chat, plus the shell-wide dialogs. */
@@ -48,7 +88,11 @@ export function AppShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [navMode, setNavMode] = useState<NavMode>(initialNavMode);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [layers] = useState(createShellLayers);
+  const chatOpen = useSyncExternalStore(layers.subscribe, layers.chatOpen, layers.chatOpen);
+  const panelOpen = useSyncExternalStore(layers.subscribe, layers.panelOpen, layers.panelOpen);
+  const setChatOpen = layers.setChatOpen;
+  const panel: Panel = { open: panelOpen, setOpen: layers.setPanelOpen };
   // Whichever taiyaki opened the panel gets the focus back when it closes.
   const chatOpener = useRef<HTMLButtonElement>(null);
   const toggleChat = (event: MouseEvent<HTMLButtonElement>) => {
@@ -62,7 +106,7 @@ export function AppShell({
     chatOpener.current = opener;
     setQueuedLink(url);
     setChatOpen(true);
-  }, []);
+  }, [setChatOpen]);
   const openSearch = () => setSearchOpen(true);
   const openHelp = () => setHelpOpen(true);
   const toggleNav = () => {
@@ -83,20 +127,25 @@ export function AppShell({
   });
   return (
     <LanguageProvider initial={language}>
+      {/* reducedMotion="user": the three motions (the rating press, the toast, the taiyaki's turn) go still under prefers-reduced-motion (2a spec D7). */}
+      <MotionConfig reducedMotion="user">
       {/* The preview's ratings stay in memory, like its other writes. */}
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
           <ReadHereContext value={readHere}>
+            <PanelContext value={panel}>
             <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
               {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
                   so none of them covers the end of the page. The corner one's goes inside the page's own last element,
                   so that page's surface runs on under it. */}
               <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
             </DesktopNav>
+            </PanelContext>
           </ReadHereContext>
           <MobileNav
             email={email}
             onSearch={openSearch}
+            onHelp={openHelp}
             chat={
               <TaiyakiButton
                 open={chatOpen}
@@ -108,7 +157,7 @@ export function AppShell({
           <TaiyakiButton
             open={chatOpen}
             onClick={toggleChat}
-            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--ink)] md:grid"
+            className="fixed right-6 bottom-6 z-40 hidden size-14 shadow-[4px_4px_0_var(--signal)] md:grid"
           />
           {/* Keyed so the preview's fail=1 and slow=1 switches get a fresh in-memory transport. */}
           <LinkChat
@@ -125,6 +174,7 @@ export function AppShell({
           <UndoToast />
         </RefreshProvider>
       </RatingsProvider>
+      </MotionConfig>
     </LanguageProvider>
   );
 }
@@ -133,11 +183,11 @@ export function AppShell({
 const MORE_HREFS = MOBILE_MORE_NAV.flatMap((item) => (item.href ? [item.href] : []));
 
 const slotClass =
-  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[10px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 
-/** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds AI cégek and
- *  Archívum, the language, the coming views and sign-out; on their pages its slot carries the active mark. */
-function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => void; chat: ReactNode }) {
+/** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds the mobileMore pages and
+ *  the account rows (language, help, sign-out); on their pages its slot carries the active mark. */
+function MobileNav({ email, onSearch, onHelp, chat }: { email: string; onSearch: () => void; onHelp: () => void; chat: ReactNode }) {
   const { language } = useLanguage();
   const active = activeNavId(usePathname());
   const [moreOpen, setMoreOpen] = useState(false);
@@ -203,14 +253,14 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
               </li>
             ))}
           </ul>
-          <div className="flex items-center justify-between border-b-2 border-ink pb-4">
-            <span className="font-mono text-xs tracking-[0.14em]">{t.language}</span>
-            <LanguageToggle />
-          </div>
-          <SoonList />
-          <div className="border-t-2 border-ink pt-4">
-            <AccountActions email={email} />
-          </div>
+          {/* The account rows (2a spec D5): the language, the shortcuts help (which closes the sheet first) and sign out. */}
+          <AccountRows
+            email={email}
+            onHelp={() => {
+              setMoreOpen(false);
+              onHelp();
+            }}
+          />
         </SheetContent>
       </Sheet>
     </nav>

@@ -1,6 +1,7 @@
 import { ErrorLine } from "@/app/components/error-line";
-import { StatusCard } from "@/app/components/page-header";
-import { both, SignInForms } from "@/app/components/sign-in-forms";
+import { PublicPage } from "@/app/components/public-page";
+import { both, SignInCard, SignInForms } from "@/app/components/sign-in-forms";
+import { getLanguage } from "@/lib/language";
 import { safeNext } from "@/lib/supabase/server";
 
 // Before sign-in there is no language yet, so every line shows both, "magyar / English".
@@ -24,19 +25,28 @@ export default async function LoginPage({
   const failure = error ? (copy.errors[error as keyof typeof copy.errors] ?? copy.errors["1"]) : null;
 
   return (
-    <StatusCard brand eyebrow="INVITE-ONLY / CSAK MEGHÍVÓVAL" title="SIGN IN">
-      {sent ? (
-        <p className="mt-7 border-l-4 border-signal pl-4 text-sm leading-6">
-          {copy.sent.hu}
-          <br />
-          <span className="text-ink/60">{copy.sent.en}</span>
-        </p>
-      ) : (
-        <>
-          <ErrorLine className="mt-7">{failure && both(failure)}</ErrorLine>
-          <SignInForms next={target} />
-        </>
-      )}
-    </StatusCard>
+    <PublicPage language={await getLanguage()}>
+      {/* The landing page's frame (2a spec D6); StatusCard stays for the error and not-found pages. */}
+      <main className="mx-auto max-w-[1600px] px-4 py-12 sm:px-10">
+        <SignInCard>
+          <p className="font-mono text-xs tracking-[0.2em] text-signal">INVITE-ONLY / CSAK MEGHÍVÓVAL</p>
+          <h1 className="mt-2 font-display text-4xl leading-[0.9] tracking-[-0.04em] sm:text-5xl">
+            SIGN IN<span className="text-signal">{"//"}</span>
+          </h1>
+          {sent ? (
+            <p className="mt-7 border-l-4 border-signal pl-4 text-sm leading-6">
+              {copy.sent.hu}
+              <br />
+              <span className="text-ink/60">{copy.sent.en}</span>
+            </p>
+          ) : (
+            <>
+              <ErrorLine className="mt-7">{failure && both(failure)}</ErrorLine>
+              <SignInForms next={target} />
+            </>
+          )}
+        </SignInCard>
+      </main>
+    </PublicPage>
   );
 }

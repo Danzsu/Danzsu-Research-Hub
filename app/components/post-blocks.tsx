@@ -131,7 +131,7 @@ function BlockView({
     case "code":
       return (
         <div className="border-2 border-ink bg-ink text-paper">
-          {block.language && <p className="border-b border-paper/15 px-4 py-1 font-mono text-[10px] tracking-[0.15em] text-paper/50">{block.language.toUpperCase()}</p>}
+          {block.language && <p className="border-b border-paper/15 px-4 py-1 font-mono text-[11px] tracking-[0.15em] text-paper/50">{block.language.toUpperCase()}</p>}
           <pre className="overflow-x-auto p-4 font-mono text-sm leading-6"><code>{block.code}</code></pre>
         </div>
       );
@@ -153,7 +153,7 @@ function BlockView({
     case "chapters":
       return (
         <nav aria-label={labels[language].chapters} className="border-2 border-ink bg-paper p-4">
-          <p className="font-mono text-[10px] tracking-[0.15em] text-signal">{labels[language].chapters.toUpperCase()}</p>
+          <p className="font-mono text-[11px] tracking-[0.15em] text-signal">{labels[language].chapters.toUpperCase()}</p>
           <ol className="mt-2 space-y-1">
             {block.items.map((chapter, index) => (
               <li key={`${index}-${chapter.seconds}`}>

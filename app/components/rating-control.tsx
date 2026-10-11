@@ -1,6 +1,7 @@
 "use client";
 
 import { Heart, ThumbsDown, ThumbsUp } from "lucide-react";
+import { motion } from "motion/react";
 import { createContext, useContext, useState, useSyncExternalStore, type PropsWithChildren } from "react";
 import { Button } from "@/components/ui/button";
 import { createRatingStore, ratingKey, type RatingStore, type RatingTarget, type RatingValue, type RatingWrite } from "@/lib/ratings";
@@ -43,6 +44,10 @@ function useRating(target: RatingTarget, initial: RatingValue | null) {
 export function RatingControl({ target, initial, className = "" }: { target: RatingTarget; initial: RatingValue | null; className?: string }) {
   const { language } = useLanguage();
   const { store, value } = useRating(target, initial);
+  // The last press, so only that button springs (2a spec D7): the count keys a fresh span that mounts pressed
+  // (0.88) and springs back to 1. A spring takes two keyframes only, and `initial={false}` would skip the mount
+  // animation, so the other spans get that and stay at 1.
+  const [press, setPress] = useState<{ name: string; count: number }>({ name: "", count: 0 });
   const t = copy[language];
   return (
     <div role="group" aria-label={t.group} data-rating={value === null ? undefined : buttonOf(value).name} className={`flex ${className}`}>
@@ -54,10 +59,22 @@ export function RatingControl({ target, initial, className = "" }: { target: Rat
           aria-pressed={value === pressed}
           aria-label={t[name]}
           title={t[name]}
-          onClick={() => void store.press(target, initial, pressed)}
+          onClick={() => {
+            setPress((last) => ({ name, count: last.count + 1 }));
+            void store.press(target, initial, pressed);
+          }}
           className={`size-10 sm:pointer-fine:size-8 ${index ? "-ml-0.5" : ""} ${pressedClass}`}
         >
-          <Icon className={name === "heart" && value === 2 ? "fill-current" : undefined} />
+          <motion.span
+            data-press-motion
+            key={press.name === name ? press.count : 0}
+            initial={press.name === name && press.count ? { scale: 0.88 } : false}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", duration: 0.18, bounce: 0.4 }}
+            className="grid place-items-center"
+          >
+            <Icon className={name === "heart" && value === 2 ? "fill-current" : undefined} />
+          </motion.span>
         </Button>
       ))}
     </div>
