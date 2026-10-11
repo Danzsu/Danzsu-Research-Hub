@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "Invite-only bilingual AI research, company, local LLM, and GitHub intelligence digest.",
   // Load-bearing: mirrored articles must never be indexed (see README, "Content and copyright").
   robots: { index: false, follow: false, nocache: true },
-  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+  // The tab and home-screen icons are app/icon.png and app/apple-icon.png (Next file convention).
 };
 
 // Paints the mobile browser chrome ink, matching the page edges.

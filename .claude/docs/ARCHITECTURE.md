@@ -23,7 +23,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract), `cron/daily` and `cron/mirror`;
   - `media/[...path]/`, which serves the mirrored images to signed-in readers;
   - `dev/preview/`, the offline preview on fixtures;
-  - the error, not-found and manifest files;
+  - the error, not-found and manifest files, and the app icon (`icon.png`, 512px, for the tab and the manifest; `apple-icon.png`, 180px on ink, for the iOS home screen);
   - `layout.tsx`, which sets `robots: noindex`;
   - `globals.css`, the theme (DESIGN.md).
 - `app/components/` has the shared UI:
