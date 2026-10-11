@@ -366,6 +366,7 @@ Shadows are hard offsets with zero blur:
 
 - **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. Every Sheet and Dialog opens and closes in 160ms. The toast slides in from 8px and fades out over 160ms. A press moves 2px at once and eases back on release. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. Nothing moves on hover or press either: the shadows and colours still change. The `.live-pulse` dot (9px, signal) pulses a ring every 2s. Loading feedback waits before it shows, so a fast answer flashes nothing: the pending dot and the refresh bar appear 100ms in, at once, and leave at once; the skeletons' placeholders fade in over 160ms after 150ms. The bar runs a third-wide segment across itself every 1.2s. Under reduced motion the dot's ring stops, the skeletons don't pulse and their placeholders appear without the fade, still after 150ms, and the bar stands still at full width.
 - **One overlay at a time** (R3 §4): the Radar's reader panel and the link chat never show together; opening one closes the other (`createShellLayers`, `app-shell.tsx`, which both read through `PanelContext` and the chat's open state). The panel's column keeps `pb-24` at its foot, so the corner taiyaki covers no to-do.
+- **The `motion` library** (`motion/react`, pinned; `MotionConfig reducedMotion="user"` in the shell) runs the three motions CSS can't (2a spec D7): the rating press (a 180ms spring to 0.88 and back, on the pressed button alone, `rating-control.tsx`), the toast's enter and exit (`AnimatePresence`, 160ms, `undo-toast.tsx`), and the taiyaki's turn when its panel opens (`link-chat.tsx`). Sheets and dialogs keep their Radix 160ms CSS animations. Nothing else animates on its own, and under reduced motion all three stand still.
 - **Layering.** From bottom to top:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
@@ -394,6 +395,8 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
 
 ```tsx app/components/app-shell.tsx
     <LanguageProvider initial={language}>
+      {/* reducedMotion="user": the three motions (the rating press, the toast, the taiyaki's turn) go still under prefers-reduced-motion (2a spec D7). */}
+      <MotionConfig reducedMotion="user">
       {/* The preview's ratings stay in memory, like its other writes. */}
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
@@ -439,6 +442,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
           <UndoToast />
         </RefreshProvider>
       </RatingsProvider>
+      </MotionConfig>
     </LanguageProvider>
 ```
 
@@ -732,9 +736,9 @@ className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-a
 ```
 
 ```tsx app/components/undo-toast.tsx
-          className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs duration-160 ${
-            toast ? "animate-in fade-in-0 slide-in-from-bottom-2" : "animate-out fade-out-0 [animation-fill-mode:forwards]"
-          } ${shown.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"}`}
+            className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs ${
+              toast.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"
+            }`}
 ```
 
 Raise one from any event handler (`digest-dashboard.tsx`). The Undo button uses the `signal` variant:

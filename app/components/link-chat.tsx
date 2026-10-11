@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { motion } from "motion/react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -54,7 +55,10 @@ export function TaiyakiButton({ open, onClick, className }: { open: boolean; onC
       aria-controls={CHAT_PANEL_ID}
       className={`focus-ring lift place-items-center border-2 border-ink bg-paper ${className}`}
     >
-      <TaiyakiIcon className="size-10" />
+      {/* The fish turns a little when its panel is open (2a spec D7); still under reduced motion. */}
+      <motion.span data-taiyaki-icon animate={{ rotate: open ? -12 : 0 }} transition={{ type: "spring", duration: 0.25, bounce: 0.3 }} className="grid">
+        <TaiyakiIcon className="size-10" />
+      </motion.span>
     </button>
   );
 }

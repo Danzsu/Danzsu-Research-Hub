@@ -45,3 +45,10 @@ test("dislikedClass only dashes the frame", async () => {
   const { dislikedClass } = await import("./rating-classes.ts");
   assert.equal(dislikedClass, "has-[[data-rating=down]]:border-dashed");
 });
+
+// 2a spec D7. Kills a press with no motion wrapper (the spring answers the tap): the wrapper is what the
+// shell's MotionConfig turns off under reduced motion.
+test("each rating button wraps its icon in a motion span that answers the press", () => {
+  const doc = inShell(createElement(RatingControl, { target: { kind: "item", id: "a" }, initial: null }));
+  assert.equal(doc.querySelectorAll('[role="group"] button [data-press-motion]').length, 3);
+});

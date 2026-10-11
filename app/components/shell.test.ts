@@ -90,6 +90,8 @@ test("UndoToast mounts its live region and survives an active toast with no rend
     const status = doc.querySelector('[role="status"]');
     assert.ok(status, "the toast's live region is always mounted");
     assert.equal(status.getAttribute("aria-live"), "polite");
+    // 2a spec D7: the toast itself is a motion element inside an AnimatePresence, so it can leave with a fade.
+    assert.ok(doc.querySelector("[data-toast-presence]"), "the toast's presence wrapper is always there");
     // useSyncExternalStore calls getServerSnapshot ("no toast") under renderToStaticMarkup, so the
     // toast's own text never reaches this static markup even with one showing — a harness gap, not
     // a bug (see the report). What this test still proves: 271d147's unconditional
@@ -337,6 +339,8 @@ test("TaiyakiButton names itself in the reader's language, and says which panel 
     ).querySelector("button");
     return [element?.getAttribute("aria-label"), element?.getAttribute("aria-expanded"), element?.getAttribute("aria-controls")];
   };
+  // 2a spec D7: the icon turns in a motion span when the panel opens.
+  assert.ok(render(createElement(LanguageProvider, { initial: "hu" } as ComponentProps<typeof LanguageProvider>, createElement(TaiyakiButton, { open: false, onClick: noop, className: "grid" }))).querySelector("button [data-taiyaki-icon]"));
   assert.deepEqual(button("hu", false), ["Link bedobása", "false", CHAT_PANEL_ID]);
   assert.deepEqual(button("en", true), ["Drop a link", "true", CHAT_PANEL_ID]);
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { createToastQueue } from "@/lib/undo-queue";
@@ -34,25 +35,22 @@ const noToast = () => null;
 export const isUndoToast = (target: EventTarget | null) => target instanceof Element && target.closest("[data-undo-toast]") !== null;
 
 /** Mounted once by the app shell, above any open panel. Below md it sits above the bottom bar and the
- *  taiyaki raised out of it; from md up its lane stops short of the taiyaki's corner (`md:right-24`). */
+ *  taiyaki raised out of it; from md up its lane stops short of the taiyaki's corner (`md:right-24`).
+ *  The toast slides in from 8px and fades out in 160ms (2a spec D7: `AnimatePresence` keeps the leaving one
+ *  for its exit, and needs no animationend bookkeeping); the shell's MotionConfig drops the motion under
+ *  reduced motion. */
 export function UndoToast() {
   const { language } = useLanguage();
   const toast = useSyncExternalStore(toasts.subscribe, toasts.getSnapshot, noToast);
   // Paused while the pointer or focus is on it, so the Undo button can be reached in time.
   const [paused, setPaused] = useState(false);
-  type Shown = NonNullable<typeof toast>;
-  // The toast that just went: kept for its 160ms fade-out, then dropped on its animationend, which also
-  // fires under reduced motion's 0.01ms (R2 spec 3).
-  const [leaving, setLeaving] = useState<Shown | null>(null);
-  const [prevToast, setPrevToast] = useState(toast);
-  if (toast?.id !== prevToast?.id) {
+  const [prevToastId, setPrevToastId] = useState(toast?.id);
+  if (toast?.id !== prevToastId) {
     // Browsers don't reliably fire pointerleave/blur on a removed node, so a toast that goes away clears the pause.
-    setPrevToast(toast);
-    setLeaving(toast ? null : prevToast);
-    if (!toast) setPaused(false);
+    setPrevToastId(toast?.id);
+    setPaused(false);
   }
   const toastId = toast?.id;
-  const shown = toast ?? leaving;
 
   useEffect(() => {
     if (toastId === undefined || paused) return;
@@ -71,47 +69,52 @@ export function UndoToast() {
     <div
       role="status"
       aria-live="polite"
+      data-toast-presence
       className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem_+_env(safe-area-inset-bottom))] z-[60] flex justify-center md:right-24 md:bottom-6"
     >
-      {shown && (
-        <div
-          key={shown.id}
-          data-undo-toast
-          // The leaving toast is out of reach: its action is already final.
-          inert={!toast}
-          onAnimationEnd={toast ? undefined : () => setLeaving(null)}
-          onPointerEnter={() => setPaused(true)}
-          onPointerLeave={() => setPaused(false)}
-          onFocus={() => setPaused(true)}
-          onBlur={(event) => {
-            // Only unpause if focus moved outside the toast's container
-            if (
-              !(event.currentTarget instanceof Element) ||
-              !(event.relatedTarget instanceof Node) ||
-              !event.currentTarget.contains(event.relatedTarget)
-            ) {
-              setPaused(false);
-            }
-          }}
-          className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs duration-160 ${
-            toast ? "animate-in fade-in-0 slide-in-from-bottom-2" : "animate-out fade-out-0 [animation-fill-mode:forwards]"
-          } ${shown.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"}`}
-        >
-          <span className="min-w-0 flex-1">{t[shown.kind]}</span>
-          {shown.undo && (
-            <Button
-              variant="signal"
-              className="min-h-10"
-              onClick={() => {
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key={toast.id}
+            data-undo-toast
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            // The leaving toast is out of reach: its action is already final.
+            exit={{ opacity: 0, pointerEvents: "none" }}
+            transition={{ duration: 0.16 }}
+            onPointerEnter={() => setPaused(true)}
+            onPointerLeave={() => setPaused(false)}
+            onFocus={() => setPaused(true)}
+            onBlur={(event) => {
+              // Only unpause if focus moved outside the toast's container
+              if (
+                !(event.currentTarget instanceof Element) ||
+                !(event.relatedTarget instanceof Node) ||
+                !event.currentTarget.contains(event.relatedTarget)
+              ) {
                 setPaused(false);
-                toasts.undo(shown.id);
-              }}
-            >
-              {t.undo}
-            </Button>
-          )}
-        </div>
-      )}
+              }
+            }}
+            className={`pointer-events-auto flex min-h-12 w-full max-w-md items-center gap-3 border-2 border-ink px-4 py-1 font-mono text-xs ${
+              toast.kind === "failed" ? "bg-signal text-ink shadow-[5px_5px_0_var(--ink)]" : "bg-ink text-paper shadow-[5px_5px_0_var(--signal)]"
+            }`}
+          >
+            <span className="min-w-0 flex-1">{t[toast.kind]}</span>
+            {toast.undo && (
+              <Button
+                variant="signal"
+                className="min-h-10"
+                onClick={() => {
+                  setPaused(false);
+                  toasts.undo(toast.id);
+                }}
+              >
+                {t.undo}
+              </Button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

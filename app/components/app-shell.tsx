@@ -1,5 +1,6 @@
 "use client";
 
+import { MotionConfig } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
@@ -126,6 +127,8 @@ export function AppShell({
   });
   return (
     <LanguageProvider initial={language}>
+      {/* reducedMotion="user": the three motions (the rating press, the toast, the taiyaki's turn) go still under prefers-reduced-motion (2a spec D7). */}
+      <MotionConfig reducedMotion="user">
       {/* The preview's ratings stay in memory, like its other writes. */}
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
@@ -171,6 +174,7 @@ export function AppShell({
           <UndoToast />
         </RefreshProvider>
       </RatingsProvider>
+      </MotionConfig>
     </LanguageProvider>
   );
 }
