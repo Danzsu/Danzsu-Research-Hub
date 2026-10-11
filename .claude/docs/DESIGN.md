@@ -410,6 +410,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
           <MobileNav
             email={email}
             onSearch={openSearch}
+            onHelp={openHelp}
             chat={
               <TaiyakiButton
                 open={chatOpen}
@@ -450,7 +451,8 @@ Each page then sets its own surface. The Radar uses `<div className="min-w-0 bg-
 `app/components/desktop-nav.tsx` and `nav-parts.tsx`:
 
 - **The column:** ink, sticky and full height, with a `border-paper/15` right rule. At the top sit the round signal logo badge and the stacked NEON / NEWS / RADAR wordmark, with RADAR in signal.
-- **Entries:** 40px mono rows. The active one gets a 2px signal left border, a `bg-signal/10` wash and signal text. The coming views are listed at 40% opacity with a "soon" label.
+- **Entries:** 40px mono rows. The active one gets a 2px signal left border, a `bg-signal/10` wash and signal text.
+- **The foot** (2a spec D5): the account menu (`account-menu.tsx`). The avatar (the address's first letter in a signal circle) and the whole address open a cream dropdown with a 2px ink frame and a signal hard shadow, holding the account rows: the language toggle, the shortcuts help and a POST sign-out. In the rail only the avatar shows, named in a tooltip. The collapse toggle sits under it.
 - **The rail:** only the icons stay. Each one shows its name in a `NavTooltip` on hover and on keyboard focus. The rail's nav has no overflow, because a scroll container would clip the tooltips. On viewports under 32rem tall, the whole aside scrolls instead.
 
 ```tsx app/components/desktop-nav.tsx
@@ -481,7 +483,7 @@ const slotClass =
   "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 ```
 
-"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek, Archívum and Gyűjtemény (the primary items marked `mobileMore` in `lib/nav.ts`), the language row, the coming views and the account row. It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
+"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek, Archívum and Gyűjtemény (the primary items marked `mobileMore` in `lib/nav.ts`), and the account rows (the language, the shortcuts help, sign out: `AccountRows`, `account-menu.tsx`). It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
 
 ```tsx app/components/app-shell.tsx
         <SheetContent

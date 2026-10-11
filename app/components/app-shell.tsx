@@ -11,9 +11,9 @@ import { activeNavId, inMobileMore, MOBILE_BAR_NAV, MOBILE_CHAT_SLOT, MOBILE_MOR
 import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
-import { LanguageToggle } from "./language-toggle";
 import { LinkChat, ReadHereContext, TaiyakiButton, type ChatPreview, type ReadHere } from "./link-chat";
-import { AccountActions, NavEntry, SoonList } from "./nav-parts";
+import { AccountRows } from "./account-menu";
+import { NavEntry } from "./nav-parts";
 import { RatingsProvider } from "./rating-control";
 import { RefreshProvider } from "./refresh-bar";
 import { SearchSoon, ShortcutHelp } from "./shell-dialogs";
@@ -21,8 +21,8 @@ import { toasts, UndoToast } from "./undo-toast";
 import { useShortcuts } from "./use-shortcuts";
 
 const copy = {
-  hu: { nav: "Menü", more: "Több", language: "Nyelv", close: "Bezárás" },
-  en: { nav: "Menu", more: "More", language: "Language", close: "Close" },
+  hu: { nav: "Menü", more: "Több", close: "Bezárás" },
+  en: { nav: "Menu", more: "More", close: "Close" },
 };
 
 /** Mirrors persistLanguage (language-context.tsx): same cookie shape, read back on the server by getNavMode (lib/language.ts). */
@@ -142,6 +142,7 @@ export function AppShell({
           <MobileNav
             email={email}
             onSearch={openSearch}
+            onHelp={openHelp}
             chat={
               <TaiyakiButton
                 open={chatOpen}
@@ -180,9 +181,9 @@ const MORE_HREFS = MOBILE_MORE_NAV.flatMap((item) => (item.href ? [item.href] : 
 const slotClass =
   "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
 
-/** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds AI cégek and
- *  Archívum, the language, the coming views and sign-out; on their pages its slot carries the active mark. */
-function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => void; chat: ReactNode }) {
+/** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds the mobileMore pages and
+ *  the account rows (language, help, sign-out); on their pages its slot carries the active mark. */
+function MobileNav({ email, onSearch, onHelp, chat }: { email: string; onSearch: () => void; onHelp: () => void; chat: ReactNode }) {
   const { language } = useLanguage();
   const active = activeNavId(usePathname());
   const [moreOpen, setMoreOpen] = useState(false);
@@ -248,14 +249,14 @@ function MobileNav({ email, onSearch, chat }: { email: string; onSearch: () => v
               </li>
             ))}
           </ul>
-          <div className="flex items-center justify-between border-b-2 border-ink pb-4">
-            <span className="font-mono text-xs tracking-[0.14em]">{t.language}</span>
-            <LanguageToggle />
-          </div>
-          <SoonList />
-          <div className="border-t-2 border-ink pt-4">
-            <AccountActions email={email} />
-          </div>
+          {/* The account rows (2a spec D5): the language, the shortcuts help (which closes the sheet first) and sign out. */}
+          <AccountRows
+            email={email}
+            onHelp={() => {
+              setMoreOpen(false);
+              onHelp();
+            }}
+          />
         </SheetContent>
       </Sheet>
     </nav>

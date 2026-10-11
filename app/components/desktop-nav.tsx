@@ -3,20 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { ChevronsLeft, ChevronsRight, Keyboard, Radar } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Radar } from "lucide-react";
 import { activeNavId, PRIMARY_NAV } from "@/lib/nav";
 import type { NavMode } from "@/lib/nav-mode";
 import { useLanguage } from "./language-context";
-import { LanguageToggle } from "./language-toggle";
-import { AccountActions, NavEntry, NavTooltip, SoonList } from "./nav-parts";
+import { AccountMenu } from "./account-menu";
+import { NavEntry, NavTooltip } from "./nav-parts";
 
 // Desktop navigation, variant A: a sidebar, collapsible to a ~56px icon rail (spec 1.2). Variants B
 // (top bar) and C (icon rail as the default) replace this one file: same props, the same items from
 // lib/nav.ts, and each lays out `children` (the page) itself.
 
 const copy = {
-  hu: { nav: "Fő navigáció", collapse: "Oldalsáv összecsukása", expand: "Oldalsáv kinyitása", shortcuts: "Billentyűparancsok" },
-  en: { nav: "Main navigation", collapse: "Collapse sidebar", expand: "Expand sidebar", shortcuts: "Keyboard shortcuts" },
+  hu: { nav: "Fő navigáció", collapse: "Oldalsáv összecsukása", expand: "Oldalsáv kinyitása" },
+  en: { nav: "Main navigation", collapse: "Collapse sidebar", expand: "Expand sidebar" },
 };
 
 const itemClassFull =
@@ -97,37 +97,10 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
               return <li key={item.id}>{rail ? <NavTooltip label={item.label[language]}>{entry}</NavTooltip> : entry}</li>;
             })}
           </ul>
-          {!rail && <SoonList className="mt-6 px-3" />}
         </nav>
+        {/* The foot (2a spec D5): the account menu holds the language, the shortcuts help and sign out; the collapse toggle under it. */}
         <div className={`space-y-3 border-t border-paper/15 ${rail ? "px-2 py-3" : "p-4"}`}>
-          {rail ? (
-            <div className="flex flex-col items-center gap-3">
-              <LanguageToggle iconOnly />
-              <NavTooltip label={t.shortcuts}>
-                <button
-                  type="button"
-                  onClick={onHelp}
-                  aria-label={t.shortcuts}
-                  className="press-ink focus-ring grid size-10 place-items-center text-paper/55 hover:text-signal"
-                >
-                  <Keyboard className="size-4" />
-                </button>
-              </NavTooltip>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-2">
-              <LanguageToggle />
-              <button
-                type="button"
-                onClick={onHelp}
-                aria-label={t.shortcuts}
-                className="press-ink focus-ring flex min-h-10 items-center gap-2 px-2 font-mono text-[11px] text-paper/55 hover:text-signal"
-              >
-                <Keyboard className="size-4" /> ?
-              </button>
-            </div>
-          )}
-          {rail ? <AccountActions email={email} iconOnly /> : <AccountActions email={email} />}
+          <AccountMenu email={email} onHelp={onHelp} iconOnly={rail} />
           {rail ? <NavTooltip label={t.expand}>{toggle}</NavTooltip> : toggle}
         </div>
       </aside>
