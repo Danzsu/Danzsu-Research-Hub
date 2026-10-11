@@ -17,9 +17,9 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 
 `app/` is Next.js routing and UI. `lib/` is the logic, and it runs under plain `node --test`.
 
-- `app/(app)/` holds the signed-in pages (`/`, `/companies`, `/archive`, `/archive/[week]`, `/library`, `/library/[id]`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list. Three more route groups hold one page each, `(radar)/` (`/`), `library/(list)/` and `archive/(list)/`, so that each page's `loading.tsx` wraps that page alone (CLAUDE.md → App shell and navigation). `companies/` is the AI companies page: `/` and it both render `current-week-page.tsx`, the current week's dashboard, the second with `scope="companies"`.
+- `app/(app)/` holds the signed-in pages (`/`, `/companies`, `/archive`, `/archive/[week]`, `/archive/github`, `/library`, `/library/[id]`, `/collection`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list, its tabs (`archive-tabs`) and the GitHub tab (`github-view`, its page in `archive/(list)/github/`). `collection/` is the collection of ❤ marks. Three more route groups hold one page each, `(radar)/` (`/`), `library/(list)/` and `archive/(list)/`, so that each page's `loading.tsx` wraps that page alone (CLAUDE.md → App shell and navigation). `companies/` is the AI companies page: `/` and it both render `current-week-page.tsx`, the current week's dashboard, the second with `scope="companies"`.
 - The rest of `app/`, outside the group:
-  - `login/` and `auth/` (login, google, callback, signout);
+  - `login/` and `auth/` (login, google, callback, signout), and the public `about/` and `privacy/` pages (`public-page` frames them, `sign-in-forms` is shared with `login/`);
   - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract), `cron/daily` and `cron/mirror`;
   - `media/[...path]/`, which serves the mirrored images to signed-in readers;
   - `dev/preview/`, the offline preview on fixtures;
@@ -31,6 +31,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `page-skeletons`, the loading skeletons the `loading.tsx` files render;
   - the language: `language-context`, `language-toggle`;
   - the Radar: `digest-dashboard`, `story-card`, `reader-panel`, `tag`;
+  - the ratings: `rating-control` (`RatingsProvider`, `RatingControl`, `RatingBadge`), `rating-classes` (the pressed and 👎 class strings, a plain module so server components can use them), and `filter-chips`, the link rows of the archive's tabs, the GitHub tab and the collection;
   - the title bands: `page-header` (`PageHero`, `StatusCard`);
   - the post renderer: `post-blocks`, `post-image`;
   - the hooks: `use-reader-state`, `use-shortcuts`, `use-model-context-tools`.
@@ -49,7 +50,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - the submitter's edits: `post-edit.ts`, `overrides.ts`;
   - `translate.ts` and the model client, `llm.ts`;
   - `content.ts`, which turns DB rows into content types, and holds the two content caches;
-  - reader state: `reader-store.ts`, `state.ts`, `feed.ts`;
+  - reader state: `reader-store.ts`, `state.ts`, `feed.ts`, and the ratings store, `ratings.ts`;
   - the link chat: `link-chat.ts` (the message parser, the thread and its store, the HTTP and in-memory transports), `my-sources.ts` (the reader's own submissions and their retry), `source-kinds.ts` (the kind names, `SOURCE_KIND_LABELS`);
   - the shell's data: `nav.ts`, `nav-mode.ts`, `keymap.ts`, `undo-queue.ts`, `idle-prefetch.ts` (the "Több" sheet's prefetch);
   - `media.ts` (the bucket and its key format), `public-paths.ts`, `api.ts` (`jsonError`, `postRoute`), `language.ts`;
@@ -84,7 +85,7 @@ Breaking one of these is a bug even when every test passes.
   The mechanics are in CLAUDE.md → Server path.
 - **Every user-supplied or page-derived URL is fetched through `safeFetch`** (SECURITY.md → SSRF).
 - **The offline preview never reaches real data.** Local dev points at the production project, so preview writes send nothing:
-  - reader state goes through `memorySend`;
+  - reader state and ratings go through `memorySend`;
   - the Library form goes through `memoryTransport` with no seed (`preview` on `LibraryView`);
   - the link chat goes through `memoryTransport` (`chatPreview` on `AppShell`, seeded from `previewMySources`);
   - the post page's `MarkPostRead` gets `preview`;

@@ -74,8 +74,8 @@ export type DigestItem = {
   why: Localized;
 };
 
-/** Positional tuple, destructured as `[repo, focus, url]` by the dashboard. */
-export type GithubTopEntry = readonly [repo: string, focus: string, url: string];
+/** A week's GitHub Top 10 row. stars, language and score are null on the weeks before G1 (2026-10). */
+export type GithubTopEntry = { repo: string; focus: string; url: string; stars: number | null; language: string | null; score: number | null };
 
 export type ArchiveIssue = {
   id: string;

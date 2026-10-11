@@ -84,3 +84,33 @@ test("GET /api/state answers 500 db_error when the underlying query fails, and l
   assert.deepEqual([response.status, await response.json()], [500, { error: "db_error" }]);
   assert.equal(error.mock.calls.length, 1);
 });
+
+// G1 spec 3. Kills the upsert keyed on anything but the reader's target, a clear written as an upsert,
+// a delete that drops the kind filter (it would clear a post's rating along with an item of the same id),
+// and a repo written in its casing.
+test("POST /api/state set_rating upserts the reader's rating and a null deletes it", async () => {
+  resetRoute();
+  const db = fakeDb();
+  routeStub.reader = signedIn(db);
+  for (const body of [{ action: "set_rating", kind: "repo", id: "Owner/Tool", value: 2 }, { action: "set_rating", kind: "item", id: "local-a", value: null }]) {
+    const response = await write(body);
+    assert.deepEqual([response.status, await response.json()], [200, { ok: true }]);
+  }
+  const [upsert] = db.upserts;
+  const { updated_at, ...rating } = upsert.values as Record<string, unknown>;
+  assert.equal(typeof updated_at, "string");
+  assert.deepEqual([upsert.table, rating, upsert.options], ["ratings", { target_kind: "repo", target_id: "owner/tool", value: 2 }, { onConflict: "user_id,target_kind,target_id" }]);
+  assert.deepEqual(db.deletes, [{ table: "ratings", filters: [["target_kind", "item"], ["target_id", "local-a"]] }]);
+});
+
+// Kills a failed write answered as ok, or not logged.
+test("POST /api/state set_rating answers 500 db_error when the write fails, and logs it once", async (t) => {
+  const logged = t.mock.method(console, "error", () => {});
+  resetRoute();
+  routeStub.reader = signedIn(fakeDb(undefined, { tableWriteErrors: { ratings: pgError("08006", "connection failure") } }));
+  for (const value of [1, null]) {
+    const response = await write({ action: "set_rating", kind: "post", id: "3", value });
+    assert.deepEqual([response.status, await response.json()], [500, { error: "db_error" }]);
+  }
+  assert.equal(logged.mock.callCount(), 2);
+});

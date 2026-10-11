@@ -25,7 +25,7 @@ const curatedSchema = z.object({
       why: localizedSchema,
     }),
   ),
-  github: z.array(z.object({ index: z.int(), focus: z.string() })).max(10),
+  github: z.array(z.object({ index: z.int(), focus: z.string(), score: z.int().min(0).max(100) })).max(10),
 });
 
 const AUDIENCE =
@@ -72,13 +72,13 @@ PART 1 — news. From the numbered NEWS list, choose at most ${MAX_NEW_ITEMS} it
 - Use only facts present in the listing. Do not invent numbers or claims.
 - Skip promotions: course, event or product sign-ups, sales and sponsored posts are not news.
 
-PART 2 — repositories. From the numbered REPOS list, choose the 10 most useful (skip awesome-lists and spam) and return them in "github" with a focus line of at most 8 English words.
+PART 2 — repositories. From the numbered REPOS list, choose the 10 most useful (skip awesome-lists and spam) and return them in "github" with a focus line of at most 8 English words and a score from 0 to 100 on the same scale as the news (how useful it is to the reader).
 
 NEWS:
 ${listing(picked)}
 
 REPOS:
-${repos.map((r, i) => `[${i}] ${r.repo} (${r.stars}★) — ${r.focus}`).join("\n")}`;
+${repos.map((r, i) => `[${i}] ${r.repo} (${r.stars}★${r.language ? `, ${r.language}` : ""}) — ${r.focus}`).join("\n")}`;
 }
 
 /**
@@ -109,7 +109,10 @@ export function toDigestRows(curated: z.infer<typeof curatedSchema>, picked: Can
   const top = curated.github
     .filter((entry) => repos[entry.index])
     .slice(0, 10)
-    .map((entry, i) => ({ issue_id: week.id, rank: i + 1, repo: repos[entry.index].repo, focus: entry.focus, url: repos[entry.index].url }));
+    .map((entry, i) => {
+      const repo = repos[entry.index];
+      return { issue_id: week.id, rank: i + 1, repo: repo.repo, focus: entry.focus, url: repo.url, stars: repo.stars, language: repo.language, score: entry.score };
+    });
   return { items, top };
 }
 

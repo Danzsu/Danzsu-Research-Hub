@@ -4,6 +4,7 @@ import { LocalizedText } from "@/app/components/language-context";
 import { PendingDot } from "@/app/components/nav-parts";
 import { PageHero } from "@/app/components/page-header";
 import type { ArchiveIssue } from "@/data/digest-types";
+import { ArchiveTabs } from "./archive-tabs";
 
 // Server-rendered with both languages; LocalizedText picks one on the client, so the toggle needs no refresh here.
 const copy = {
@@ -25,6 +26,7 @@ export function ArchiveView({ issues }: { issues: ArchiveIssue[] }) {
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="WEEKLY FREEZE / HETI ZÁRÁS" title="ARCHIVE" lead={<LocalizedText value={copy.lead} />} />
+      <ArchiveTabs current="weeks" />
       <section className="mx-auto grid max-w-6xl gap-5 px-4 py-10 sm:px-10 lg:grid-cols-2">
         {!issues.length && (
           <p className="font-mono text-sm text-paper/55 lg:col-span-2">

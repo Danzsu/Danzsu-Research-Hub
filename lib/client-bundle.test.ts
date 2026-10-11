@@ -97,3 +97,25 @@ test("the client walk starts at every use-client file and reaches the modules zo
 test("no module a client component reaches imports zod", () => {
   assert.deepEqual(zodChains, []);
 });
+
+/** What a file without "use client" imports from a "use client" module, other than a component (PascalCase),
+ *  a hook or a type: in a server component such a value arrives as a client reference, not the value. */
+function serverImportsOfClientValues(href: string): string[] {
+  return parse(href).statements.flatMap((statement) => {
+    if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly) return [];
+    const named = statement.importClause?.namedBindings;
+    if (!named || !ts.isNamedImports(named)) return [];
+    const target = resolveImport((statement.moduleSpecifier as ts.StringLiteral).text, href);
+    if (!target || !isClientRoot(parse(target))) return [];
+    return named.elements
+      .filter((element) => !element.isTypeOnly && !/^([A-Z]|use[A-Z])/.test((element.propertyName ?? element.name).text))
+      .map((element) => `${shown(href)} ← ${(element.propertyName ?? element.name).text} from ${shown(target)}`);
+  });
+}
+
+// G1. Kills a class string (dislikedClass) exported from a client module and imported by a server
+// component: the Library list and the GitHub tab rendered "function() { throw … }" in their class lists.
+test("a file without use client imports only components, hooks and types from a use-client module", () => {
+  const nonClient = rootDirs.filter((href) => !/\.test\.tsx?$/.test(href) && !isClientRoot(parse(href)));
+  assert.deepEqual(nonClient.flatMap(serverImportsOfClientValues), []);
+});

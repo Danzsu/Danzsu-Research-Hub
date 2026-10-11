@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getPost } from "@/lib/content";
+import { getPost, getRatings } from "@/lib/content";
 import { getLanguage } from "@/lib/language";
 import { parseId } from "@/lib/pipeline/util";
 import type { PostQuery } from "@/lib/post-view";
@@ -25,13 +25,14 @@ export default async function PostPage({
   const postId = parseId(id);
   const post = postId ? await getPost(reader.db, postId) : null;
   if (!post) notFound();
+  const ratings = await getRatings(reader.db, [{ kind: "post", id: String(post.id) }]);
 
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <MarkPostRead postId={post.id} />
       {/* A run on this post's source (a re-extraction): the page follows it until it is done (R2 spec 1). */}
       <RefreshWhileProcessing active={post.processing} />
-      <PostArticle post={post} language={language} query={query} canEdit={post.submittedBy === reader.viewer.id} />
+      <PostArticle post={post} language={language} query={query} canEdit={post.submittedBy === reader.viewer.id} rating={ratings[`post:${post.id}`] ?? null} />
     </main>
   );
 }

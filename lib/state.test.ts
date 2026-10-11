@@ -63,3 +63,16 @@ test("parseStateAction answers each malformed body with the route's error code",
   ];
   for (const [body, error] of cases) assert.deepEqual(parseStateAction(body), { error }, JSON.stringify(body));
 });
+
+// G1 spec 3 and Review Focus 1. Kills a repo id kept in its casing, a value outside −1/1/2 accepted, a
+// missing value read as a clear (only an explicit null clears), and an unknown kind or an empty or
+// over-long id accepted.
+test("parseStateAction accepts set_rating, lowercasing a repo's id, and refuses anything else", () => {
+  assert.deepEqual(parseStateAction({ action: "set_rating", kind: "repo", id: " Owner/Repo ", value: 2 }), { action: "set_rating", kind: "repo", id: "owner/repo", value: 2 });
+  assert.deepEqual(parseStateAction({ action: "set_rating", kind: "post", id: "12", value: null }), { action: "set_rating", kind: "post", id: "12", value: null });
+  assert.deepEqual(parseStateAction({ action: "set_rating", kind: "item", id: "Local-a", value: -1 }), { action: "set_rating", kind: "item", id: "Local-a", value: -1 });
+  for (const value of [0, 3, "2", undefined]) assert.deepEqual(parseStateAction({ action: "set_rating", kind: "item", id: "a", value }), { error: "invalid_rating" }, String(value));
+  for (const [kind, id] of [["user", "a"], ["item", ""], ["item", "x".repeat(201)], ["item", 5]]) {
+    assert.deepEqual(parseStateAction({ action: "set_rating", kind, id, value: 1 }), { error: "invalid_target" }, `${kind}:${String(id).slice(0, 8)}`);
+  }
+});

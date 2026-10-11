@@ -1,12 +1,13 @@
 import { z } from "zod/v4";
 import { TODO_TEXT_MAX } from "./pipeline/util.ts";
+import { RATING_ID_MAX, ratingTargetId } from "./ratings.ts";
 
 // The /api/state POST body. RLS already scopes every write to the caller; this only gets the shape right.
 // Each field's schema carries the error code the route answers 400 with as its message.
 
 const ITEM_ID_MAX = 120;
 
-const ERRORS = ["missing_item", "invalid_item", "missing_text", "invalid_id"] as const;
+const ERRORS = ["missing_item", "invalid_item", "missing_text", "invalid_id", "invalid_target", "invalid_rating"] as const;
 export type StateActionError = (typeof ERRORS)[number] | "unknown_action";
 
 const itemIdOf = (id: string) => id.slice(0, ITEM_ID_MAX);
@@ -31,6 +32,13 @@ const actionSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("set_todo"), id: todoId, value: flag }),
   z.object({ action: z.literal("delete_todo"), id: todoId }),
+  z.object({
+    action: z.literal("set_rating"),
+    kind: z.enum(["item", "post", "repo"], { error: "invalid_target" }),
+    id: z.string({ error: "invalid_target" }).trim().min(1, { error: "invalid_target" }).max(RATING_ID_MAX, { error: "invalid_target" }),
+    // Only an explicit null clears: a missing value is a broken request, not "no rating".
+    value: z.union([z.literal(-1), z.literal(1), z.literal(2), z.null()], { error: "invalid_rating" }),
+  }),
 ]);
 
 export type StateAction = z.infer<typeof actionSchema>;
@@ -41,7 +49,7 @@ const isKnownError = (message: string | undefined): message is (typeof ERRORS)[n
 /** A validated state action, or the error code the route answers 400 with. */
 export function parseStateAction(body: unknown): StateAction | { error: StateActionError } {
   const result = actionSchema.safeParse(body);
-  if (result.success) return result.data;
+  if (result.success) return result.data.action === "set_rating" ? { ...result.data, id: ratingTargetId(result.data) } : result.data;
   const message = result.error.issues[0]?.message;
   return { error: isKnownError(message) ? message : "unknown_action" };
 }

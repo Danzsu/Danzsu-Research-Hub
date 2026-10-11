@@ -4,8 +4,11 @@ import { Button } from "@/components/ui/button";
 import type { DigestItem, Language } from "@/data/digest-types";
 import { nextCardIndex } from "@/lib/keymap";
 import { parseSubmittedUrl } from "@/lib/pipeline/util";
+import type { RatingValue } from "@/lib/ratings";
 import type { Flag, ItemState } from "@/lib/reader-store";
 import { PendingDot } from "./nav-parts";
+import { dislikedClass, pressedClass } from "./rating-classes";
+import { RatingControl } from "./rating-control";
 import { Tag } from "./tag";
 
 const copy = {
@@ -51,9 +54,10 @@ export type CardProps = {
   actions: CardActions;
   /** The Library post already made from the item's URL (readHerePosts): "Olvasd itt" opens it. */
   postId?: number;
+  /** The reader's rating of the item, from the page's render (getRatings). */
+  rating: RatingValue | null;
 };
 
-const pressedClass = "aria-pressed:bg-ink aria-pressed:text-paper";
 
 /** Makes a card a j/k stop: focusable from script (not by Tab) and findable by id. */
 const cardFocus = (itemId: string) => ({ tabIndex: -1, "data-card-id": itemId });
@@ -65,7 +69,7 @@ export function StoryCard(props: CardProps) {
   return (
     <article
       {...cardFocus(item.id)}
-      className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${state.read ? "story-read" : ""}`}
+      className={`focus-ring story-card border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
         {/* A row of meta on narrow screens, the 96px gutter from lg up. */}
@@ -93,7 +97,7 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
   return (
     <article
       {...cardFocus(item.id)}
-      className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${state.read ? "story-read" : ""}`}
+      className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="mb-6 flex items-start justify-between">
         <span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
@@ -127,8 +131,8 @@ function CardText({ item, language, titleClassName }: CardProps & { titleClassNa
   );
 }
 
-/** [Open] [Olvasd itt] [rating: milestone B] [Later] [+ to-do] … [Read]: every action in one row at the bottom, in thumb reach. */
-function CardFooter({ item, state, hasTodo, language, actions, postId }: CardProps) {
+/** [Open] [Olvasd itt] [👎 👍 ❤] [Later] [+ to-do] … [Read]: every action in one row at the bottom, in thumb reach. */
+function CardFooter({ item, state, hasTodo, language, actions, postId, rating }: CardProps) {
   const t = copy[language];
   const todoLabel = hasTodo ? t.hasTodo : t.addTodo;
   return (
@@ -168,7 +172,7 @@ function CardFooter({ item, state, hasTodo, language, actions, postId }: CardPro
           </Button>
         )
       )}
-      {/* Milestone B puts the 👎 👍 ❤ RatingControl here, between Open and Later (spec 1.4.3). */}
+      <RatingControl target={{ kind: "item", id: item.id }} initial={rating} />
       <Button
         variant="brutal"
         size="icon-lg"

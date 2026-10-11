@@ -6,7 +6,21 @@ import { resetRoute, routeStub, signedIn } from "./test/route-hooks.ts";
 
 // lib/content.ts is a Next-only server module (`@/` imports, `server-only`, `next/cache`): route-hooks.ts
 // registers the loader that resolves them, and stands in for lib/supabase/server.ts and next/cache.
-const { archivedWeek, archiveList, getOpenSources, getPost, getPosts, getRadar, getReadPostIds, getReaderState, getReaderSeed } = await import("./content.ts");
+const {
+  archivedWeek,
+  archiveList,
+  getFavorites,
+  getGithubRepos,
+  getOpenSources,
+  getPost,
+  getPosts,
+  getRadar,
+  getRatings,
+  getReadPostIds,
+  getReaderState,
+  getReaderSeed,
+  githubPage,
+} = await import("./content.ts");
 
 const text = (en: string) => ({ hu: `${en} (hu)`, en });
 /** A digest_items row as the embed selects it. */
@@ -36,10 +50,20 @@ const issueRow = (id: string, overrides: Record<string, unknown> = {}) => ({
 
 // Kills a mapping that re-sorts or drops the embedded rows (the database orders them: must_read, then
 // score), a tuple with its fields swapped, and an issue id that isn't the row's.
-test("getRadar maps the one embedded answer: the items in the database's order, the repos as tuples, the week's id", async () => {
+test("getRadar maps the one embedded answer: the items in the database's order, the repos with their score, the week's id", async () => {
   const items = [itemRow("2609.00002", 80, true), itemRow("2609.00001", 95)];
   const db = fakeDb(undefined, {
-    rows: { issues: [issueRow("2026-W38", { digest_items: items, github_top: [{ repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool" }] })] },
+    rows: {
+      issues: [
+        issueRow("2026-W38", {
+          digest_items: items,
+          github_top: [
+            { repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool", stars: 120, language: "Go", score: 77 },
+            { repo: "owner/old", focus: "Before G1", url: "https://github.com/owner/old", stars: null, language: null, score: null },
+          ],
+        }),
+      ],
+    },
   });
   const radar = await getRadar(db, "2026-W38");
   assert.deepEqual(radar?.issue, { id: "2026-W38", label: "2026 / W38", updated: "09. 20. 07:00", archiveAt: "09. 20." });
@@ -60,7 +84,10 @@ test("getRadar maps the one embedded answer: the items in the database's order, 
     summary: text("Summary."),
     why: text("Why."),
   });
-  assert.deepEqual(radar?.githubTop10, [["owner/tool", "A tool", "https://github.com/owner/tool"]]);
+  assert.deepEqual(radar?.githubTop10, [
+    { repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool", stars: 120, language: "Go", score: 77 },
+    { repo: "owner/old", focus: "Before G1", url: "https://github.com/owner/old", stars: null, language: null, score: null },
+  ]);
 });
 
 // Kills the embeds' order dropped or aimed at the wrong table (the Top 3 would no longer lead), a
@@ -73,7 +100,7 @@ test("getRadar asks for the named week or the latest issue in one query, with th
   assert.deepEqual([empty?.items, empty?.githubTop10], [[], []]);
   const select = [
     "select",
-    "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url)",
+    "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url, stars, language, score)",
   ];
   const embedOrder = [
     ["order", "must_read", { ascending: false, referencedTable: "digest_items" }],
@@ -184,7 +211,7 @@ test("archivedWeek reads a closed week through the one-day cache and the admin c
   const radar = await archivedWeek(reader, "2026-W38", wednesdayW39);
   assert.deepEqual(radar, { issue: { id: "2026-W38", label: "2026 / W38", updated: "09. 20. 07:00", archiveAt: "09. 20." }, items: [], githubTop10: [] });
   assert.equal(routeStub.adminCalls, 1);
-  assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v2"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
+  assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v3"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
 });
 
 // Kills `<` → `<=`: the week still being collected would be frozen for a day, and a reader would miss
@@ -265,4 +292,152 @@ test("a failed query in either cached loader rejects, so the cache keeps nothing
   const reader = signedIn(fakeDb());
   await assert.rejects(archivedWeek(reader, "2026-W38", wednesdayW39), /radar query failed: connection failure/);
   await assert.rejects(archiveList(reader), /archive query failed: connection failure/);
+});
+
+// G1 spec 3. Kills a lookup that answers another kind's rating for the same id, a repo found only in its
+// stored casing, and a failure that fails the page instead of costing only the marks.
+test("getRatings answers the reader's own ratings by key, and a failed query logs and answers none", async (t) => {
+  const db = fakeDb(undefined, {
+    rows: {
+      ratings: [
+        { target_kind: "item", target_id: "a", value: 2 },
+        { target_kind: "post", target_id: "a", value: -1 },
+        { target_kind: "repo", target_id: "owner/tool", value: 1 },
+      ],
+    },
+  });
+  assert.deepEqual(await getRatings(db, [{ kind: "item", id: "a" }, { kind: "repo", id: "Owner/Tool" }]), { "item:a": 2, "repo:owner/tool": 1 });
+  assert.deepEqual(await getRatings(db, []), {});
+  const logged = t.mock.method(console, "error", () => {});
+  assert.deepEqual(await getRatings(fakeDb(undefined, { tableErrors: { ratings: pgError("08006", "connection failure") } }), [{ kind: "item", id: "a" }]), {});
+  assert.equal(logged.mock.callCount(), 1);
+});
+
+/** The value lists a fake db's `.in(...)` calls on `table` received, one per query. */
+const inLists = (db: ReturnType<typeof fakeDb>, table: string) =>
+  db.queries.filter((query) => query.table === table).flatMap(({ calls }) => calls.filter(([method]) => method === "in").map(([, , values]) => values as unknown[]));
+
+// Final review. Kills one `.in(...)` with every id: a busy week's hundred-odd ids pass PostgREST's URL-length
+// limit, and every rating on the Radar would vanish with the failed query.
+test("getRatings looks the ids up 30 at a time and answers every chunk's ratings", async () => {
+  const targets = Array.from({ length: 31 }, (_, index) => ({ kind: "item" as const, id: `local-2026w39-${index}` }));
+  const db = fakeDb(undefined, { rows: { ratings: [{ target_kind: "item", target_id: "local-2026w39-0", value: 2 }, { target_kind: "item", target_id: "local-2026w39-30", value: -1 }] } });
+  assert.deepEqual(await getRatings(db, targets), { "item:local-2026w39-0": 2, "item:local-2026w39-30": -1 });
+  assert.deepEqual(inLists(db, "ratings").map((values) => values.length), [30, 1]);
+});
+
+// Review Focus 3. Kills a page number taken as written (NaN, 0, or a 999-page query).
+test("githubPage reads a page from 1 to 20, and anything else as 1", () => {
+  assert.deepEqual(["1", "3", "20", "21", "999", "0", "-2", "abc", undefined].map(githubPage), [1, 3, 20, 20, 20, 1, 1, 1, 1]);
+});
+
+const repoRow = (key: string, overrides: Record<string, unknown> = {}) => ({
+  repo_key: key,
+  repo: key,
+  focus: "f",
+  url: `https://github.com/${key}`,
+  stars: 10,
+  language: "Go",
+  score: 70,
+  first_week: "2026-W38",
+  last_week: "2026-W40",
+  week_count: 2,
+  best_rank: 3,
+  rating: null,
+  disliked: false,
+  ...overrides,
+});
+
+// G1 spec 4. Kills the 👎 not sorted last, the filters not passed to the view, a page that can't tell
+// there is more, and the language list not deduplicated.
+test("getGithubRepos asks the view for one page with the 👎 last, applies the filters, and says when there is more", async () => {
+  const rows = Array.from({ length: 31 }, (_, i) => repoRow(`o/r${i}`, { language: i % 2 ? "Go" : "Rust" }));
+  const db = fakeDb(undefined, { rows: { github_repos: rows } });
+  const page = await getGithubRepos(db, { page: 1 });
+  assert.equal(page.repos.length, 30);
+  assert.equal(page.more, true);
+  assert.deepEqual(page.languages, ["Go", "Rust"]);
+  assert.deepEqual(page.repos[0], {
+    key: "o/r0",
+    repo: "o/r0",
+    focus: "f",
+    url: "https://github.com/o/r0",
+    stars: 10,
+    language: "Rust",
+    score: 70,
+    firstWeek: "2026-W38",
+    lastWeek: "2026-W40",
+    weekCount: 2,
+    bestRank: 3,
+    rating: null,
+  });
+  const listing = db.queries.find(({ table, calls }) => table === "github_repos" && calls.some(([method]) => method === "limit"));
+  assert.deepEqual(listing?.calls.filter(([method]) => method === "order" || method === "limit"), [
+    ["order", "disliked"],
+    ["order", "last_week", { ascending: false }],
+    ["order", "best_rank"],
+    ["limit", 31],
+  ]);
+  const filtered = fakeDb(undefined, { rows: { github_repos: [repoRow("o/a", { rating: 2 }), repoRow("o/b"), repoRow("o/c", { rating: 2, language: "Rust" })] } });
+  assert.deepEqual((await getGithubRepos(filtered, { rating: "heart", language: "Go", page: 1 })).repos.map((r) => r.key), ["o/a"]);
+  assert.deepEqual((await getGithubRepos(filtered, { rating: "none", page: 1 })).repos.map((r) => r.key), ["o/b"]);
+});
+
+// Kills a failed tab read answered as an empty tab.
+test("getGithubRepos throws on a failed query, with the PostgREST error as the cause", async () => {
+  const error = pgError("08006", "connection failure");
+  await assert.rejects(getGithubRepos(fakeDb(undefined, { tableErrors: { github_repos: error } }), { page: 1 }), (e: unknown) => e instanceof Error && e.cause === error);
+});
+
+// G1 spec 5 and Review Focus 4. Kills the order lost (the latest ❤ first), a gone target kept as a broken
+// row, a post shown with the model's title over the reader's own, and a 👍 listed as a favourite.
+// Final review: a ❤ repo that fell out of the week's final Top 10 (the daily run rewrites it by rank) has
+// no github_repos row, so it is kept from its own id; an id that isn't a repo path is left out.
+test("getFavorites lists the reader's ❤ items, posts and repos, latest first, and leaves out what is gone", async () => {
+  const db = fakeDb(undefined, {
+    rows: {
+      ratings: [
+        { target_kind: "post", target_id: "7", value: 2, updated_at: "2026-10-03T10:00:00Z" },
+        { target_kind: "repo", target_id: "owner/tool", value: 2, updated_at: "2026-10-02T10:00:00Z" },
+        { target_kind: "post", target_id: "99", value: 2, updated_at: "2026-10-01T10:00:00Z" },
+        { target_kind: "item", target_id: "local-2026w39-a", value: 2, updated_at: "2026-09-30T10:00:00Z" },
+        { target_kind: "item", target_id: "local-2026w39-b", value: 1, updated_at: "2026-09-29T10:00:00Z" },
+        { target_kind: "repo", target_id: "dropped/tool", value: 2, updated_at: "2026-09-28T10:00:00Z" },
+        { target_kind: "repo", target_id: "javascript:alert(1)", value: 2, updated_at: "2026-09-27T10:00:00Z" },
+      ],
+      digest_items: [
+        { id: "local-2026w39-a", issue_id: "2026-W39", title: { hu: "Hír", en: "News" }, url: "https://blog.test/a", source: "Blog" },
+        { id: "local-2026w39-b", issue_id: "2026-W39", title: { hu: "Hasznos", en: "Useful" }, url: "https://blog.test/b", source: "Blog" },
+      ],
+      posts: [{ id: 7, title: { hu: "Modell", en: "Model" }, overrides: { title: { hu: "Saját", en: "Own" } } }],
+      github_repos: [repoRow("owner/tool", { repo: "Owner/Tool" })],
+    },
+  });
+  assert.deepEqual(await getFavorites(db), [
+    { kind: "post", id: "7", title: { hu: "Saját", en: "Own" }, href: "/library/7", external: false, detail: null },
+    { kind: "repo", id: "owner/tool", title: "Owner/Tool", href: "https://github.com/owner/tool", external: true, detail: "W40" },
+    { kind: "item", id: "local-2026w39-a", title: { hu: "Hír", en: "News" }, href: "https://blog.test/a", external: true, detail: "Blog · W39" },
+    { kind: "repo", id: "dropped/tool", title: "dropped/tool", href: "https://github.com/dropped/tool", external: true, detail: null },
+  ]);
+});
+
+// Final review. Kills a ❤ lookup sent in one `.in(...)`: a reader's hearts only grow, and past the URL-length
+// limit the collection would fail to an error page.
+test("getFavorites looks the ❤ items up 30 at a time", async () => {
+  const ids = Array.from({ length: 31 }, (_, index) => `local-2026w39-${index}`);
+  const db = fakeDb(undefined, {
+    rows: {
+      ratings: ids.map((id) => ({ target_kind: "item", target_id: id, value: 2, updated_at: "2026-10-01T10:00:00Z" })),
+      digest_items: ids.map((id) => ({ id, issue_id: "2026-W39", title: { hu: id, en: id }, url: `https://blog.test/${id}`, source: "Blog" })),
+    },
+  });
+  assert.equal((await getFavorites(db)).length, 31);
+  assert.deepEqual(inLists(db, "digest_items").map((values) => values.length), [30, 1]);
+});
+
+// Kills a failed lookup answered as no rows: the collection would quietly show fewer hearts instead of the error page.
+test("getFavorites throws when a lookup fails, with the PostgREST error as the cause", async () => {
+  const error = pgError("08006", "connection failure");
+  const db = fakeDb(undefined, { rows: { ratings: [{ target_kind: "item", target_id: "a", value: 2, updated_at: "2026-10-01T10:00:00Z" }] }, tableErrors: { digest_items: error } });
+  await assert.rejects(getFavorites(db), (e: unknown) => e instanceof Error && e.cause === error);
 });

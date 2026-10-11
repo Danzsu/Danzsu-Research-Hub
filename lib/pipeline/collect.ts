@@ -13,7 +13,7 @@ export type Candidate = {
   hint: DigestCategory;
 };
 
-export type Repo = { repo: string; focus: string; url: string; stars: number };
+export type Repo = { repo: string; focus: string; url: string; stars: number; language: string | null };
 
 const DAY = 86_400_000;
 
@@ -92,7 +92,7 @@ export async function collectRepos(now: Date): Promise<Repo[]> {
     githubTopics.map(async (topic) => {
       const q = encodeURIComponent(`topic:${topic} created:>${since}`);
       const data = (await (await get(`https://api.github.com/search/repositories?q=${q}&sort=stars&order=desc&per_page=10`, headers)).json()) as {
-        items: Array<{ full_name: string; description: string | null; html_url: string; stargazers_count: number }>;
+        items: Array<{ full_name: string; description: string | null; html_url: string; stargazers_count: number; language: string | null }>;
       };
       return data.items;
     }),
@@ -106,6 +106,7 @@ export async function collectRepos(now: Date): Promise<Repo[]> {
         focus: (item.description ?? "").slice(0, 90),
         url: item.html_url,
         stars: item.stargazers_count,
+        language: item.language ?? null,
       });
     }
   }

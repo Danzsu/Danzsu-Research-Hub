@@ -28,7 +28,7 @@ const { AppShell } = await import("./app-shell.tsx");
 const { LanguageProvider } = await import("./language-context.tsx");
 const { toasts, UndoToast } = await import("./undo-toast.tsx");
 const { ReaderPanel } = await import("./reader-panel.tsx");
-const { DigestDashboard } = await import("./digest-dashboard.tsx");
+const { DigestDashboard, GithubTopList } = await import("./digest-dashboard.tsx");
 const { MustReadCard, StoryCard } = await import("./story-card.tsx");
 const { PostImage } = await import("./post-image.tsx");
 const { Progress } = await import("../../components/ui/progress.tsx");
@@ -36,6 +36,8 @@ const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
 const { CHAT_PANEL_ID, LinkChat, ReadHereContext, TaiyakiButton } = await import("./link-chat.tsx");
 const { RefreshBar, RefreshProvider } = await import("./refresh-bar.tsx");
+const { RatingsProvider } = await import("./rating-control.tsx");
+const sendNothing = { send: async () => ({}) };
 const { PostToolbar } = await import("../(app)/library/[id]/post-toolbar.tsx");
 const { useReaderState } = await import("./use-reader-state.ts");
 
@@ -50,7 +52,7 @@ const withShellProviders = <P extends object>(Component: ComponentType<P>, props
     createElement(
       LanguageProvider,
       { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-      createElement(RefreshProvider, null, createElement(ReadHereContext, { value: noop }, createElement(Component, props))),
+      createElement(RatingsProvider, sendNothing, createElement(RefreshProvider, null, createElement(ReadHereContext, { value: noop }, createElement(Component, props)))),
     ),
   );
 /** Renders DigestDashboard from a real seed (never preview) and returns its body text. */
@@ -219,28 +221,24 @@ test("useReaderState routes a preview source's writes through createSourceStore,
 
 test("StoryCard renders an unread feed card with its full action row", () => {
   const item = previewItems.find((candidate) => !candidate.mustRead)!;
-  const doc = render(
-    createElement(StoryCard, { item, state: { read: false, saved: false }, hasTodo: false, language: "en", actions: cardActions }),
-  );
+  const doc = withShellProviders(StoryCard, { item, state: { read: false, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: null });
   const article = doc.querySelector("article.story-card")!;
   assert.equal(article.getAttribute("data-card-id"), item.id);
   assert.equal(article.classList.contains("story-read"), false);
   assert.equal(doc.querySelectorAll(`a[href="${item.url}"]`).length, 1);
-  assert.equal(doc.querySelectorAll("button[aria-pressed]").length, 2); // Later + Read
+  assert.equal(doc.querySelectorAll("button[aria-pressed]").length, 5); // Later + Read + the three rating toggles
 });
 
 test("MustReadCard dims once read and shows its rank", () => {
   const item = previewItems.find((candidate) => candidate.mustRead)!;
-  const doc = render(
-    createElement(MustReadCard, { rank: 1, item, state: { read: true, saved: false }, hasTodo: false, language: "en", actions: cardActions }),
-  );
+  const doc = withShellProviders(MustReadCard, { rank: 1, item, state: { read: true, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: null });
   const article = doc.querySelector("article.must-card")!;
   assert.ok(article.classList.contains("story-read"));
   assert.match(article.textContent ?? "", /01/);
 });
 
 test("LibraryView lists every preview post, its mirrored badge and the pending/failed sources", () => {
-  const doc = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, preview: { failWrites: false } });
+  const doc = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, ratings: {}, preview: { failWrites: false } });
   assert.equal(doc.querySelectorAll('a[href^="/library/"]').length, previewPosts.length);
   assert.ok(doc.querySelector("form#submit"), "the submit form renders in preview mode");
   assert.equal(doc.querySelectorAll('input[type="url"]').length, 1);
@@ -346,20 +344,23 @@ test("every nav link carries one hidden pending dot, the search button none, and
     navigationStub.linkPending = false;
   });
   const doc = shell("en");
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1]); // Radar, AI companies, Library, Archive
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1, 1]); // Radar, AI companies, Library, Archive, Collection
   assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
   const searchButtons = [...doc.querySelectorAll("aside nav button, #mobile-nav > button")].filter((button) => button.textContent?.startsWith("Search"));
   assert.deepEqual(hiddenSpanCounts(searchButtons), [0, 0]);
   assert.equal(doc.querySelectorAll("[data-pending]").length, 0);
   navigationStub.linkPending = true;
-  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 6);
+  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 7);
 });
 
-// Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.
-test("every archive week card and Library post card carries one hidden pending dot", () => {
+// Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too, and
+// from the archive's tabs (G1).
+test("every archive week card, archive tab and Library post card carries one hidden pending dot", () => {
   const perCard = (doc: Document, selector: string) => hiddenSpanCounts([...doc.querySelectorAll(selector)]);
-  assert.deepEqual(perCard(withShellProviders(ArchiveView, { issues: previewArchive }), 'a[href^="/archive/"]'), previewArchive.map(() => 1));
-  const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, preview: { failWrites: false } });
+  const archive = withShellProviders(ArchiveView, { issues: previewArchive });
+  assert.deepEqual(perCard(archive, previewArchive.map((issue) => `a[href="/archive/${issue.id}"]`).join(", ")), previewArchive.map(() => 1));
+  assert.deepEqual(perCard(archive, 'nav a[href^="/archive"]'), [1, 1]);
+  const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, ratings: {}, preview: { failWrites: false } });
   assert.deepEqual(perCard(library, 'a[href^="/library/"]'), previewPosts.map(() => 1));
 });
 
@@ -376,7 +377,7 @@ test("the refresh bar is absent at rest, in the shell too, and hidden from assis
 // Spec 2.3, like useLanguage. Kills a useRefresh that quietly does nothing without its provider: the
 // refresh would be lost, and the bar with it.
 test("useRefresh outside RefreshProvider throws, naming where the provider lives", () => {
-  const props = { postId: 7, language: "en", hasTranslation: false, showingTranslation: false, canEdit: false, hasTranslatable: true } as const;
+  const props = { postId: 7, language: "en", hasTranslation: false, showingTranslation: false, canEdit: false, hasTranslatable: true, rating: null } as const;
   assert.throws(() => render(createElement(PostToolbar, props)), /RefreshProvider \(app\/components\/app-shell\.tsx\)/);
 });
 
@@ -385,7 +386,7 @@ test("useRefresh outside RefreshProvider throws, naming where the provider lives
 // say "invalid_url"), and the button missing for a public link.
 test("a card's Read here opens the Library post when there is one, asks the chat for a public link, and is absent otherwise", () => {
   const card = (url: string, postId?: number) =>
-    render(createElement(StoryCard, { item: digestItem("local-2026w40-x-1", { url }), state: EMPTY_ITEM_STATE, hasTodo: false, language: "en", actions: cardActions, postId }));
+    withShellProviders(StoryCard, { item: digestItem("local-2026w40-x-1", { url }), state: EMPTY_ITEM_STATE, hasTodo: false, language: "en", actions: cardActions, postId, rating: null });
   assert.equal(card("https://blog.test/a", 7).querySelector('a[href="/library/7"]')?.textContent?.trim(), "Read here");
   const buttons = [...card("https://blog.test/a").querySelectorAll("button")].filter((button) => button.textContent?.trim() === "Read here");
   assert.equal(buttons.length, 1);
@@ -414,8 +415,41 @@ test("useReadHere outside AppShell throws, naming where the provider lives", () 
       createElement(
         LanguageProvider,
         { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-        createElement(RefreshProvider, null, createElement(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } })),
+        createElement(
+          RatingsProvider,
+          sendNothing,
+          createElement(RefreshProvider, null, createElement(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } })),
+        ),
       ),
     );
   assert.throws(bare, /useReadHere must be used inside AppShell \(app\/components\/app-shell\.tsx\)/);
+});
+
+// G1 spec 3. Kills the rating group missing from a card, and a card that ignores the page's ratings.
+test("every Radar card carries a rating group, pressed by the page's ratings", () => {
+  const [first] = previewItems;
+  const doc = withShellProviders(DigestDashboard, {
+    issue: previewIssue,
+    items: previewItems,
+    githubTop10: previewGithub,
+    preview: { data: previewReader, failWrites: false },
+    ratings: { [`item:${first.id}`]: 2 },
+  });
+  const cards = doc.querySelectorAll("[data-card-id]");
+  assert.equal(doc.querySelectorAll('[data-card-id] [role="group"][aria-label="Rating"]').length, cards.length);
+  assert.equal(doc.querySelector(`[data-card-id="${first.id}"] [role="group"]`)?.getAttribute("data-rating"), "heart");
+});
+
+// G1 spec 3. Kills a Top 10 row without its rating group or score, the group put inside the repo link (a
+// button in a link), a pre-G1 row shown with "null/100", and a repo looked up in its casing.
+test("each Top 10 row links the repo with its score and keeps its rating group beside the link", () => {
+  // A repo shown in its own casing, rated under its lowercase name (Review Focus 1).
+  const entries = [{ ...previewGithub[0], repo: "GGML-org/Llama.cpp" }, previewGithub[1]];
+  const doc = withShellProviders(GithubTopList, { entries, ratings: { "repo:ggml-org/llama.cpp": -1 } });
+  const rows = [...doc.querySelectorAll('[role="group"][aria-label="Rating"]')].map((group) => group.parentElement!);
+  assert.equal(rows.length, previewGithub.length);
+  assert.equal(doc.querySelectorAll('a [role="group"]').length, 0);
+  assert.equal(rows[0].querySelector('[role="group"]')?.getAttribute("data-rating"), "down");
+  assert.match(rows[0].querySelector("a")?.textContent ?? "", /92\/100/);
+  assert.match(rows[1].querySelector("a")?.textContent ?? "", /—/);
 });

@@ -14,7 +14,7 @@ const picked: Candidate[] = [
   { url: "https://blog.test/llama-4", title: "Llama 4 on a laptop", source: "Blog", snippet: "", publishedAt: "2026-09-22", hint: "local" },
   { url: "https://arxiv.org/abs/2609.00001", title: "A paper", source: "arXiv cs.CL", snippet: "", publishedAt: "2026-09-21", hint: "research" },
 ];
-const repos: Repo[] = Array.from({ length: 12 }, (_, i) => ({ repo: `owner/repo-${i}`, focus: "", url: `https://github.com/owner/repo-${i}`, stars: 100 - i }));
+const repos: Repo[] = Array.from({ length: 12 }, (_, i) => ({ repo: `owner/repo-${i}`, focus: "", url: `https://github.com/owner/repo-${i}`, stars: 100 - i, language: i % 2 ? null : "Python" }));
 
 /** `n` synthetic Hacker News Algolia hits ("Story 0".."Story n-1"), all above the points threshold. */
 const hnHits = (n: number) =>
@@ -63,18 +63,18 @@ test("toDigestRows takes the URL, date and source from the listing, and the rest
 });
 
 test("toDigestRows drops indices the model made up and ranks at most 10 repos in answer order", () => {
-  const github = [{ index: 5, focus: "fifth" }, { index: 99, focus: "made up" }, ...[0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11].map((index) => ({ index, focus: "" }))];
+  const github = [{ index: 5, focus: "fifth", score: 91 }, { index: 99, focus: "made up", score: 50 }, ...[0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11].map((index) => ({ index, focus: "", score: 40 }))];
   const { items, top } = toDigestRows({ items: [curatedItem(7, "Made up")], github }, picked, repos, week);
   assert.deepEqual(items, []);
   assert.equal(top.length, 10);
-  assert.deepEqual(top[0], { issue_id: "2026-W39", rank: 1, repo: "owner/repo-5", focus: "fifth", url: "https://github.com/owner/repo-5" });
+  assert.deepEqual(top[0], { issue_id: "2026-W39", rank: 1, repo: "owner/repo-5", focus: "fifth", url: "https://github.com/owner/repo-5", stars: 95, language: null, score: 91 });
   assert.deepEqual(top.map((row) => row.rank), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 });
 
 test("curatePrompt numbers the news and repo listings the model answers with", () => {
   const prompt = curatePrompt(picked, repos.slice(0, 1));
   assert.match(prompt, /NEWS:\n\[0\] \(local\) Llama 4 on a laptop — Blog\n\[1\] \(research\) A paper — arXiv cs\.CL\n/);
-  assert.match(prompt, /REPOS:\n\[0\] owner\/repo-0 \(100★\) — $/);
+  assert.match(prompt, /REPOS:\n\[0\] owner\/repo-0 \(100★, Python\) — $/);
 });
 
 // Only the first feed answers; every other feed, and the fixed-host APIs, are mocked too, so nothing
@@ -92,11 +92,11 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
     if (url === feeds[0].url) return new Response(rss);
     if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits: [] });
     if (url.startsWith("https://api.github.com/search/")) {
-      return Response.json({ items: [{ full_name: "owner/tool", description: "A tool", html_url: "https://github.com/owner/tool", stargazers_count: 42 }] });
+      return Response.json({ items: [{ full_name: "owner/tool", description: "A tool", html_url: "https://github.com/owner/tool", stargazers_count: 42, language: "Rust" }] });
     }
     if (url.startsWith("https://generativelanguage.googleapis.com/")) {
       prompt = geminiPrompt(init);
-      return geminiResponse({ items: [curatedItem(0, "Fresh story")], github: [{ index: 0, focus: "A tool" }] });
+      return geminiResponse({ items: [curatedItem(0, "Fresh story")], github: [{ index: 0, focus: "A tool", score: 88 }] });
     }
     return new Response("", { status: 404 });
   });
@@ -113,7 +113,7 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
   const [item] = upserted.digest_items.values as { id: string; url: string }[];
   assert.equal(item.url, "https://blog.test/fresh");
   assert.deepEqual(upserted.digest_items.options, { onConflict: "url", ignoreDuplicates: true }); // ids are never rewritten
-  assert.deepEqual(upserted.github_top.values, [{ issue_id: "2026-W39", rank: 1, repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool" }]);
+  assert.deepEqual(upserted.github_top.values, [{ issue_id: "2026-W39", rank: 1, repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool", stars: 42, language: "Rust", score: 88 }]);
   assert.deepEqual(upserted.github_top.options, { onConflict: "issue_id,rank" }); // a re-run replaces the week's ranking
   // "Known" means stored in the last 14 days, by creation time.
   assert.deepEqual(db.gteCalls, [{ table: "digest_items", column: "created_at", value: "2026-09-09T05:00:00.000Z" }]);
@@ -162,4 +162,9 @@ test("runDaily skips the shortlist call at exactly 40 candidates, curating all o
   assert.equal(result.candidates, 40);
   assert.equal(result.shortlisted, 40);
   assert.deepEqual(db.tasks, ["daily_curate"]); // exactly 40: the shortlist call itself never runs
+});
+
+// G1 spec 2. Kills the score dropped from the prompt (the model would answer without one and fail the schema).
+test("curatePrompt asks for a 0–100 score on every repo, on the news' scale", () => {
+  assert.match(curatePrompt([], repos), /"github" with a focus line of at most 8 English words and a score from 0 to 100/);
 });
