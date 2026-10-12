@@ -15,8 +15,8 @@ import { itemSources } from "@/lib/my-sources";
 import { readOverrides } from "@/lib/overrides";
 import { toPost } from "@/lib/post-row";
 import { shownTitle, type Post } from "@/lib/post-view";
-import { budapestDay, DAILY_SIZE } from "@/lib/pipeline/daily-top";
-import { archiveLabel, githubRepo, inChunks, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
+import { budapestDay, budapestHour, DAILY_DUE_HOUR, DAILY_SIZE } from "@/lib/pipeline/daily-top";
+import { archiveLabel, githubRepo, inChunks, isoWeek, isoWeekMonday, MAX_ATTEMPTS, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
 import { RATING_FILTERS, ratingKey, ratingTargetId, type RatingFilter, type RatingKind, type RatingTarget, type RatingValue, type Ratings } from "@/lib/ratings";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 import { createAdminClient, type Reader } from "@/lib/supabase/server";
@@ -98,7 +98,8 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
   };
 }
 
-export type DailyData = { issue: CurrentIssue; today: boolean; items: DigestItem[]; briefs: Record<string, DailyBrief>; posts: Record<string, number> };
+/** `late`: the list isn't today's and 18:00 has passed in Budapest (a failed or late run). */
+export type DailyData = { issue: CurrentIssue; today: boolean; late: boolean; items: DigestItem[]; briefs: Record<string, DailyBrief>; posts: Record<string, number> };
 
 /**
  * The latest day's Top 10 (daily news spec N7) with each card's long text (N8) and its Library post. A failed
@@ -123,7 +124,7 @@ export async function getDaily(db: SupabaseClient, now = new Date()): Promise<Da
     updated: "",
     archiveAt: "",
   };
-  const sources = await itemSources(db, items, "url, status, posts(id, brief, summary, key_points, overrides)");
+  const sources = await itemSources(db, items, "url, status, attempts, posts(id, brief, summary, key_points, overrides)");
   const briefs: Record<string, DailyBrief> = {};
   const posts: Record<string, number> = {};
   for (const [id, source] of sources ?? []) {
@@ -134,11 +135,12 @@ export async function getDaily(db: SupabaseClient, now = new Date()): Promise<Da
       briefs[id] = brief
         ? { kind: "brief", paragraphs: brief }
         : { kind: "post", summary: readOverrides(post.overrides).summary ?? post.summary, keyPoints: post.key_points };
-    } else if (source.status === "pending") {
+    } else if (source.status === "pending" && (source.attempts as number) < MAX_ATTEMPTS) {
       briefs[id] = { kind: "pending" };
     }
   }
-  return { issue, today: day === budapestDay(now), items, briefs, posts };
+  const today = day === budapestDay(now);
+  return { issue, today, late: !today && budapestHour(now) >= DAILY_DUE_HOUR, items, briefs, posts };
 }
 
 /** Every issue but the current week's, newest first. Throws on a failed query, like getRadar. */

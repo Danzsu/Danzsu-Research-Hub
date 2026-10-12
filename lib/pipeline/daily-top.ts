@@ -7,6 +7,11 @@ export const budapestDay = (now: Date) => budapestDate.format(now);
 
 const HOUR = 3_600_000;
 
+const budapestClock = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Budapest", hour: "2-digit", hourCycle: "h23" });
+/** The hour on Budapest's clock (0–23): the daily list is due by DAILY_DUE_HOUR. */
+export const budapestHour = (now: Date) => Number(budapestClock.format(now));
+export const DAILY_DUE_HOUR = 18;
+
 /** Budapest's midnight as an instant: 22:00 UTC the evening before in summer (UTC+2), 23:00 in winter (UTC+1). */
 export function budapestDayStart(now: Date): Date {
   const day = budapestDay(now);

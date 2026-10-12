@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { budapestDay, budapestDayStart, pickDailyTop, type DailyCandidate } from "./daily-top.ts";
+import { budapestDay, budapestDayStart, budapestHour, pickDailyTop, type DailyCandidate } from "./daily-top.ts";
 
 const item = (id: string, score: number, minutes: number): DailyCandidate => ({ id, score, read_minutes: minutes });
 const ids = (items: DailyCandidate[]) => items.map((entry) => entry.id);
@@ -52,4 +52,10 @@ test("budapestDayStart is Budapest's midnight as a UTC instant, in summer and wi
   assert.equal(budapestDayStart(new Date("2026-07-01T15:00:00Z")).toISOString(), "2026-06-30T22:00:00.000Z");
   assert.equal(budapestDayStart(new Date("2026-01-15T15:00:00Z")).toISOString(), "2026-01-14T23:00:00.000Z");
   assert.equal(budapestDayStart(new Date("2026-07-01T22:30:00Z")).toISOString(), "2026-07-01T22:00:00.000Z");
+});
+
+// Polish 1, Review Focus 3. Kills the hour taken in UTC: 16:30 UTC is 18:30 in a Budapest summer, 17:30 in winter.
+test("budapestHour reads Budapest's clock, summer and winter", () => {
+  assert.equal(budapestHour(new Date("2026-07-01T16:30:00Z")), 18);
+  assert.equal(budapestHour(new Date("2026-01-15T16:30:00Z")), 17);
 });

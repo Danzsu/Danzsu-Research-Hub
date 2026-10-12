@@ -163,6 +163,9 @@ export const SUMMARY_MAX = 2000;
 /** The link chat's thread shows this many of the reader's latest submissions (listMySources, memoryTransport). */
 export const MINE_LIMIT = 10;
 
+/** A source left pending after this many runs (each killed before it could fail) waits for none any more. */
+export const MAX_ATTEMPTS = 3;
+
 export function formatTimestamp(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);

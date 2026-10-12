@@ -465,19 +465,25 @@ test("getDaily answers the latest day's list in rank order, with its week and wh
   assert.equal(daily.issue.label, "2026. 09. 18.");
   assert.equal(daily.today, true);
   assert.equal((await getDaily(db, new Date("2026-09-18T22:30:00Z"))).today, false);
+  // Polish 1, Review Focus 3. Late only when the list isn't today's and 18:00 has passed in Budapest.
+  assert.equal(daily.late, false);
+  assert.equal((await getDaily(db, new Date("2026-09-19T15:00:00Z"))).late, false); // 17:00, still due
+  assert.equal((await getDaily(db, new Date("2026-09-19T16:30:00Z"))).late, true); // 18:30, no list
 });
 
 // Spec N8. Kills each fallback step: the brief over the summary, the submitter's summary over the model's,
 // "being written" only for a pending source, and nothing for a failed one; "Olvasd itt" for every post.
 test("getDaily gives each card the best long text there is", async () => {
-  const urls = ["brief", "summary", "pending", "failed"].map((name) => `https://arxiv.org/abs/${name}`);
+  const urls = ["brief", "summary", "pending", "failed", "stuck"].map((name) => `https://arxiv.org/abs/${name}`);
   const db = fakeDb(undefined, {
-    rows: { daily_top: ["brief", "summary", "pending", "failed"].map((id, i) => dailyRow("2026-09-18", i + 1, id)) },
+    rows: { daily_top: ["brief", "summary", "pending", "failed", "stuck"].map((id, i) => dailyRow("2026-09-18", i + 1, id)) },
     sources: [
       { url: urls[0], status: "done", posts: { id: 1, brief: { hu: ["B"], en: ["B"] }, summary: text("S"), key_points: { hu: [], en: [] }, overrides: {} } },
       { url: urls[1], status: "done", posts: { id: 2, brief: null, summary: text("S"), key_points: { hu: ["k"], en: ["k"] }, overrides: { summary: text("Mine") } } },
-      { url: urls[2], status: "pending", posts: null },
-      { url: urls[3], status: "failed", posts: null },
+      { url: urls[2], status: "pending", attempts: 1, posts: null },
+      { url: urls[3], status: "failed", attempts: 1, posts: null },
+      // Polish 1, Review Focus 4: killed three times, it waits for no run any more.
+      { url: urls[4], status: "pending", attempts: 3, posts: null },
     ],
   });
   const daily = await getDaily(db, new Date("2026-09-18T15:00:00Z"));

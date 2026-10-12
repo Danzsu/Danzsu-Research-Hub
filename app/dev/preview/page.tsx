@@ -61,7 +61,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
           issue={previewDailyIssue}
           items={view === "daily" ? previewDailyItems : []}
           githubTop10={[]}
-          daily={view === "daily" ? previewDaily : { today: true, briefs: {} }}
+          daily={view === "daily" ? previewDaily : { today: true, late: false, briefs: {} }}
           preview={{ data: previewReader, failWrites }}
           posts={previewReadHerePosts}
           ratings={previewRatings}

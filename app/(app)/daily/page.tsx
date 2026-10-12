@@ -19,7 +19,7 @@ export default async function DailyPage() {
       items={daily.items}
       githubTop10={[]}
       scope="daily"
-      daily={{ today: daily.today, briefs: daily.briefs }}
+      daily={{ today: daily.today, late: daily.late, briefs: daily.briefs }}
       seed={seed}
       posts={daily.posts}
       ratings={ratings}
