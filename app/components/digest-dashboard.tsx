@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bookmark,
   Building2,
@@ -223,6 +223,9 @@ export function DigestDashboard(
   const topLabel = companies && top.length ? `${t.dailyTop} · ${addedDayLabel(top[0].addedAt)}` : t.mustRead;
 
   const panelLayer = usePanel();
+  const closePanel = panelLayer.setOpen;
+  // The panel belongs to this page: leaving it (a link, Back, Forward) must not leave it open for the next Radar view.
+  useEffect(() => () => closePanel(false), [closePanel]);
   // Rendered twice: as the side column from a 95rem-wide Radar (R3 §2: its own width, not the viewport's), and inside the header Sheet below that.
   const panel = (
     <ReaderPanel
