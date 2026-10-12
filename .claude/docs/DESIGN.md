@@ -208,7 +208,7 @@ Anthropic's frontend-design skill lists several of this app's core traits as the
 - **The cream and paper background** (`#fbefca`, `#f8e8b4`), with near-black ink (`#141414`) instead of pure black and a single bright signal accent.
 - **Zero border-radius, 2px rules and broadsheet columns.** These are the newsprint look.
 - **ALL-CAPS mono eyebrows over headings** (`MIRRORED SOURCES / KÖNYVTÁR`, `TOP 3 · KÖTELEZŐ`), mono data labels (`SCORE`, `12 MIN`, `3 / 12 · SYNCED`), and meta joined with middle dots.
-- **A `→` on links and buttons** (`Sign out →`, `Irány a Radar →`), a signal `//` after every display title, and RADAR in signal in the wordmark.
+- **A `→` on links and buttons** (`Sign out →`, `Irány a Radar →`), a signal `//` after every display title, and RADAR in signal in the wordmark. The logo beside the wordmark is the app icon (`BrandMark`), in the sidebar, the public header and the status card alike.
 - **01 / 02 / 03 numerals.** These encode real sequences: the Top 3 are ranked by score, the GitHub top 10 is ranked, and the archive numbers its closed weeks newest first. Use numerals only where the content really is a sequence.
 - **Hover feedback on every card.** A card is the unit you act on, so it answers the pointer.
 
@@ -381,7 +381,7 @@ Shadows are hard offsets with zero blur:
 
 - **Radius is 0.** `--radius` (`0rem` in `:root`) and `--radius-sm/md/lg/xl` (`0` in `@theme inline`) are all zero. This is why stock shadcn files can be dropped in unmodified: `rounded-sm`, `rounded-md`, `rounded-lg` and `rounded-xl` compile to zero.
 - **Not everything is neutralized.** `rounded-xs`, `rounded-2xl` to `4xl` and arbitrary `rounded-[…]` values keep their radius. Today that means the vendored `Checkbox` (`rounded-[4px]`), so the reader panel's to-do checkboxes have 4px corners.
-- **`rounded-full` is not neutralized, and it is used on purpose:** for the logo badge in the desktop nav, the language toggle (both the pill and the round rail button), and the progress pill that opens the Radar's panel. The live dot draws its circle with `border-radius: 999px` in `.live-pulse`.
+- **`rounded-full` is not neutralized, and it is used on purpose:** for the account avatar, the shell's language toggle (both the pill and the round rail button), and the progress pill that opens the Radar's panel. The live dot draws its circle with `border-radius: 999px` in `.live-pulse`.
 - **Rules.** A 2px ink border (`border-2 border-ink`) is the default frame. Tags and meta chips use 1px. A dashed border means "missing or empty": an unavailable image, an empty view, the hidden-blocks link. A 4px signal bar on the left (`border-l-4 border-signal`) marks quotes, "why it matters" and key points.
 - **Texture.** `.signal-grid` draws a 34px paper grid at 12% opacity over the ink Radar hero, masked in from the left.
 
@@ -454,7 +454,7 @@ Each page then sets its own surface. The Radar uses `<div className="min-w-0 bg-
 
 `app/components/desktop-nav.tsx` and `nav-parts.tsx`:
 
-- **The column:** ink, sticky and full height, with a `border-paper/15` right rule. At the top sit the round signal logo badge and the stacked NEON / NEWS / RADAR wordmark, with RADAR in signal.
+- **The column:** ink, sticky and full height, with a `border-paper/15` right rule. At the top sit the logo (`BrandMark`, the flame-diamond app icon, `brand-mark.tsx`) and the stacked NEON / NEWS / RADAR wordmark, with RADAR in signal.
 - **Entries:** 40px mono rows. The active one gets a 2px signal left border, a `bg-signal/10` wash and signal text.
 - **The foot** (2a spec D5): the account menu (`account-menu.tsx`). The avatar (the address's first letter in a signal circle) and the whole address, named "Account: <address>", open a cream dropdown menu with a 2px ink frame and a signal hard shadow: Magyar / English as radio items, the shortcuts help and a POST sign-out, each a real menu item (`AccountMenuItems`), so arrows move between them, Enter picks one and Esc closes; a Radix menu swallows Tab, which is why the rows aren't nested controls here. In the rail only the avatar shows, named in a tooltip. The collapse toggle sits under it.
 - **The rail:** only the icons stay. Each one shows its name in a `NavTooltip` on hover and on keyboard focus. The rail's nav has no overflow, because a scroll container would clip the tooltips. On viewports under 32rem tall, the whole aside scrolls instead.
@@ -550,7 +550,7 @@ In use (`app/(app)/library/library-view.tsx`):
 <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm preview={preview} />} />
 ```
 
-`StatusCard` is a lone cream card on ink, with an optional wordmark (`brand`), for the error and not-found pages. Sign-in (`/login`) sits in the public landing frame instead (`PublicPage`, `public-page.tsx`), in the same `SignInCard` the landing page's own sign-in section uses (`sign-in-forms.tsx`):
+`StatusCard` is a lone cream card on ink, with an optional wordmark (`brand`), for the error and not-found pages. Sign-in (`/login`) sits in the public landing frame instead (`PublicPage`, `public-page.tsx`), in the same `SignInCard` the landing page's header sheet slides up from the bottom (`sign-in-sheet.tsx`, `sign-in-forms.tsx`). The public header's Belépés and HU/EN buttons, and the card's Google and email-link buttons, move like the taiyaki: `liftSurface` (`lift-classes.ts`, the cream square with an ink frame) or, for the ink email button, `.lift` alone, each with a 3px signal shadow; they step forward on hover and focus and sink on press. The footer ends with "Made by Danzsu":
 
 ```tsx app/components/page-header.tsx
     <main className="grid min-h-dvh place-items-center bg-ink px-4 text-paper">

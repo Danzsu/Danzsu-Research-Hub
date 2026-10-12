@@ -25,7 +25,7 @@ export default async function LoginPage({
   const failure = error ? (copy.errors[error as keyof typeof copy.errors] ?? copy.errors["1"]) : null;
 
   return (
-    <PublicPage language={await getLanguage()}>
+    <PublicPage language={await getLanguage()} signIn="none">
       {/* The landing page's frame (2a spec D6); StatusCard stays for the error and not-found pages. */}
       <main className="mx-auto max-w-[1600px] px-4 py-12 sm:px-10">
         <SignInCard>

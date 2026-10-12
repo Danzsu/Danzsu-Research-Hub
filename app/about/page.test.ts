@@ -6,15 +6,25 @@ const { default: AboutPage } = await import("./page.tsx");
 const about = async (query: Record<string, string> = {}) => render(await AboutPage({ searchParams: Promise.resolve(query) }));
 const { default: PrivacyPage } = await import("../privacy/page.tsx");
 
-// Kills the landing page without its sign-in (both forms, going home) or without the privacy link Google's
-// consent screen points at, and a feature card dropped from the list.
-test("the about page lists what the site does and carries both sign-in forms and the privacy link", async () => {
+// Kills the landing page without its sign-in or without the privacy link Google's consent screen points at,
+// a feature card dropped from the list, and the sign-in card back in the page: it lives in the header's sheet
+// (portalled, so the forms never reach this markup), opened by the cream Belépés button.
+test("the about page lists what the site does, opens sign-in from the header and links the privacy page", async () => {
   const doc = await about();
   assert.equal(doc.querySelector("h1")?.textContent, "NEON NEWS RADAR//");
   assert.equal(doc.querySelectorAll("main ul li").length, 9);
-  const forms = [...doc.querySelectorAll("form")].map((form) => [form.getAttribute("action"), form.querySelector('input[name="next"]')?.getAttribute("value")]);
-  assert.deepEqual(forms, [["/auth/google", "/"], ["/auth/login", "/"]]);
+  assert.equal(doc.querySelectorAll("form").length, 0);
+  const trigger = doc.querySelector('header button[aria-haspopup="dialog"]');
+  assert.equal(trigger?.textContent, "Belépés");
+  assert.match(trigger?.className ?? "", /\blift\b/);
   assert.ok([...doc.querySelectorAll("a")].some((a) => a.getAttribute("href") === "/privacy"));
+});
+
+// Kills the radar glyph back beside the wordmark, and the credit line missing from the footer.
+test("the public frame carries the logo and the credit line", async () => {
+  const doc = await about();
+  assert.match(doc.querySelector("header a[href='/about'] img")?.getAttribute("src") ?? "", /icon\.png/);
+  assert.match(doc.querySelector("footer")?.textContent ?? "", /Made by Danzsu/);
 });
 
 // Kills a privacy page without its sections, and the Google scopes claim drifting from what the app asks for.

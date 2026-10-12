@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Radar } from "lucide-react";
+import { BrandMark } from "./brand-mark";
 
 // Hook-free, so server pages and the client error boundary can both use these.
 
@@ -48,7 +48,7 @@ export function StatusCard({ eyebrow, title, brand = false, children }: {
       <section className="w-full max-w-md border-2 border-ink bg-cream p-7 text-ink shadow-[8px_8px_0_var(--signal)] sm:p-9">
         {brand && (
           <div className="mb-6 flex items-center gap-2 font-display text-xl sm:text-2xl">
-            <Radar className="shrink-0 text-signal" /> NEON NEWS RADAR
+            <BrandMark /> NEON NEWS RADAR
           </div>
         )}
         <p className="font-mono text-xs tracking-[0.2em] text-signal">{eyebrow}</p>

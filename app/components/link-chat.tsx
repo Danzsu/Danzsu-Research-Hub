@@ -12,6 +12,7 @@ import { isSendKey } from "@/lib/keymap";
 import { createLinkChat, focusIsIdle, httpTransport, memoryTransport } from "@/lib/link-chat";
 import type { MySource } from "@/lib/my-sources";
 import { busyClass, ChatThread } from "./chat-thread";
+import { liftSurface } from "./lift-classes";
 import { useLanguage } from "./language-context";
 import { useRefresh } from "./refresh-bar";
 import { TaiyakiIcon } from "./taiyaki-icon";
@@ -53,7 +54,7 @@ export function TaiyakiButton({ open, onClick, className }: { open: boolean; onC
       aria-label={copy[language].open}
       aria-expanded={open}
       aria-controls={CHAT_PANEL_ID}
-      className={`focus-ring lift place-items-center border-2 border-ink bg-paper ${className}`}
+      className={`${liftSurface} place-items-center ${className}`}
     >
       {/* The fish turns a little when its panel is open (2a spec D7); still under reduced motion. */}
       <motion.span data-taiyaki-icon animate={{ rotate: open ? -12 : 0 }} transition={{ type: "spring", duration: 0.25, bounce: 0.3 }} className="grid">
