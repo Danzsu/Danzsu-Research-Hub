@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { budapestDay, pickDailyTop, type DailyCandidate } from "./daily-top.ts";
+import { budapestDay, budapestDayStart, pickDailyTop, type DailyCandidate } from "./daily-top.ts";
 
 const item = (id: string, score: number, minutes: number): DailyCandidate => ({ id, score, read_minutes: minutes });
 const ids = (items: DailyCandidate[]) => items.map((entry) => entry.id);
@@ -45,4 +45,11 @@ test("pickDailyTop keeps a short day whole, ties in their given order, and nothi
   // Two short reads tied at 70 swap in one after the other, landing in reverse slots: the tie still keeps their order.
   assert.deepEqual(ids(pickDailyTop([...longs(10, 90), item("S1", 70, 5), item("S2", 70, 5), item("S3", 60, 5)])).slice(7), ["S1", "S2", "S3"]);
   assert.deepEqual(pickDailyTop([]), []);
+});
+
+// Review Focus 1. Kills the day's start taken in UTC, or with the wrong offset in summer or winter.
+test("budapestDayStart is Budapest's midnight as a UTC instant, in summer and winter", () => {
+  assert.equal(budapestDayStart(new Date("2026-07-01T15:00:00Z")).toISOString(), "2026-06-30T22:00:00.000Z");
+  assert.equal(budapestDayStart(new Date("2026-01-15T15:00:00Z")).toISOString(), "2026-01-14T23:00:00.000Z");
+  assert.equal(budapestDayStart(new Date("2026-07-01T22:30:00Z")).toISOString(), "2026-07-01T22:00:00.000Z");
 });
