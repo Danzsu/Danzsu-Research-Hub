@@ -236,7 +236,8 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
   }
 
   /** `sent`: this load follows the reader's own send, so the list it lands takes that send's bubble away
-   *  in the same snapshot, and the message never shows twice. */
+   *  in the same snapshot, and the message never shows twice. An accepted message whose own reload failed
+   *  keeps its bubble until the next good list, unless another send is on its way by then. */
   async function load(sent = false) {
     const request = ++latest;
     // A fresh load supersedes whatever was scheduled before it. Cleared here, not left to
@@ -252,7 +253,7 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
     }
     if (request !== latest) return;
     if (answer?.status === 200 && Array.isArray(answer.body.sources)) {
-      set({ sources: answer.body.sources as MySource[], unreachable: false, ...(sent ? { outgoing: null } : {}) });
+      set({ sources: answer.body.sources as MySource[], unreachable: false, ...(sent || !snapshot.sending ? { outgoing: null } : {}) });
     } else if (answer?.status === 401) {
       // Signed out: say so (deduped in `say`), clear `unreachable` so the two notices never sit side
       // by side, and stop — reopening (which reloads) is what restarts polling, not another tick.
@@ -300,12 +301,14 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         return false;
       }
       set({ sending: true, outgoing: { url: message.url, href: safeHref(message.url, message.url), note: message.note } });
+      let accepted = false;
       try {
         const answer = await transport.submit(message.url, message.note);
         if (answer.status !== 202) {
           say(noticeFor(answer));
           return false;
         }
+        accepted = true;
         // A resend that goes through this time must not leave an earlier refusal (e.g. "Nem ment
         // át…") sitting above the new pending entry (Important 3): cleared before this send's own
         // more_links notice, so that one still shows.
@@ -317,7 +320,8 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         say({ kind: "network" });
         return false;
       } finally {
-        set({ sending: false, outgoing: null });
+        // An accepted message keeps its bubble: if the reload failed, the thread would otherwise lose it until the next poll.
+        set({ sending: false, ...(accepted ? {} : { outgoing: null }) });
       }
     },
     /** "Újra": one request per source at a time. A 409 means another click already started it. A refusal

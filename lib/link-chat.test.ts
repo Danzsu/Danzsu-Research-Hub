@@ -298,6 +298,28 @@ test("after a finished thread's load blips once, the new submission still lands"
   assert.deepEqual(chat.getSnapshot().sources?.map((source) => source.id), [2, 1]);
 });
 
+// Polish 3, Review Focus 1. Kills the `finally` that always takes the bubble away: an accepted message
+// whose reload fails must stay in view until a good list shows it.
+test("an accepted message stays in the thread when the reload after it fails, until a good list lands", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const chat = createLinkChat(
+    fakeTransport([], {
+      mine: inTurn(answer(200, { sources: [] }), answer(500, { error: "db_error" }), answer(200, { sources: [source(2, "pending")] })),
+      submit: answer(202, { ok: true, id: 2 }),
+    }).transport,
+    () => true,
+  );
+  t.after(() => chat.close());
+  chat.open();
+  await flush();
+  assert.equal(await chat.send("https://blog.test/2"), true);
+  assert.equal(chat.getSnapshot().outgoing?.url, "https://blog.test/2");
+  assert.equal(chat.getSnapshot().sending, false);
+  await wait(t, POLL_MS);
+  assert.equal(chat.getSnapshot().outgoing, null);
+  assert.deepEqual(chat.getSnapshot().sources?.map((source) => source.id), [2]);
+});
+
 // Kills `close()` not resetting notices while a send is still in flight (Important 2, spec 1.3): its
 // late refusal must not leak into the next `open()`.
 test("closing the panel while a send is in flight drops that send's reply on reopen", async (t) => {
