@@ -64,7 +64,7 @@ export function ShortcutHelp({ open, onOpenChange }: DialogProps) {
           <Fragment key={action}>
             <dt className="flex flex-wrap gap-1">
               {keys.map((key) => (
-                <Kbd key={key} className="bg-paper text-xs">
+                <Kbd key={key} className="bg-paper">
                   {key}
                 </Kbd>
               ))}
