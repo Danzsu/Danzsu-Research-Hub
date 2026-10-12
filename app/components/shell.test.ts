@@ -575,6 +575,19 @@ test("an older daily list says so, and no list at all says when the first one co
   assert.match(lateHu.body.textContent ?? "", /A mai lista késik — addig a korábbi látszik \(2026\. 09\. 24\.\)\./);
 });
 
+// Kills the weekly and companies feeds left in one 900px column on a wide screen, and the daily list split
+// into two: it is a ranked list with long briefs, read top to bottom.
+test("the weekly and companies feeds go two-up in a wide column, the daily list stays one", () => {
+  const feedList = (doc: Document) => doc.querySelector("article.story-card")!.parentElement!;
+  const props = { issue: previewIssue, items: previewItems, githubTop10: [], preview: { data: previewReader, failWrites: false } };
+  for (const scope of [undefined, "companies"] as const) {
+    const list = feedList(withShellProviders(DigestDashboard, { ...props, scope }));
+    assert.match(list.className, /@\[100rem\]:grid-cols-2/, scope ?? "weekly");
+    assert.match(list.parentElement!.className, /@container/, scope ?? "weekly");
+  }
+  assert.doesNotMatch(feedList(dailyView()).className, /grid-cols-2/);
+});
+
 // Spec N7. Kills the weekly cards' DAY TOP mark missing, or put on an item that was never in a daily list.
 test("the weekly view marks the items of a daily Top 10", () => {
   const doc = withShellProviders(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } });

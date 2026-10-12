@@ -380,7 +380,7 @@ export function DigestDashboard(
                   </section>
                 )}
 
-                <section className="mt-9">
+                <section className="mt-9 @container">
                   <SectionLabel icon={dailyView ? Sunset : Newspaper} label={dailyView ? t.dailyFeed : companies ? t.companiesFeed : t.feed} />
                   {dailyView && items.length > 0 && (
                     <nav aria-label={t.dailyIndex} className="mb-6 border-2 border-ink bg-paper p-4">
@@ -397,21 +397,23 @@ export function DigestDashboard(
                       </ol>
                     </nav>
                   )}
-                  <div className="space-y-4">
+                  {/* Two-up in a wide column, so a 900px card doesn't leave half of it empty; the daily list stays one,
+                      a ranked list with long briefs read top to bottom. */}
+                  <div className={`grid gap-4 ${dailyView ? "" : "@[100rem]:grid-cols-2"}`}>
                     {feed.map((item, index) => (
                       <StoryCard key={item.id} {...cardProps(item)} rank={dailyView ? index + 1 : undefined} />
                     ))}
-                    {!feed.length && emptyFeed && (
-                      <EmptyState tone="cream" icon={Newspaper}>
-                        <p>{emptyFeed}</p>
-                        {filter !== "all" && (
-                          <Button variant="brutal" className="mt-4 min-h-10" onClick={() => setFilter("all")}>
-                            {t.showAll}
-                          </Button>
-                        )}
-                      </EmptyState>
-                    )}
                   </div>
+                  {!feed.length && emptyFeed && (
+                    <EmptyState tone="cream" icon={Newspaper}>
+                      <p>{emptyFeed}</p>
+                      {filter !== "all" && (
+                        <Button variant="brutal" className="mt-4 min-h-10" onClick={() => setFilter("all")}>
+                          {t.showAll}
+                        </Button>
+                      )}
+                    </EmptyState>
+                  )}
                 </section>
               </>
             )}
