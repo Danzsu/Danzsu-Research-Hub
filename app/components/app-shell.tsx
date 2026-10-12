@@ -210,7 +210,7 @@ function MobileNav({ email, onSearch, onHelp, chat }: { email: string; onSearch:
     <nav
       id="mobile-nav"
       aria-label={t.nav}
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-paper md:hidden"
     >
       {MOBILE_BAR_NAV.slice(0, MOBILE_CHAT_SLOT).map(slot)}
       {chat}

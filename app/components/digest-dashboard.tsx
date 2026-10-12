@@ -281,7 +281,7 @@ export function DigestDashboard(
             }}
             // Never modal, so Tab goes on past it to the page, as in the link chat.
             onKeyDownCapture={(event) => tabPastPanel(event, () => panelTrigger.current)}
-            className={`overflow-y-auto border-ink bg-cream p-5 pt-12 text-ink ${isMobile ? "max-h-[85dvh] border-t-2" : "w-[88vw] max-w-sm border-l-2"}`}
+            className={`overflow-y-auto border-ink bg-cream p-5 pt-12 text-ink ${isMobile ? "max-h-[85dvh] border-t-2 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]" : "w-[88vw] max-w-sm border-l-2"}`}
           >
             <SheetHeader className="sr-only">
               <SheetTitle>{t.panel}</SheetTitle>

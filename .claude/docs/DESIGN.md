@@ -479,7 +479,7 @@ className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y
 Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The slots are Radar, Napi, the taiyaki, Library and Több; Keresés sits in the "Több" sheet (it is a placeholder until search lands). The active slot, the open "Több", or "Több" on an AI cégek, GitHub repók, Archívum or Gyűjtemény page (`data-active`) turns signal:
 
 ```tsx app/components/app-shell.tsx
-className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
+className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-paper md:hidden"
 ```
 
 ```tsx app/components/app-shell.tsx

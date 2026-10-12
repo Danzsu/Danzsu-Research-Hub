@@ -71,6 +71,13 @@ test("app/globals.css lets the Radar header and chip bar scroll on a short viewp
   assert.match(readRepoFile("app/globals.css"), /max-height: 31\.25rem/);
 });
 
+// Polish 3, Review Focus 5. Kills the iPhone's safe areas left off: without viewport-fit=cover every
+// env(safe-area-inset-*) reads 0, and in landscape the page runs under the notch.
+test("the iPhone safe areas are on: viewport-fit=cover, and the body keeps clear of the notch in landscape", () => {
+  assert.match(readRepoFile("app/layout.tsx"), /viewportFit: "cover"/);
+  assert.match(readRepoFile("app/globals.css"), /padding-inline: env\(safe-area-inset-left\) env\(safe-area-inset-right\);/);
+});
+
 function sourceFiles(dir: URL): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     if (entry.isDirectory()) return sourceFiles(new URL(`${entry.name}/`, dir));

@@ -93,7 +93,10 @@
 html { background: var(--ink); }
 body {
   margin: 0;
+  /* Landscape iPhone: the page keeps clear of the notch, and the strip beside it shows the html's ink, not paper. */
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   background: var(--paper);
+  background-clip: content-box;
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
   text-rendering: optimizeLegibility;
