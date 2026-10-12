@@ -222,13 +222,13 @@
     - egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik;
     - a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
     - a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban.
-  - **Napi hírek (záró review, 2026-10-12)** — terv: [plans/2026-10-12-polish-1-daily-news.md](plans/2026-10-12-polish-1-daily-news.md):
-    - egy beszúrás után elbukott futás elveszti a nap listáját, és az újrafuttatás sem hozza vissza; az első este (05 UTC utáni deploy) rövid lehet;
-    - a `daily_top` írásának hibája a `refresh_must_read`-et is kihagyja;
-    - régebbi listán az angol felirat „Today's”;
-    - egy elbukott futás után 18:00 után is „a mai 18:00-ra készül” látszik;
-    - a háromszor megszakadt forrás kártyáján örökre „készül…”;
-    - hétfőn a 13 UTC-s futásig a múlt hét látszik élőként a Radaron.
+  - **Napi hírek (záró review, 2026-10-12), kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-1-daily-news.md](plans/2026-10-12-polish-1-daily-news.md):
+    - [x] egy beszúrás után elbukott futás elveszti a nap listáját, és az újrafuttatás sem hozza vissza; az első este (05 UTC utáni deploy) rövid lehet;
+    - [x] a `daily_top` írásának hibája a `refresh_must_read`-et is kihagyja;
+    - [x] régebbi listán az angol felirat „Today's”;
+    - [x] egy elbukott futás után 18:00 után is „a mai 18:00-ra készül” látszik;
+    - [x] a háromszor megszakadt forrás kártyáján örökre „készül…”;
+    - [x] hétfőn a 13 UTC-s futásig a múlt hét látszik élőként a Radaron.
   - **2a vizuális audit (záró review, 2026-10-11):**
     - csökkentett mozgás alatt a toast még 160 ms-ot halványul (az opacity-t a `reducedMotion="user"` nem állítja le): `useReducedMotion` → 0 időtartam, ha zavar;
     - a panel kontextusa (`app-shell.tsx`) minden rendernél új objektum: `useMemo`;
