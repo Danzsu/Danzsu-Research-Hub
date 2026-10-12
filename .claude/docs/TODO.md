@@ -213,10 +213,10 @@
   - **G2, „A hónap repói” (Top 3) a Top 10 felett:** a régóta vagy nagyon gyorsan növő, releváns repók, havi nézetben. Ehhez napi csillagszám-mentés kell (a „Valódi GitHub trending” pont);
   - forrás: a Star History Monthly hírlevél és a star-history.com chart-linkje ([truthful_sites.md](truthful_sites.md) → Jelöltek).
 - [ ] **Halasztott apróságok** (a záró reviewk „Minor” pontjai, egyik sem sürgős):
-  - **R2:**
+  - **R2, kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-2-ui.md](plans/2026-10-12-polish-2-ui.md) és [plans/2026-10-12-polish-3-chat-a11y.md](plans/2026-10-12-polish-3-chat-a11y.md):
     - [x] lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni — a felirat, a két ikon és az archívum száma kész; a jelvény (ma a `BrandMark` képe) és a GitHub-sor (a `RepoCard`-nak nincs saját lenyomása) már nem érintett;
     - a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön;
-    - a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön).
+    - [x] a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön) — elavult: a toast 2a óta `AnimatePresence`, és nem vár `animationend`-re.
   - **Google-belépés:**
     - kézzel gyártott `?error=constructor` / `toString` / `__proto__` cím a belépő oldalon „undefined / undefined”-et mutat: `Object.hasOwn`, és a hibakódok közös `LoginError` típusa;
     - egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik;
@@ -229,20 +229,21 @@
     - [x] egy elbukott futás után 18:00 után is „a mai 18:00-ra készül” látszik;
     - [x] a háromszor megszakadt forrás kártyáján örökre „készül…”;
     - [x] hétfőn a 13 UTC-s futásig a múlt hét látszik élőként a Radaron.
-  - **2a vizuális audit (záró review, 2026-10-11):**
-    - csökkentett mozgás alatt a toast még 160 ms-ot halványul (az opacity-t a `reducedMotion="user"` nem állítja le): `useReducedMotion` → 0 időtartam, ha zavar;
-    - a panel kontextusa (`app-shell.tsx`) minden rendernél új objektum: `useMemo`;
-    - a panel nyitott állapota túléli az oldalt (Back után újranyílik): zárás útvonalváltáskor;
-    - az archívum üres sora még nem `EmptyState`;
-    - a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja);
-    - a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel; a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül.
+  - **2a vizuális audit (záró review, 2026-10-11), kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-2-ui.md](plans/2026-10-12-polish-2-ui.md):
+    - [x] csökkentett mozgás alatt a toast még 160 ms-ot halványul (az opacity-t a `reducedMotion="user"` nem állítja le): `useReducedMotionConfig` → 0 időtartam;
+    - [x] a panel kontextusa (`app-shell.tsx`) minden rendernél új objektum: `useMemo`;
+    - [x] a panel nyitott állapota túléli az oldalt (Back után újranyílik): a dashboard lecsatolásakor bezárul;
+    - [x] az archívum üres sora még nem `EmptyState`;
+    - [x] a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja) — elavult: a `/login` a landing-signin óta gomb nélkül (`signIn="none"`) használja a keretet;
+    - [x] a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel;
+    - a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül: nyitott ötlet, előbb mérni kell.
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Az R1 Gyors és az R2 Visszajelzés kész; hátra van az **R3 Elrendezés** (a mobil fekvő keret, a széles képernyő, a panel és a chat takarása, a taiyaki kerete ink oldalon). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
   Emellett jobb visszajelző effektek és további javítások. Előbb egy átvilágítás az egész appon: Playwright-mérések 360/768/1280 px-en és a lassú pontok felmérése. Ebből lesz egy jóváhagyandó terv.
   - A taiyaki link-chatből ide parkolt tételek:
     - [x] lassú küldésnél azonnal jelenjen meg egy „küldés…” buborék (optimista) (R2, 2026-10-01);
-    - ink oldalon (Library, Archívum) a sarokgomb ink kerete és árnyéka eltűnik;
+    - [x] ink oldalon (Library, Archívum) a sarokgomb ink kerete és árnyéka eltűnik — elavult: a sarokgomb árnyéka 2a óta signal;
     - ha a gomb után semmi nem kapható fókuszba, az előre Tab a gomb és a panel között körbejár;
     - a Radar olvasópanelje saját Tab-hurkot tart; ha ezt javítjuk, a `tabPastPanel` közös helyre költözik;
     - `md` és `2xl` között a Radar olvasópanelje eltakarja a chat panelt és a sarokgombot;

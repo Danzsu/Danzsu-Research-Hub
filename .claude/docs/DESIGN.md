@@ -358,7 +358,7 @@ Shadows are hard offsets with zero blur:
 | undo toast | `5px 5px 0 var(--signal)` (failed: `var(--ink)`) | none |
 | image frame | `4px 4px 0 var(--ink)` | none |
 | nav tooltip | `3px 3px 0 var(--ink)` | none |
-| taiyaki button | `4px 4px 0 var(--ink)`; in the mobile bar `3px 3px 0 var(--signal)` | `8px 8px 0 var(--signal)`, also on keyboard focus (`.lift`) |
+| taiyaki button | `4px 4px 0 var(--signal)`, in the corner and in the mobile bar (`3px 3px 0`) | `8px 8px 0 var(--signal)`, also on keyboard focus (`.lift`) |
 | link chat panel, from `md` | `6px 6px 0 var(--ink)` | none |
 | link chat bubbles | the taiyaki's `3px 3px 0 var(--ink)`, the reader's `3px 3px 0 var(--signal)` | none |
 
@@ -612,7 +612,7 @@ className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-ce
 
 ### Pressed state
 
-Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show); a signal child of one (the logo's RADAR, a card's icon, an archive card's number) turns ink with it (`group-active:`), or it would vanish. The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
 
 ```css app/globals.css
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
