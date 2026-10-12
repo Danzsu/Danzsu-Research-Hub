@@ -50,11 +50,11 @@ const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop, onReadHere:
 const hiddenSpanCounts = (elements: Element[]) => elements.map((element) => element.querySelectorAll('span[aria-hidden="true"]').length);
 /** Wraps a component in the providers the shell gives it: the language (LocalizedText, SubmitForm,
  *  DigestDashboard), the refresh bar (SubmitForm, LinkChat) and "Olvasd itt" (DigestDashboard). */
-const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P) =>
+const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P, language: "hu" | "en" = "en") =>
   render(
     createElement(
       LanguageProvider,
-      { initial: "en" } as ComponentProps<typeof LanguageProvider>,
+      { initial: language } as ComponentProps<typeof LanguageProvider>,
       createElement(
         RatingsProvider,
         sendNothing,
@@ -570,6 +570,9 @@ test("an older daily list says so, and no list at all says when the first one co
   const late = dailyView({ daily: { ...previewDaily, late: true } }).body.textContent ?? "";
   assert.match(late, /Today's list is late — showing the one from 2026\. 09\. 24\./);
   assert.doesNotMatch(late, /ready by 18:00/);
+  // Polish final review. Kills the "-i" suffix glued to the date's closing period ("2026. 09. 24.-i").
+  const lateHu = withShellProviders(DigestDashboard, { issue: previewDailyIssue, items: previewDailyItems, githubTop10: [], scope: "daily", daily: { ...previewDaily, late: true }, preview: { data: previewReader, failWrites: false } }, "hu");
+  assert.match(lateHu.body.textContent ?? "", /A mai lista késik — addig a korábbi látszik \(2026\. 09\. 24\.\)\./);
 });
 
 // Spec N7. Kills the weekly cards' DAY TOP mark missing, or put on an item that was never in a daily list.

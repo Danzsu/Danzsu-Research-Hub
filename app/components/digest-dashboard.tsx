@@ -54,7 +54,8 @@ const copy = {
     dailyLead: "A nap 10 legfontosabb híre, mindegyikhez 2–3 perces összefoglalóval.",
     dailyCount: (count: number, short: number) => `${count} hír · ebből ${short} rövid`,
     dailyStale: (day: string) => `Korábbi lista (${day}) — a mai 18:00-ra készül.`,
-    dailyLate: (day: string) => `A mai lista késik — addig a ${day}-i látszik.`,
+    // The date ends in a period ("2026. 10. 11."), so it goes in brackets, not before a suffix.
+    dailyLate: (day: string) => `A mai lista késik — addig a korábbi látszik (${day}).`,
     dailyIndex: "A nap hírei",
     dailyFeed: "A NAP 10 HÍRE",
     emptyDaily: "Még nincs napi lista. Az első este 18:00-ra készül el.",
