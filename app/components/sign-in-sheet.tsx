@@ -4,18 +4,16 @@ import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useLanguage } from "./language-context";
 import { liftSurface } from "./lift-classes";
-import { SignInCard, SignInForms } from "./sign-in-forms";
+import { SignInCard, signInCopy, SignInForms } from "./sign-in-forms";
 
 const copy = {
   hu: {
     signIn: "Belépés",
-    title: "BELÉPÉS",
     note: "Csak meghívással lehet belépni. Nincs regisztráció: a meghívott címeddel jelentkezz be Google-lel vagy e-mailes linkkel.",
     close: "Bezárás",
   },
   en: {
     signIn: "Sign in",
-    title: "SIGN IN",
     note: "Entry is by invitation only. There is no sign-up: use your invited address, with Google or an email link.",
     close: "Close",
   },
@@ -66,7 +64,7 @@ export function SignInSheet({ autoOpen }: { autoOpen: boolean }) {
         <div className="mx-auto w-full max-w-md">
           <SignInCard>
             <SheetTitle className="font-display text-4xl leading-[0.9] tracking-[-0.04em]">
-              {t.title}
+              {signInCopy.title[language]}
               <span className="text-signal">{"//"}</span>
             </SheetTitle>
             <SheetDescription className="mt-4 text-sm leading-6 text-ink/70">{t.note}</SheetDescription>

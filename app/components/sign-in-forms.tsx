@@ -3,8 +3,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { liftSurface } from "./lift-classes";
 
-// Before sign-in there is no language yet, so every line shows both, "magyar / English".
-const copy = {
+// Before sign-in there is no language yet, so most lines show both, "magyar / English". Shared with /login,
+// /about and the sign-in sheet, which take the title and the eyebrow from here.
+export const signInCopy = {
+  title: { hu: "BELÉPÉS", en: "SIGN IN" },
+  // The house eyebrows read EN / HU (both() prints HU / EN), so this one stays a plain string.
+  inviteOnly: "INVITE-ONLY / CSAK MEGHÍVÓVAL",
+  email: { hu: "E-MAIL", en: "EMAIL" },
   google: { hu: "Belépés Google-lel", en: "Continue with Google" },
   or: { hu: "vagy", en: "or" },
   send: { hu: "Belépő link küldése", en: "Send link" },
@@ -38,16 +43,16 @@ export function SignInForms({ next }: { next: string }) {
         <input type="hidden" name="next" value={next} />
         {/* Wraps on a narrow phone: the two-language label is wider than the 360px card. */}
         <button type="submit" className={`${liftSurface} flex min-h-10 w-full items-center justify-center gap-2 px-4 py-2 font-mono text-xs shadow-[3px_3px_0_var(--signal)]`}>
-          <GoogleMark /> {both(copy.google)}
+          <GoogleMark /> {both(signInCopy.google)}
         </button>
       </form>
       <p className="my-5 flex items-center gap-3 font-mono text-[11px] text-ink/60 before:h-px before:flex-1 before:bg-ink/20 after:h-px after:flex-1 after:bg-ink/20">
-        {both(copy.or)}
+        {both(signInCopy.or)}
       </p>
       <form action="/auth/login" method="post" className="space-y-4">
         <input type="hidden" name="next" value={next} />
         <div className="space-y-2">
-          <Label htmlFor="email" className="font-mono text-xs">EMAIL</Label>
+          <Label htmlFor="email" className="font-mono text-xs">{both(signInCopy.email)}</Label>
           <Input
             id="email"
             name="email"
@@ -59,7 +64,7 @@ export function SignInForms({ next }: { next: string }) {
         </div>
         {/* The taiyaki's motion on the ink primary: it steps forward on hover and sinks on press. */}
         <button type="submit" className="lift focus-ring min-h-10 w-full border-2 border-ink bg-ink px-4 font-mono text-xs text-paper shadow-[3px_3px_0_var(--signal)]">
-          {both(copy.send)}
+          {both(signInCopy.send)}
         </button>
       </form>
     </>

@@ -38,6 +38,15 @@ test("the login page says why a sign-in failed, in both languages, in its alert 
   assert.equal((await page({})).querySelector('[role="alert"]')?.textContent, "");
 });
 
+// Polish 4, Review Focus 2. Kills the title, the eyebrow and the email label left out of the copy object:
+// the title follows the reader's language (the stub's is hu), like the sheet's, and the label reads both.
+test("the login page's title, eyebrow and email label come from the shared sign-in copy", async () => {
+  const doc = await page({});
+  assert.equal(doc.querySelector("h1")?.textContent, "BELÉPÉS//");
+  assert.equal(doc.querySelector("main p")?.textContent, "INVITE-ONLY / CSAK MEGHÍVÓVAL");
+  assert.equal(doc.querySelector('label[for="email"]')?.textContent, "E-MAIL / EMAIL");
+});
+
 // Kills the sent state that still shows a form (a second link, or a Google sign-in mid-wait).
 test("after a link is sent, the page shows only that note", async () => {
   const doc = await page({ sent: "1" });

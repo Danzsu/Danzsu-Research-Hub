@@ -1,6 +1,7 @@
 import { ErrorLine } from "@/app/components/error-line";
 import { PublicPage } from "@/app/components/public-page";
-import { both, SignInCard, SignInForms } from "@/app/components/sign-in-forms";
+import { LocalizedText } from "@/app/components/language-context";
+import { both, SignInCard, signInCopy, SignInForms } from "@/app/components/sign-in-forms";
 import { getLanguage } from "@/lib/language";
 import type { LoginError } from "@/lib/pipeline/util";
 import { safeNext } from "@/lib/supabase/server";
@@ -31,9 +32,10 @@ export default async function LoginPage({
       {/* The landing page's frame (2a spec D6); StatusCard stays for the error and not-found pages. */}
       <main className="mx-auto max-w-[1600px] px-4 py-12 sm:px-10">
         <SignInCard>
-          <p className="font-mono text-xs tracking-[0.2em] text-signal">INVITE-ONLY / CSAK MEGHÍVÓVAL</p>
+          <p className="font-mono text-xs tracking-[0.2em] text-signal">{signInCopy.inviteOnly}</p>
           <h1 className="mt-2 font-display text-4xl leading-[0.9] tracking-[-0.04em] sm:text-5xl">
-            SIGN IN<span className="text-signal">{"//"}</span>
+            <LocalizedText value={signInCopy.title} />
+            <span className="text-signal">{"//"}</span>
           </h1>
           {sent ? (
             <p className="mt-7 border-l-4 border-signal pl-4 text-sm leading-6">
