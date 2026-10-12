@@ -16,6 +16,9 @@ export function isoWeek(date: Date): Week {
   return { id: `${year}-W${ww}`, period: `${year} / ${month}`, compact: `${year}w${ww}`, monday };
 }
 
+/** A week before the current ISO week: its issue is final, whether or not the new week's has been opened yet. */
+export const isClosedWeek = (week: string, now = new Date()) => week < isoWeek(now).id;
+
 /** Monday (UTC) of an ISO week id like '2026-W39', or null if the id is malformed or out of range. */
 export function isoWeekMonday(id: string): Date | null {
   const match = /^(\d{4})-W(\d{2})$/.exec(id);

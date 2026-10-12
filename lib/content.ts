@@ -16,7 +16,7 @@ import { readOverrides } from "@/lib/overrides";
 import { toPost } from "@/lib/post-row";
 import { shownTitle, type Post } from "@/lib/post-view";
 import { budapestDay, budapestHour, DAILY_DUE_HOUR, DAILY_SIZE } from "@/lib/pipeline/daily-top";
-import { archiveLabel, githubRepo, inChunks, isoWeek, isoWeekMonday, MAX_ATTEMPTS, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
+import { archiveLabel, githubRepo, inChunks, isClosedWeek, isoWeek, isoWeekMonday, MAX_ATTEMPTS, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
 import { RATING_FILTERS, ratingKey, ratingTargetId, type RatingFilter, type RatingKind, type RatingTarget, type RatingValue, type Ratings } from "@/lib/ratings";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 import { createAdminClient, type Reader } from "@/lib/supabase/server";
@@ -192,7 +192,7 @@ function assertSignedIn(reader: Reader | null) {
 export async function archivedWeek(reader: Reader, week: string, now = new Date()): Promise<RadarData | null> {
   if (!isoWeekMonday(week)) return null;
   assertSignedIn(reader);
-  return week < isoWeek(now).id ? closedWeek(week) : getRadar(reader.db, week);
+  return isClosedWeek(week, now) ? closedWeek(week) : getRadar(reader.db, week);
 }
 
 /** The /archive list, from its cache until the daily cron drops it. */

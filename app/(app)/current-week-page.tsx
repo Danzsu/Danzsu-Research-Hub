@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
 import { getRadar, getRatings, getReaderSeed } from "@/lib/content";
 import { readHerePosts } from "@/lib/my-sources";
+import { isClosedWeek } from "@/lib/pipeline/util";
 import { radarTargets } from "@/lib/ratings";
 import { getReader } from "@/lib/supabase/server";
 
@@ -17,5 +18,6 @@ export async function CurrentWeekPage({ path, scope }: { path: string; scope?: "
     readHerePosts(reader.db, radar.items),
     getRatings(reader.db, radarTargets(radar.items, radar.githubTop10)),
   ]);
-  return <DigestDashboard {...radar} scope={scope} seed={seed} posts={posts} ratings={ratings} />;
+  // On Monday, until the evening run opens the new week, the latest issue is last week's: show it as closed.
+  return <DigestDashboard {...radar} archived={isClosedWeek(radar.issue.id)} scope={scope} seed={seed} posts={posts} ratings={ratings} />;
 }
