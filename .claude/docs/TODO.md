@@ -214,7 +214,7 @@
   - forrás: a Star History Monthly hírlevél és a star-history.com chart-linkje ([truthful_sites.md](truthful_sites.md) → Jelöltek).
 - [ ] **Halasztott apróságok** (a záró reviewk „Minor” pontjai, egyik sem sürgős):
   - **R2:**
-    - lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni;
+    - [x] lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni — a felirat, a két ikon és az archívum száma kész; a jelvény (ma a `BrandMark` képe) és a GitHub-sor (a `RepoCard`-nak nincs saját lenyomása) már nem érintett;
     - a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön;
     - a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön).
   - **Google-belépés:**

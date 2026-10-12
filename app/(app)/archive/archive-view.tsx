@@ -44,10 +44,10 @@ export function ArchiveView({ issues }: { issues: ArchiveIssue[] }) {
           >
             <div className="flex items-start justify-between">
               <span className="flex items-center gap-2">
-                <Archive className="size-7 text-signal group-hover:text-ink" />
+                <Archive className="size-7 text-signal group-hover:text-ink group-active:text-ink" />
                 <PendingDot className="group-hover:text-ink" />
               </span>
-              <span className="font-display text-5xl text-paper/15 group-hover:text-ink/20">
+              <span className="font-display text-5xl text-paper/15 group-hover:text-ink/20 group-active:text-ink/20">
                 {String(index + 1).padStart(2, "0")}
               </span>
             </div>
