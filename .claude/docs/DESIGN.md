@@ -375,7 +375,7 @@ Shadows are hard offsets with zero blur:
   - sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;
   - the undo toast lane, `z-[60]`;
   - the refresh bar, `z-[70]`.
-- **Known exceptions:** the vendored Sheet keeps shadcn's blurred `shadow-lg`. `Input`, `Textarea` and `Checkbox` keep `shadow-xs`, and so does the `outline` Button variant, which the Radar's progress pill uses. House components never add a blurred shadow. The fix for these, and for the checkbox corners (Shapes), is tracked in TODO.md.
+- **Known exceptions:** the vendored Sheet keeps shadcn's blurred `shadow-lg`. `Input`, `Textarea` and `Checkbox` keep `shadow-xs` (the link chat's field drops it with `shadow-none`), and so does the `outline` Button variant, which the Radar's progress pill uses. House components never add a blurred shadow. The fix for these, and for the checkbox corners (Shapes), is tracked in TODO.md.
 
 ## Shapes
 

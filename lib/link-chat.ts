@@ -78,6 +78,10 @@ export type ChatNotice =
  *  (`search` without its `?`, as URLSearchParams prints it). */
 export const signInHref = (pathname: string, search: string) => `/login?next=${encodeURIComponent(search ? `${pathname}?${search}` : pathname)}`;
 
+/** A success proves the session works again: every entry's own "sign in again" goes; other refusals stay. */
+const withoutSignedOut = (notices: Record<number, ChatNotice>) =>
+  Object.fromEntries(Object.entries(notices).filter(([, notice]) => notice.kind !== "signed_out"));
+
 /** What a route answered: its status and its JSON body (`{}` when the body isn't a JSON object). */
 export type Answer = { status: number; body: Record<string, unknown> };
 
@@ -316,7 +320,7 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         // A resend that goes through this time must not leave an earlier refusal (e.g. "Nem ment
         // át…") sitting above the new pending entry (Important 3): cleared before this send's own
         // more_links notice, so that one still shows.
-        set({ notices: [] });
+        set({ notices: [], retryNotices: withoutSignedOut(snapshot.retryNotices) });
         if (message.moreLinks) say({ kind: "more_links" });
         await reload(true);
         return true;
@@ -341,7 +345,7 @@ export function createLinkChat(transport: ChatTransport, isVisible: () => boolea
         if (answer.status === 202 || answer.status === 409) {
           // Same reasoning as send's own clear above: an earlier refusal (a signed_out, say) must not
           // outlive this one's success.
-          set({ notices: [] });
+          set({ notices: [], retryNotices: withoutSignedOut(snapshot.retryNotices) });
           await reload();
         } else refusal = noticeFor(answer);
       } catch {

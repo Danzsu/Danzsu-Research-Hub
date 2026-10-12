@@ -259,7 +259,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
             placeholder={t.placeholder}
             // nowrap keeps the placeholder on one line: under field-sizing a wrapped one would make the empty field
             // a line taller than a one-line value. The copy is short enough to show whole from 330px up.
-            className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base placeholder:whitespace-nowrap focus-visible:border-signal"
+            className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base shadow-none placeholder:whitespace-nowrap focus-visible:border-signal"
           />
           {/* aria-disabled, not disabled, while sending: a disabled button would drop the focus. send() ignores a second press.
               A tap or click leaves the focus in the field, so a phone keyboard doesn't drop and come back. */}

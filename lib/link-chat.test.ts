@@ -663,6 +663,21 @@ test("a successful retry clears the refusals a previous failed retry left behind
   assert.deepEqual(said(), [[], {}]);
 });
 
+// Polish 3. Kills a success that proves the session works again yet leaves other entries' "sign in again"
+// behind; their other refusals (a network one) stay, since only a sign-in is proven.
+test("a successful retry or send clears every entry's signed_out, and keeps their other refusals", async () => {
+  const chat = createLinkChat(
+    fakeTransport([], { retry: inTurn(answer(401, { error: "unauthorized" }), offline, answer(401, { error: "unauthorized" }), answer(202, { ok: true })) }).transport,
+    () => true,
+  );
+  for (const id of [1, 2, 3, 4]) await chat.retry(id);
+  assert.deepEqual([chat.getSnapshot().notices, chat.getSnapshot().retryNotices], [[], { 2: { kind: "network" } }]);
+  const sent = createLinkChat(fakeTransport([], { retry: answer(401, { error: "unauthorized" }) }).transport, () => true);
+  await sent.retry(1);
+  assert.equal(await sent.send("https://blog.test/a"), true);
+  assert.deepEqual(sent.getSnapshot().retryNotices, {});
+});
+
 // Kills local replies that outlive the panel: they live only while it stays open, a retry's included.
 test("closing the panel drops the local replies", async (t) => {
   const chat = createLinkChat(fakeTransport([], { retry: offline }).transport, () => true);
