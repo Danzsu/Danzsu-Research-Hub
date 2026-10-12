@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
   Building2,
@@ -28,6 +28,7 @@ import { useLanguage } from "./language-context";
 import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
+import { tabPastPanel } from "./tab-past-panel";
 import { useReadHere } from "./link-chat";
 import { isUndoToast, toasts } from "./undo-toast";
 import { useModelContextTools } from "./use-model-context-tools";
@@ -223,6 +224,7 @@ export function DigestDashboard(
   const topLabel = companies && top.length ? `${t.dailyTop} · ${addedDayLabel(top[0].addedAt)}` : t.mustRead;
 
   const panelLayer = usePanel();
+  const panelTrigger = useRef<HTMLButtonElement>(null);
   const closePanel = panelLayer.setOpen;
   // The panel belongs to this page: leaving it (a link, Back, Forward) must not leave it open for the next Radar view.
   useEffect(() => () => closePanel(false), [closePanel]);
@@ -255,6 +257,7 @@ export function DigestDashboard(
         <Sheet modal={false} open={panelLayer.open} onOpenChange={panelLayer.setOpen}>
           <SheetTrigger asChild>
             <Button
+              ref={panelTrigger}
               variant="outline"
               size="sm"
               aria-label={t.panel}
@@ -276,6 +279,8 @@ export function DigestDashboard(
             onInteractOutside={(event) => {
               if (isUndoToast(event.target)) event.preventDefault();
             }}
+            // Never modal, so Tab goes on past it to the page, as in the link chat.
+            onKeyDownCapture={(event) => tabPastPanel(event, () => panelTrigger.current)}
             className={`overflow-y-auto border-ink bg-cream p-5 pt-12 text-ink ${isMobile ? "max-h-[85dvh] border-t-2" : "w-[88vw] max-w-sm border-l-2"}`}
           >
             <SheetHeader className="sr-only">
