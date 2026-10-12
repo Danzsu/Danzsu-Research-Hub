@@ -9,6 +9,7 @@ import { resetRoute, routeStub, signedIn } from "./test/route-hooks.ts";
 const {
   archivedWeek,
   archiveList,
+  getDaily,
   getFavorites,
   getGithubRepos,
   getOpenSources,
@@ -100,7 +101,7 @@ test("getRadar asks for the named week or the latest issue in one query, with th
   assert.deepEqual([empty?.items, empty?.githubTop10], [[], []]);
   const select = [
     "select",
-    "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url, stars, language, score)",
+    "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at, daily_top(rank)), github_top(repo, focus, url, stars, language, score)",
   ];
   const embedOrder = [
     ["order", "must_read", { ascending: false, referencedTable: "digest_items" }],
@@ -211,7 +212,7 @@ test("archivedWeek reads a closed week through the one-day cache and the admin c
   const radar = await archivedWeek(reader, "2026-W38", wednesdayW39);
   assert.deepEqual(radar, { issue: { id: "2026-W38", label: "2026 / W38", updated: "09. 20. 07:00", archiveAt: "09. 20." }, items: [], githubTop10: [] });
   assert.equal(routeStub.adminCalls, 1);
-  assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v3"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
+  assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v4"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
 });
 
 // Kills `<` → `<=`: the week still being collected would be frozen for a day, and a reader would miss
@@ -440,4 +441,61 @@ test("getFavorites throws when a lookup fails, with the PostgREST error as the c
   const error = pgError("08006", "connection failure");
   const db = fakeDb(undefined, { rows: { ratings: [{ target_kind: "item", target_id: "a", value: 2, updated_at: "2026-10-01T10:00:00Z" }] }, tableErrors: { digest_items: error } });
   await assert.rejects(getFavorites(db), (e: unknown) => e instanceof Error && e.cause === error);
+});
+
+// Daily news spec N7. Kills the weekly card's DAY TOP mark lost in the mapping, and one invented for an item
+// that never made a daily list.
+test("getRadar marks the items ranked in a daily Top 10", async () => {
+  const db = fakeDb(undefined, { rows: { issues: [issueRow("2026-W38", { digest_items: [{ ...itemRow("a", 90), daily_top: [{ rank: 3 }] }, { ...itemRow("b", 80), daily_top: [] }] })] } });
+  const radar = await getRadar(db, "2026-W38");
+  assert.deepEqual(radar?.items.map((item) => item.dailyRank), [3, undefined]);
+});
+
+const dailyRow = (day: string, rank: number, id: string, minutes = 6) => ({ day, rank, digest_items: { ...itemRow(id, 90 - rank), issue_id: "2026-W38", read_minutes: minutes } });
+
+// Spec N7, N8, Review Focus 5. Kills an older day's ranks mixed in (the limit reaches past a short day), the
+// rank order lost, the week taken from the clock instead of the items, and `today` judged in UTC.
+test("getDaily answers the latest day's list in rank order, with its week and whether it is today's", async () => {
+  const db = fakeDb(undefined, {
+    rows: { daily_top: [dailyRow("2026-09-17", 1, "x"), dailyRow("2026-09-18", 1, "a"), dailyRow("2026-09-18", 2, "b")] },
+  });
+  const daily = await getDaily(db, new Date("2026-09-18T21:30:00Z"));
+  assert.deepEqual(daily.items.map((item) => item.id), ["a", "b"]);
+  assert.equal(daily.issue.id, "2026-W38");
+  assert.equal(daily.issue.label, "2026. 09. 18.");
+  assert.equal(daily.today, true);
+  assert.equal((await getDaily(db, new Date("2026-09-18T22:30:00Z"))).today, false);
+});
+
+// Spec N8. Kills each fallback step: the brief over the summary, the submitter's summary over the model's,
+// "being written" only for a pending source, and nothing for a failed one; "Olvasd itt" for every post.
+test("getDaily gives each card the best long text there is", async () => {
+  const urls = ["brief", "summary", "pending", "failed"].map((name) => `https://arxiv.org/abs/${name}`);
+  const db = fakeDb(undefined, {
+    rows: { daily_top: ["brief", "summary", "pending", "failed"].map((id, i) => dailyRow("2026-09-18", i + 1, id)) },
+    sources: [
+      { url: urls[0], status: "done", posts: { id: 1, brief: { hu: ["B"], en: ["B"] }, summary: text("S"), key_points: { hu: [], en: [] }, overrides: {} } },
+      { url: urls[1], status: "done", posts: { id: 2, brief: null, summary: text("S"), key_points: { hu: ["k"], en: ["k"] }, overrides: { summary: text("Mine") } } },
+      { url: urls[2], status: "pending", posts: null },
+      { url: urls[3], status: "failed", posts: null },
+    ],
+  });
+  const daily = await getDaily(db, new Date("2026-09-18T15:00:00Z"));
+  assert.deepEqual(daily.briefs, {
+    brief: { kind: "brief", paragraphs: { hu: ["B"], en: ["B"] } },
+    summary: { kind: "post", summary: text("Mine"), keyPoints: { hu: ["k"], en: ["k"] } },
+    pending: { kind: "pending" },
+  });
+  assert.deepEqual(daily.posts, { brief: 1, summary: 2 });
+});
+
+// Spec N8. Kills a crash or a made-up day before the first list: no day, the current week, nothing to show.
+test("getDaily before any list answers an empty, not-today day in the current week", async () => {
+  const daily = await getDaily(fakeDb(undefined, { rows: { daily_top: [] } }), new Date("2026-09-18T15:00:00Z"));
+  assert.deepEqual([daily.items, daily.today, daily.issue.id, daily.issue.label], [[], false, "2026-W38", "—"]);
+});
+
+// Kills a failed query answered as an empty day (the page would say "no list yet" during an outage).
+test("getDaily throws on a failed query", async () => {
+  await assert.rejects(getDaily(fakeDb(undefined, { tableErrors: { daily_top: pgError("08006", "down") } })), /daily query failed/);
 });

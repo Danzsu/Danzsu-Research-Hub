@@ -4,13 +4,18 @@ import { unstable_cache } from "next/cache";
 import type {
   ArchiveIssue,
   CurrentIssue,
+  DailyBrief,
   DigestItem,
   GithubTopEntry,
+  Language,
   Localized,
 } from "@/data/digest-types";
+import { readBrief } from "@/lib/brief";
+import { itemSources } from "@/lib/my-sources";
 import { readOverrides } from "@/lib/overrides";
 import { toPost } from "@/lib/post-row";
 import { shownTitle, type Post } from "@/lib/post-view";
+import { budapestDay, DAILY_SIZE } from "@/lib/pipeline/daily-top";
 import { archiveLabel, githubRepo, inChunks, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
 import { RATING_FILTERS, ratingKey, ratingTargetId, type RatingFilter, type RatingKind, type RatingTarget, type RatingValue, type Ratings } from "@/lib/ratings";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
@@ -32,8 +37,32 @@ function queryFailed(what: string, error: { message: string }): Error {
   return new Error(`${what} query failed: ${error.message}`, { cause: error });
 }
 
-const RADAR_COLUMNS =
-  "id, updated_at, digest_items(id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at), github_top(repo, focus, url, stars, language, score)";
+const ITEM_COLUMNS = "id, category, must_read, score, read_minutes, published_at, source, url, tags, title, summary, why, created_at, daily_top(rank)";
+const RADAR_COLUMNS = `id, updated_at, digest_items(${ITEM_COLUMNS}), github_top(repo, focus, url, stars, language, score)`;
+
+type ItemRow = Record<string, unknown> & { daily_top?: { rank: number }[] | null };
+
+/** A digest_items row (ITEM_COLUMNS) as the cards' DigestItem. */
+function toDigestItem(row: ItemRow): DigestItem {
+  const dailyRank = row.daily_top?.[0]?.rank;
+  return {
+    id: row.id as string,
+    category: row.category as DigestItem["category"],
+    mustRead: row.must_read as boolean,
+    score: row.score as number,
+    readMinutes: row.read_minutes as number,
+    publishedAt: row.published_at as string,
+    publishedLabel: publishedLabel(row.published_at as string),
+    addedAt: row.created_at as string,
+    source: row.source as string,
+    url: row.url as string,
+    tags: row.tags as DigestItem["tags"],
+    title: row.title as Localized,
+    summary: row.summary as Localized,
+    why: row.why as Localized,
+    ...(dailyRank ? { dailyRank } : {}),
+  };
+}
 
 /**
  * The latest issue, or the one `issueId` names ('2026-W38'), with its items and repos embedded: one
@@ -64,24 +93,52 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
 
   return {
     issue,
-    items: latest.digest_items.map((row) => ({
-      id: row.id,
-      category: row.category,
-      mustRead: row.must_read,
-      score: row.score,
-      readMinutes: row.read_minutes,
-      publishedAt: row.published_at,
-      publishedLabel: publishedLabel(row.published_at),
-      addedAt: row.created_at,
-      source: row.source,
-      url: row.url,
-      tags: row.tags,
-      title: row.title as Localized,
-      summary: row.summary as Localized,
-      why: row.why as Localized,
-    })),
+    items: latest.digest_items.map((row) => toDigestItem(row as ItemRow)),
     githubTop10: latest.github_top.map(({ repo, focus, url, stars, language, score }) => ({ repo, focus, url, stars, language, score })),
   };
+}
+
+export type DailyData = { issue: CurrentIssue; today: boolean; items: DigestItem[]; briefs: Record<string, DailyBrief>; posts: Record<string, number> };
+
+/**
+ * The latest day's Top 10 (daily news spec N7) with each card's long text (N8) and its Library post. A failed
+ * list query throws, like getRadar; a failed post lookup only costs the briefs.
+ */
+export async function getDaily(db: SupabaseClient, now = new Date()): Promise<DailyData> {
+  const { data, error } = await db
+    .from("daily_top")
+    .select(`day, rank, digest_items(issue_id, ${ITEM_COLUMNS})`)
+    .order("day", { ascending: false })
+    .order("rank")
+    .limit(DAILY_SIZE);
+  if (error) throw queryFailed("daily", error);
+  const rows = (data ?? []) as unknown as { day: string; rank: number; digest_items: ItemRow | null }[];
+  // The latest day, and only its rows: the limit can reach past a short day into the one before.
+  const day = rows.reduce<string | null>((latest, row) => (latest === null || row.day > latest ? row.day : latest), null);
+  const own = rows.filter((row) => row.day === day && row.digest_items).sort((a, b) => a.rank - b.rank);
+  const items = own.map((row) => toDigestItem(row.digest_items!));
+  const issue: CurrentIssue = {
+    id: (own[0]?.digest_items?.issue_id as string | undefined) ?? isoWeek(now).id,
+    label: day ? `${day.replaceAll("-", ". ")}.` : "—",
+    updated: "",
+    archiveAt: "",
+  };
+  const sources = await itemSources(db, items, "url, status, posts(id, brief, summary, key_points, overrides)");
+  const briefs: Record<string, DailyBrief> = {};
+  const posts: Record<string, number> = {};
+  for (const [id, source] of sources ?? []) {
+    const post = source.posts as { id: number; brief: unknown; summary: Localized; key_points: Record<Language, string[]>; overrides: unknown } | null;
+    if (post) {
+      posts[id] = post.id;
+      const brief = readBrief(post.brief);
+      briefs[id] = brief
+        ? { kind: "brief", paragraphs: brief }
+        : { kind: "post", summary: readOverrides(post.overrides).summary ?? post.summary, keyPoints: post.key_points };
+    } else if (source.status === "pending") {
+      briefs[id] = { kind: "pending" };
+    }
+  }
+  return { issue, today: day === budapestDay(now), items, briefs, posts };
 }
 
 /** Every issue but the current week's, newest first. Throws on a failed query, like getRadar. */
@@ -117,7 +174,7 @@ const ONE_DAY = 86_400;
 export const ARCHIVE_TAG = "archive";
 
 // A closed week never changes, so it needs no tag: a day later Next refills it in the background.
-const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v3"], { revalidate: ONE_DAY });
+const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v4"], { revalidate: ONE_DAY });
 const cachedArchive = unstable_cache(() => getArchive(createAdminClient()), ["archive-list", "v1"], { revalidate: ONE_DAY, tags: [ARCHIVE_TAG] });
 
 /** The type keeps a signed-out caller away from the caches; this keeps one whose types were cast. */
