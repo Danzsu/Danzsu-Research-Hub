@@ -163,11 +163,11 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
     if (trimError) throw trimError;
   }
 
-  // Before the daily list: a failed write there must not leave the week's Top 3 stale.
+  // Both run whichever fails: a failed daily list must not leave the week's Top 3 stale, nor a failed refresh
+  // cost the day's list. The run still fails on either.
   const { error: rpcError } = await db.rpc("refresh_must_read", { p_issue: week.id });
-  if (rpcError) throw rpcError;
-
   const daily = await writeDailyTop(db, now);
+  if (rpcError) throw rpcError;
 
   return { issue: week.id, candidates: candidates.length, shortlisted: picked.length, inserted: fresh.length, repos: top.length, daily };
 }

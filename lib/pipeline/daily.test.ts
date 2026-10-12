@@ -273,6 +273,13 @@ test("a failed daily_top write still leaves the week's Top 3 refreshed", async (
   assert.deepEqual(db.rpcCalls.map((call) => call.name), ["refresh_must_read"]);
 });
 
+// Polish final review. Kills the reverse trade: a failed refresh_must_read must not cost the day's list either.
+test("a failed refresh_must_read still writes the day's list, and the run still fails", async (t) => {
+  const db = fakeDb(undefined, { rpcError: pgError("08006", "down") });
+  await assert.rejects(dailyRun(t, [{ title: "Story", score: 80, minutes: 5 }], {}, undefined, db));
+  assert.equal((db.upserts.find((u) => u.table === "daily_top")?.values as unknown[] | undefined)?.length, 1);
+});
+
 // Spec N6, Review Focus 3. Kills the day taken in UTC: a manual run at 00:30 in Budapest belongs to the new day.
 test("a run after midnight in Budapest writes the new day's list", async (t) => {
   const { db } = await dailyRun(t, [{ title: "Late", score: 80, minutes: 5 }], {}, new Date("2026-09-23T22:30:00Z"));
