@@ -14,6 +14,7 @@
 - [ ] **Saját SMTP nélkül a sablonok nem szerkeszthetők** (2026-09-25). Addig két szabály érvényes:
   - Magadat a *Users → Add user → Create new user* (Auto Confirm) menüben vedd fel, ne meghívóval. Az alap „Invite” sablon linkje nem léptet be.
   - A belépő linket ugyanabban a böngészőben nyisd meg, ahol kérted. Az alap Magic Link a `?code=` (PKCE) utat használja.
+  - Ugyanezért egy közben elkezdett Google-belépés érvényteleníti a még meg nem nyitott magic linket (a kettő ugyanazt a PKCE-sütit használja). A token-hash sablonok (lent) ezt is megszüntetik.
 - [ ] *Authentication → Email Templates* (csak saját SMTP után):
   - Magic Link: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`
   - Invite user: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite`
@@ -217,11 +218,11 @@
     - [x] lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni — a felirat, a két ikon és az archívum száma kész; a jelvény (ma a `BrandMark` képe) és a GitHub-sor (a `RepoCard`-nak nincs saját lenyomása) már nem érintett;
     - [x] a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön — a buborék marad (FELDOLGOZÁS…) a következő jó listáig;
     - [x] a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön) — elavult: a toast 2a óta `AnimatePresence`, és nem vár `animationend`-re.
-  - **Google-belépés:**
-    - kézzel gyártott `?error=constructor` / `toString` / `__proto__` cím a belépő oldalon „undefined / undefined”-et mutat: `Object.hasOwn`, és a hibakódok közös `LoginError` típusa;
-    - egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik;
-    - a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
-    - a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban.
+  - **Google-belépés, kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-4-sign-in-docs.md](plans/2026-10-12-polish-4-sign-in-docs.md):
+    - [x] kézzel gyártott `?error=constructor` / `toString` / `__proto__` cím a belépő oldalon „undefined / undefined”-et mutat: `Object.hasOwn`, és a hibakódok közös `LoginError` típusa;
+    - [x] egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik — kódot nem kér: a tulajdonos lépése, fent a „Saját SMTP nélkül” pontnál;
+    - [x] a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
+    - [x] a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban — kész: `signInCopy` (a `/login`, az `/about` és a lap is innen veszi).
   - **Napi hírek (záró review, 2026-10-12), kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-1-daily-news.md](plans/2026-10-12-polish-1-daily-news.md):
     - [x] egy beszúrás után elbukott futás elveszti a nap listáját, és az újrafuttatás sem hozza vissza; az első este (05 UTC utáni deploy) rövid lehet;
     - [x] a `daily_top` írásának hibája a `refresh_must_read`-et is kihagyja;
