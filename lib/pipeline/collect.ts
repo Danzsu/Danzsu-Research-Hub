@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
 import { apiFetch, ensureOk, githubHeaders } from "./fetch.ts";
-import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "../../config/sources.ts";
+import { dailyPapers, DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "../../config/sources.ts";
 import { list, publishedDate, settledValues, xmlText } from "./util.ts";
 
 export type Candidate = {
@@ -56,6 +56,37 @@ async function fromFeeds(since: Date): Promise<Candidate[]> {
     feeds.map(async (feed) => parseFeed(await (await get(feed.url)).text(), feed, since).slice(0, feed.limit ?? DEFAULT_FEED_LIMIT)),
   );
   return settledValues(results, (i) => `feed failed: ${feeds[i].name}`).flat();
+}
+
+type DailyPaper = { title: string; summary?: string; paper: { id: string; upvotes: number } };
+
+/** The finished days (UTC) from `since` up to yesterday: a day's upvotes settle once it is over. */
+function finishedDays(since: Date, now: Date): string[] {
+  const today = now.toISOString().slice(0, 10);
+  const days: string[] = [];
+  for (let day = since; day.toISOString().slice(0, 10) < today; day = new Date(day.getTime() + DAY)) days.push(day.toISOString().slice(0, 10));
+  return days;
+}
+
+/** The most upvoted Daily Papers of those days, as arXiv links (the ids come from a third party, so only arXiv ids pass). */
+async function fromDailyPapers(since: Date, now: Date): Promise<Candidate[]> {
+  const days = finishedDays(since, now);
+  const results = await Promise.allSettled(
+    days.map(async (date) => ((await (await get(`${dailyPapers.url}?date=${date}`)).json()) as DailyPaper[]).map((paper) => ({ ...paper, date }))),
+  );
+  return settledValues(results, (i) => `daily papers failed: ${days[i]}`)
+    .flat()
+    .filter((entry) => /^\d{4}\.\d{4,5}$/.test(entry.paper?.id ?? ""))
+    .sort((a, b) => b.paper.upvotes - a.paper.upvotes)
+    .slice(0, dailyPapers.limit)
+    .map((entry): Candidate => ({
+      url: `https://arxiv.org/abs/${entry.paper.id}`,
+      title: entry.title,
+      source: `${dailyPapers.name} · ${entry.paper.upvotes} upvotes`,
+      snippet: stripHtml(entry.summary ?? "").slice(0, 400),
+      publishedAt: entry.date,
+      hint: "research",
+    }));
 }
 
 const HN_SEARCHES = [
@@ -125,7 +156,9 @@ export function dedupeCandidates(all: Candidate[]): Candidate[] {
   });
 }
 
-/** Everything published since `since`, deduplicated by URL. */
-export async function collectCandidates(since: Date): Promise<Candidate[]> {
-  return dedupeCandidates([...(await fromFeeds(since)), ...(await fromHackerNews(since))]);
+/** Everything published since `since`, deduplicated by URL. The Daily Papers go first, so a paper also in an arXiv
+ *  feed keeps its vote count. */
+export async function collectCandidates(since: Date, now = new Date()): Promise<Candidate[]> {
+  const [papers, fromFeedList, fromHn] = await Promise.all([fromDailyPapers(since, now), fromFeeds(since), fromHackerNews(since)]);
+  return dedupeCandidates([...papers, ...fromFeedList, ...fromHn]);
 }

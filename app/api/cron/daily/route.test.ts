@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { fakeDb, pgError } from "../../../../lib/pipeline/fake-db.ts";
-import { feeds } from "../../../../config/sources.ts";
+import { dailyPapers, feeds } from "../../../../config/sources.ts";
 import { geminiResponse, mockFetch, TEST_HOST, withBudgetGone, withEnv, withGeminiKey } from "../../../../lib/pipeline/mock-fetch.ts";
 import { isoWeek } from "../../../../lib/pipeline/util.ts";
 import { resetRoute, routeStub } from "../../../../lib/test/route-hooks.ts";
@@ -11,9 +11,10 @@ const { GET } = await import("./route.ts");
 const cronRequest = (authorization?: string) =>
   new Request("http://localhost/api/cron/daily", { headers: authorization ? { authorization } : {} }) as Parameters<typeof GET>[0];
 
-/** A good run's network: the model curates nothing, Hacker News and GitHub answer empty, every feed 404s. */
+/** A good run's network: the model curates nothing, the Daily Papers, Hacker News and GitHub answer empty, every feed 404s. */
 async function goodRunFetch(url: string): Promise<Response> {
   if (url.startsWith("https://generativelanguage.googleapis.com/")) return geminiResponse({ items: [], github: [] });
+  if (url.startsWith(dailyPapers.url)) return Response.json([]);
   if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits: [] });
   if (url.startsWith("https://api.github.com/")) return Response.json({ items: [] });
   return new Response("", { status: 404 });

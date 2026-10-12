@@ -133,7 +133,7 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
   const known = new Set((recent ?? []).map((row) => row.url as string));
 
   const [candidates, repos] = await Promise.all([
-    collectCandidates(new Date(now.getTime() - 2 * DAY)).then((all) => all.filter((c) => !known.has(c.url))),
+    collectCandidates(new Date(now.getTime() - 2 * DAY), now).then((all) => all.filter((c) => !known.has(c.url))),
     collectRepos(now),
   ]);
   const picked = await shortlist(db, candidates);

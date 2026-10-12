@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { docFile } from "./test/doc-file.ts";
-import { DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "../config/sources.ts";
+import { dailyPapers, DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "../config/sources.ts";
 
 // truthful_sites.md → "Bent van" documents config/sources.ts. This keeps the two equal, both ways:
 // it fails for a source added to or removed from either side, and for a changed URL, limit or category.
@@ -26,6 +26,11 @@ test("truthful_sites.md lists exactly the feeds the daily run reads, with their 
     rows.map(([, name, url, hint, limit]) => [name.trim(), url, hint, Number(limit)]),
     feeds.map(({ name, url, hint, limit }) => [name, url, hint, limit ?? DEFAULT_FEED_LIMIT]),
   );
+});
+
+test("truthful_sites.md documents the Daily Papers endpoint and how many the run takes", () => {
+  assert.deepEqual(bullets("Hugging Face Daily Papers"), [dailyPapers.url]);
+  assert.match(section("Hugging Face Daily Papers"), new RegExp(`legtöbb szavazatot kapott ${dailyPapers.limit} `));
 });
 
 test("truthful_sites.md lists exactly the Hacker News queries and GitHub topics the daily run searches", () => {
