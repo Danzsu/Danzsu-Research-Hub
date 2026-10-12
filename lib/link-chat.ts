@@ -74,6 +74,10 @@ export type ChatNotice =
   | { kind: "no_link" | "more_links" | "invalid_url" | "network" | "signed_out" }
   | { kind: "already_submitted"; postId: number | null; queued?: true };
 
+/** The `signed_out` reply's link: back to this very page after the sign-in, query string and all
+ *  (`search` without its `?`, as URLSearchParams prints it). */
+export const signInHref = (pathname: string, search: string) => `/login?next=${encodeURIComponent(search ? `${pathname}?${search}` : pathname)}`;
+
 /** What a route answered: its status and its JSON body (`{}` when the body isn't a JSON object). */
 export type Answer = { status: number; body: Record<string, unknown> };
 

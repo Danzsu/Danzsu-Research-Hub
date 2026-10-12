@@ -11,12 +11,15 @@ export default function Link({ href, children, ...rest }: { href: string; childr
 /** `next/navigation`'s router, inert: a static render never navigates (nor runs the effect that prefetches). */
 export const useRouter = () => ({ push() {}, refresh() {}, prefetch() {} });
 
-/** What the stubs answer: `usePathname` "/" and `useLinkStatus` not pending, unless a test sets them,
- *  like `routeStub` in route-hooks.ts. Reset them after. */
-export const navigationStub = { pathname: "/", linkPending: false };
+/** What the stubs answer: `usePathname` "/", `useSearchParams` empty and `useLinkStatus` not pending,
+ *  unless a test sets them, like `routeStub` in route-hooks.ts. Reset them after. */
+export const navigationStub = { pathname: "/", search: "", linkPending: false };
 
 /** `next/link`'s `useLinkStatus`: the pending navigation of the Link it sits in. */
 export const useLinkStatus = () => ({ pending: navigationStub.linkPending });
 
 /** The navigations and language-toggle.tsx read this to mark the active link. */
 export const usePathname = () => navigationStub.pathname;
+
+/** link-chat.tsx reads it for the sign-in link's way back. */
+export const useSearchParams = () => new URLSearchParams(navigationStub.search);

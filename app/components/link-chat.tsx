@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isSendKey } from "@/lib/keymap";
-import { createLinkChat, focusIsIdle, httpTransport, memoryTransport } from "@/lib/link-chat";
+import { createLinkChat, focusIsIdle, httpTransport, memoryTransport, signInHref } from "@/lib/link-chat";
 import type { MySource } from "@/lib/my-sources";
 import { busyClass, ChatThread } from "./chat-thread";
 import { liftSurface } from "./lift-classes";
@@ -102,6 +102,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
 }) {
   const { language } = useLanguage();
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   const refresh = useRefresh();
   const isMobile = useIsMobile();
   const [chat] = useState(() =>
@@ -226,7 +227,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
             <ChatThread
               language={language}
               snapshot={snapshot}
-              loginHref={`/login?next=${encodeURIComponent(pathname)}`}
+              loginHref={signInHref(pathname, search)}
               onRetry={(sourceId) => void chat.retry(sourceId)}
               onOpenPost={isMobile ? () => onOpenChange(false) : undefined}
             />

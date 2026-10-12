@@ -8,6 +8,7 @@ import {
   memoryTransport,
   parseLinkMessage,
   POLL_MS,
+  signInHref,
   toThread,
   type Answer,
   type ChatNotice,
@@ -16,7 +17,7 @@ import {
 } from "./link-chat.ts";
 import type { MySource } from "./my-sources.ts";
 import { mockFetch } from "./pipeline/mock-fetch.ts";
-import { MINE_LIMIT, safeHref } from "./pipeline/util.ts";
+import { MINE_LIMIT, safeHref, safeNext } from "./pipeline/util.ts";
 
 const linkOf = (text: string) => {
   const message = parseLinkMessage(text);
@@ -815,4 +816,12 @@ test("focusIsIdle is true only with the focus on the body or nowhere", () => {
   assert.equal(focusIsIdle({ activeElement: null, body }), true);
   assert.equal(focusIsIdle({ activeElement: body, body }), true);
   assert.equal(focusIsIdle({ activeElement: {}, body }), false);
+});
+
+// Polish 3, Review Focus 4. Kills the link that drops the query string: back from the sign-in, the reader
+// lands on the same view (the Hungarian text, a filter), and the login page's safeNext keeps it.
+test("the chat's sign-in link brings the reader back to the same page, query string and all", () => {
+  assert.equal(signInHref("/library/42", "text=hu"), "/login?next=%2Flibrary%2F42%3Ftext%3Dhu");
+  assert.equal(signInHref("/library", ""), "/login?next=%2Flibrary");
+  assert.equal(safeNext(new URL(signInHref("/github", "rating=heart&lang=Rust"), "https://radar.test").searchParams.get("next")), "/github?rating=heart&lang=Rust");
 });
