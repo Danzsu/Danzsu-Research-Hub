@@ -75,6 +75,8 @@ test("summarize asks for a 300–450 word brief in both languages, and none with
   const prompt = capturePrompt(t);
   await summarize(fakeDb(), extracted, "");
   assert.match(prompt(), /brief: .*3–5 short paragraphs, 300–450 words in each language/);
+  // Final review: a tweet can't fill 300 words without filler or invention.
+  assert.match(prompt(), /shorter when the source is short; never pad/);
   await summarize(fakeDb(), { ...extracted, meta: { extractionFailed: true } }, "");
   assert.match(prompt(), /leave brief empty/);
 });

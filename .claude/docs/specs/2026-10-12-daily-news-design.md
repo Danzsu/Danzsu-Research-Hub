@@ -31,6 +31,8 @@ A Vercel Hobby csomagon a cron naponta egyszer fut, **±59 perces pontossággal,
 | `/api/cron/mirror` | `0 16 * * *` | 18:00–18:59 | 17:00–17:59 |
 | `/api/cron/mirror` | `0 17 * * *` | 19:00–19:59 | 18:00–18:59 |
 
+**A záró review után (2026-10-12) minden cron egy órával korábbra került:** napi `0 13 * * *`, tükör 14, 15 és 16 UTC. A fenti táblázattal nyáron csak két kör ért volna 18:00 elé, ami a 10 brief közül kb. 5–9-hez elég; így három. A táblázat a tervezett állapotot mutatja.
+
 A napi futás a saját 300 másodpercéből már a Top 10 egy részét feldolgozza (`retryPendingSources` a route-ban). A 15:00-s tükör-kör nyáron is 18:00 előtt lefut. A 16:00-s és a 17:00-s kör a kimaradt vagy elbukott források ismétlése. A futásszám nem változik (négy cron), csak az időpontok.
 
 A Hacker News és a csatornák 2 napos visszatekintése marad. A HF Daily Papers a lezárt napokat olvassa (`finishedDays`), 14 UTC-kor is a tegnapit és a tegnapelőttit.

@@ -42,7 +42,7 @@ const copy = {
     categories: "Kategóriák",
     panel: "Haladás és to-do",
     updated: "Napi frissítés",
-    schedule: "NAPI 14:00 UTC · ZÁRÁS VAS 24:00",
+    schedule: "NAPI 13:00 UTC · ZÁRÁS VAS 24:00",
     archive: "Heti zárás",
     status: "ÁLLAPOT",
     frozen: "LEZÁRVA",
@@ -84,7 +84,7 @@ const copy = {
     categories: "Categories",
     panel: "Progress & to-do",
     updated: "Daily refresh",
-    schedule: "DAILY 14:00 UTC · FREEZE SUN 24:00",
+    schedule: "DAILY 13:00 UTC · FREEZE SUN 24:00",
     archive: "Weekly close",
     status: "STATUS",
     frozen: "FROZEN",
@@ -376,7 +376,7 @@ export function DigestDashboard(
                       <ol className="space-y-1 font-mono text-xs">
                         {items.map((item, index) => (
                           <li key={item.id}>
-                            <a href={`#daily-${index + 1}`} className="focus-ring flex min-h-8 items-baseline gap-3 hover:text-signal">
+                            <a href={`#daily-${index + 1}`} className="focus-ring flex min-h-10 items-center gap-3 hover:text-signal">
                               <span className="text-signal">{String(index + 1).padStart(2, "0")}</span>
                               <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{item.title[language]}</span>
                               <span className="text-ink/55">{item.score}</span>

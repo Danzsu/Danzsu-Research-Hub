@@ -22,7 +22,7 @@ Two server-side writers put content in. Both do their pipeline work with the Sup
 
 ```mermaid
 flowchart TD
-  subgraph daily["Writer 1: the daily cron, 14:00 UTC"]
+  subgraph daily["Writer 1: the daily cron, 13:00 UTC"]
     cron["Vercel Cron"] --> cronRoute["GET /api/cron/daily"]
     cronRoute --> runDaily["runDaily: feeds, Hacker News, GitHub search"]
     runDaily --> shortlist["daily_shortlist"] --> curate["daily_curate"]
@@ -147,7 +147,7 @@ This table is the one list of migrations; AGENTS.md, CLAUDE.md and TODO.md point
 
 `npm run dev`, open `http://localhost:3000/login`, and sign in with the invited address (on the shared project, with the origin swap above).
 
-The first issue, without waiting for 14:00 UTC:
+The first issue, without waiting for 13:00 UTC:
 
 ```bash
 curl -H "Authorization: Bearer <CRON_SECRET>" http://localhost:3000/api/cron/daily
@@ -169,7 +169,7 @@ The shared project is already deployed. These steps are for a deployment of your
 
 1. **Vercel:** *Add New → Project*, import the repository. Next.js and pnpm are detected automatically.
 2. **Environment variables:** everything from the [Environment](#environment) table, with your own project's values, for Production and Preview. Tick Development too if you want a plain `vercel env pull` to work; otherwise pull with `--environment=production`. Environment changes take effect on the next deploy.
-3. **Cron and region:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 14 * * *` (14:00 UTC, so the day's Top 10 is ready by 18:00 in Budapest), and `/api/cron/mirror` at 15, 16 and 17 UTC, which only works the Library's queue (the mirror's sources and any run a crash left behind). On Hobby each runs once a day, anywhere within its hour. With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry, translation and re-extraction routes may run for up to 300 s. `"regions": ["dub1"]` runs every function in Dublin, beside the shared Supabase project (`eu-west-1`), and `"fluid": true` turns on Fluid compute. Both override the dashboard's Function Region and Fluid Compute settings, and both take effect with the next deploy. Point `regions` at the region of your own Supabase project.
+3. **Cron and region:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 13 * * *` (13:00 UTC, so the day's Top 10 and its briefs are ready by 18:00 in Budapest), and `/api/cron/mirror` at 14, 15 and 16 UTC, which only works the Library's queue (the mirror's sources and any run a crash left behind). On Hobby each runs once a day, anywhere within its hour. With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry, translation and re-extraction routes may run for up to 300 s. `"regions": ["dub1"]` runs every function in Dublin, beside the shared Supabase project (`eu-west-1`), and `"fluid": true` turns on Fluid compute. Both override the dashboard's Function Region and Fluid Compute settings, and both take effect with the next deploy. Point `regions` at the region of your own Supabase project.
 4. **Install command:** check that Vercel installs from `pnpm-lock.yaml` in frozen mode with pnpm 11, so the 7-day age gate applies. This is an open item in [TODO.md](.claude/docs/TODO.md).
 5. **Supabase:** set your project's Site URL to the deployment's domain, add that domain to the Redirect URLs, and send new invites. On the shared project, the Site URL is the production domain and changes only when that domain does (for example after renaming the Vercel project). Only the owner changes it, and never to localhost or a preview URL, because every member's magic link follows it.
 6. **First run:** the same `curl` against `https://<domain>/api/cron/daily`. The next morning, check *Vercel → Logs* and *Cron Jobs*.

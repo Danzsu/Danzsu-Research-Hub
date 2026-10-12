@@ -529,6 +529,8 @@ test("the daily view lists its cards in rank order, each with an anchor the inde
   assert.equal(doc.querySelector('nav[aria-label="Categories"]'), null);
   assert.match(doc.body.textContent ?? "", /5 stories · 2 short/);
   assert.match(doc.querySelector("header")?.textContent ?? "", /DAILY LIST/);
+  // Final review: the index rows are touch targets too (DESIGN.md: 40px).
+  assert.ok([...doc.querySelectorAll(`nav[aria-label="Today's stories"] a`)].every((link) => link.className.includes("min-h-10")));
   // Every daily item carries its rank (getDaily's embed): the weekly DAY TOP mark must stay off this page.
   assert.doesNotMatch(doc.body.textContent ?? "", /DAY TOP/);
 });
