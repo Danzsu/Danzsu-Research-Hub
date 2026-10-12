@@ -12,6 +12,7 @@ const { default: PrivacyPage } = await import("../privacy/page.tsx");
 test("the about page lists what the site does, opens sign-in from the header and links the privacy page", async () => {
   const doc = await about();
   assert.equal(doc.querySelector("h1")?.textContent, "NEON NEWS RADAR//");
+  assert.ok([...doc.querySelectorAll("p")].some((line) => line.textContent === "INVITE-ONLY / CSAK MEGHÍVÓVAL"), "the hero's eyebrow");
   assert.equal(doc.querySelectorAll("main ul li").length, 9);
   assert.equal(doc.querySelectorAll("form").length, 0);
   const trigger = doc.querySelector('header button[aria-haspopup="dialog"]');

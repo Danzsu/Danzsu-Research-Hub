@@ -10,8 +10,9 @@ export const metadata: Metadata = {
   // The tab and home-screen icons are app/icon.png and app/apple-icon.png (Next file convention).
 };
 
-// Paints the mobile browser chrome ink, matching the page edges.
-export const viewport: Viewport = { themeColor: "#141414" };
+// Paints the mobile browser chrome ink, matching the page edges. `cover` turns on the iPhone's
+// env(safe-area-inset-*) values, which read 0 without it.
+export const viewport: Viewport = { themeColor: "#141414", viewportFit: "cover" };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

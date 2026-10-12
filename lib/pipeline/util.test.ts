@@ -14,6 +14,7 @@ import {
   hasNoarchive,
   hostOf,
   isPrivateAddress,
+  isClosedWeek,
   isoWeek,
   isoWeekMonday,
   loginWithError,
@@ -432,4 +433,11 @@ test("claimHeld: a claim holds for CLAIM_LEASE_MS, and none is held without one"
 test("authCallback and loginWithError carry the post-login target, encoded once", () => {
   assert.equal(authCallback("http://localhost:3000", "/library/12?text=hu#b-3"), "http://localhost:3000/auth/callback?next=%2Flibrary%2F12%3Ftext%3Dhu%23b-3");
   assert.equal(loginWithError("https://radar.test", "not_invited", "/library"), "https://radar.test/login?error=not_invited&next=%2Flibrary");
+});
+
+// Polish 1, Review Focus 5. Kills last week shown as live on Monday before the evening run opens the new one.
+test("isClosedWeek is true for any week before the current ISO week", () => {
+  const monday = new Date("2026-09-28T10:00:00Z"); // W40's Monday morning
+  assert.equal(isClosedWeek("2026-W39", monday), true);
+  assert.equal(isClosedWeek("2026-W40", monday), false);
 });

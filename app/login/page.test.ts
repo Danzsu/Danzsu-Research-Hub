@@ -29,9 +29,22 @@ test("the login page says why a sign-in failed, in both languages, in its alert 
     ["google", "A Google-belépés nem sikerült, próbáld újra. / Google sign-in failed, try again."],
     ["1", expired],
     ["valami", expired],
+    // Polish 4, Review Focus 1: a hand-made code that names an Object.prototype member.
+    ["constructor", expired],
+    ["toString", expired],
+    ["__proto__", expired],
   ];
   for (const [error, text] of cases) assert.equal((await page({ error })).querySelector('[role="alert"]')?.textContent, text, error);
   assert.equal((await page({})).querySelector('[role="alert"]')?.textContent, "");
+});
+
+// Polish 4, Review Focus 2. Kills the title, the eyebrow and the email label left out of the copy object:
+// the title follows the reader's language (the stub's is hu), like the sheet's, and the label reads both.
+test("the login page's title, eyebrow and email label come from the shared sign-in copy", async () => {
+  const doc = await page({});
+  assert.equal(doc.querySelector("h1")?.textContent, "BELÉPÉS//");
+  assert.equal(doc.querySelector("main p")?.textContent, "INVITE-ONLY / CSAK MEGHÍVÓVAL");
+  assert.equal(doc.querySelector('label[for="email"]')?.textContent, "E-MAIL / EMAIL");
 });
 
 // Kills the sent state that still shows a form (a second link, or a Google sign-in mid-wait).

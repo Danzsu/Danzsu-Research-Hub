@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import type { Candidate, Repo } from "./collect.ts";
 import { curatePrompt, runDaily, toDigestRows } from "./daily.ts";
-import { fakeDb } from "./fake-db.ts";
+import { fakeDb, pgError } from "./fake-db.ts";
 import { feeds } from "../../config/sources.ts";
 import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockFetch, withGeminiKey } from "./mock-fetch.ts";
 import { isoWeek } from "./util.ts";
@@ -100,7 +100,7 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
     }
     return new Response("", { status: 404 });
   });
-  const db = fakeDb(undefined, { rows: { digest_items: [{ url: "https://blog.test/known" }] } });
+  const db = fakeDb(undefined, { rows: { digest_items: [{ url: "https://blog.test/known", created_at: "2026-09-20T05:00:00Z" }] } });
 
   const result = await runDaily(db, now);
 
@@ -124,7 +124,11 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
   assert.deepEqual(upserted.daily_top.values, [{ day: "2026-09-23", rank: 1, item_id: item.id }]);
   assert.deepEqual(upserted.daily_top.options, { onConflict: "day,rank" });
   // "Known" means stored in the last 14 days, by creation time.
-  assert.deepEqual(db.gteCalls, [{ table: "digest_items", column: "created_at", value: "2026-09-09T05:00:00.000Z" }]);
+  // …and the day's Top 10 is picked from what was added since Budapest's midnight (22:00 UTC in summer).
+  assert.deepEqual(db.gteCalls, [
+    { table: "digest_items", column: "created_at", value: "2026-09-09T05:00:00.000Z" },
+    { table: "digest_items", column: "created_at", value: "2026-09-22T22:00:00.000Z" },
+  ]);
   assert.deepEqual(db.rpcCalls, [{ name: "refresh_must_read", args: { p_issue: "2026-W39" } }]);
 });
 
@@ -205,7 +209,7 @@ test("curatePrompt lists what the last 14 days already covered, and asks for one
 });
 
 /** A run whose model curates `items` from one feed item each, with the given scores and minutes. */
-async function dailyRun(t: TestContext, picks: { title: string; score: number; minutes: number }[], tables: Parameters<typeof fakeDb>[1] = {}, now = new Date("2026-09-23T14:00:00Z")) {
+async function dailyRun(t: TestContext, picks: { title: string; score: number; minutes: number }[], tables: Parameters<typeof fakeDb>[1] = {}, now = new Date("2026-09-23T14:00:00Z"), db = fakeDb(undefined, tables)) {
   withGeminiKey(t);
   t.mock.method(console, "warn", () => {});
   const rss = `<rss><channel>${picks.map((p, i) => `<item><title>${p.title}</title><link>https://blog.test/${i}</link><pubDate>Tue, 22 Sep 2026 09:00:00 GMT</pubDate></item>`).join("")}</channel></rss>`;
@@ -219,7 +223,6 @@ async function dailyRun(t: TestContext, picks: { title: string; score: number; m
     }
     return new Response("", { status: 404 });
   });
-  const db = fakeDb(undefined, tables);
   const result = await runDaily(db, now);
   return { db, result, prompt: () => prompt };
 }
@@ -245,15 +248,36 @@ test("runDaily ranks only the items this run wrote", async (t) => {
   assert.equal(result.inserted, 1);
 });
 
-// Review Focus 1. Kills a second run of the day replacing the list with only its own new items: the day's
-// earlier Top 10 and the new items compete together, so the list only improves.
-test("a second run of the day keeps the earlier picks in the race", async (t) => {
-  const earlier = { day: "2026-09-23", digest_items: { id: "earlier-best", score: 95, read_minutes: 5 } };
-  const { db } = await dailyRun(t, [{ title: "Later", score: 60, minutes: 30 }], { rows: { daily_top: [earlier] } });
-  const top = db.upserts.find((u) => u.table === "daily_top")?.values as { rank: number; item_id: string }[];
-  assert.deepEqual(top.map((row) => row.rank), [1, 2]);
-  assert.equal(top[0].item_id, "earlier-best");
-  assert.match(top[1].item_id, /-later-/);
+// Polish 1, Review Focus 1. Kills a list built from this run's inserts only: a re-run after a failed one, or the
+// first evening after a morning run, would rank only the few new items. Every item added since Budapest's
+// midnight competes; yesterday's don't.
+test("the day's Top 10 is picked from every item added today, whichever run added it", async (t) => {
+  const { db } = await dailyRun(t, [{ title: "Evening", score: 60, minutes: 30 }], {
+    rows: {
+      digest_items: [
+        { id: "morning-best", url: "https://old.test/m", score: 95, read_minutes: 5, created_at: "2026-09-23T05:00:00Z" },
+        { id: "yesterday", url: "https://old.test/y", score: 99, read_minutes: 5, created_at: "2026-09-22T20:00:00Z" },
+      ],
+    },
+  });
+  const top = db.upserts.find((u) => u.table === "daily_top")?.values as { item_id: string }[];
+  assert.deepEqual(top.map((row) => row.item_id).slice(0, 1), ["morning-best"]);
+  assert.match(top[1].item_id, /-evening-/);
+  assert.equal(top.length, 2);
+});
+
+// Polish 1, Review Focus 2. Kills the must-read refresh skipped when the daily list's write fails.
+test("a failed daily_top write still leaves the week's Top 3 refreshed", async (t) => {
+  const db = fakeDb(undefined, { tableWriteErrors: { daily_top: pgError("08006", "down") } });
+  await assert.rejects(dailyRun(t, [{ title: "Story", score: 80, minutes: 5 }], {}, undefined, db));
+  assert.deepEqual(db.rpcCalls.map((call) => call.name), ["refresh_must_read"]);
+});
+
+// Polish final review. Kills the reverse trade: a failed refresh_must_read must not cost the day's list either.
+test("a failed refresh_must_read still writes the day's list, and the run still fails", async (t) => {
+  const db = fakeDb(undefined, { rpcError: pgError("08006", "down") });
+  await assert.rejects(dailyRun(t, [{ title: "Story", score: 80, minutes: 5 }], {}, undefined, db));
+  assert.equal((db.upserts.find((u) => u.table === "daily_top")?.values as unknown[] | undefined)?.length, 1);
 });
 
 // Spec N6, Review Focus 3. Kills the day taken in UTC: a manual run at 00:30 in Budapest belongs to the new day.

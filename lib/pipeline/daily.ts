@@ -4,7 +4,7 @@ import { localizedSchema } from "../blocks.ts";
 import { digestCategories, digestTags } from "../../data/digest-types.ts";
 import { generate } from "../llm.ts";
 import { collectCandidates, collectRepos, type Candidate, type Repo } from "./collect.ts";
-import { budapestDay, pickDailyTop, type DailyCandidate } from "./daily-top.ts";
+import { budapestDay, budapestDayStart, pickDailyTop, type DailyCandidate } from "./daily-top.ts";
 import { errorMessage, isoWeek, itemId, type Week } from "./util.ts";
 
 const DAY = 86_400_000;
@@ -163,24 +163,29 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
     if (trimError) throw trimError;
   }
 
-  const daily = await writeDailyTop(db, budapestDay(now), fresh);
-
+  // Both run whichever fails: a failed daily list must not leave the week's Top 3 stale, nor a failed refresh
+  // cost the day's list. The run still fails on either.
   const { error: rpcError } = await db.rpc("refresh_must_read", { p_issue: week.id });
+  const daily = await writeDailyTop(db, now);
   if (rpcError) throw rpcError;
 
   return { issue: week.id, candidates: candidates.length, shortlisted: picked.length, inserted: fresh.length, repos: top.length, daily };
 }
 
 /**
- * The day's Top 10 (spec N4, N6): the day's earlier picks and this run's new items compete together, so a
- * second run of the day can only improve the list. Answers how many it ranked.
+ * The day's Top 10 (spec N4, N6). Every item added since Budapest's midnight competes, whichever run added it:
+ * a re-run, a run after a failed one, or the first evening after a morning run ranks the whole day, and the list
+ * only improves. Answers how many it ranked.
  */
-async function writeDailyTop(db: SupabaseClient, day: string, fresh: DailyCandidate[]): Promise<number> {
-  const { data: kept, error } = await db.from("daily_top").select("digest_items(id, score, read_minutes)").eq("day", day);
+async function writeDailyTop(db: SupabaseClient, now: Date): Promise<number> {
+  const day = budapestDay(now);
+  const { data, error } = await db
+    .from("digest_items")
+    .select("id, score, read_minutes")
+    .gte("created_at", budapestDayStart(now).toISOString())
+    .order("created_at");
   if (error) throw error;
-  const earlier = (kept ?? []).map((row) => row.digest_items as unknown as DailyCandidate | null).filter((item): item is DailyCandidate => item !== null);
-  const known = new Set(earlier.map((item) => item.id));
-  const daily = pickDailyTop([...earlier, ...fresh.filter((item) => !known.has(item.id))]);
+  const daily = pickDailyTop((data ?? []) as DailyCandidate[]);
   if (!daily.length) return 0;
   const { error: upsertError } = await db.from("daily_top").upsert(daily.map((item, index) => ({ day, rank: index + 1, item_id: item.id })), { onConflict: "day,rank" });
   if (upsertError) throw upsertError;

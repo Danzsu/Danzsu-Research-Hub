@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
   Building2,
@@ -28,6 +28,7 @@ import { useLanguage } from "./language-context";
 import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
+import { tabPastPanel } from "./tab-past-panel";
 import { useReadHere } from "./link-chat";
 import { isUndoToast, toasts } from "./undo-toast";
 import { useModelContextTools } from "./use-model-context-tools";
@@ -53,6 +54,8 @@ const copy = {
     dailyLead: "A nap 10 legfontosabb híre, mindegyikhez 2–3 perces összefoglalóval.",
     dailyCount: (count: number, short: number) => `${count} hír · ebből ${short} rövid`,
     dailyStale: (day: string) => `Korábbi lista (${day}) — a mai 18:00-ra készül.`,
+    // The date ends in a period ("2026. 10. 11."), so it goes in brackets, not before a suffix.
+    dailyLate: (day: string) => `A mai lista késik — addig a korábbi látszik (${day}).`,
     dailyIndex: "A nap hírei",
     dailyFeed: "A NAP 10 HÍRE",
     emptyDaily: "Még nincs napi lista. Az első este 18:00-ra készül el.",
@@ -95,8 +98,9 @@ const copy = {
     dailyLead: "The day's 10 most important stories, each with a 2–3 minute brief.",
     dailyCount: (count: number, short: number) => `${count} stories · ${short} short`,
     dailyStale: (day: string) => `An earlier list (${day}) — today's is ready by 18:00.`,
-    dailyIndex: "Today's stories",
-    dailyFeed: "TODAY'S 10",
+    dailyLate: (day: string) => `Today's list is late — showing the one from ${day}.`,
+    dailyIndex: "The day's stories",
+    dailyFeed: "THE DAY'S 10",
     emptyDaily: "No daily list yet. The first one is ready by 18:00.",
     companiesLead: "OpenAI · Google · Anthropic · xAI · Meta · Mistral · Microsoft · Chinese labs",
     dailyTop: "DAILY TOP 5",
@@ -144,7 +148,7 @@ export function DigestDashboard(
     /** The page's ratings by ratingKey (getRatings): the cards' and repos' initial values. */
     ratings?: Ratings;
     /** /daily (daily news spec N7): whether the list is today's, and each card's long text. */
-    daily?: { today: boolean; briefs: Record<string, DailyBrief> };
+    daily?: { today: boolean; late: boolean; briefs: Record<string, DailyBrief> };
   } & ReaderSource,
 ) {
   const { issue, githubTop10, archived = false } = props;
@@ -221,6 +225,10 @@ export function DigestDashboard(
   const topLabel = companies && top.length ? `${t.dailyTop} · ${addedDayLabel(top[0].addedAt)}` : t.mustRead;
 
   const panelLayer = usePanel();
+  const panelTrigger = useRef<HTMLButtonElement>(null);
+  const closePanel = panelLayer.setOpen;
+  // The panel belongs to this page: leaving it (a link, Back, Forward) must not leave it open for the next Radar view.
+  useEffect(() => () => closePanel(false), [closePanel]);
   // Rendered twice: as the side column from a 95rem-wide Radar (R3 §2: its own width, not the viewport's), and inside the header Sheet below that.
   const panel = (
     <ReaderPanel
@@ -250,6 +258,7 @@ export function DigestDashboard(
         <Sheet modal={false} open={panelLayer.open} onOpenChange={panelLayer.setOpen}>
           <SheetTrigger asChild>
             <Button
+              ref={panelTrigger}
               variant="outline"
               size="sm"
               aria-label={t.panel}
@@ -271,7 +280,9 @@ export function DigestDashboard(
             onInteractOutside={(event) => {
               if (isUndoToast(event.target)) event.preventDefault();
             }}
-            className={`overflow-y-auto border-ink bg-cream p-5 pt-12 text-ink ${isMobile ? "max-h-[85dvh] border-t-2" : "w-[88vw] max-w-sm border-l-2"}`}
+            // Never modal, so Tab goes on past it to the page, as in the link chat.
+            onKeyDownCapture={(event) => tabPastPanel(event, () => panelTrigger.current)}
+            className={`overflow-y-auto border-ink bg-cream p-5 pt-12 text-ink ${isMobile ? "max-h-[85dvh] border-t-2 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]" : "w-[88vw] max-w-sm border-l-2"}`}
           >
             <SheetHeader className="sr-only">
               <SheetTitle>{t.panel}</SheetTitle>
@@ -325,7 +336,7 @@ export function DigestDashboard(
                   {dailyView ? (
                     <p className="mt-3 font-mono text-xs text-paper/70">
                       {t.dailyCount(items.length, items.filter((item) => item.readMinutes <= SHORT_MINUTES).length)}
-                      {props.daily && !props.daily.today && items.length > 0 && <span className="block text-signal">{t.dailyStale(issue.label)}</span>}
+                      {props.daily && !props.daily.today && items.length > 0 && <span className="block text-signal">{props.daily.late ? t.dailyLate(issue.label) : t.dailyStale(issue.label)}</span>}
                     </p>
                   ) : (
                     <p className="mt-3 font-mono text-xs text-paper/60 sm:hidden">

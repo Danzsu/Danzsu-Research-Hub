@@ -14,6 +14,7 @@
 - [ ] **Saját SMTP nélkül a sablonok nem szerkeszthetők** (2026-09-25). Addig két szabály érvényes:
   - Magadat a *Users → Add user → Create new user* (Auto Confirm) menüben vedd fel, ne meghívóval. Az alap „Invite” sablon linkje nem léptet be.
   - A belépő linket ugyanabban a böngészőben nyisd meg, ahol kérted. Az alap Magic Link a `?code=` (PKCE) utat használja.
+  - Ugyanezért egy közben elkezdett Google-belépés érvényteleníti a még meg nem nyitott magic linket (a kettő ugyanazt a PKCE-sütit használja). A token-hash sablonok (lent) ezt is megszüntetik.
 - [ ] *Authentication → Email Templates* (csak saját SMTP után):
   - Magic Link: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`
   - Invite user: a link legyen `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite`
@@ -162,10 +163,11 @@
 
 ### Következő lépések
 - [x] **A kiadás: a `visual-review` PR** (2026-10-11, a `codebase-order` után; beolvasztva 2026-10-11, PR #3). Az élő próbák még hátravannak. Migráció nincs; egy új függőség (`motion` 14.0.0). A merge után élő próba: a fiók-menü asztalon és a „Több” alatt telefonon; kilépés → landing a „Kijelentkeztél” sorral; a `/login` a landing keretében; a hírkártya eszközsora egy valódi telefonon; a Radar panel és a chat egyszerre sosem; `prefers-reduced-motion` mellett az értékelés-nyomás nem mozdul.
-- [ ] **A kiadás: az `app-icon` PR** (2026-10-11, pusholva, merge-re vár). Az új alkalmazás-ikon: `app/icon.png` (512 px, a böngészőfül és a manifest) és `app/apple-icon.png` (180 px, ink alapon, az iOS kezdőképernyő); a régi `public/favicon.svg` törölve. Migráció és új függőség nincs. A merge után: az új ikon a fülön (a böngésző cache-eli, Ctrl+F5 vagy új lap), és telefonon a „Hozzáadás a kezdőképernyőhöz” ikonja.
-- [ ] **A kiadás: a `landing-signin` PR** (2026-10-12, az `app-icon` tetején). A landing belépője a fejléc krémszínű Belépés gombjáról alulról felcsúszó lapban (az `/about`-on egy perc után magától is, látogatásonként egyszer); a Belépés, a HU/EN, a Google- és a belépőlink-gomb a taiyaki mozgásával; az új logó a felirat mellett (oldalsáv, nyilvános fejléc, státuszkártya); „Made by Danzsu” a láblécben; három új forrás (The Rundown AI, MIT Technology Review, Pragmatic Engineer). Migráció és új függőség nincs. A merge után: a lap telefonon és asztalon, egy perc várakozás az `/about`-on, a másnapi futásban az új források tételei.
-- [ ] **A kiadás: a `sources-review` PR** (2026-10-12, a `landing-signin` tetején). A források élő felülvizsgálata: a Hugging Face Daily Papers legtöbb szavazatot kapott 15 cikke a lezárt napokból, az arXiv két listája 40 → 10, az AWS ML 10 → 5; a HN marad teljes szöveges (a csak címben keresés a nagy modellbejelentéseket ejtené ki). Migráció és új függőség nincs. A merge utáni első hétköznapi futásban (a hétvégén nincs Daily Papers) a jelöltek között legyenek `HF Daily Papers · N upvotes` tételek.
-- [ ] **A kiadás: a `daily-news` PR** (2026-10-12, a `sources-review` tetején). **Migráció kell, a deploy előtt:** `supabase/migrations/20261012000000_daily_top_and_brief.sql` az SQL Editorban (a `daily_top` tábla és a `posts.brief` oszlop). Új függőség nincs. A cronok a deploy-jal 13:00 UTC-re (napi) és 14–16 UTC-re (tükör) költöznek. Ha a deploy 05 UTC után van, az első esti lista rövidebb lehet: a reggeli futás aznapi tételeit a válogatás már ismertnek veszi; a második estétől teljes. Az első este: a `/daily` 18:00-ra kész, a Top 10-ben 3–5 rövid olvasmány, a kártyákon a brief (ha egy hiányzik, a Library-ben a forrás állapota mutatja, miért); a heti nézetben a „NAP TOP” jelek; telefonon a sáv Radar, Napi, taiyaki, Könyvtár, Több.
+- [x] **A kiadás: az `app-icon` PR** (beolvasztva 2026-10-12, PR #8) (2026-10-11, pusholva, merge-re vár). Az új alkalmazás-ikon: `app/icon.png` (512 px, a böngészőfül és a manifest) és `app/apple-icon.png` (180 px, ink alapon, az iOS kezdőképernyő); a régi `public/favicon.svg` törölve. Migráció és új függőség nincs. A merge után: az új ikon a fülön (a böngésző cache-eli, Ctrl+F5 vagy új lap), és telefonon a „Hozzáadás a kezdőképernyőhöz” ikonja.
+- [x] **A kiadás: a `landing-signin` PR** (beolvasztva 2026-10-12, PR #7) (2026-10-12, az `app-icon` tetején). A landing belépője a fejléc krémszínű Belépés gombjáról alulról felcsúszó lapban (az `/about`-on egy perc után magától is, látogatásonként egyszer); a Belépés, a HU/EN, a Google- és a belépőlink-gomb a taiyaki mozgásával; az új logó a felirat mellett (oldalsáv, nyilvános fejléc, státuszkártya); „Made by Danzsu” a láblécben; három új forrás (The Rundown AI, MIT Technology Review, Pragmatic Engineer). Migráció és új függőség nincs. A merge után: a lap telefonon és asztalon, egy perc várakozás az `/about`-on, a másnapi futásban az új források tételei.
+- [x] **A kiadás: a `sources-review` PR** (beolvasztva 2026-10-12, PR #6) (2026-10-12, a `landing-signin` tetején). A források élő felülvizsgálata: a Hugging Face Daily Papers legtöbb szavazatot kapott 15 cikke a lezárt napokból, az arXiv két listája 40 → 10, az AWS ML 10 → 5; a HN marad teljes szöveges (a csak címben keresés a nagy modellbejelentéseket ejtené ki). Migráció és új függőség nincs. A merge utáni első hétköznapi futásban (a hétvégén nincs Daily Papers) a jelöltek között legyenek `HF Daily Papers · N upvotes` tételek.
+- [x] **A kiadás: a `daily-news` PR** (beolvasztva 2026-10-12, PR #9; a migráció a merge után futott: a rés alatt a Radar és a `/daily` hibát adhatott, a 16 UTC-s tükör-kör forrásai elbukhattak — ellenőrző és visszaállító SQL a beszélgetésben, 2026-10-12) (2026-10-12, a `sources-review` tetején). **Migráció kell, a deploy előtt:** `supabase/migrations/20261012000000_daily_top_and_brief.sql` az SQL Editorban (a `daily_top` tábla és a `posts.brief` oszlop). Új függőség nincs. A cronok a deploy-jal 13:00 UTC-re (napi) és 14–16 UTC-re (tükör) költöznek. Ha a deploy 05 UTC után van, az első esti lista rövidebb lehet: a reggeli futás aznapi tételeit a válogatás már ismertnek veszi; a második estétől teljes. Az első este: a `/daily` 18:00-ra kész, a Top 10-ben 3–5 rövid olvasmány, a kártyákon a brief (ha egy hiányzik, a Library-ben a forrás állapota mutatja, miért); a heti nézetben a „NAP TOP” jelek; telefonon a sáv Radar, Napi, taiyaki, Könyvtár, Több.
+- [ ] **Ütemterv a hátralévő nagy funkciókra:** [plans/2026-10-12-roadmap.md](plans/2026-10-12-roadmap.md) (2026-10-12): előbb az apróságok négy csomagja, aztán a chat AI, a keresés, a chat AI 2, a dashboard, a G2, az üzemeltetés és a tartalom.
 - [ ] **Taiyaki chat AI (2d, a napi hírek után, saját spec; a tulajdonos döntése 2026-10-12):** a chat LLM-je „skilleket” kap: becsomagolt promptokat zod-sémával a meglévő `generate()` mögött (például kérdés a Library-ről és a hírekről, egy link összefoglalása, források felülvizsgálata és felvétele). **A forráslista karbantartása:** a források a `config/sources.ts`-ből egy adatbázis-táblába költöznek (migráció), mert a futó app a repót nem írhatja; a chat egy új csatornát élőben ellenőriz és javasol, de csak a tulajdonos (admin) jóváhagyása után kerül be. Nincs éles GitHub-token. A 2026-10-12-i felülvizsgálat mérése (14 napos tételszám, AI-arány, frissesség, átfedés) lesz a felülvizsgálat-skill alapja.
 - [ ] **2b Keresés** (a következő spec): Postgres teljes szövegű + trigram keresés a ⌘K palettában és a `/search` oldalon, a C-spec 3.4–3.5 szerint; utána 2c dashboard, 2d chat + embedding + G3.
 - [x] **A kiadás: a `codebase-order` PR** (2026-10-11; beolvasztva 2026-10-11, PR #4). Az élő próbák még hátravannak. Migráció nincs. A merge után élő próba: a `/` kijelentkezve az `/about`-ra visz; a menüben a GitHub repók és a `/github` listázza a korábbi hetek repóit (ha üres marad, a Supabase-ben a `github_repos` nézet lekérdezése a következő lépés); a Top 10 kártyáin a gombcsoport a kártyán belül; a másnapi futás után a pontszámok látszanak.
@@ -212,39 +214,54 @@
   - **G2, „A hónap repói” (Top 3) a Top 10 felett:** a régóta vagy nagyon gyorsan növő, releváns repók, havi nézetben. Ehhez napi csillagszám-mentés kell (a „Valódi GitHub trending” pont);
   - forrás: a Star History Monthly hírlevél és a star-history.com chart-linkje ([truthful_sites.md](truthful_sites.md) → Jelöltek).
 - [ ] **Halasztott apróságok** (a záró reviewk „Minor” pontjai, egyik sem sürgős):
-  - **R2:**
-    - lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni;
-    - a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön;
-    - a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön).
-  - **Google-belépés:**
-    - kézzel gyártott `?error=constructor` / `toString` / `__proto__` cím a belépő oldalon „undefined / undefined”-et mutat: `Object.hasOwn`, és a hibakódok közös `LoginError` típusa;
-    - egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik;
-    - a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
-    - a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban.
-  - **2a vizuális audit (záró review, 2026-10-11):**
-    - csökkentett mozgás alatt a toast még 160 ms-ot halványul (az opacity-t a `reducedMotion="user"` nem állítja le): `useReducedMotion` → 0 időtartam, ha zavar;
-    - a panel kontextusa (`app-shell.tsx`) minden rendernél új objektum: `useMemo`;
-    - a panel nyitott állapota túléli az oldalt (Back után újranyílik): zárás útvonalváltáskor;
-    - az archívum üres sora még nem `EmptyState`;
-    - a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja);
-    - a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel; a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül.
+  - **R2, kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-2-ui.md](plans/2026-10-12-polish-2-ui.md) és [plans/2026-10-12-polish-3-chat-a11y.md](plans/2026-10-12-polish-3-chat-a11y.md):
+    - [x] lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni — a felirat, a két ikon és az archívum száma kész; a jelvény (ma a `BrandMark` képe) és a GitHub-sor (a `RepoCard`-nak nincs saját lenyomása) már nem érintett;
+    - [x] a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön — a buborék marad (FELDOLGOZÁS…) a következő jó listáig;
+    - [x] a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön) — elavult: a toast 2a óta `AnimatePresence`, és nem vár `animationend`-re.
+  - **Google-belépés, kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-4-sign-in-docs.md](plans/2026-10-12-polish-4-sign-in-docs.md):
+    - [x] kézzel gyártott `?error=constructor` / `toString` / `__proto__` cím a belépő oldalon „undefined / undefined”-et mutat: `Object.hasOwn`, és a hibakódok közös `LoginError` típusa;
+    - [x] egy elkezdett Google-belépés érvényteleníti a függőben lévő, régi típusú (`?code=`) magic linket; a token-hash sablonokkal megszűnik — kódot nem kér: a tulajdonos lépése, fent a „Saját SMTP nélkül” pontnál;
+    - [x] a SECURITY.md „a `+radar` aliast a Google nem éri el” mondata csak Gmail- vagy Workspace-alapcímre igaz: ezt kiírni ott és a README rendszer-fiók lépésénél;
+    - [x] a belépő oldal fejléce, címe és EMAIL felirata még nincs a copy-objektumban — kész: `signInCopy` (a `/login`, az `/about` és a lap is innen veszi).
+  - **Napi hírek (záró review, 2026-10-12), kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-1-daily-news.md](plans/2026-10-12-polish-1-daily-news.md):
+    - [x] egy beszúrás után elbukott futás elveszti a nap listáját, és az újrafuttatás sem hozza vissza; az első este (05 UTC utáni deploy) rövid lehet;
+    - [x] a `daily_top` írásának hibája a `refresh_must_read`-et is kihagyja;
+    - [x] régebbi listán az angol felirat „Today's”;
+    - [x] egy elbukott futás után 18:00 után is „a mai 18:00-ra készül” látszik;
+    - [x] a háromszor megszakadt forrás kártyáján örökre „készül…”;
+    - [x] hétfőn a 13 UTC-s futásig a múlt hét látszik élőként a Radaron.
+  - **2a vizuális audit (záró review, 2026-10-11), kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-2-ui.md](plans/2026-10-12-polish-2-ui.md):
+    - [x] csökkentett mozgás alatt a toast még 160 ms-ot halványul (az opacity-t a `reducedMotion="user"` nem állítja le): `useReducedMotionConfig` → 0 időtartam;
+    - [x] a panel kontextusa (`app-shell.tsx`) minden rendernél új objektum: `useMemo`;
+    - [x] a panel nyitott állapota túléli az oldalt (Back után újranyílik): a dashboard lecsatolásakor bezárul;
+    - [x] az archívum üres sora még nem `EmptyState`;
+    - [x] a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja) — elavult: a `/login` a landing-signin óta gomb nélkül (`signIn="none"`) használja a keretet;
+    - [x] a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel;
+    - a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül: nyitott ötlet, előbb mérni kell.
+  - **Apróságok (polish) záró reviewja (2026-10-12):**
+    - fekvő iPhone-on (`md`-től) a fix elemek nem kapják az oldalsó insetet: a sarok-taiyaki (`right-6`), a chat panel (`md:right-6`), a jobb oldali olvasópanel és a toast sávja kb. 24 px-re ül a 47 px-es kivágástól; javítás: `md:right-[calc(1.5rem+env(safe-area-inset-right))]` és társai;
+    - az olvasópanel csak félig ül a pill után a Tab-sorrendben: a pillről egy Tab az oldalra megy, nem a panelbe, és a Radix bezárja; javítás: nyitott panelnél a pill Tabja a panel első elemére;
+    - a harmadik, utolsó futásán lévő forrás kártyáján a futás alatt nem „készül…”, hanem az elem összefoglalója látszik (a claim már 3-ra emelte az `attempts`-et); javítás: a `claimed_at` is kell, és a `claimHeld` futás is függőben lévőnek számít;
+    - a hétfői „lezárt hét” bekötésének (`current-week-page.tsx`, `archived={isClosedWeek(…)}`) nincs tesztje, csak az `isClosedWeek`-nek;
+    - a `MAX_ATTEMPTS` két helyről exportálódik: az `ingest.ts` újraexportja csak az `app/api/sources/route.ts` miatt kell, az importálhatna a `util`-ból;
+    - a `fakeDb` általános upsertje az `onConflict`-tól függetlenül hozzáfűz, és a hívó `tables.rows`-át módosítja (ma minden teszt saját táblát épít, így nem bukik semmi).
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Az R1 Gyors és az R2 Visszajelzés kész; hátra van az **R3 Elrendezés** (a mobil fekvő keret, a széles képernyő, a panel és a chat takarása, a taiyaki kerete ink oldalon). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
   Emellett jobb visszajelző effektek és további javítások. Előbb egy átvilágítás az egész appon: Playwright-mérések 360/768/1280 px-en és a lassú pontok felmérése. Ebből lesz egy jóváhagyandó terv.
   - A taiyaki link-chatből ide parkolt tételek:
     - [x] lassú küldésnél azonnal jelenjen meg egy „küldés…” buborék (optimista) (R2, 2026-10-01);
-    - ink oldalon (Library, Archívum) a sarokgomb ink kerete és árnyéka eltűnik;
-    - ha a gomb után semmi nem kapható fókuszba, az előre Tab a gomb és a panel között körbejár;
-    - a Radar olvasópanelje saját Tab-hurkot tart; ha ezt javítjuk, a `tabPastPanel` közös helyre költözik;
-    - `md` és `2xl` között a Radar olvasópanelje eltakarja a chat panelt és a sarokgombot;
-    - a `loginHref` elhagyja a query stringet (`/login?next=` csak az útvonalat kapja);
-    - iOS safe area: nincs `viewport-fit=cover`, ezért a Safariban minden `env(safe-area-inset-bottom)` 0;
-    - az sr-only beszélő-előtag szóköze nem jut el a Chrome akadálymentességi fájába (a csomópontok amúgy is külön vannak);
-    - a chat mezőjén a stock `Textarea` `shadow-xs`-e: a lenti fix(ui) pont része;
+    - [x] ink oldalon (Library, Archívum) a sarokgomb ink kerete és árnyéka eltűnik — elavult: a sarokgomb árnyéka 2a óta signal;
+    - [x] ha a gomb után semmi nem kapható fókuszba, az előre Tab a gomb és a panel között körbejár — kész (polish 3, 2026-10-12): az oldal első elemére megy;
+    - [x] a Radar olvasópanelje saját Tab-hurkot tart; ha ezt javítjuk, a `tabPastPanel` közös helyre költözik — kész: `tab-past-panel.ts`, a pill a nyitója;
+    - [x] `md` és `2xl` között a Radar olvasópanelje eltakarja a chat panelt és a sarokgombot — elavult: 2a óta egyszerre csak egy réteg látszik (R3 §4);
+    - [x] a `loginHref` elhagyja a query stringet (`/login?next=` csak az útvonalat kapja) — kész: `signInHref`;
+    - [x] iOS safe area: nincs `viewport-fit=cover`, ezért a Safariban minden `env(safe-area-inset-bottom)` 0 — kész; a tulajdonos valódi iPhone-on nézi meg a kezdőképernyőről indított appot, fekvő módban is (`md`-től a sarok-taiyaki és a jobb oldali lapok még nem kapják az oldalsó insetet);
+    - [x] az sr-only beszélő-előtag szóköze nem jut el a Chrome akadálymentességi fájába — kihagyva: a csomópontok amúgy is külön vannak, a felolvasó külön mondja;
+    - [x] a chat mezőjén a stock `Textarea` `shadow-xs`-e — kész: `shadow-none` (a többi `Input`/`Textarea` a lenti fix(ui) pont része);
     - [x] több sikertelen küldés egyforma „Nem ment át, próbáld újra.” buborékokat halmoz a szál végére (csak a `signed_out` van összevonva) (R2, 2026-10-01);
-    - egy másik beküldés sikeres „Újra”-ja nem törli a többi bejegyzés saját `signed_out` válaszát (`retryNotices`), az csak a saját „Újra”-ig vagy a panel bezárásáig marad;
-    - a retry 403-a és 404-e „Nem ment át, próbáld újra.”-ként jelenik meg (ma egyik sem fordulhat elő);
+    - [x] egy másik beküldés sikeres „Újra”-ja nem törli a többi bejegyzés saját `signed_out` válaszát (`retryNotices`), az csak a saját „Újra”-ig vagy a panel bezárásáig marad — kész: `withoutSignedOut`, a küldésnél is;
+    - [x] a retry 403-a és 404-e „Nem ment át, próbáld újra.”-ként jelenik meg — kihagyva: ma egyik sem fordulhat elő (a chat csak a saját forrásait listázza);
     - [x] a zod kikerült a kliens csomagjából (R1); a `lib/client-bundle.test.ts` őrzi.
 - [ ] **`/glossary` a főmenübe** (döntve 2026-09-25, az M2 után): egy nem elsődleges tétel a `lib/nav.ts`-ben, a tesztjei bővítésével.
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.

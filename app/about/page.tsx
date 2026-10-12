@@ -2,6 +2,7 @@ import { Archive, BookOpen, Building2, GitFork, Heart, Keyboard, Languages, Link
 import type { Localized } from "@/data/digest-types";
 import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
+import { signInCopy } from "@/app/components/sign-in-forms";
 import { PublicPage } from "@/app/components/public-page";
 import { getLanguage } from "@/lib/language";
 
@@ -93,7 +94,7 @@ export default async function AboutPage({ searchParams }: { searchParams: Promis
   const [{ signed_out }, language] = await Promise.all([searchParams, getLanguage()]);
   return (
     <PublicPage language={language} notice={signed_out === "1" ? copy.signedOut : undefined} signIn="auto">
-      <PageHero eyebrow="INVITE-ONLY / CSAK MEGHÍVÓVAL" title="NEON NEWS RADAR" lead={<LocalizedText value={copy.lead} />} />
+      <PageHero eyebrow={signInCopy.inviteOnly} title="NEON NEWS RADAR" lead={<LocalizedText value={copy.lead} />} />
       <main>
         <section className="mx-auto max-w-[1600px] px-4 pt-12 pb-16 sm:px-10">
           <h2 className="font-display text-3xl tracking-[-0.04em] sm:text-4xl">

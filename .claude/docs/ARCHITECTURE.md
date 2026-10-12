@@ -27,7 +27,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `layout.tsx`, which sets `robots: noindex`;
   - `globals.css`, the theme (DESIGN.md).
 - `app/components/` has the shared UI:
-  - the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts` (with the pending dot), `shell-dialogs`, `undo-toast`, `refresh-bar` (the refresh transition and its bar), and the link chat: `link-chat` (the taiyaki button and panel), `chat-thread`, `taiyaki-icon`;
+  - the shell: `app-shell` (with the mobile bottom bar), `desktop-nav`, `nav-parts` (with the pending dot), `shell-dialogs`, `undo-toast`, `refresh-bar` (the refresh transition and its bar), and the link chat: `link-chat` (the taiyaki button and panel), `chat-thread`, `taiyaki-icon`, `tab-past-panel` (Tab past a non-modal panel, which the reader panel shares);
   - `page-skeletons`, the loading skeletons the `loading.tsx` files render;
   - the language: `language-context`, `language-toggle`;
   - the Radar: `digest-dashboard`, `story-card`, `reader-panel`, `tag`;

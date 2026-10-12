@@ -16,6 +16,9 @@ export function isoWeek(date: Date): Week {
   return { id: `${year}-W${ww}`, period: `${year} / ${month}`, compact: `${year}w${ww}`, monday };
 }
 
+/** A week before the current ISO week: its issue is final, whether or not the new week's has been opened yet. */
+export const isClosedWeek = (week: string, now = new Date()) => week < isoWeek(now).id;
+
 /** Monday (UTC) of an ISO week id like '2026-W39', or null if the id is malformed or out of range. */
 export function isoWeekMonday(id: string): Date | null {
   const match = /^(\d{4})-W(\d{2})$/.exec(id);
@@ -163,6 +166,9 @@ export const SUMMARY_MAX = 2000;
 /** The link chat's thread shows this many of the reader's latest submissions (listMySources, memoryTransport). */
 export const MINE_LIMIT = 10;
 
+/** A source left pending after this many runs (each killed before it could fail) waits for none any more. */
+export const MAX_ATTEMPTS = 3;
+
 export function formatTimestamp(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -305,8 +311,11 @@ export function authCallback(origin: string, next: string, via?: "google"): stri
   return callback.toString();
 }
 
+/** Why a sign-in round trip was refused (`/login?error=`): the callback writes it, the login page explains it. */
+export type LoginError = "1" | "google" | "not_invited";
+
 /** The login page after a failed sign-in: the reason the page explains (app/login/page.tsx), and the target kept. */
-export function loginWithError(origin: string, reason: "1" | "google" | "not_invited", next: string): string {
+export function loginWithError(origin: string, reason: LoginError, next: string): string {
   const login = new URL("/login", origin);
   login.searchParams.set("error", reason);
   login.searchParams.set("next", next);

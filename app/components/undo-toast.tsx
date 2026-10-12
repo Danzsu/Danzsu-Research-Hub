@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { createToastQueue } from "@/lib/undo-queue";
@@ -37,11 +37,12 @@ export const isUndoToast = (target: EventTarget | null) => target instanceof Ele
 /** Mounted once by the app shell, above any open panel. Below md it sits above the bottom bar and the
  *  taiyaki raised out of it; from md up its lane stops short of the taiyaki's corner (`md:right-24`).
  *  The toast slides in from 8px and fades out in 160ms (2a spec D7: `AnimatePresence` keeps the leaving one
- *  for its exit, and needs no animationend bookkeeping); the shell's MotionConfig drops the motion under
- *  reduced motion. */
+ *  for its exit, and needs no animationend bookkeeping). Under reduced motion it appears and leaves at once: the
+ *  shell's MotionConfig stops only transforms, so the fade's duration goes to 0 here. */
 export function UndoToast() {
   const { language } = useLanguage();
   const toast = useSyncExternalStore(toasts.subscribe, toasts.getSnapshot, noToast);
+  const reduceMotion = useReducedMotionConfig();
   // Paused while the pointer or focus is on it, so the Undo button can be reached in time.
   const [paused, setPaused] = useState(false);
   const [prevToastId, setPrevToastId] = useState(toast?.id);
@@ -82,7 +83,7 @@ export function UndoToast() {
             animate={{ opacity: 1, y: 0 }}
             // The leaving toast is out of reach: its action is already final.
             exit={{ opacity: 0, pointerEvents: "none" }}
-            transition={{ duration: 0.16 }}
+            transition={{ duration: reduceMotion ? 0 : 0.16 }}
             onPointerEnter={() => setPaused(true)}
             onPointerLeave={() => setPaused(false)}
             onFocus={() => setPaused(true)}

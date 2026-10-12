@@ -5,10 +5,10 @@ import { aiCleanup } from "./cleanup.ts";
 import { extract } from "./extract/index.ts";
 import { IMAGE_BUDGET_MS, mirrorImages, unusedMediaPaths } from "./images.ts";
 import { summarize, writeNotes } from "./summary.ts";
-import { claimHeld, errorMessage, type SourceKind } from "./util.ts";
+import { claimHeld, errorMessage, MAX_ATTEMPTS, type SourceKind } from "./util.ts";
 
 /** The runs a source gets before the queue gives up on it (a reader's "Újra" resets the count). */
-export const MAX_ATTEMPTS = 3;
+export { MAX_ATTEMPTS };
 
 // The cleanup prompt targets web-page chrome (nav, ads, share buttons); pdf (a Gemini
 // transcription), x (post text) and youtube (the video block) have none of that to strip,

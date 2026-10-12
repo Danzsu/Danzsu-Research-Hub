@@ -8,6 +8,7 @@ import {
   memoryTransport,
   parseLinkMessage,
   POLL_MS,
+  signInHref,
   toThread,
   type Answer,
   type ChatNotice,
@@ -16,7 +17,7 @@ import {
 } from "./link-chat.ts";
 import type { MySource } from "./my-sources.ts";
 import { mockFetch } from "./pipeline/mock-fetch.ts";
-import { MINE_LIMIT, safeHref } from "./pipeline/util.ts";
+import { MINE_LIMIT, safeHref, safeNext } from "./pipeline/util.ts";
 
 const linkOf = (text: string) => {
   const message = parseLinkMessage(text);
@@ -277,8 +278,10 @@ test("two retries that each answer 401 say signed_out once at the thread's end, 
 
 // Kills the `pending` fallback losing `unreachable` once a list has ever loaded (Important 1): a
 // finished thread whose next good load (after a send) blips once must still poll again and show the
-// new submission, not sit forever behind a stale "nothing pending" read of the old list.
-test("after a finished thread's load blips once, the new submission still lands", async (t) => {
+// new submission, not sit forever behind a stale "nothing pending" read of the old list. Polish 3,
+// Review Focus 1: also kills the `finally` that always took the bubble away, so the accepted message
+// stays in view until the good list shows it.
+test("after a finished thread's load blips once, the new submission still lands, its bubble kept until then", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const finished = source(1, "done", { post: { id: 9, title: { hu: "Kész", en: "Done" } } });
   const chat = createLinkChat(
@@ -293,8 +296,11 @@ test("after a finished thread's load blips once, the new submission still lands"
   await flush();
   assert.equal(await chat.send("https://blog.test/2"), true);
   assert.equal(chat.getSnapshot().unreachable, true);
+  assert.equal(chat.getSnapshot().outgoing?.url, "https://blog.test/2");
+  assert.equal(chat.getSnapshot().sending, false);
   await wait(t, POLL_MS);
   assert.equal(chat.getSnapshot().unreachable, false);
+  assert.equal(chat.getSnapshot().outgoing, null);
   assert.deepEqual(chat.getSnapshot().sources?.map((source) => source.id), [2, 1]);
 });
 
@@ -657,6 +663,21 @@ test("a successful retry clears the refusals a previous failed retry left behind
   assert.deepEqual(said(), [[], {}]);
 });
 
+// Polish 3. Kills a success that proves the session works again yet leaves other entries' "sign in again"
+// behind; their other refusals (a network one) stay, since only a sign-in is proven.
+test("a successful retry or send clears every entry's signed_out, and keeps their other refusals", async () => {
+  const chat = createLinkChat(
+    fakeTransport([], { retry: inTurn(answer(401, { error: "unauthorized" }), offline, answer(401, { error: "unauthorized" }), answer(202, { ok: true })) }).transport,
+    () => true,
+  );
+  for (const id of [1, 2, 3, 4]) await chat.retry(id);
+  assert.deepEqual([chat.getSnapshot().notices, chat.getSnapshot().retryNotices], [[], { 2: { kind: "network" } }]);
+  const sent = createLinkChat(fakeTransport([], { retry: answer(401, { error: "unauthorized" }) }).transport, () => true);
+  await sent.retry(1);
+  assert.equal(await sent.send("https://blog.test/a"), true);
+  assert.deepEqual(sent.getSnapshot().retryNotices, {});
+});
+
 // Kills local replies that outlive the panel: they live only while it stays open, a retry's included.
 test("closing the panel drops the local replies", async (t) => {
   const chat = createLinkChat(fakeTransport([], { retry: offline }).transport, () => true);
@@ -810,4 +831,12 @@ test("focusIsIdle is true only with the focus on the body or nowhere", () => {
   assert.equal(focusIsIdle({ activeElement: null, body }), true);
   assert.equal(focusIsIdle({ activeElement: body, body }), true);
   assert.equal(focusIsIdle({ activeElement: {}, body }), false);
+});
+
+// Polish 3, Review Focus 4. Kills the link that drops the query string: back from the sign-in, the reader
+// lands on the same view (the Hungarian text, a filter), and the login page's safeNext keeps it.
+test("the chat's sign-in link brings the reader back to the same page, query string and all", () => {
+  assert.equal(signInHref("/library/42", "text=hu"), "/login?next=%2Flibrary%2F42%3Ftext%3Dhu");
+  assert.equal(signInHref("/library", ""), "/login?next=%2Flibrary");
+  assert.equal(safeNext(new URL(signInHref("/github", "rating=heart&lang=Rust"), "https://radar.test").searchParams.get("next")), "/github?rating=heart&lang=Rust");
 });

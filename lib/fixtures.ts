@@ -80,8 +80,9 @@ export const previewDailyItems: DigestItem[] = [
   digestItem("research-2026-W39-daily-plain", { category: "research", score: 70, readMinutes: 40 }),
 ].map((item, index) => ({ ...item, dailyRank: index + 1 }));
 const paragraphs = (lang: string) => [1, 2, 3].map((n) => `${lang} ${n}. bekezdés: mi történt, a fontos számok, és miért számít egy AI-mérnöknek.`);
-export const previewDaily: { today: boolean; briefs: Record<string, DailyBrief> } = {
+export const previewDaily: { today: boolean; late: boolean; briefs: Record<string, DailyBrief> } = {
   today: false,
+  late: false,
   briefs: {
     "research-2026-W39-daily-brief": { kind: "brief", paragraphs: { hu: paragraphs("HU"), en: paragraphs("EN") } },
     "companies-2026-W39-daily-short": { kind: "brief", paragraphs: { hu: paragraphs("HU"), en: paragraphs("EN") } },

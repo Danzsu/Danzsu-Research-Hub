@@ -206,7 +206,7 @@ function NoticeText({ notice, language, loginHref, onOpenPost }: ThreadActions &
 }
 
 /** The thread: the greeting, the reader's own submissions (oldest first) with the taiyaki's replies, then the local replies. */
-export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "outgoing" | "retrying" | "retryNotices"> }) {
+export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot: Pick<ChatSnapshot, "sources" | "notices" | "unreachable" | "sending" | "outgoing" | "retrying" | "retryNotices"> }) {
   const { language } = actions;
   const t = copy[language];
   // Nothing has answered yet, and no local reply or the unreachable line already covers it: one
@@ -254,7 +254,7 @@ export function ChatThread({ snapshot, ...actions }: ThreadActions & { snapshot:
         <li className="space-y-2">
           <Mine entry={snapshot.outgoing} language={language} />
           <Taiyaki language={language}>
-            <InProgress label={t.sending} />
+            <InProgress label={snapshot.sending ? t.sending : t.processing} />
           </Taiyaki>
         </li>
       )}

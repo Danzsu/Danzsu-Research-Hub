@@ -5,6 +5,22 @@ const budapestDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budape
 /** The day a run belongs to, as Budapest sees it ("2026-10-12"): a late manual run stays on its own evening. */
 export const budapestDay = (now: Date) => budapestDate.format(now);
 
+const HOUR = 3_600_000;
+
+const budapestClock = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Budapest", hour: "2-digit", hourCycle: "h23" });
+/** The hour on Budapest's clock (0–23): the daily list is due by DAILY_DUE_HOUR. */
+export const budapestHour = (now: Date) => Number(budapestClock.format(now));
+export const DAILY_DUE_HOUR = 18;
+
+/** Budapest's midnight as an instant: 22:00 UTC the evening before in summer (UTC+2), 23:00 in winter (UTC+1). */
+export function budapestDayStart(now: Date): Date {
+  const day = budapestDay(now);
+  const utcMidnight = Date.parse(`${day}T00:00:00Z`);
+  // The earlier candidate that already reads as `day` in Budapest is its midnight.
+  const start = [2, 1].map((hours) => utcMidnight - hours * HOUR).find((instant) => budapestDay(new Date(instant)) === day);
+  return new Date(start ?? utcMidnight);
+}
+
 export const DAILY_SIZE = 10;
 export const SHORT_MINUTES = 15;
 const MIN_SHORT = 3;

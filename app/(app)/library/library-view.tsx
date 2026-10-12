@@ -84,7 +84,7 @@ export function LibraryView({
               >
                 <div className="flex items-start justify-between">
                   <span className="flex items-center gap-2">
-                    <Icon className="size-7 text-signal group-hover:text-ink" />
+                    <Icon className="size-7 text-signal group-hover:text-ink group-active:text-ink" />
                     <PendingDot className="group-hover:text-ink" />
                   </span>
                   <span className="flex items-center gap-3">

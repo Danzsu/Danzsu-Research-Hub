@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
@@ -9,10 +9,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isSendKey } from "@/lib/keymap";
-import { createLinkChat, focusIsIdle, httpTransport, memoryTransport } from "@/lib/link-chat";
+import { createLinkChat, focusIsIdle, httpTransport, memoryTransport, signInHref } from "@/lib/link-chat";
 import type { MySource } from "@/lib/my-sources";
 import { busyClass, ChatThread } from "./chat-thread";
 import { liftSurface } from "./lift-classes";
+import { tabPastPanel } from "./tab-past-panel";
 import { useLanguage } from "./language-context";
 import { useRefresh } from "./refresh-bar";
 import { TaiyakiIcon } from "./taiyaki-icon";
@@ -64,46 +65,11 @@ export function TaiyakiButton({ open, onClick, className }: { open: boolean; onC
   );
 }
 
-/** Where Tab can land, as the browser sees it, less Radix's invisible focus guards at either end of <body>. */
-function tabStops(root: ParentNode): HTMLElement[] {
-  return [...root.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]:not([data-radix-focus-guard])")].filter(
-    (element) =>
-      element.tabIndex >= 0 &&
-      !element.matches(":disabled") &&
-      element.getClientRects().length > 0 &&
-      getComputedStyle(element).visibility === "visible" &&
-      !element.closest("[inert]"),
-  );
-}
-
 /** The button that opened the panel or, once it is hidden (the mobile slot, after the window widened
  *  past md), the taiyaki that is showing now: the one the focus can go back to. */
 function shownOpener(opener: HTMLElement | null): HTMLElement | null {
   if (!opener || opener.getClientRects().length > 0) return opener;
   return [...document.querySelectorAll<HTMLElement>(`button[aria-controls="${CHAT_PANEL_ID}"]`)].find((button) => button.getClientRects().length > 0) ?? opener;
-}
-
-/**
- * Desktop: Radix's FocusScope loops Tab inside the panel even when it isn't modal, which would keep a
- * keyboard reader from the page behind it. Instead the panel sits right after its opener in tab order:
- * Shift+Tab off its first stop goes back to the opener, and Tab off its last goes on to the first stop
- * after the opener outside the panel, or back to the opener when there is none. The key is cancelled
- * only once the focus has really moved; a target that takes no focus leaves it to Radix, which wraps
- * it inside the panel.
- */
-function tabPastPanel(event: KeyboardEvent<HTMLDivElement>, openedBy: HTMLElement | null) {
-  if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
-  // Only now, on Tab: shownOpener reads layout, and every key typed in the field passes through here.
-  const opener = shownOpener(openedBy);
-  if (!opener) return;
-  const panel = event.currentTarget;
-  const stops = tabStops(panel);
-  if (event.target !== (event.shiftKey ? stops[0] : stops.at(-1))) return;
-  const next = event.shiftKey
-    ? opener
-    : (tabStops(document).find((element) => !panel.contains(element) && opener.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) ?? opener);
-  next.focus();
-  if (document.activeElement === next) event.preventDefault();
 }
 
 /** A card's "Olvasd itt" for an article with no post yet (read-here spec 1): opens the chat and sends
@@ -136,6 +102,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
 }) {
   const { language } = useLanguage();
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   const refresh = useRefresh();
   const isMobile = useIsMobile();
   const [chat] = useState(() =>
@@ -241,7 +208,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
         onInteractOutside={(event) => {
           if (!isMobile || isUndoToast(event.target)) event.preventDefault();
         }}
-        onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, opener.current)}
+        onKeyDownCapture={isMobile ? undefined : (event) => tabPastPanel(event, () => shownOpener(opener.current))}
         className="max-h-[75dvh] gap-0 border-t-2 border-ink bg-cream p-0 text-ink shadow-none md:inset-x-auto md:right-6 md:bottom-24 md:max-h-[70dvh] md:w-[360px] md:border-2 md:shadow-[6px_6px_0_var(--ink)]"
       >
         <SheetHeader className="flex-row items-center gap-2 bg-ink py-3 pr-14 pl-4">
@@ -260,7 +227,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
             <ChatThread
               language={language}
               snapshot={snapshot}
-              loginHref={`/login?next=${encodeURIComponent(pathname)}`}
+              loginHref={signInHref(pathname, search)}
               onRetry={(sourceId) => void chat.retry(sourceId)}
               onOpenPost={isMobile ? () => onOpenChange(false) : undefined}
             />
@@ -292,7 +259,7 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
             placeholder={t.placeholder}
             // nowrap keeps the placeholder on one line: under field-sizing a wrapped one would make the empty field
             // a line taller than a one-line value. The copy is short enough to show whole from 330px up.
-            className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base placeholder:whitespace-nowrap focus-visible:border-signal"
+            className="max-h-[30dvh] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-2 border-ink bg-cream text-base shadow-none placeholder:whitespace-nowrap focus-visible:border-signal"
           />
           {/* aria-disabled, not disabled, while sending: a disabled button would drop the focus. send() ignores a second press.
               A tap or click leaves the focus in the field, so a phone keyboard doesn't drop and come back. */}

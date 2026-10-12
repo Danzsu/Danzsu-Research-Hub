@@ -2,7 +2,7 @@
 
 import { MotionConfig } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
@@ -92,7 +92,8 @@ export function AppShell({
   const chatOpen = useSyncExternalStore(layers.subscribe, layers.chatOpen, layers.chatOpen);
   const panelOpen = useSyncExternalStore(layers.subscribe, layers.panelOpen, layers.panelOpen);
   const setChatOpen = layers.setChatOpen;
-  const panel: Panel = { open: panelOpen, setOpen: layers.setPanelOpen };
+  // Stable between renders: the page below reads it, and a new object would re-render the whole dashboard on every shell change.
+  const panel = useMemo<Panel>(() => ({ open: panelOpen, setOpen: layers.setPanelOpen }), [panelOpen, layers]);
   // Whichever taiyaki opened the panel gets the focus back when it closes.
   const chatOpener = useRef<HTMLButtonElement>(null);
   const toggleChat = (event: MouseEvent<HTMLButtonElement>) => {
@@ -209,7 +210,7 @@ function MobileNav({ email, onSearch, onHelp, chat }: { email: string; onSearch:
     <nav
       id="mobile-nav"
       aria-label={t.nav}
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-paper md:hidden"
     >
       {MOBILE_BAR_NAV.slice(0, MOBILE_CHAT_SLOT).map(slot)}
       {chat}

@@ -50,11 +50,11 @@ const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop, onReadHere:
 const hiddenSpanCounts = (elements: Element[]) => elements.map((element) => element.querySelectorAll('span[aria-hidden="true"]').length);
 /** Wraps a component in the providers the shell gives it: the language (LocalizedText, SubmitForm,
  *  DigestDashboard), the refresh bar (SubmitForm, LinkChat) and "Olvasd itt" (DigestDashboard). */
-const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P) =>
+const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P, language: "hu" | "en" = "en") =>
   render(
     createElement(
       LanguageProvider,
-      { initial: "en" } as ComponentProps<typeof LanguageProvider>,
+      { initial: language } as ComponentProps<typeof LanguageProvider>,
       createElement(
         RatingsProvider,
         sendNothing,
@@ -301,6 +301,14 @@ test("ArchiveView lists every preview issue", () => {
   );
 });
 
+// Polish 2. Kills the archive's empty note left outside the shared EmptyState, or without its way back.
+test("an empty archive says so in the shared empty state, with a link back to the Radar", () => {
+  const doc = withShellProviders(ArchiveView, { issues: [] });
+  const box = doc.querySelector(".border-dashed");
+  assert.match(box?.textContent ?? "", /No closed week yet/);
+  assert.equal(box?.querySelector('a[href="/"]')?.textContent, "Go to the Radar →");
+});
+
 test("PostImage keeps the pre-load placeholder behind the img until it settles", () => {
   const placeholder = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   const doc = render(
@@ -525,12 +533,13 @@ const dailyView = (overrides: Partial<Pick<ComponentProps<typeof DigestDashboard
 test("the daily view lists its cards in rank order, each with an anchor the index links to", () => {
   const doc = dailyView();
   assert.deepEqual([...doc.querySelectorAll("article[id]")].map((card) => card.id), ["daily-1", "daily-2", "daily-3", "daily-4", "daily-5"]);
-  assert.deepEqual([...doc.querySelectorAll('nav[aria-label="Today\'s stories"] a')].map((link) => link.getAttribute("href")), ["#daily-1", "#daily-2", "#daily-3", "#daily-4", "#daily-5"]);
+  assert.deepEqual([...doc.querySelectorAll(`nav[aria-label="The day's stories"] a`)].map((link) => link.getAttribute("href")), ["#daily-1", "#daily-2", "#daily-3", "#daily-4", "#daily-5"]);
+  assert.match(doc.body.textContent ?? "", /THE DAY'S 10/);
   assert.equal(doc.querySelector('nav[aria-label="Categories"]'), null);
   assert.match(doc.body.textContent ?? "", /5 stories · 2 short/);
   assert.match(doc.querySelector("header")?.textContent ?? "", /DAILY LIST/);
   // Final review: the index rows are touch targets too (DESIGN.md: 40px).
-  assert.ok([...doc.querySelectorAll(`nav[aria-label="Today's stories"] a`)].every((link) => link.className.includes("min-h-10")));
+  assert.ok([...doc.querySelectorAll(`nav[aria-label="The day's stories"] a`)].every((link) => link.className.includes("min-h-10")));
   // Every daily item carries its rank (getDaily's embed): the weekly DAY TOP mark must stay off this page.
   assert.doesNotMatch(doc.body.textContent ?? "", /DAY TOP/);
 });
@@ -556,7 +565,14 @@ test("each daily card shows the best long text it has", () => {
 test("an older daily list says so, and no list at all says when the first one comes", () => {
   assert.match(dailyView().body.textContent ?? "", /An earlier list \(2026\. 09\. 24\.\) — today's is ready by 18:00\./);
   assert.doesNotMatch(dailyView({ daily: { ...previewDaily, today: true } }).body.textContent ?? "", /An earlier list/);
-  assert.match(dailyView({ items: [], daily: { today: false, briefs: {} } }).body.textContent ?? "", /No daily list yet/);
+  assert.match(dailyView({ items: [], daily: { today: false, late: false, briefs: {} } }).body.textContent ?? "", /No daily list yet/);
+  // Polish 1, Review Focus 3. Past 18:00 with no list of the day, it says so instead of promising 18:00.
+  const late = dailyView({ daily: { ...previewDaily, late: true } }).body.textContent ?? "";
+  assert.match(late, /Today's list is late — showing the one from 2026\. 09\. 24\./);
+  assert.doesNotMatch(late, /ready by 18:00/);
+  // Polish final review. Kills the "-i" suffix glued to the date's closing period ("2026. 09. 24.-i").
+  const lateHu = withShellProviders(DigestDashboard, { issue: previewDailyIssue, items: previewDailyItems, githubTop10: [], scope: "daily", daily: { ...previewDaily, late: true }, preview: { data: previewReader, failWrites: false } }, "hu");
+  assert.match(lateHu.body.textContent ?? "", /A mai lista késik — addig a korábbi látszik \(2026\. 09\. 24\.\)\./);
 });
 
 // Spec N7. Kills the weekly cards' DAY TOP mark missing, or put on an item that was never in a daily list.

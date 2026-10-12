@@ -287,6 +287,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 - **Container queries, not `vw`.** Layout widths inside the main column use container queries (`@container`, `cqi`, `@3xl:`), because the desktop nav and the panel make that column far narrower than the viewport. `PageHero` switches to two columns at `@4xl`, the must-read grid at `@3xl`, and the GitHub list at `@2xl`.
 - **Navigation by width.**
   - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, with the taiyaki raised 16px out of its centre slot; the content column's bottom padding clears both (Components → Page shell).
+  - The iPhone's safe areas: `viewportFit: "cover"` (`app/layout.tsx`) turns the `env(safe-area-inset-*)` values on; without it they read 0. The bar, the bottom sheets and the toast clear the home indicator. In landscape the body pads to the side insets, its background clipped to its content, so the strip beside the notch shows the html's ink; the bar pads too. From `md` up the fixed elements (the corner taiyaki, the right-side sheets) don't add the side insets yet.
   - From `md` up, the desktop nav takes its place: a 256px sidebar (`w-64`) or a 56px icon rail (`w-14`).
   - The Radar's categories are a sticky chip bar at every width.
 - **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md`, and a 330px column once the Radar's own column is 95rem wide (`@[95rem]`, R3 §2: the nav and the viewport decide together). It is non-modal, so the undo toast stays usable while it is open.
@@ -358,7 +359,7 @@ Shadows are hard offsets with zero blur:
 | undo toast | `5px 5px 0 var(--signal)` (failed: `var(--ink)`) | none |
 | image frame | `4px 4px 0 var(--ink)` | none |
 | nav tooltip | `3px 3px 0 var(--ink)` | none |
-| taiyaki button | `4px 4px 0 var(--ink)`; in the mobile bar `3px 3px 0 var(--signal)` | `8px 8px 0 var(--signal)`, also on keyboard focus (`.lift`) |
+| taiyaki button | `4px 4px 0 var(--signal)`, in the corner and in the mobile bar (`3px 3px 0`) | `8px 8px 0 var(--signal)`, also on keyboard focus (`.lift`) |
 | link chat panel, from `md` | `6px 6px 0 var(--ink)` | none |
 | link chat bubbles | the taiyaki's `3px 3px 0 var(--ink)`, the reader's `3px 3px 0 var(--signal)` | none |
 
@@ -366,7 +367,7 @@ Shadows are hard offsets with zero blur:
 
 - **Motion.** The transitions in `globals.css` (the must-card, `.lift` and story-card lifts) run 160ms `ease`. Tailwind's `transition*` utilities (buttons, list cards, the repo block, tooltips, the sheet close button) run at Tailwind's default of 150ms `cubic-bezier(0.4, 0, 0.2, 1)`. Every Sheet and Dialog opens and closes in 160ms. The toast slides in from 8px and fades out over 160ms. A press moves 2px at once and eases back on release. `prefers-reduced-motion: reduce` cuts every animation to 0.01ms and turns off smooth scrolling, and j/k card scrolling jumps instead of gliding. Nothing moves on hover or press either: the shadows and colours still change. The `.live-pulse` dot (9px, signal) pulses a ring every 2s. Loading feedback waits before it shows, so a fast answer flashes nothing: the pending dot and the refresh bar appear 100ms in, at once, and leave at once; the skeletons' placeholders fade in over 160ms after 150ms. The bar runs a third-wide segment across itself every 1.2s. Under reduced motion the dot's ring stops, the skeletons don't pulse and their placeholders appear without the fade, still after 150ms, and the bar stands still at full width.
 - **One overlay at a time** (R3 §4): the Radar's reader panel and the link chat never show together; opening one closes the other (`createShellLayers`, `app-shell.tsx`, which both read through `PanelContext` and the chat's open state). The panel's column keeps `pb-24` at its foot, so the corner taiyaki covers no to-do.
-- **The `motion` library** (`motion/react`, pinned; `MotionConfig reducedMotion="user"` in the shell) runs the three motions CSS can't (2a spec D7): the rating press (the pressed button's icon alone mounts at 0.88 and springs back to 1 in 180ms, `rating-control.tsx`; a spring takes two keyframes only), the toast's enter and exit (`AnimatePresence` in `popLayout` mode, 160ms, `undo-toast.tsx`), and the taiyaki's turn when its panel opens (`link-chat.tsx`). Sheets and dialogs keep their Radix 160ms CSS animations. Nothing else animates on its own. Under reduced motion the press and the turn stand still; the toast's fade is opacity, which `reducedMotion="user"` leaves alone, so it still fades over 160ms.
+- **The `motion` library** (`motion/react`, pinned; `MotionConfig reducedMotion="user"` in the shell) runs the three motions CSS can't (2a spec D7): the rating press (the pressed button's icon alone mounts at 0.88 and springs back to 1 in 180ms, `rating-control.tsx`; a spring takes two keyframes only), the toast's enter and exit (`AnimatePresence` in `popLayout` mode, 160ms, `undo-toast.tsx`), and the taiyaki's turn when its panel opens (`link-chat.tsx`). Sheets and dialogs keep their Radix 160ms CSS animations. Nothing else animates on its own. Under reduced motion all three stand still: `reducedMotion="user"` stops the press and the turn, and the toast sets its own fade to 0ms (`useReducedMotionConfig`), since that setting leaves opacity alone.
 - **Layering.** From bottom to top:
   - the chip bar, `z-10`, sticky under the header;
   - the Radar header, `z-20`;
@@ -375,7 +376,7 @@ Shadows are hard offsets with zero blur:
   - sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;
   - the undo toast lane, `z-[60]`;
   - the refresh bar, `z-[70]`.
-- **Known exceptions:** the vendored Sheet keeps shadcn's blurred `shadow-lg`. `Input`, `Textarea` and `Checkbox` keep `shadow-xs`, and so does the `outline` Button variant, which the Radar's progress pill uses. House components never add a blurred shadow. The fix for these, and for the checkbox corners (Shapes), is tracked in TODO.md.
+- **Known exceptions:** the vendored Sheet keeps shadcn's blurred `shadow-lg`. `Input`, `Textarea` and `Checkbox` keep `shadow-xs` (the link chat's field drops it with `shadow-none`), and so does the `outline` Button variant, which the Radar's progress pill uses. House components never add a blurred shadow. The fix for these, and for the checkbox corners (Shapes), is tracked in TODO.md.
 
 ## Shapes
 
@@ -479,7 +480,7 @@ className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y
 Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The slots are Radar, Napi, the taiyaki, Library and Több; Keresés sits in the "Több" sheet (it is a placeholder until search lands). The active slot, the open "Több", or "Több" on an AI cégek, GitHub repók, Archívum or Gyűjtemény page (`data-active`) turns signal:
 
 ```tsx app/components/app-shell.tsx
-className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
+className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-paper md:hidden"
 ```
 
 ```tsx app/components/app-shell.tsx
@@ -612,7 +613,7 @@ className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-ce
 
 ### Pressed state
 
-Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show). The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show); a signal child of one (the logo's RADAR, a card's icon, an archive card's number) turns ink with it (`group-active:`), or it would vanish. The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
 
 ```css app/globals.css
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
@@ -825,7 +826,7 @@ A multi-line field, from `app/(app)/library/[id]/post-editor.tsx`:
 
 ### Empty states
 
-An empty view says what to do next, in one component (`EmptyState`, `app/components/empty-state.tsx`, 2a spec D8): a dashed box, an optional signal icon, a sentence at most 75ch wide and, where there is one, a 40px link or `brutal` button. Two tones, `cream` (the Radar) and `ink` (the Library, the GitHub page, the collection):
+An empty view says what to do next, in one component (`EmptyState`, `app/components/empty-state.tsx`, 2a spec D8): a dashed box, an optional signal icon, a sentence at most 75ch wide and, where there is one, a 40px link or `brutal` button. Two tones, `cream` (the Radar) and `ink` (the Library, the GitHub page, the collection, the archive):
 
 ```tsx app/components/empty-state.tsx
     <div className={`flex flex-col items-center gap-3 border-2 border-dashed p-10 text-center font-mono text-sm ${frame}`}>
