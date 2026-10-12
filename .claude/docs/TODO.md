@@ -215,7 +215,7 @@
 - [ ] **Halasztott apróságok** (a záró reviewk „Minor” pontjai, egyik sem sürgős):
   - **R2, kész a `polish` branchen (2026-10-12)** — terv: [plans/2026-10-12-polish-2-ui.md](plans/2026-10-12-polish-2-ui.md) és [plans/2026-10-12-polish-3-chat-a11y.md](plans/2026-10-12-polish-3-chat-a11y.md):
     - [x] lenyomás közben egy-egy gyerekelem színe eltűnik (a logó „RADAR” felirata és jelvénye, a Library-kártya ikonja, az archívum száma, a GitHub-sor sorszáma): a `group-hover:` cseréket `group-active:`-val tükrözni — a felirat, a két ikon és az archívum száma kész; a jelvény (ma a `BrandMark` képe) és a GitHub-sor (a `RepoCard`-nak nincs saját lenyomása) már nem érintett;
-    - a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön;
+    - [x] a chat ritka versenye: ha a küldés utáni újratöltés elbukik, az elfogadott üzenet nem látszik, amíg a lekérdezés helyre nem jön — a buborék marad (FELDOLGOZÁS…) a következő jó listáig;
     - [x] a toastnak nincs tartalék-időzítője, ha egy bővítmény letiltja az animációkat (`animationend` nem jön) — elavult: a toast 2a óta `AnimatePresence`, és nem vár `animationend`-re.
   - **Google-belépés:**
     - kézzel gyártott `?error=constructor` / `toString` / `__proto__` cím a belépő oldalon „undefined / undefined”-et mutat: `Object.hasOwn`, és a hibakódok közös `LoginError` típusa;
@@ -244,16 +244,16 @@
   - A taiyaki link-chatből ide parkolt tételek:
     - [x] lassú küldésnél azonnal jelenjen meg egy „küldés…” buborék (optimista) (R2, 2026-10-01);
     - [x] ink oldalon (Library, Archívum) a sarokgomb ink kerete és árnyéka eltűnik — elavult: a sarokgomb árnyéka 2a óta signal;
-    - ha a gomb után semmi nem kapható fókuszba, az előre Tab a gomb és a panel között körbejár;
-    - a Radar olvasópanelje saját Tab-hurkot tart; ha ezt javítjuk, a `tabPastPanel` közös helyre költözik;
-    - `md` és `2xl` között a Radar olvasópanelje eltakarja a chat panelt és a sarokgombot;
-    - a `loginHref` elhagyja a query stringet (`/login?next=` csak az útvonalat kapja);
-    - iOS safe area: nincs `viewport-fit=cover`, ezért a Safariban minden `env(safe-area-inset-bottom)` 0;
-    - az sr-only beszélő-előtag szóköze nem jut el a Chrome akadálymentességi fájába (a csomópontok amúgy is külön vannak);
-    - a chat mezőjén a stock `Textarea` `shadow-xs`-e: a lenti fix(ui) pont része;
+    - [x] ha a gomb után semmi nem kapható fókuszba, az előre Tab a gomb és a panel között körbejár — kész (polish 3, 2026-10-12): az oldal első elemére megy;
+    - [x] a Radar olvasópanelje saját Tab-hurkot tart; ha ezt javítjuk, a `tabPastPanel` közös helyre költözik — kész: `tab-past-panel.ts`, a pill a nyitója;
+    - [x] `md` és `2xl` között a Radar olvasópanelje eltakarja a chat panelt és a sarokgombot — elavult: 2a óta egyszerre csak egy réteg látszik (R3 §4);
+    - [x] a `loginHref` elhagyja a query stringet (`/login?next=` csak az útvonalat kapja) — kész: `signInHref`;
+    - [x] iOS safe area: nincs `viewport-fit=cover`, ezért a Safariban minden `env(safe-area-inset-bottom)` 0 — kész; a tulajdonos valódi iPhone-on nézi meg a kezdőképernyőről indított appot, fekvő módban is (`md`-től a sarok-taiyaki és a jobb oldali lapok még nem kapják az oldalsó insetet);
+    - [x] az sr-only beszélő-előtag szóköze nem jut el a Chrome akadálymentességi fájába — kihagyva: a csomópontok amúgy is külön vannak, a felolvasó külön mondja;
+    - [x] a chat mezőjén a stock `Textarea` `shadow-xs`-e — kész: `shadow-none` (a többi `Input`/`Textarea` a lenti fix(ui) pont része);
     - [x] több sikertelen küldés egyforma „Nem ment át, próbáld újra.” buborékokat halmoz a szál végére (csak a `signed_out` van összevonva) (R2, 2026-10-01);
-    - egy másik beküldés sikeres „Újra”-ja nem törli a többi bejegyzés saját `signed_out` válaszát (`retryNotices`), az csak a saját „Újra”-ig vagy a panel bezárásáig marad;
-    - a retry 403-a és 404-e „Nem ment át, próbáld újra.”-ként jelenik meg (ma egyik sem fordulhat elő);
+    - [x] egy másik beküldés sikeres „Újra”-ja nem törli a többi bejegyzés saját `signed_out` válaszát (`retryNotices`), az csak a saját „Újra”-ig vagy a panel bezárásáig marad — kész: `withoutSignedOut`, a küldésnél is;
+    - [x] a retry 403-a és 404-e „Nem ment át, próbáld újra.”-ként jelenik meg — kihagyva: ma egyik sem fordulhat elő (a chat csak a saját forrásait listázza);
     - [x] a zod kikerült a kliens csomagjából (R1); a `lib/client-bundle.test.ts` őrzi.
 - [ ] **`/glossary` a főmenübe** (döntve 2026-09-25, az M2 után): egy nem elsődleges tétel a `lib/nav.ts`-ben, a tesztjei bővítésével.
 - [ ] **Admin szerepkör.** Most minden meghívott egyenrangú. Kell egy `ADMIN_EMAILS` env és egy admin API route. Erre épül a következő pont.
