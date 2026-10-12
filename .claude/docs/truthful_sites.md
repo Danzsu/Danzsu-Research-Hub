@@ -36,8 +36,8 @@ A promóciót és az ismétlést két szűrő tartja távol:
 
 | Név | Csatorna | Kategória | Limit | Típus |
 | --- | --- | --- | --- | --- |
-| arXiv cs.CL | `https://rss.arxiv.org/rss/cs.CL` | research | 40 | elsődleges (preprint, nem lektorált) |
-| arXiv cs.AI | `https://rss.arxiv.org/rss/cs.AI` | research | 40 | elsődleges (preprint, nem lektorált) |
+| arXiv cs.CL | `https://rss.arxiv.org/rss/cs.CL` | research | 10 | elsődleges (preprint, nem lektorált) |
+| arXiv cs.AI | `https://rss.arxiv.org/rss/cs.AI` | research | 10 | elsődleges (preprint, nem lektorált) |
 | Hugging Face | `https://huggingface.co/blog/feed.xml` | local | 25 | elsődleges |
 | Ollama | `https://ollama.com/blog/rss.xml` | local | 25 | elsődleges |
 | Simon Willison | `https://simonwillison.net/atom/everything/` | local | 15 | elsődleges (független szakértő) |
@@ -45,7 +45,7 @@ A promóciót és az ismétlést két szűrő tartja távol:
 | Google DeepMind | `https://deepmind.google/blog/rss.xml` | companies | 25 | elsődleges (céges) |
 | Google AI | `https://blog.google/technology/ai/rss/` | companies | 25 | elsődleges (céges) |
 | NVIDIA | `https://blogs.nvidia.com/blog/category/generative-ai/feed/` | companies | 25 | elsődleges (céges) |
-| AWS ML | `https://aws.amazon.com/blogs/machine-learning/feed/` | companies | 10 | elsődleges (céges) |
+| AWS ML | `https://aws.amazon.com/blogs/machine-learning/feed/` | companies | 5 | elsődleges (céges) |
 | The Decoder | `https://the-decoder.com/feed/` | companies | 20 | másodlagos |
 | Interconnects | `https://www.interconnects.ai/feed` | research | 25 | elsődleges (független szakértő) |
 | ByteByteGo | `https://blog.bytebytego.com/feed` | research | 5 | elsődleges (szakmai blog; promóció szűrve) |
@@ -80,9 +80,17 @@ A promóciót és az ismétlést két szűrő tartja távol:
 
 **Pragmatic Engineer:** Gergely Orosz szabadon olvasható blogja (szoftvermérnökség, egyre több AI-eszközzel). A hírlevél (`newsletter.pragmaticengineer.com`) nagyrészt fizetős, ezért nincs bent.
 
-**Az Anthropic Engineering tükre** 2026-10-11-én a május 25-i posztnál tartott, az anthropic.com-on egy június 6-i is van: kicsit lemarad, figyelni kell.
+**Az Anthropic Engineering** május 25. óta nem közölt (2026-10-12): a tükör nem marad le. A sitemap egy június 6-i dátuma csak a május 25-i poszt frissítése (`lastmod`), az oldal szerint az is május 25-én jelent meg (`article:published_time`). Ezért nem is olvassuk a sitemapet: a frissített régi posztokat új hírként hozná vissza.
+
+**Felülvizsgálat (2026-10-12):** a csatornák élő mérése (14 nap: tételszám, AI-arány, frissesség, átfedés). Az arXiv két listája naponta kb. 485 cikket adott, rangsor nélkül, és 59 mindkettőben szerepelt: a futás az első 40+40-et vette, ami a jelöltek felét tette ki, ezért a limit 10 lett, a felszavazott cikkek pedig a Hugging Face Daily Papersből jönnek (lent). Az AWS ML két nap alatt 12 tételt adott, többnyire Bedrock-útmutatót: a limit 5 lett. A Meta AI Research augusztus óta hallgat, a ChinAI és a Pragmatic Engineer friss tételei nem AI-ról szólnak; maradnak, mert egy hallgató csatorna egy kérés, a témán kívülit pedig a válogató szűri.
 
 **A kínai laborok** (DeepSeek, Qwen, Kimi, Zhipu, MiniMax) nem adnak géppel olvasható csatornát (2026-09-29: a Qwen blogja egy éve áll, a többinek nincs feedje). Két hírlevél és a Hacker News fedi le őket: a Recode China AI hetente többször, a ChinAI hetente ír róluk, a nagy bejelentések pedig a lenti lekérdezésekkel jönnek.
+
+### Hugging Face Daily Papers
+
+Közösségi rangsor elsődleges forrásokról: az arXiv-cikkek, amelyeket a Hugging Face közössége beküld és felszavaz. A futás a lezárt napokat olvassa a legutóbbi két napból (`?date=`; a mai nap szavazatai még gyűlnek: 2026-10-12-én a mai lista legjobbja 12 szavazatot kapott, egy lezárt napé 259-et), és a legtöbb szavazatot kapott 15 cikket veszi, arXiv-linkként, a szavazatszámmal a forrás nevében. Ha egy cikk az arXiv-csatornában is szerepel, a Daily Papers-változat marad meg. Hétvégén nincs Daily Papers (2026-10-10 és -11: 0 cikk), így a hétfő reggeli futás nem talál egyet sem; a hétfői listát a keddi futás olvassa.
+
+- `https://huggingface.co/api/daily_papers`
 
 ### Hacker News
 
@@ -98,7 +106,7 @@ Közösségi forrás. Az Algolia keresője az elmúlt 2 nap 80 pont feletti tör
 - `Kimi`
 - `MiniMax`
 
-Az utolsó öt laborneve (`hnNames` a kódban) a csatorna nélküli laborok nagy bejelentéseit hozza (2026-09-29). Ezeket az Algolia pontosan és csak a címben keresi (`typoTolerance=false`, `restrictSearchableAttributes=title`): elgépelés-tűréssel a „Grok”-ra a „Growing” is talál, a „MiniMax”-ra a „Minimal” (2026-09-30: 23 Grok-találatból 3 szólt a Grokról). A témalekérdezések maradnak a régi keresésnél, mert a pontos egyezés az igazi találataikat is megfelezné.
+Az utolsó öt laborneve (`hnNames` a kódban) a csatorna nélküli laborok nagy bejelentéseit hozza (2026-09-29). Ezeket az Algolia pontosan és csak a címben keresi (`typoTolerance=false`, `restrictSearchableAttributes=title`): elgépelés-tűréssel a „Grok”-ra a „Growing” is talál, a „MiniMax”-ra a „Minimal” (2026-09-30: 23 Grok-találatból 3 szólt a Grokról). A témalekérdezések maradnak a régi keresésnél, mert a pontos egyezés az igazi találataikat is megfelezné. 2026-10-12-én újramérve a csak címben keresést is: az `LLM`-nél főleg zajt vágna (F1, csillagászati appok), de az `AI model`-ből kiesne a Mistral Large 4, a Gemini 4 Argon, a FLUX 3, a Beam és az EmbeddingGemma 2, vagyis éppen a nagy bejelentések. A zajt a válogató kiszűri, ezért marad a teljes szöveges keresés.
 
 ### GitHub
 
@@ -118,7 +126,6 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 | Név | Csatorna | Állapot | Megjegyzés |
 | --- | --- | --- | --- |
 | Google Research | research.google, a blog és a `research.google/pubs` publikációs oldal | ellenőrizendő | A pontos RSS- vagy API-végpontot a megvalósítás elején kell megkeresni. A felhasználó kérte. |
-| Hugging Face Daily Papers | a közösség napi felszavazott cikkei | ellenőrizendő | Közösségi rangsor elsődleges cikkekről. |
 | Semantic Scholar | API | ellenőrizendő | A Google Scholar helyett. |
 | OpenAlex | API | ellenőrizendő | A Google Scholar helyett. |
 | IBM Research | blog | ellenőrizendő | |

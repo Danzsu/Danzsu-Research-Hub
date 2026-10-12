@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { collectCandidates, collectRepos, dedupeCandidates, parseFeed, type Candidate } from "./collect.ts";
-import { feeds, githubTopics, hnNames, hnQueries } from "../../config/sources.ts";
+import { dailyPapers, feeds, githubTopics, hnNames, hnQueries } from "../../config/sources.ts";
 import { mockFetch } from "./mock-fetch.ts";
 
 const since = new Date("2026-09-21T00:00:00Z");
@@ -121,6 +121,7 @@ test("collectRepos logs each failing topic search (an expired GitHub token) inst
 test("the lab names search Hacker News exactly and in titles only, the topic queries as before", async (t) => {
   const searched = new Map<string, URLSearchParams>();
   mockFetch(t, (url) => {
+    if (url.startsWith(dailyPapers.url)) return Response.json([]);
     if (!url.startsWith("https://hn.algolia.com/")) return new Response("", { status: 404 });
     const params = new URL(url).searchParams;
     searched.set(params.get("query") ?? "", params);
@@ -138,4 +139,39 @@ test("the lab names search Hacker News exactly and in titles only, the topic que
     assert.equal(searched.get(query)?.has("restrictSearchableAttributes"), false, query);
   }
   assert.equal(warn.mock.callCount(), feeds.length, "every feed 404s here, and each logs once");
+});
+
+// Kills the Daily Papers read for today (its votes are still coming in, 2026-10-12: today's top had 12, a
+// finished day's 259), a list ranked by anything but upvotes or not capped, an id that isn't an arXiv id
+// turned into a URL (it comes from a third party), and the paper losing its vote count on the card.
+test("the Daily Papers come from the finished days since `since`, the most upvoted first, capped, as arXiv links", async (t) => {
+  const asked: string[] = [];
+  const paper = (id: string, upvotes: number) => ({ title: `Paper ${id}`, summary: "<p>What it does.</p>", paper: { id, upvotes } });
+  mockFetch(t, (url) => {
+    if (url.startsWith(dailyPapers.url)) {
+      const date = new URL(url).searchParams.get("date") ?? "";
+      asked.push(date);
+      return Response.json(date === "2026-09-21" ? [paper("2609.00001", 3), paper("../evil", 999)] : [paper("2609.00002", 40), ...Array.from({ length: 20 }, (_, i) => paper(`2609.1${String(i).padStart(4, "0")}`, 10))]);
+    }
+    if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits: [] });
+    // The top paper is in an arXiv feed too: the Daily Papers copy, with its votes, must be the one kept.
+    if (url === feeds[0].url) return new Response(rss(`<item><title>Paper 2609.00002</title><link>https://arxiv.org/abs/2609.00002</link><pubDate>Tue, 22 Sep 2026 04:00:00 GMT</pubDate></item>`));
+    return new Response("", { status: 404 });
+  });
+  t.mock.method(console, "warn", () => {});
+  const all = await collectCandidates(new Date("2026-09-21T05:00:00Z"), new Date("2026-09-23T05:00:00Z"));
+  assert.equal(all.filter((c) => c.url === "https://arxiv.org/abs/2609.00002").length, 1);
+  const papers = all.filter((c) => c.source.startsWith(dailyPapers.name));
+  assert.deepEqual(asked.sort(), ["2026-09-21", "2026-09-22"]);
+  assert.equal(papers.length, dailyPapers.limit);
+  assert.deepEqual(papers[0], {
+    url: "https://arxiv.org/abs/2609.00002",
+    title: "Paper 2609.00002",
+    source: `${dailyPapers.name} · 40 upvotes`,
+    snippet: "What it does.",
+    publishedAt: "2026-09-22",
+    hint: "research",
+  });
+  assert.equal(papers.some((c) => c.url.includes("evil")), false);
+  assert.equal(papers.some((c) => c.url.endsWith("2609.00001")), false, "3 upvotes is below the 15th of the other day");
 });
