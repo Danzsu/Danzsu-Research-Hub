@@ -81,7 +81,7 @@ test("a good cron run answers the digest and drops the archive list's cache at o
 
   const response = await GET(cronRequest("Bearer s3cret"));
 
-  assert.deepEqual([response.status, await response.json()], [200, { issue: isoWeek(new Date()).id, candidates: 0, shortlisted: 0, inserted: 0, repos: 0, mirrored: 0, retriedSources: 0 }]);
+  assert.deepEqual([response.status, await response.json()], [200, { issue: isoWeek(new Date()).id, candidates: 0, shortlisted: 0, inserted: 0, repos: 0, daily: 0, mirrored: 0, retriedSources: 0 }]);
   assert.deepEqual(routeStub.revalidated, [["archive", { expire: 0 }]]);
   assert.equal(warn.mock.callCount(), feeds.length); // each feed's 404
 });

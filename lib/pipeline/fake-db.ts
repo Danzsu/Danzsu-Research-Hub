@@ -221,6 +221,7 @@ function tableQuery(rows: Record<string, unknown>[], error: PostgrestErrorShape 
     },
     gte: (column: string, value: unknown) => {
       onGte(column, value);
+      kept.push((row) => !(column in row) || String(row[column]) >= String(value));
       return record("gte", column, value);
     },
     order: (...args: unknown[]) => record("order", ...args),
@@ -485,9 +486,20 @@ export function fakeDb(
     }
     const writeError = tables.tableWriteErrors?.[table];
     return {
-      upsert: async (values: unknown, options?: Record<string, unknown>) => {
+      // Awaited as is, or through `.select(columns)`, which answers the rows written. With ignoreDuplicates
+      // (ON CONFLICT DO NOTHING) a row whose `url` the table's fixture rows already hold is not written.
+      upsert: (values: unknown, options?: Record<string, unknown>) => {
         upserts.push({ table, values, options: options ?? {} });
-        return { data: null, error: writeError ?? null };
+        const written = () => {
+          const list = (Array.isArray(values) ? values : [values]) as Record<string, unknown>[];
+          const known = new Set((tables.rows?.[table] ?? []).map((row) => row.url));
+          return options?.ignoreDuplicates ? list.filter((row) => !known.has(row.url)) : list;
+        };
+        return {
+          select: async (columns = "*") => (writeError ? { data: null, error: writeError } : { data: written().map((row) => project(row, columns)), error: null }),
+          then: (onFulfilled: (result: UpdateResult) => unknown, onRejected?: (reason: unknown) => unknown) =>
+            Promise.resolve({ data: null, error: writeError ?? null }).then(onFulfilled, onRejected),
+        };
       },
       // Chainable `.eq(...)` filters, awaitable like the real builder.
       delete: () => {

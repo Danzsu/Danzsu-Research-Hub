@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import type { Candidate, Repo } from "./collect.ts";
 import { curatePrompt, runDaily, toDigestRows } from "./daily.ts";
 import { fakeDb } from "./fake-db.ts";
@@ -104,7 +104,7 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
 
   const result = await runDaily(db, now);
 
-  assert.deepEqual(result, { issue: "2026-W39", candidates: 1, shortlisted: 1, inserted: 1, repos: 1 });
+  assert.deepEqual(result, { issue: "2026-W39", candidates: 1, shortlisted: 1, inserted: 1, repos: 1, daily: 1 });
   assert.doesNotMatch(prompt, /Known story/);
   assert.ok(prompt.includes(`[0] (${feeds[0].hint}) Fresh story`));
   assert.deepEqual(db.tasks, ["daily_curate"]); // one candidate is under the shortlist threshold
@@ -116,7 +116,13 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
   assert.deepEqual(upserted.github_top.values, [{ issue_id: "2026-W39", rank: 1, repo: "owner/tool", focus: "A tool", url: "https://github.com/owner/tool", stars: 42, language: "Rust", score: 88 }]);
   assert.deepEqual(upserted.github_top.options, { onConflict: "issue_id,rank" }); // a re-run replaces the week's ranking
   // The week's Top 10 is rewritten by rank; a shorter day must not leave yesterday's ranks 9–10 behind.
-  assert.deepEqual(db.deletes, [{ table: "github_top", filters: [["issue_id", "2026-W39"], ["rank", 1, "gt"]] }]);
+  assert.deepEqual(db.deletes, [
+    { table: "github_top", filters: [["issue_id", "2026-W39"], ["rank", 1, "gt"]] },
+    { table: "daily_top", filters: [["day", "2026-09-23"], ["rank", 1, "gt"]] },
+  ]);
+  // The day's Top 10, by the Budapest date, rewritten by rank like the repos.
+  assert.deepEqual(upserted.daily_top.values, [{ day: "2026-09-23", rank: 1, item_id: item.id }]);
+  assert.deepEqual(upserted.daily_top.options, { onConflict: "day,rank" });
   // "Known" means stored in the last 14 days, by creation time.
   assert.deepEqual(db.gteCalls, [{ table: "digest_items", column: "created_at", value: "2026-09-09T05:00:00.000Z" }]);
   assert.deepEqual(db.rpcCalls, [{ name: "refresh_must_read", args: { p_issue: "2026-W39" } }]);
@@ -184,4 +190,74 @@ test("runDaily with no repos leaves the week's github_top rows alone", async (t)
   await runDaily(db, new Date("2026-09-23T05:00:00Z"));
   assert.deepEqual(db.deletes, []);
   assert.equal(db.upserts.some((u) => u.table === "github_top"), false);
+});
+
+// Spec N3. Kills the covered titles left out of the prompt (the model would repeat a story told yesterday),
+// the list unbounded (14 days can hold 350 items), and the one-story-one-item rule dropped.
+test("curatePrompt lists what the last 14 days already covered, and asks for one item per story", () => {
+  const covered = Array.from({ length: 450 }, (_, i) => `Covered story ${i}`);
+  const prompt = curatePrompt(picked, [], covered);
+  assert.match(prompt, /ALREADY COVERED[^\n]*\n- Covered story 0\n/);
+  assert.match(prompt, /- Covered story 399\n/);
+  assert.doesNotMatch(prompt, /Covered story 400/);
+  assert.match(prompt, /same story/);
+  assert.doesNotMatch(curatePrompt(picked, []), /ALREADY COVERED/);
+});
+
+/** A run whose model curates `items` from one feed item each, with the given scores and minutes. */
+async function dailyRun(t: TestContext, picks: { title: string; score: number; minutes: number }[], tables: Parameters<typeof fakeDb>[1] = {}, now = new Date("2026-09-23T14:00:00Z")) {
+  withGeminiKey(t);
+  t.mock.method(console, "warn", () => {});
+  const rss = `<rss><channel>${picks.map((p, i) => `<item><title>${p.title}</title><link>https://blog.test/${i}</link><pubDate>Tue, 22 Sep 2026 09:00:00 GMT</pubDate></item>`).join("")}</channel></rss>`;
+  let prompt = "";
+  mockFetch(t, async (url, init) => {
+    if (url === feeds[0].url) return new Response(rss);
+    if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits: [] });
+    if (url.startsWith("https://generativelanguage.googleapis.com/")) {
+      prompt = geminiPrompt(init);
+      return geminiResponse({ items: picks.map((p, i) => ({ ...curatedItem(i, p.title), score: p.score, readMinutes: p.minutes })), github: [] });
+    }
+    return new Response("", { status: 404 });
+  });
+  const db = fakeDb(undefined, tables);
+  const result = await runDaily(db, now);
+  return { db, result, prompt: () => prompt };
+}
+
+// Spec N3. Kills the recent lookup still asking for URLs only: the titles feed the ALREADY COVERED block.
+test("runDaily hands the model the titles stored in the last 14 days", async (t) => {
+  const { prompt } = await dailyRun(t, [{ title: "New", score: 80, minutes: 5 }], {
+    rows: { digest_items: [{ url: "https://old.test/a", title: { hu: "Régi", en: "Old story" } }] },
+  });
+  assert.match(prompt(), /ALREADY COVERED[^\n]*\n- Old story\n/);
+});
+
+// Review Focus 2. Kills a daily_top row for an item the upsert ignored (its URL was stored more than 14 days
+// ago): the foreign key would fail the whole run. Only the rows written count.
+test("runDaily ranks only the items this run wrote", async (t) => {
+  // Stored long ago: past the 14-day lookup, so the model sees it, but the upsert skips it.
+  const { db, result } = await dailyRun(t, [{ title: "Kept", score: 80, minutes: 5 }, { title: "Old", score: 99, minutes: 5 }], {
+    rows: { digest_items: [{ url: "https://blog.test/1", created_at: "2026-08-01T00:00:00Z" }] },
+  });
+  const top = db.upserts.find((u) => u.table === "daily_top")?.values as { item_id: string }[];
+  assert.equal(top.length, 1);
+  assert.match(top[0].item_id, /kept/);
+  assert.equal(result.inserted, 1);
+});
+
+// Review Focus 1. Kills a second run of the day replacing the list with only its own new items: the day's
+// earlier Top 10 and the new items compete together, so the list only improves.
+test("a second run of the day keeps the earlier picks in the race", async (t) => {
+  const earlier = { day: "2026-09-23", digest_items: { id: "earlier-best", score: 95, read_minutes: 5 } };
+  const { db } = await dailyRun(t, [{ title: "Later", score: 60, minutes: 30 }], { rows: { daily_top: [earlier] } });
+  const top = db.upserts.find((u) => u.table === "daily_top")?.values as { rank: number; item_id: string }[];
+  assert.deepEqual(top.map((row) => row.rank), [1, 2]);
+  assert.equal(top[0].item_id, "earlier-best");
+  assert.match(top[1].item_id, /-later-/);
+});
+
+// Spec N6, Review Focus 3. Kills the day taken in UTC: a manual run at 00:30 in Budapest belongs to the new day.
+test("a run after midnight in Budapest writes the new day's list", async (t) => {
+  const { db } = await dailyRun(t, [{ title: "Late", score: 80, minutes: 5 }], {}, new Date("2026-09-23T22:30:00Z"));
+  assert.deepEqual(db.deletes.at(-1), { table: "daily_top", filters: [["day", "2026-09-24"], ["rank", 1, "gt"]] });
 });

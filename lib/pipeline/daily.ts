@@ -4,11 +4,14 @@ import { localizedSchema } from "../blocks.ts";
 import { digestCategories, digestTags } from "../../data/digest-types.ts";
 import { generate } from "../llm.ts";
 import { collectCandidates, collectRepos, type Candidate, type Repo } from "./collect.ts";
+import { budapestDay, pickDailyTop, type DailyCandidate } from "./daily-top.ts";
 import { errorMessage, isoWeek, itemId, type Week } from "./util.ts";
 
 const DAY = 86_400_000;
 const SHORTLIST = 40;
 const MAX_NEW_ITEMS = 25;
+/** The covered titles the curate prompt lists, the latest first. */
+const MAX_COVERED = 400;
 
 const shortlistSchema = z.object({ keep: z.array(z.int()) });
 
@@ -58,7 +61,7 @@ async function shortlist(db: SupabaseClient, candidates: Candidate[]): Promise<C
 }
 
 /** The curation prompt: numbered NEWS and REPOS listings the model answers with indices into. */
-export function curatePrompt(picked: Candidate[], repos: Repo[]): string {
+export function curatePrompt(picked: Candidate[], repos: Repo[], covered: string[] = []): string {
   return `${AUDIENCE}
 You curate NEON NEWS RADAR, a bilingual (Hungarian/English) AI digest.
 
@@ -71,10 +74,11 @@ PART 1 — news. From the numbered NEWS list, choose at most ${MAX_NEW_ITEMS} it
 - Hungarian must be natural, idiomatic Hungarian — not a literal translation. Keep technical terms (LLM, fine-tuning, GGUF) as Hungarian engineers say them.
 - Use only facts present in the listing. Do not invent numbers or claims.
 - Skip promotions: course, event or product sign-ups, sales and sponsored posts are not news.
+- One story, one item: when several NEWS entries report the same story, keep the one from the primary source (the lab, company or author) and skip the rest.${covered.length ? "\n- Skip a story the ALREADY COVERED list below already told, unless it brings a substantial new development." : ""}
 
 PART 2 — repositories. From the numbered REPOS list, choose the 10 most useful (skip awesome-lists and spam) and return them in "github" with a focus line of at most 8 English words and a score from 0 to 100 on the same scale as the news (how useful it is to the reader).
 
-NEWS:
+${covered.length ? `ALREADY COVERED (the last 14 days' stories):\n${covered.slice(0, MAX_COVERED).map((title) => `- ${title}`).join("\n")}\n\n` : ""}NEWS:
 ${listing(picked)}
 
 REPOS:
@@ -124,13 +128,15 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
     .upsert({ id: week.id, period: week.period, updated_at: now.toISOString() });
   if (issueError) throw issueError;
 
-  // Anything already stored in the last two weeks is not news again.
+  // Anything already stored in the last two weeks is not news again, by URL here and by story in the prompt.
   const { data: recent, error: recentError } = await db
     .from("digest_items")
-    .select("url")
-    .gte("created_at", new Date(now.getTime() - 14 * DAY).toISOString());
+    .select("url, title")
+    .gte("created_at", new Date(now.getTime() - 14 * DAY).toISOString())
+    .order("created_at", { ascending: false });
   if (recentError) throw recentError;
   const known = new Set((recent ?? []).map((row) => row.url as string));
+  const covered = (recent ?? []).map((row) => (row.title as { en?: string } | null)?.en).filter((title): title is string => Boolean(title));
 
   const [candidates, repos] = await Promise.all([
     collectCandidates(new Date(now.getTime() - 2 * DAY), now).then((all) => all.filter((c) => !known.has(c.url))),
@@ -138,13 +144,16 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
   ]);
   const picked = await shortlist(db, candidates);
 
-  const curated = await generate(db, "daily_curate", curatedSchema, curatePrompt(picked, repos));
+  const curated = await generate(db, "daily_curate", curatedSchema, curatePrompt(picked, repos, covered));
   const { items, top } = toDigestRows(curated, picked, repos, week);
 
+  let fresh: DailyCandidate[] = [];
   if (items.length) {
-    // ignoreDuplicates: an existing row (same URL) is never rewritten — ids are permanent.
-    const { error } = await db.from("digest_items").upsert(items, { onConflict: "url", ignoreDuplicates: true });
+    // ignoreDuplicates: an existing row (same URL) is never rewritten — ids are permanent. The rows answered
+    // are the ones written, so an item the upsert skipped never gets a daily_top row.
+    const { data, error } = await db.from("digest_items").upsert(items, { onConflict: "url", ignoreDuplicates: true }).select("id, score, read_minutes");
     if (error) throw error;
+    fresh = (data ?? []) as DailyCandidate[];
   }
   if (top.length) {
     const { error } = await db.from("github_top").upsert(top, { onConflict: "issue_id,rank" });
@@ -154,8 +163,29 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
     if (trimError) throw trimError;
   }
 
+  const daily = await writeDailyTop(db, budapestDay(now), fresh);
+
   const { error: rpcError } = await db.rpc("refresh_must_read", { p_issue: week.id });
   if (rpcError) throw rpcError;
 
-  return { issue: week.id, candidates: candidates.length, shortlisted: picked.length, inserted: items.length, repos: top.length };
+  return { issue: week.id, candidates: candidates.length, shortlisted: picked.length, inserted: fresh.length, repos: top.length, daily };
+}
+
+/**
+ * The day's Top 10 (spec N4, N6): the day's earlier picks and this run's new items compete together, so a
+ * second run of the day can only improve the list. Answers how many it ranked.
+ */
+async function writeDailyTop(db: SupabaseClient, day: string, fresh: DailyCandidate[]): Promise<number> {
+  const { data: kept, error } = await db.from("daily_top").select("digest_items(id, score, read_minutes)").eq("day", day);
+  if (error) throw error;
+  const earlier = (kept ?? []).map((row) => row.digest_items as unknown as DailyCandidate | null).filter((item): item is DailyCandidate => item !== null);
+  const known = new Set(earlier.map((item) => item.id));
+  const daily = pickDailyTop([...earlier, ...fresh.filter((item) => !known.has(item.id))]);
+  if (!daily.length) return 0;
+  const { error: upsertError } = await db.from("daily_top").upsert(daily.map((item, index) => ({ day, rank: index + 1, item_id: item.id })), { onConflict: "day,rank" });
+  if (upsertError) throw upsertError;
+  // Like github_top: an earlier run's ranks past today's list would stay behind.
+  const { error: trimError } = await db.from("daily_top").delete().eq("day", day).gt("rank", daily.length);
+  if (trimError) throw trimError;
+  return daily.length;
 }
