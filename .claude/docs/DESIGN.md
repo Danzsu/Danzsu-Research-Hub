@@ -341,7 +341,7 @@ In the rail, the ink column shrinks to `w-14`: only the icons stay, each with it
 |                              |
 |   [ Marked read    UNDO ]    |  toast lane, above the bar
 +------------------------------+
-| Radar Libr. [TY] Search More |  bottom bar, 5 x 64px, ink; [TY] the taiyaki, raised 16px
+| Radar Napi [TY] Libr.  More  |  bottom bar, 5 x 64px, ink; [TY] the taiyaki, raised 16px
 +------------------------------+
 ```
 
@@ -476,7 +476,7 @@ className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y
 
 ### Bottom bar and the "Több" sheet
 
-Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The active slot, the open "Több", or "Több" on an AI cégek, Archívum or Gyűjtemény page (`data-active`) turns signal:
+Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The slots are Radar, Napi, the taiyaki, Library and Több; Keresés sits in the "Több" sheet (it is a placeholder until search lands). The active slot, the open "Több", or "Több" on an AI cégek, GitHub repók, Archívum or Gyűjtemény page (`data-active`) turns signal:
 
 ```tsx app/components/app-shell.tsx
 className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
@@ -632,6 +632,16 @@ export function Tag({ tag }: { tag: string }) {
   return <span className="border border-current/30 px-2 py-1 font-mono text-[11px]">#{tag}</span>;
 }
 ```
+
+### Daily view
+
+`/daily` is `DigestDashboard` with `scope="daily"` (daily news spec N7): the weekly UI, reshaped for one day's Top 10.
+
+- **Header and hero:** the header reads NAPI LISTA / DAILY LIST over the day (`2026. 09. 24.`); the hero is "NAPI//" with its lead, then one mono line with the count ("5 hír · ebből 2 rövid") and, in signal, "Korábbi lista (…) — a mai 18:00-ra készül." when the list isn't today's. No category chips, no Top 3 grid, no archive box.
+- **The index:** a paper box with a 2px ink frame, one mono line per card (the rank in signal, the title, the score), each an anchor to its card (`#daily-N`). The cards carry `scroll-mt-20`, so a jump lands clear of the 64px sticky header.
+- **The cards:** `StoryCard` with a `rank`: the rank in display type, signal, at the top of the meta gutter; a signal SHORT / RÖVID mark under the minutes for a read of at most 15 minutes; and the long text (`DailyBrief`) in place of the summary: the brief's paragraphs, or the post's summary and its FŐ PONTOK list, or the item's summary with "A részletes összefoglaló készül…" under it. Lines stop at `75ch`.
+- **The weekly mark:** on the Radar, a card ranked in a daily Top 10 shows a 1px ink-framed "NAP TOP · N." / "DAY TOP · N." above its source link; the daily page itself shows none.
+- **Empty:** `EmptyState` with "Még nincs napi lista. Az első este 18:00-ra készül el."
 
 ### must-card and story-card
 
