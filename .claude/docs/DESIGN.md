@@ -222,7 +222,7 @@ The roles of the brand tokens:
 | paper | `#fbefca` | the body background; the card surface (story, must-read, repo, image frame, form cards); light text on ink |
 | cream | `#f8e8b4` | the working surface: the Radar column with its header and chip bar, `PageHero`, `StatusCard`, the post article, sheets and dialogs |
 | signal | `#f15f22` | the one accent: the `//` after titles, eyebrows, source labels and inline links, the active nav entry, the focus outline, the hover state (an 8px signal shadow, or a card that turns signal), the rank numerals, the progress bar, the live dot, the failed toast, the pressed chip |
-| cyan | `#59e1e8` | rare: only the Library's PROCESSING status and the `/// DAILY 07:00 → SUN FREEZE` caption on the Radar hero grid |
+| cyan | `#59e1e8` | rare: only the Library's PROCESSING status and the `/// DAILY 18:00 → SUN FREEZE` caption on the Radar hero grid |
 
 The remapped shadcn tokens:
 
@@ -661,7 +661,7 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClas
 ```
 
 ```tsx app/components/story-card.tsx
-className={`focus-ring story-card max-w-[900px] border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+className={`focus-ring story-card max-w-[900px] scroll-mt-20 border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.

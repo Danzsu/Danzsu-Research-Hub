@@ -1,5 +1,5 @@
 import { assignIds, type BlockDraft } from "./blocks.ts";
-import type { ArchiveIssue, CurrentIssue, DigestItem, GithubTopEntry } from "../data/digest-types.ts";
+import type { ArchiveIssue, CurrentIssue, DailyBrief, DigestItem, GithubTopEntry } from "../data/digest-types.ts";
 import type { Favorite, GithubRepo, SubmittedSource } from "./content.ts";
 import type { MySource } from "./my-sources.ts";
 import { publishedLabel } from "./pipeline/util.ts";
@@ -54,7 +54,7 @@ export const previewItems: DigestItem[] = [
   // must-2 and four from the same run are its daily Top 5; "yesterday" outscores them all but is a day
   // older, so it stays below.
   digestItem("companies-2026-W39-yesterday", { category: "companies", score: 95, addedAt: "2026-09-23T05:59:40Z" }),
-  digestItem("companies-2026-W39-mistral", { category: "companies", score: 86 }),
+  digestItem("companies-2026-W39-mistral", { category: "companies", score: 86, dailyRank: 4 }),
   digestItem("local-2026-W39-read", { score: 82 }),
   digestItem("companies-2026-W39-meta", { category: "companies", score: 79 }),
   digestItem("local-2026-W39-long-url", {
@@ -68,6 +68,31 @@ export const previewItems: DigestItem[] = [
   digestItem("companies-2026-W39-plain", { category: "companies", score: 58 }),
   digestItem("github-2026-W39-plain", { category: "github", score: 52 }),
 ];
+
+/** The daily view (daily news spec N7): five cards, two of them short (one right at 15 minutes), each long-text state of
+ *  N8 once. Each carries its dailyRank, as getDaily's embed gives it. */
+export const previewDailyIssue: CurrentIssue = { id: "2026-W39", label: "2026. 09. 24.", updated: "", archiveAt: "" };
+export const previewDailyItems: DigestItem[] = [
+  digestItem("research-2026-W39-daily-brief", { category: "research", score: 94, readMinutes: 22 }),
+  digestItem("companies-2026-W39-daily-short", { category: "companies", score: 88, readMinutes: 6 }),
+  digestItem("local-2026-W39-daily-post", { score: 81, readMinutes: 18 }),
+  digestItem("local-2026-W39-daily-pending", { score: 77, readMinutes: 15 }),
+  digestItem("research-2026-W39-daily-plain", { category: "research", score: 70, readMinutes: 40 }),
+].map((item, index) => ({ ...item, dailyRank: index + 1 }));
+const paragraphs = (lang: string) => [1, 2, 3].map((n) => `${lang} ${n}. bekezdés: mi történt, a fontos számok, és miért számít egy AI-mérnöknek.`);
+export const previewDaily: { today: boolean; briefs: Record<string, DailyBrief> } = {
+  today: false,
+  briefs: {
+    "research-2026-W39-daily-brief": { kind: "brief", paragraphs: { hu: paragraphs("HU"), en: paragraphs("EN") } },
+    "companies-2026-W39-daily-short": { kind: "brief", paragraphs: { hu: paragraphs("HU"), en: paragraphs("EN") } },
+    "local-2026-W39-daily-post": {
+      kind: "post",
+      summary: { hu: "A poszt saját összefoglalója.", en: "The post's own summary." },
+      keyPoints: { hu: ["Első pont", "Második pont"], en: ["First point", "Second point"] },
+    },
+    "local-2026-W39-daily-pending": { kind: "pending" },
+  },
+};
 
 export const previewGithub: GithubTopEntry[] = [
   { repo: "ggml-org/llama.cpp", focus: "LLM inference in C/C++", url: "https://github.com/ggml-org/llama.cpp", stars: 81000, language: "C++", score: 92 },
