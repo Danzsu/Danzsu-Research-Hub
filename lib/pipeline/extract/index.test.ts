@@ -104,7 +104,7 @@ test("extract() still calls Gemini and keeps the video block for youtube when oE
     }
     if (url.includes("googleapis.com")) {
       counters.gemini++;
-      return geminiResponse({ title: { hu: "C", en: "T" }, summary: { hu: "Ö", en: "S" }, keyPoints: { hu: [], en: [] }, tags: [], chapters: [] });
+      return geminiResponse({ title: { hu: "C", en: "T" }, summary: { hu: "Ö", en: "S" }, keyPoints: { hu: [], en: [] }, tags: [], brief: { hu: [], en: [] }, chapters: [] });
     }
     counters.other++; // the watch page, if it were ever fetched
     return new Response("", { status: 404 });

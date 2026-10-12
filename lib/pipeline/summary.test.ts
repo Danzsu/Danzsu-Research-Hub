@@ -15,7 +15,7 @@ const extracted: Extracted = {
   text: "Some article text.",
 };
 
-const okSummary = { title: { hu: "", en: "" }, summary: { hu: "", en: "" }, keyPoints: { hu: [], en: [] }, tags: [] };
+const okSummary = { title: { hu: "", en: "" }, summary: { hu: "", en: "" }, keyPoints: { hu: [], en: [] }, tags: [], brief: { hu: [], en: [] } };
 
 /** Captures the prompt text sent in the single Gemini `generateContent` call the handler intercepts, replying with `out` (defaulting to a valid summary). */
 function capturePrompt(t: TestContext, out: unknown = okSummary) {
@@ -66,4 +66,15 @@ test("writeNotes turns sections into heading and list blocks with ids, and inclu
   assert.ok(blocks.every((block) => typeof block.id === "string" && block.id.length > 0));
   assert.ok(prompt().includes(NOT_INSTRUCTIONS));
   assert.ok(prompt().indexOf(NOT_INSTRUCTIONS) < prompt().indexOf('SOURCE "'));
+});
+
+// Spec N5. Kills the brief left out of the instructions (the model would skip it), its length or language
+// rule lost, and a brief asked for when only the page's description was available.
+test("summarize asks for a 300–450 word brief in both languages, and none without the text", async (t) => {
+  withGeminiKey(t);
+  const prompt = capturePrompt(t);
+  await summarize(fakeDb(), extracted, "");
+  assert.match(prompt(), /brief: .*3–5 short paragraphs, 300–450 words in each language/);
+  await summarize(fakeDb(), { ...extracted, meta: { extractionFailed: true } }, "");
+  assert.match(prompt(), /leave brief empty/);
 });

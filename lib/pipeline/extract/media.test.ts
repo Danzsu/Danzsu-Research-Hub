@@ -89,7 +89,7 @@ test("extractX wraps a network error (the oEmbed fetch itself rejects) as FetchE
 
 const videoOf = (result: { blocks: Block[] }) => result.blocks.find((b): b is Extract<Block, { type: "video" }> => b.type === "video");
 const chaptersOf = (result: { blocks: Block[] }) => result.blocks.find((b): b is Extract<Block, { type: "chapters" }> => b.type === "chapters");
-const noChapters = { title: { hu: "C", en: "T" }, summary: { hu: "Ö", en: "S" }, keyPoints: { hu: [], en: [] }, tags: [], chapters: [] };
+const noChapters = { title: { hu: "C", en: "T" }, summary: { hu: "Ö", en: "S" }, keyPoints: { hu: [], en: [] }, tags: [], brief: { hu: [], en: [] }, chapters: [] };
 
 test("extractYoutube embeds the video and sorts chapters by seconds, keeping chapters out of `generated`", async (t) => {
   withGeminiKey(t);
@@ -101,6 +101,7 @@ test("extractYoutube embeds the video and sorts chapters by seconds, keeping cha
           summary: { hu: "Összefoglaló", en: "Summary" },
           keyPoints: { hu: ["pont"], en: ["point"] },
           tags: ["training"],
+          brief: { hu: [], en: [] },
           chapters: [
             { seconds: 90, title: "Details" }, // out of order on purpose
             { seconds: 0, title: "Intro" },
