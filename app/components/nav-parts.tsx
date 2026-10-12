@@ -2,7 +2,7 @@
 
 import Link, { useLinkStatus } from "next/link";
 import type { ReactNode } from "react";
-import { Archive, BookOpen, Building2, FolderOpen, GitFork, Radar, Search, type LucideIcon } from "lucide-react";
+import { Archive, BookOpen, Building2, FolderOpen, GitFork, Radar, Search, Sunset, type LucideIcon } from "lucide-react";
 import type { NavId, NavItem } from "@/lib/nav";
 import { useLanguage } from "./language-context";
 
@@ -12,6 +12,7 @@ import { useLanguage } from "./language-context";
 
 export const navIcons: Record<NavId, LucideIcon> = {
   radar: Radar,
+  daily: Sunset,
   companies: Building2,
   library: BookOpen,
   github: GitFork,
