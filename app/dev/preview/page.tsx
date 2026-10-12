@@ -8,6 +8,9 @@ import { DigestDashboard } from "@/app/components/digest-dashboard";
 import { ListSkeleton, PostSkeleton, RadarSkeleton } from "@/app/components/page-skeletons";
 import {
   previewArchive,
+  previewDaily,
+  previewDailyIssue,
+  previewDailyItems,
   previewEmail,
   previewFavorites,
   previewGithub,
@@ -46,6 +49,19 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
           issue={previewIssue}
           items={previewItems}
           githubTop10={previewGithub}
+          preview={{ data: previewReader, failWrites }}
+          posts={previewReadHerePosts}
+          ratings={previewRatings}
+        />
+      )}
+      {(view === "daily" || view === "daily-empty") && (
+        <DigestDashboard
+          key={`${view}:${failWrites}`}
+          scope="daily"
+          issue={previewDailyIssue}
+          items={view === "daily" ? previewDailyItems : []}
+          githubTop10={[]}
+          daily={view === "daily" ? previewDaily : { today: true, briefs: {} }}
           preview={{ data: previewReader, failWrites }}
           posts={previewReadHerePosts}
           ratings={previewRatings}

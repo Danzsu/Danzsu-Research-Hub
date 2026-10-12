@@ -1,4 +1,5 @@
 import type { DigestCategory, DigestItem } from "../data/digest-types.ts";
+import { budapestDay } from "./pipeline/daily-top.ts";
 import type { ItemState } from "./reader-store.ts";
 
 export type Filter = "all" | DigestCategory | "saved";
@@ -30,9 +31,8 @@ export function feedItems(
   return sortUnreadFirst(visible, loadedStates);
 }
 
-// The day is Budapest's, not UTC's: the cron (05:00 UTC) lands on the same date either way, but a manual
-// run after 22:00 UTC (23:00 in winter) already belongs to the next Budapest day.
-const budapestDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }); // 2026-09-29
+// The day is Budapest's, not UTC's (budapestDay, shared with the daily Top 10): a manual run after 22:00 UTC
+// (23:00 in winter) already belongs to the next Budapest day.
 const budapestLabel = new Intl.DateTimeFormat("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit" });
 
 /** The Budapest day an item was added on, as the Radar writes its dates: `09. 29.` */
@@ -40,7 +40,7 @@ export const addedDayLabel = (addedAt: string) => budapestLabel.format(new Date(
 
 /** The AI companies page's Top 5: the latest day's items (by the Budapest day they were added on), highest score first. */
 export function dailyTop(items: DigestItem[], count = 5): DigestItem[] {
-  const day = (item: DigestItem) => budapestDay.format(new Date(item.addedAt));
+  const day = (item: DigestItem) => budapestDay(new Date(item.addedAt));
   const latest = items.map(day).sort().at(-1);
   // One run's rows share one created_at, so ties go by id: the same Top 5 on every load.
   return items.filter((item) => day(item) === latest).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).slice(0, count);

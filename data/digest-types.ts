@@ -64,6 +64,8 @@ export type DigestItem = {
   publishedAt: string;
   /** When the daily run added it (`digest_items.created_at`, an ISO timestamp): the daily Top 5 goes by it. */
   addedAt: string;
+  /** Its rank in the day's Top 10 when it made one (daily news spec N7): the weekly card's DAY TOP mark. */
+  dailyRank?: number;
   /** Publisher or handle, rendered as plain text. The link lives in `url`. */
   source: string;
   url: string;
@@ -96,3 +98,10 @@ export type CurrentIssue = {
   updated: string;
   archiveAt: string;
 };
+
+/** A daily Top 10 card's long text (daily news spec N5, N8): the post's brief, else its summary and key points,
+ *  else "being written" while its source waits. No entry: the item's own summary. */
+export type DailyBrief =
+  | { kind: "brief"; paragraphs: Record<Language, string[]> }
+  | { kind: "post"; summary: Localized; keyPoints: Record<Language, string[]> }
+  | { kind: "pending" };

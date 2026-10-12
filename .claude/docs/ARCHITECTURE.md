@@ -17,7 +17,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 
 `app/` is Next.js routing and UI. `lib/` is the logic, and it runs under plain `node --test`.
 
-- `app/(app)/` holds the signed-in pages (`/`, `/companies`, `/archive`, `/archive/[week]`, `/github`, `/library`, `/library/[id]`, `/collection`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list. `github/` is the GitHub page (`github-view`), one `repo-card` per repo. `collection/` is the collection of ❤ marks. Three more route groups hold one page each, `(radar)/` (`/`), `library/(list)/` and `archive/(list)/`, so that each page's `loading.tsx` wraps that page alone (CLAUDE.md → App shell and navigation). `companies/` is the AI companies page: `/` and it both render `current-week-page.tsx`, the current week's dashboard, the second with `scope="companies"`.
+- `app/(app)/` holds the signed-in pages (`/`, `/daily`, `/companies`, `/archive`, `/archive/[week]`, `/github`, `/library`, `/library/[id]`, `/collection`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list. `github/` is the GitHub page (`github-view`), one `repo-card` per repo. `collection/` is the collection of ❤ marks. Three more route groups hold one page each, `(radar)/` (`/`), `library/(list)/` and `archive/(list)/`, so that each page's `loading.tsx` wraps that page alone (CLAUDE.md → App shell and navigation). `companies/` is the AI companies page: `/` and it both render `current-week-page.tsx`, the current week's dashboard, the second with `scope="companies"`. `daily/` is the day's Top 10, the same dashboard with `scope="daily"` on `getDaily`.
 - The rest of `app/`, outside the group:
   - `login/` and `auth/` (login, google, callback, signout), and the public `about/` and `privacy/` pages (`public-page` frames them with the `brand-mark` logo, `sign-in-sheet` slides the sign-in up from its header, `sign-in-forms` is shared with `login/`, `lift-classes` is the taiyaki's cream button surface);
   - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract), `cron/daily` and `cron/mirror`;
@@ -38,7 +38,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - the hooks: `use-reader-state`, `use-shortcuts`, `use-model-context-tools`.
 - `components/ui/` holds vendored shadcn components on the unified `radix-ui` package. A few are hand-patched (CLAUDE.md → Hand-authored components). Most aren't used yet and are kept for the UI/UX milestones. `hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel and the link chat use it.
 - `lib/pipeline/` holds the two writers:
-  - the Radar: `daily.ts`, `collect.ts` (its sources come from `config/sources.ts`), and `mirror.ts`, which queues the week's best items for the Library;
+  - the Radar: `daily.ts`, `collect.ts` (its sources come from `config/sources.ts`), `daily-top.ts` (the day's Top 10 and the Budapest date), and `mirror.ts`, which queues the week's best items and every daily Top 10 for the Library;
   - the Library: `ingest.ts` (`processSource`, `retryPendingSources`), and `extract/` with one extractor per source kind, where `index.ts` holds the fallback chain;
   - HTML to blocks: `html-to-blocks.ts`, plus `html-noise.ts` and `cleanup.ts` for the three noise layers;
   - images: `html-images.ts` and `images.ts` (mirroring);
@@ -46,6 +46,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `fetch.ts` (`safeFetch`, `apiFetch`) and `util.ts` (ids, URL parsing and small shared helpers).
 - The rest of `lib/`:
   - the block model, `blocks.ts`;
+  - `brief.ts`, the 2–3 minute brief's schema and its tolerant reader;
   - `post-view.ts`, the page's `Post` and the renderer's helpers, zod-free because the browser gets it (`shownTitle` is the title readers see, `editPayload` the editor's save);
   - `post-row.ts`, server-only, which turns a post row into that `Post`;
   - the submitter's edits: `post-edit.ts`, `overrides.ts`;

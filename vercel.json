@@ -3,9 +3,9 @@
   "regions": ["dub1"],
   "fluid": true,
   "crons": [
-    { "path": "/api/cron/daily", "schedule": "0 5 * * *" },
-    { "path": "/api/cron/mirror", "schedule": "0 7 * * *" },
-    { "path": "/api/cron/mirror", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/mirror", "schedule": "0 9 * * *" }
+    { "path": "/api/cron/daily", "schedule": "0 13 * * *" },
+    { "path": "/api/cron/mirror", "schedule": "0 14 * * *" },
+    { "path": "/api/cron/mirror", "schedule": "0 15 * * *" },
+    { "path": "/api/cron/mirror", "schedule": "0 16 * * *" }
   ]
 }

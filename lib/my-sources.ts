@@ -117,6 +117,26 @@ export async function retrySource(db: SupabaseClient, admin: SupabaseClient, vie
   return claimed?.length ? "accepted" : "not_failed";
 }
 
+/** Each item's `sources` row, by the URL a submission of it would normalize to, 30 URLs a query. `columns`
+ *  must include `url`. Null when a lookup fails (logged): a page shows its cards without the extras then. */
+export async function itemSources(db: SupabaseClient, items: { id: string; url: string }[], columns: string): Promise<Map<string, Record<string, unknown>> | null> {
+  const idsByUrl = new Map<string, string[]>();
+  for (const item of items) {
+    const url = parseSubmittedUrl(item.url)?.toString();
+    if (url) idsByUrl.set(url, [...(idsByUrl.get(url) ?? []), item.id]);
+  }
+  const answers = await inChunks([...idsByUrl.keys()], (chunk) => db.from("sources").select(columns).in("url", chunk));
+  const byItem = new Map<string, Record<string, unknown>>();
+  for (const { data, error } of answers) {
+    if (error) {
+      console.warn("item source lookup failed", error);
+      return null;
+    }
+    for (const row of (data ?? []) as unknown as Record<string, unknown>[]) for (const id of idsByUrl.get(row.url as string) ?? []) byItem.set(id, row);
+  }
+  return byItem;
+}
+
 /**
  * Item id → the Library post already made from its URL: a card's "Olvasd itt" opens it (read-here
  * spec 1). The URLs go through parseSubmittedUrl, as a submission's and the mirror's do, so both sides
@@ -125,23 +145,11 @@ export async function retrySource(db: SupabaseClient, admin: SupabaseClient, vie
  * closed one.
  */
 export async function readHerePosts(db: SupabaseClient, items: { id: string; url: string }[]): Promise<Record<string, number>> {
-  const idsByUrl = new Map<string, string[]>();
-  for (const item of items) {
-    const url = parseSubmittedUrl(item.url)?.toString();
-    if (url) idsByUrl.set(url, [...(idsByUrl.get(url) ?? []), item.id]);
-  }
-  const urls = [...idsByUrl.keys()];
-  const answers = await inChunks(urls, (chunk) => db.from("sources").select("url, posts(id)").in("url", chunk));
+  const sources = await itemSources(db, items, "url, posts(id)");
   const posts: Record<string, number> = {};
-  for (const { data, error } of answers) {
-    if (error) {
-      console.warn("read-here post lookup failed", error);
-      return {};
-    }
-    for (const row of data ?? []) {
-      const post = embeddedPost(row.posts);
-      if (post) for (const id of idsByUrl.get(row.url as string) ?? []) posts[id] = post.id;
-    }
+  for (const [id, row] of sources ?? []) {
+    const post = embeddedPost(row.posts);
+    if (post) posts[id] = post.id;
   }
   return posts;
 }

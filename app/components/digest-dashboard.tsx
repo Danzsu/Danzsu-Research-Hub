@@ -9,14 +9,16 @@ import {
   ListTodo,
   Newspaper,
   Radar,
+  Sunset,
   Zap,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import type { CurrentIssue, DigestItem, GithubTopEntry } from "@/data/digest-types";
+import type { CurrentIssue, DailyBrief, DigestItem, GithubTopEntry } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
+import { SHORT_MINUTES } from "@/lib/pipeline/daily-top";
 import { ratingKey, type Ratings } from "@/lib/ratings";
 import { repoStats } from "@/lib/repo-format";
 import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-store";
@@ -35,17 +37,25 @@ import { useShortcuts } from "./use-shortcuts";
 const copy = {
   hu: {
     live: "ÉLŐ KIADÁS",
+    dailyList: "NAPI LISTA",
     archived: "LEZÁRT KIADÁS",
     categories: "Kategóriák",
     panel: "Haladás és to-do",
     updated: "Napi frissítés",
-    schedule: "NAPI 05:00 UTC · ZÁRÁS VAS 24:00",
+    schedule: "NAPI 13:00 UTC · ZÁRÁS VAS 24:00",
     archive: "Heti zárás",
     status: "ÁLLAPOT",
     frozen: "LEZÁRVA",
     collecting: "GYŰJTÉS",
     lead: "Helyi modellek · kutatás · élvonalbeli cégek · repók",
     companiesTitle: "AI CÉGEK",
+    dailyTitle: "NAPI",
+    dailyLead: "A nap 10 legfontosabb híre, mindegyikhez 2–3 perces összefoglalóval.",
+    dailyCount: (count: number, short: number) => `${count} hír · ebből ${short} rövid`,
+    dailyStale: (day: string) => `Korábbi lista (${day}) — a mai 18:00-ra készül.`,
+    dailyIndex: "A nap hírei",
+    dailyFeed: "A NAP 10 HÍRE",
+    emptyDaily: "Még nincs napi lista. Az első este 18:00-ra készül el.",
     companiesLead: "OpenAI · Google · Anthropic · xAI · Meta · Mistral · Microsoft · kínai laborok",
     dailyTop: "NAPI TOP 5",
     companiesFeed: "A HÉT TÖBBI CÉGES HÍRE",
@@ -69,17 +79,25 @@ const copy = {
   },
   en: {
     live: "LIVE ISSUE",
+    dailyList: "DAILY LIST",
     archived: "ARCHIVED ISSUE",
     categories: "Categories",
     panel: "Progress & to-do",
     updated: "Daily refresh",
-    schedule: "DAILY 05:00 UTC · FREEZE SUN 24:00",
+    schedule: "DAILY 13:00 UTC · FREEZE SUN 24:00",
     archive: "Weekly close",
     status: "STATUS",
     frozen: "FROZEN",
     collecting: "COLLECTING",
     lead: "Local models · research · frontier companies · repositories",
     companiesTitle: "AI COMPANIES",
+    dailyTitle: "DAILY",
+    dailyLead: "The day's 10 most important stories, each with a 2–3 minute brief.",
+    dailyCount: (count: number, short: number) => `${count} stories · ${short} short`,
+    dailyStale: (day: string) => `An earlier list (${day}) — today's is ready by 18:00.`,
+    dailyIndex: "Today's stories",
+    dailyFeed: "TODAY'S 10",
+    emptyDaily: "No daily list yet. The first one is ready by 18:00.",
     companiesLead: "OpenAI · Google · Anthropic · xAI · Meta · Mistral · Microsoft · Chinese labs",
     dailyTop: "DAILY TOP 5",
     companiesFeed: "THE WEEK'S OTHER COMPANY NEWS",
@@ -120,15 +138,18 @@ export function DigestDashboard(
     /** A closed week opened from /archive: same reading UI, no "live" framing. */
     archived?: boolean;
     /** /companies: the week's company news only, the latest day's Top 5 first, no category bar. */
-    scope?: "companies";
+    scope?: "companies" | "daily";
     /** Item id → its Library post (readHerePosts): the cards' "Olvasd itt" opens it. */
     posts?: Record<string, number>;
     /** The page's ratings by ratingKey (getRatings): the cards' and repos' initial values. */
     ratings?: Ratings;
+    /** /daily (daily news spec N7): whether the list is today's, and each card's long text. */
+    daily?: { today: boolean; briefs: Record<string, DailyBrief> };
   } & ReaderSource,
 ) {
   const { issue, githubTop10, archived = false } = props;
   const companies = props.scope === "companies";
+  const dailyView = props.scope === "daily";
   // Memoized: a fresh array each render would re-register the WebMCP tools (their effect keys on the ids).
   const items = useMemo(() => (companies ? props.items.filter((item) => item.category === "companies") : props.items), [companies, props.items]);
   const { language } = useLanguage();
@@ -140,8 +161,10 @@ export function DigestDashboard(
   const isMobile = useIsMobile();
   const t = copy[language];
 
-  const top = companies ? dailyTop(items) : items.filter((item) => item.mustRead);
-  const feed = companies
+  const top = dailyView ? [] : companies ? dailyTop(items) : items.filter((item) => item.mustRead);
+  const feed = dailyView
+    ? items
+    : companies
     ? feedItems(items, "companies", states, loadedStates).filter((item) => !top.includes(item))
     : feedItems(items, filter, states, loadedStates);
   const readCount = items.filter((item) => states[item.id]?.read).length;
@@ -187,13 +210,14 @@ export function DigestDashboard(
     hasTodo: itemsWithTodo.has(item.id),
     postId: props.posts?.[item.id],
     rating: props.ratings?.[ratingKey({ kind: "item", id: item.id })] ?? null,
+    brief: props.daily?.briefs[item.id],
     language,
     actions,
   });
 
   const radarEmpty = filter === "saved" ? t.emptySaved : filter !== "all" ? t.emptyCategory : items.length ? t.emptyAll : null;
   const companiesEmpty = items.length ? t.emptyCompaniesAll : t.emptyCompanies;
-  const emptyFeed = companies ? companiesEmpty : radarEmpty;
+  const emptyFeed = dailyView ? t.emptyDaily : companies ? companiesEmpty : radarEmpty;
   const topLabel = companies && top.length ? `${t.dailyTop} · ${addedDayLabel(top[0].addedAt)}` : t.mustRead;
 
   const panelLayer = usePanel();
@@ -218,7 +242,7 @@ export function DigestDashboard(
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {!archived && <span className="live-pulse shrink-0" />}
           <div className="min-w-0">
-            <p className="truncate font-mono text-[11px] tracking-[0.18em] text-signal">{archived ? t.archived : t.live}</p>
+            <p className="truncate font-mono text-[11px] tracking-[0.18em] text-signal">{archived ? t.archived : dailyView ? t.dailyList : t.live}</p>
             <p className="font-display text-lg leading-none">{issue.label}</p>
           </div>
         </div>
@@ -260,7 +284,7 @@ export function DigestDashboard(
       <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 @[95rem]:grid-cols-[minmax(0,1fr)_330px]">
         {/* The chip bar belongs to this column, so the panel beside it is not covered. */}
         <div className="min-w-0">
-          {!companies && (
+          {!companies && !dailyView && (
             <nav
               aria-label={t.categories}
               className="radar-chips sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
@@ -293,16 +317,23 @@ export function DigestDashboard(
                     <span>{t.schedule}</span>
                   </div>
                   <h1 className="max-w-4xl font-display text-[clamp(2.6rem,15cqi,8rem)] leading-[0.77] tracking-[-0.07em]">
-                    {companies ? t.companiesTitle : "AI WEEKLY"}
+                    {dailyView ? t.dailyTitle : companies ? t.companiesTitle : "AI WEEKLY"}
                     <span className="text-signal">{"//"}</span>
                   </h1>
                   {/* R3 §1: on a phone the lead and the close box give way to one status line under the title. */}
-                  <p className="mt-5 hidden max-w-2xl font-mono text-sm leading-6 text-paper/65 sm:block">{companies ? t.companiesLead : t.lead}</p>
-                  <p className="mt-3 font-mono text-xs text-paper/60 sm:hidden">
-                    {t.archive}: {issue.archiveAt} · {archived ? t.frozen : t.collecting}
-                  </p>
+                  <p className="mt-5 hidden max-w-2xl font-mono text-sm leading-6 text-paper/65 sm:block">{dailyView ? t.dailyLead : companies ? t.companiesLead : t.lead}</p>
+                  {dailyView ? (
+                    <p className="mt-3 font-mono text-xs text-paper/70">
+                      {t.dailyCount(items.length, items.filter((item) => item.readMinutes <= SHORT_MINUTES).length)}
+                      {props.daily && !props.daily.today && items.length > 0 && <span className="block text-signal">{t.dailyStale(issue.label)}</span>}
+                    </p>
+                  ) : (
+                    <p className="mt-3 font-mono text-xs text-paper/60 sm:hidden">
+                      {t.archive}: {issue.archiveAt} · {archived ? t.frozen : t.collecting}
+                    </p>
+                  )}
                 </div>
-                <div className="hidden border-l border-paper/25 pl-5 font-mono text-xs leading-6 text-paper/60 sm:block">
+                <div className={`hidden border-l border-paper/25 pl-5 font-mono text-xs leading-6 text-paper/60 ${dailyView ? "" : "sm:block"}`}>
                   <p className="text-signal">{t.archive}</p>
                   <p className="text-lg font-bold text-paper">{issue.archiveAt}</p>
                   <p>
@@ -312,7 +343,7 @@ export function DigestDashboard(
               </div>
             </section>
 
-            {!items.length && !archived && !companies && (
+            {!items.length && !archived && !companies && !dailyView && (
               <div className="mt-4 border border-signal/50 bg-signal/10 px-4 py-3 font-mono text-xs leading-5 text-ink/70">※ {t.sample}</div>
             )}
 
@@ -339,10 +370,25 @@ export function DigestDashboard(
                 )}
 
                 <section className="mt-9">
-                  <SectionLabel icon={Newspaper} label={companies ? t.companiesFeed : t.feed} />
+                  <SectionLabel icon={dailyView ? Sunset : Newspaper} label={dailyView ? t.dailyFeed : companies ? t.companiesFeed : t.feed} />
+                  {dailyView && items.length > 0 && (
+                    <nav aria-label={t.dailyIndex} className="mb-6 border-2 border-ink bg-paper p-4">
+                      <ol className="space-y-1 font-mono text-xs">
+                        {items.map((item, index) => (
+                          <li key={item.id}>
+                            <a href={`#daily-${index + 1}`} className="focus-ring flex min-h-10 items-center gap-3 hover:text-signal">
+                              <span className="text-signal">{String(index + 1).padStart(2, "0")}</span>
+                              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{item.title[language]}</span>
+                              <span className="text-ink/55">{item.score}</span>
+                            </a>
+                          </li>
+                        ))}
+                      </ol>
+                    </nav>
+                  )}
                   <div className="space-y-4">
-                    {feed.map((item) => (
-                      <StoryCard key={item.id} {...cardProps(item)} />
+                    {feed.map((item, index) => (
+                      <StoryCard key={item.id} {...cardProps(item)} rank={dailyView ? index + 1 : undefined} />
                     ))}
                     {!feed.length && emptyFeed && (
                       <EmptyState tone="cream" icon={Newspaper}>

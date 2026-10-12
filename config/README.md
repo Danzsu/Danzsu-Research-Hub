@@ -24,7 +24,7 @@ GitHub Actions gets none of them: the CI runs the five checks without a database
 | --- | --- | --- |
 | Which model runs which task | the `model_settings` table (Supabase → SQL Editor) | one row per task with a fallback; a change takes effect on the next run, no redeploy (CLAUDE.md → How content gets in) |
 | The daily sources | [sources.ts](sources.ts), documented in `.claude/docs/truthful_sites.md` | `lib/truthful-sites.test.ts` keeps the two equal |
-| The cron schedule | `vercel.json` (`crons`), 05:00 UTC daily, the mirror at 07, 08 and 09 UTC | |
+| The cron schedule | `vercel.json` (`crons`), 13:00 UTC daily, the mirror at 14, 15 and 16 UTC | `lib/cron-schedule.test.ts` pins it (daily news spec N2) |
 | Sign-in | Supabase → Authentication: sign-ups **off** (the invite gate), the Email and Google providers on, the Site URL and the Redirect URLs | SECURITY.md → Auth and the invite gate |
 | The Google consent screen | Google Auth Platform: the home page `https://<domain>/about`, the privacy policy `https://<domain>/privacy`, the redirect URI `https://<ref>.supabase.co/auth/v1/callback` | `.claude/docs/TODO.md` → A Google-belépés beállítása |
 | The function region and compute | `vercel.json` (`regions`, `fluid`) | README.md → Deploy |

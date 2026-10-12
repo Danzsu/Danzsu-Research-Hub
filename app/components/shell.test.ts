@@ -4,6 +4,9 @@ import { createElement, type ComponentProps, type ComponentType } from "react";
 import {
   digestItem,
   previewArchive,
+  previewDaily,
+  previewDailyIssue,
+  previewDailyItems,
   previewGithub,
   previewIssue,
   previewItems,
@@ -355,11 +358,11 @@ test("AppShell carries the taiyaki, and LinkChat's top level renders without a r
   withShellProviders(LinkChat, { open: true, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
 });
 
-// Kills the bar's old order: Archívum in the bar, and no taiyaki between Könyvtár and Keresés.
-test("the mobile bar reads Radar, Könyvtár, the taiyaki, Keresés, Több", () => {
+// Kills the bar's old order: Archívum or Keresés in the bar, and no taiyaki between Napi and Könyvtár (daily news spec N7).
+test("the mobile bar reads Radar, Napi, the taiyaki, Könyvtár, Több", () => {
   const doc = shell();
   const slots = [...doc.querySelectorAll("#mobile-nav > *")].map((slot) => slot.getAttribute("aria-label") ?? slot.textContent);
-  assert.deepEqual(slots, ["Radar", "Könyvtár", "Link bedobása", "Keresés", "Több"]);
+  assert.deepEqual(slots, ["Radar", "Napi", "Link bedobása", "Könyvtár", "Több"]);
 });
 
 // Kills a "Több" slot without the active mark on an Archívum page, or with it on another page. The
@@ -387,13 +390,13 @@ test("every nav link carries one hidden pending dot, the search button none, and
     navigationStub.linkPending = false;
   });
   const doc = shell("en");
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1, 1, 1]); // Radar, AI companies, Library, GitHub, Archive, Collection
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1, 1, 1, 1]); // Radar, Daily, AI companies, Library, GitHub, Archive, Collection
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1, 1]); // Radar, Daily, Library
   const searchButtons = [...doc.querySelectorAll("aside nav button, #mobile-nav > button")].filter((button) => button.textContent?.startsWith("Search"));
-  assert.deepEqual(hiddenSpanCounts(searchButtons), [0, 0]);
+  assert.deepEqual(hiddenSpanCounts(searchButtons), [0]); // the sidebar's; the Több sheet's is portalled
   assert.equal(doc.querySelectorAll("[data-pending]").length, 0);
   navigationStub.linkPending = true;
-  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 8);
+  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 10);
 });
 
 // Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.
@@ -504,4 +507,61 @@ test("opening the link chat closes the reader panel, and opening the panel close
   assert.deepEqual([layers.panelOpen(), layers.chatOpen()], [false, true]);
   layers.setPanelOpen(true);
   assert.deepEqual([layers.panelOpen(), layers.chatOpen()], [true, false]);
+});
+
+const dailyView = (overrides: Partial<Pick<ComponentProps<typeof DigestDashboard>, "items" | "daily">> = {}) =>
+  withShellProviders(DigestDashboard, {
+    issue: previewDailyIssue,
+    items: previewDailyItems,
+    githubTop10: [],
+    scope: "daily",
+    daily: previewDaily,
+    preview: { data: previewReader, failWrites: false },
+    ...overrides,
+  });
+
+// Daily news spec N7. Kills the cards out of rank order or without their anchors, the index not linking them,
+// and the category chips shown on a list that has no categories.
+test("the daily view lists its cards in rank order, each with an anchor the index links to", () => {
+  const doc = dailyView();
+  assert.deepEqual([...doc.querySelectorAll("article[id]")].map((card) => card.id), ["daily-1", "daily-2", "daily-3", "daily-4", "daily-5"]);
+  assert.deepEqual([...doc.querySelectorAll('nav[aria-label="Today\'s stories"] a')].map((link) => link.getAttribute("href")), ["#daily-1", "#daily-2", "#daily-3", "#daily-4", "#daily-5"]);
+  assert.equal(doc.querySelector('nav[aria-label="Categories"]'), null);
+  assert.match(doc.body.textContent ?? "", /5 stories · 2 short/);
+  assert.match(doc.querySelector("header")?.textContent ?? "", /DAILY LIST/);
+  // Final review: the index rows are touch targets too (DESIGN.md: 40px).
+  assert.ok([...doc.querySelectorAll(`nav[aria-label="Today's stories"] a`)].every((link) => link.className.includes("min-h-10")));
+  // Every daily item carries its rank (getDaily's embed): the weekly DAY TOP mark must stay off this page.
+  assert.doesNotMatch(doc.body.textContent ?? "", /DAY TOP/);
+});
+
+// Spec N4, N7. Kills the SHORT mark on a long read, or missing from a short one (≤ 15 minutes).
+test("only the daily view's short reads carry the SHORT mark", () => {
+  const marked = [...dailyView().querySelectorAll("article[id]")].filter((card) => /SHORT/.test(card.textContent ?? "")).map((card) => card.id);
+  assert.deepEqual(marked, ["daily-2", "daily-4"]);
+});
+
+// Spec N8. Kills each long-text state shown wrong: the brief's paragraphs, the post's summary and key points,
+// "being written" with the item's own summary, and the plain summary with no entry.
+test("each daily card shows the best long text it has", () => {
+  const cards = [...dailyView().querySelectorAll("article[id]")].map((card) => card.textContent ?? "");
+  assert.match(cards[0], /EN 1\. bekezdés.*EN 3\. bekezdés/s);
+  assert.match(cards[2], /The post's own summary\..*First point.*Second point/s);
+  assert.match(cards[3], /A two-sentence summary.*The full brief is being written…/s);
+  assert.match(cards[4], /A two-sentence summary/);
+  assert.doesNotMatch(cards[4], /being written/);
+});
+
+// Spec N8, Review Focus 5. Kills yesterday's list shown as today's, and an empty day shown as a blank page.
+test("an older daily list says so, and no list at all says when the first one comes", () => {
+  assert.match(dailyView().body.textContent ?? "", /An earlier list \(2026\. 09\. 24\.\) — today's is ready by 18:00\./);
+  assert.doesNotMatch(dailyView({ daily: { ...previewDaily, today: true } }).body.textContent ?? "", /An earlier list/);
+  assert.match(dailyView({ items: [], daily: { today: false, briefs: {} } }).body.textContent ?? "", /No daily list yet/);
+});
+
+// Spec N7. Kills the weekly cards' DAY TOP mark missing, or put on an item that was never in a daily list.
+test("the weekly view marks the items of a daily Top 10", () => {
+  const doc = withShellProviders(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } });
+  const marked = [...doc.querySelectorAll("article[data-card-id]")].filter((card) => /DAY TOP · 4\./.test(card.textContent ?? "")).map((card) => card.getAttribute("data-card-id"));
+  assert.deepEqual([...new Set(marked)], ["companies-2026-W39-mistral"]);
 });

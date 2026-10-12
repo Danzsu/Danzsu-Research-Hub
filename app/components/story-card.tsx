@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { BookOpen, Check, Clock3, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { DigestItem, Language } from "@/data/digest-types";
+import type { DailyBrief, DigestItem, Language } from "@/data/digest-types";
 import { nextCardIndex } from "@/lib/keymap";
+import { SHORT_MINUTES } from "@/lib/pipeline/daily-top";
 import { parseSubmittedUrl } from "@/lib/pipeline/util";
 import type { RatingValue } from "@/lib/ratings";
 import type { Flag, ItemState } from "@/lib/reader-store";
@@ -19,6 +20,10 @@ const copy = {
     open: "Forrás, új lapon",
     readHere: "Olvasd itt",
     read: "Olvasott",
+    short: "RÖVID",
+    dayTop: "NAP TOP",
+    keyPoints: "FŐ PONTOK",
+    briefPending: "A részletes összefoglaló készül…",
   },
   en: {
     score: "SCORE",
@@ -27,6 +32,10 @@ const copy = {
     open: "Source, in a new tab",
     readHere: "Read here",
     read: "Read",
+    short: "SHORT",
+    dayTop: "DAY TOP",
+    keyPoints: "KEY POINTS",
+    briefPending: "The full brief is being written…",
   },
 };
 
@@ -50,6 +59,10 @@ export type CardProps = {
   postId?: number;
   /** The reader's rating of the item, from the page's render (getRatings). */
   rating: RatingValue | null;
+  /** The daily view's long text for the card (daily news spec N8); the weekly cards have none. */
+  brief?: DailyBrief;
+  /** The card's place in the daily Top 10: its number, its #daily-N anchor and the SHORT mark. */
+  rank?: number;
 };
 
 
@@ -63,12 +76,15 @@ export function StoryCard(props: CardProps) {
   return (
     <article
       {...cardFocus(item.id)}
+      id={props.rank ? `daily-${props.rank}` : undefined}
       data-saved={state.saved || undefined}
-      className={`focus-ring story-card max-w-[900px] border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+      // scroll-mt-20: the daily index jumps here, clear of the 64px sticky header.
+      className={`focus-ring story-card max-w-[900px] scroll-mt-20 border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
         {/* A row of meta on narrow screens, the 96px gutter from lg up. */}
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[11px] leading-5 text-ink/55 lg:block">
+          {props.rank !== undefined && <p className="font-display text-4xl leading-none text-signal lg:mb-3">{String(props.rank).padStart(2, "0")}</p>}
           <p className="text-signal">{item.publishedLabel}</p>
           <p className="lg:mt-2">
             {t.score} <span className="font-display text-xl text-ink lg:block lg:text-3xl">{item.score}</span>
@@ -76,6 +92,7 @@ export function StoryCard(props: CardProps) {
           <p className="flex items-center gap-1 lg:mt-2">
             <Clock3 className="size-3" /> {item.readMinutes} {t.min}
           </p>
+          {props.rank !== undefined && item.readMinutes <= SHORT_MINUTES && <p className="bg-signal px-1.5 font-bold text-ink lg:mt-2 lg:inline-block">{t.short}</p>}
         </div>
         <div className="min-w-0">
           <CardText {...props} titleClassName="max-w-3xl text-[clamp(1.5rem,3vw,2.6rem)] leading-[0.98] tracking-tight" />
@@ -105,10 +122,15 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
   );
 }
 
-function CardText({ item, language, actions, titleClassName }: CardProps & { titleClassName: string }) {
+function CardText({ item, language, actions, rank, brief, titleClassName }: CardProps & { titleClassName: string }) {
   const t = copy[language];
   return (
     <>
+      {rank === undefined && item.dailyRank !== undefined && (
+        <p className="mb-1 inline-block border border-ink px-1.5 font-mono text-[11px] text-ink">
+          {t.dayTop} · {item.dailyRank}.
+        </p>
+      )}
       {/* The source is the meta row's link (2a spec D1), and the `o` shortcut's target (data-card-open). */}
       <a
         href={item.url}
@@ -125,7 +147,7 @@ function CardText({ item, language, actions, titleClassName }: CardProps & { tit
         <span className="sr-only">({t.open})</span>
       </a>
       <h2 className={`mt-3 font-display [overflow-wrap:anywhere] ${titleClassName}`}>{item.title[language]}</h2>
-      <p className="mt-4 max-w-3xl text-base leading-7 text-ink/72">{item.summary[language]}</p>
+      <CardBody item={item} brief={brief} language={language} />
       <div className="mt-5 border-l-4 border-signal pl-4">
         <p className="font-mono text-[11px] tracking-[0.15em] text-signal">{t.why}</p>
         <p className="mt-1 text-sm leading-6">{item.why[language]}</p>
@@ -137,6 +159,45 @@ function CardText({ item, language, actions, titleClassName }: CardProps & { tit
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+/** The card's text under the title: the daily brief's paragraphs, the post's summary and key points, or the
+ *  item's own summary, with a note while the brief is being written (daily news spec N8). */
+function CardBody({ item, brief, language }: { item: DigestItem; brief?: DailyBrief; language: Language }) {
+  const t = copy[language];
+  const text = "mt-4 max-w-[75ch] text-base leading-7 text-ink/72";
+  if (brief?.kind === "brief") {
+    return (
+      <div className="mt-4 max-w-[75ch] space-y-3 text-base leading-7 text-ink/80">
+        {brief.paragraphs[language].map((paragraph, index) => (
+          <p key={index}>{paragraph}</p>
+        ))}
+      </div>
+    );
+  }
+  if (brief?.kind === "post") {
+    return (
+      <>
+        <p className={text}>{brief.summary[language]}</p>
+        {brief.keyPoints[language].length > 0 && (
+          <div className="mt-4 max-w-[75ch]">
+            <p className="font-mono text-[11px] tracking-[0.15em] text-ink/55">{t.keyPoints}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6">
+              {brief.keyPoints[language].map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      <p className={text}>{item.summary[language]}</p>
+      {brief?.kind === "pending" && <p className="mt-2 font-mono text-xs text-ink/55">{t.briefPending}</p>}
     </>
   );
 }

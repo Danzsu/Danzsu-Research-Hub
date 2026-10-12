@@ -113,7 +113,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   mask-image: linear-gradient(90deg, transparent 0%, black 55%, black 100%);
 }
 .signal-grid::after {
-  content: "/// DAILY 07:00 → SUN FREEZE";
+  content: "/// DAILY 18:00 → SUN FREEZE";
   position: absolute;
   right: 2rem;
   top: 1.2rem;

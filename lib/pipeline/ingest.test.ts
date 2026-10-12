@@ -33,7 +33,7 @@ test("imageBudgetFor(): shrinks toward the deadline, floors at 0, and is capped 
 // --- processSource()/retryPendingSources() wiring: real extract/cleanup/images/summary modules,
 // against a fake `sources`/`posts`/storage db and a mocked global fetch (page + Gemini). ---
 
-const okSummary = { title: { hu: "Cím", en: "Title" }, summary: { hu: "Összegzés", en: "Summary" }, keyPoints: { hu: [], en: [] }, tags: [] };
+const okSummary = { title: { hu: "Cím", en: "Title" }, summary: { hu: "Összegzés", en: "Summary" }, keyPoints: { hu: [], en: [] }, tags: [], brief: { hu: ["Bekezdés."], en: ["Paragraph."] } };
 
 /** A never-attempted submission served from TEST_HOST. */
 const newSource = (id: number, kind = "article", path = "post") => ({ id, url: `${TEST_HOST}/${path}`, kind, note: null, attempts: 0 });
@@ -136,6 +136,7 @@ test("processSource(): the post upsert uses onConflict: source_id and writes exa
       "author",
       "blocks",
       "blocks_hu",
+      "brief",
       "extracted_at",
       "key_points",
       "kind",
@@ -150,6 +151,7 @@ test("processSource(): the post upsert uses onConflict: source_id and writes exa
     ],
   );
   assert.ok(db.eqCalls.some((c) => c.table === "posts" && c.column === "source_id"));
+  assert.deepEqual(db.postUpserts[0].brief, okSummary.brief);
 });
 
 test("processSource(): attempts is bumped before any extraction fetch", async (t) => {

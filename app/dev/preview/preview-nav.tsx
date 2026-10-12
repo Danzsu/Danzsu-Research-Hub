@@ -6,6 +6,8 @@ export const PREVIEW_VIEWS = [
   "radar",
   "radar-empty",
   "companies",
+  "daily",
+  "daily-empty",
   "library",
   "library-empty",
   "archive",

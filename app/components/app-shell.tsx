@@ -245,7 +245,10 @@ function MobileNav({ email, onSearch, onHelp, chat }: { email: string; onSearch:
                 <NavEntry
                   item={item}
                   active={active === item.id}
-                  onSearch={onSearch}
+                  onSearch={() => {
+                    setMoreOpen(false);
+                    onSearch();
+                  }}
                   onClick={() => setMoreOpen(false)}
                   className="press focus-ring -ml-3.5 flex min-h-10 items-center gap-3 border-l-2 border-transparent pl-3 font-mono text-sm aria-[current=page]:border-signal aria-[current=page]:bg-signal/10"
                   iconClass="size-4"
