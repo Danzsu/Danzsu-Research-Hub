@@ -34,6 +34,10 @@ export const feeds: Array<{ name: string; url: string; hint: DigestCategory; lim
   // The Chinese labs (DeepSeek, Qwen, Kimi, Zhipu, MiniMax) publish no feeds; these two newsletters cover them.
   { name: "Recode China AI", url: "https://www.recodechinaai.com/feed", hint: "companies" },
   { name: "ChinAI", url: "https://chinai.substack.com/feed", hint: "companies" },
+  // Checked live on 2026-10-11. Two secondary sources, which often repeat a lab's own announcement, and a free engineering blog.
+  { name: "The Rundown AI", url: "https://www.therundown.ai/feed", hint: "companies", limit: 10 },
+  { name: "MIT Technology Review", url: "https://www.technologyreview.com/topic/artificial-intelligence/feed", hint: "companies", limit: 10 },
+  { name: "Pragmatic Engineer", url: "https://blog.pragmaticengineer.com/rss/", hint: "research", limit: 5 },
 ];
 
 // Hacker News (Algolia) queries; only stories above the points floor.

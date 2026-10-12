@@ -15,6 +15,7 @@ const here = (file: string) => new URL(file, import.meta.url).href;
 /** Modules that need a running Next.js app, and what stands in for them. */
 const STUBS = new Map([
   ["next/link", here("./next-stub.ts")],
+  ["next/image", here("./next-image-stub.ts")],
   ["next/navigation", here("./next-stub.ts")],
   ["next/server", here("./route-hooks.ts")],
   ["next/cache", here("./route-hooks.ts")],

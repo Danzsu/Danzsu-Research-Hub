@@ -4,7 +4,6 @@ import { LocalizedText } from "@/app/components/language-context";
 import { PageHero } from "@/app/components/page-header";
 import { PublicPage } from "@/app/components/public-page";
 import { getLanguage } from "@/lib/language";
-import { SignInCard, SignInForms } from "@/app/components/sign-in-forms";
 
 const copy = {
   signedOut: { hu: "Kijelentkeztél.", en: "You're signed out." },
@@ -13,11 +12,6 @@ const copy = {
     en: "A private, invite-only AI research hub: it curates the most important news every day and turns the links you send into readable posts. In Hungarian and English.",
   },
   featuresTitle: { hu: "MIT TUD", en: "WHAT IT DOES" },
-  signInTitle: { hu: "BELÉPÉS", en: "SIGN IN" },
-  signInNote: {
-    hu: "Csak meghívással lehet belépni. Nincs regisztráció: a meghívott címeddel jelentkezz be Google-lel vagy e-mailes linkkel.",
-    en: "Entry is by invitation only. There is no sign-up: use your invited address, with Google or an email link.",
-  },
 };
 
 const features: { icon: LucideIcon; title: Localized; text: Localized }[] = [
@@ -98,10 +92,10 @@ const features: { icon: LucideIcon; title: Localized; text: Localized }[] = [
 export default async function AboutPage({ searchParams }: { searchParams: Promise<{ signed_out?: string }> }) {
   const [{ signed_out }, language] = await Promise.all([searchParams, getLanguage()]);
   return (
-    <PublicPage language={language} notice={signed_out === "1" ? copy.signedOut : undefined}>
+    <PublicPage language={language} notice={signed_out === "1" ? copy.signedOut : undefined} signIn="auto">
       <PageHero eyebrow="INVITE-ONLY / CSAK MEGHÍVÓVAL" title="NEON NEWS RADAR" lead={<LocalizedText value={copy.lead} />} />
       <main>
-        <section className="mx-auto max-w-[1600px] px-4 py-12 sm:px-10">
+        <section className="mx-auto max-w-[1600px] px-4 pt-12 pb-16 sm:px-10">
           <h2 className="font-display text-3xl tracking-[-0.04em] sm:text-4xl">
             <LocalizedText value={copy.featuresTitle} />
             <span className="text-signal">{"//"}</span>
@@ -119,18 +113,6 @@ export default async function AboutPage({ searchParams }: { searchParams: Promis
               </li>
             ))}
           </ul>
-        </section>
-        <section id="login" className="mx-auto max-w-[1600px] px-4 pb-16 sm:px-10">
-          <SignInCard>
-            <h2 className="font-display text-4xl leading-[0.9] tracking-[-0.04em]">
-              <LocalizedText value={copy.signInTitle} />
-              <span className="text-signal">{"//"}</span>
-            </h2>
-            <p className="mt-4 text-sm leading-6 text-ink/70">
-              <LocalizedText value={copy.signInNote} />
-            </p>
-            <SignInForms next="/" />
-          </SignInCard>
         </section>
       </main>
     </PublicPage>

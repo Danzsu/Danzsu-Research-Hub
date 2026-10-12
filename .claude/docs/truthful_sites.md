@@ -27,7 +27,7 @@ A céges blog elsődleges forrás, de érdekelt fél: a saját termékéről ír
 
 ### Hírcsatornák (RSS, Atom)
 
-A csatornák 2026-09-23-án élőben ellenőrizve, a ByteByteGo, az Anthropic és a The Batch 2026-09-27-én, a Mistral, a Microsoft Research, a Meta AI Research, az Anthropic Research és a két kínai hírlevél 2026-09-29-én. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
+A csatornák 2026-09-23-án élőben ellenőrizve, mind a 22 újra 2026-10-11-én (mind él; az arXiv hétvégén üres, mert akkor nem közöl), a The Rundown AI, a MIT Technology Review és a Pragmatic Engineer 2026-10-11-én, a ByteByteGo, az Anthropic és a The Batch 2026-09-27-én, a Mistral, a Microsoft Research, a Meta AI Research, az Anthropic Research és a két kínai hírlevél 2026-09-29-én. A `limit` a nagy forgalmú csatornát vágja; ahol nincs megadva, 25 tétel (`DEFAULT_FEED_LIMIT`). A kategória (`hint`) az, amiből a modell kiindul.
 
 A promóciót és az ismétlést két szűrő tartja távol:
 
@@ -58,6 +58,9 @@ A promóciót és az ismétlést két szűrő tartja távol:
 | Anthropic Research | `https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_research.xml` | research | 25 | elsődleges (céges), külső RSS-tükörrel |
 | Recode China AI | `https://www.recodechinaai.com/feed` | companies | 25 | másodlagos (a kínai AI-cégekről szóló hírlevél) |
 | ChinAI | `https://chinai.substack.com/feed` | companies | 25 | másodlagos (Jeffrey Ding heti hírlevele, kínai források fordításával) |
+| The Rundown AI | `https://www.therundown.ai/feed` | companies | 10 | másodlagos (napi AI-hírlevél) |
+| MIT Technology Review | `https://www.technologyreview.com/topic/artificial-intelligence/feed` | companies | 10 | másodlagos (szerkesztett magazin; mérőórás fizetőfal) |
+| Pragmatic Engineer | `https://blog.pragmaticengineer.com/rss/` | research | 5 | elsődleges (független szakértő; nem csak AI) |
 
 **ByteByteGo:** rendszertervezés és AI-infrastruktúra. A tételek felében ott a teljes szöveg (`content:encoded`), a poszt-oldalak szerverről letölthetők, `noarchive` nincs rajtuk. A fizetős posztokból csak részlet érhető el (Substack).
 
@@ -70,6 +73,14 @@ A promóciót és az ismétlést két szűrő tartja távol:
 - **Szűrés:** a teljes heti számot (`/issue-372/`) a szűrő kihagyja, mert a cikkei külön tételként is jönnek.
 
 **Meta AI Research:** az ai.meta.com nem ad RSS-t (a `/blog/rss/` 404, 2026-09-29), ezért a Meta mérnöki blogjának AI-kutatási kategóriája jön be. A közösségi tükör Meta-csatornája július óta nem frissült.
+
+**The Rundown AI:** napi hírlevél, tételenként egy hír, a linkek a therundown.ai-ra mutatnak. Másodlagos: ugyanazt a hírt gyakran az elsődleges forrás (OpenAI, Google, Anthropic) is hozza, ezt a válogató szűri.
+
+**MIT Technology Review:** az AI-téma csatornája (napi 1–3 cikk). Mérőórás fizetőfal: a kivonat és az összefoglaló működik, a Library-tükör néha csak részletet kap.
+
+**Pragmatic Engineer:** Gergely Orosz szabadon olvasható blogja (szoftvermérnökség, egyre több AI-eszközzel). A hírlevél (`newsletter.pragmaticengineer.com`) nagyrészt fizetős, ezért nincs bent.
+
+**Az Anthropic Engineering tükre** 2026-10-11-én a május 25-i posztnál tartott, az anthropic.com-on egy június 6-i is van: kicsit lemarad, figyelni kell.
 
 **A kínai laborok** (DeepSeek, Qwen, Kimi, Zhipu, MiniMax) nem adnak géppel olvasható csatornát (2026-09-29: a Qwen blogja egy éve áll, a többinek nincs feedje). Két hírlevél és a Hacker News fedi le őket: a Recode China AI hetente többször, a ChinAI hetente ír róluk, a nagy bejelentések pedig a lenti lekérdezésekkel jönnek.
 
@@ -114,6 +125,9 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 | Star History Monthly | `https://rss.beehiiv.com/feeds/BbNzf9ozGZ.xml` | élőben ellenőrizve 2026-09-30: 20 tétel, havonta egy | A Bytebase (star-history.com) havi összefoglalója a gyorsan növő repókról. A tervezett GitHub-radarhoz kell (TODO.md). A star-history.com chart-API-ja (`https://api.star-history.com/svg?repos=<owner>/<repo>&type=Date`) egy repó csillag-idősorát rajzolja. Linkként használnánk, nem beágyazva, mert beágyazva minden megnyitás egy kérés lenne egy harmadik félhez. |
 | GenAI Works | a hírlevelük: `newsletter.genai.works` (beehiiv) | nincs nyilvános csatorna (2026-09-30: a `/feed` és a `/rss` 403) | A LinkedIn-posztjaik helyett ez jöhetne, ha a kiadó bekapcsolja az RSS-t. |
 | IBM Technology | cikkek és videók | ellenőrizendő | A videók a YouTube-kinyerőn mennek át. |
+| IBM Think News | `ibm.com/think/news` | nincs csatorna (2026-10-11: a `/rss` HTML-t ad) | Csak lekaparással menne. |
+| Future Tools | `futuretools.io/news` | nincs csatorna (2026-10-11: a `/feed`, `/rss.xml` 404) | AI-eszköz-gyűjtő; csak lekaparással menne. |
+| TLDR AI | `https://tldr.tech/api/rss/ai` | élőben ellenőrizve 2026-10-11 | Egy tétel egy teljes napi szám (kb. 27 link): a napi hírek tervében egy bontó veszi fel, ami a számot külön linkekre szedi. |
 
 **Súlyozás:** a Google DeepMind már bent van, de a kiemelt források közé kell emelni.
 
@@ -124,6 +138,7 @@ Felvétel előtt élőben ellenőrizni kell mindegyiket (lásd lent: Új forrás
 | Google Scholar | Nincs API-ja, és a feltételei tiltják a letöltést. Helyette: Semantic Scholar, OpenAlex. |
 | xAI | Az x.ai minden automatikus kérést 403-mal elutasít (2026-09-29), a közösségi tükör xAI-csatornája pedig 2026 májusa óta áll. Helyette: a `Grok` Hacker News-lekérdezés és a The Decoder. |
 | Reddit (r/LocalLLaMA) | A tulajdonos döntése (2026-10-02): közösségi fórum, nem szerkesztett, ellenőrzött forrás. A helyi modellek híreit a Hugging Face, az Ollama és Simon Willison hozza. |
+| daily.dev | Az RSS-e (`daily.dev/rss.xml`) a saját marketingblogjuk („daily.dev alternatives…”), nem hírfolyam; az AI-szűrős fejlesztői hírfolyam az alkalmazásban, belépés mögött van. |
 | LinkedIn | Bejelentkezéshez kötött, nincs nyilvános csatornája, és a felhasználási feltételei tiltják a gépi gyűjtést (az RSS-hidak is így gyűjtenek). A hivatalos API (Community Management API) csak a saját, adminisztrált oldalak posztjait adja, jóváhagyott alkalmazással. A cégek ugyanazt jellemzően a saját blogjukon vagy hírlevelükben is közlik; lásd a GenAI Works-öt a jelöltek között. |
 
 ## Új forrás felvétele

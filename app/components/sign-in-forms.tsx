@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { liftSurface } from "./lift-classes";
 
 // Before sign-in there is no language yet, so every line shows both, "magyar / English".
 const copy = {
@@ -37,9 +37,9 @@ export function SignInForms({ next }: { next: string }) {
       <form action="/auth/google" method="post" className="mt-7">
         <input type="hidden" name="next" value={next} />
         {/* Wraps on a narrow phone: the two-language label is wider than the 360px card. */}
-        <Button type="submit" variant="brutal" className="h-auto min-h-10 w-full whitespace-normal py-2">
+        <button type="submit" className={`${liftSurface} flex min-h-10 w-full items-center justify-center gap-2 px-4 py-2 font-mono text-xs shadow-[3px_3px_0_var(--signal)]`}>
           <GoogleMark /> {both(copy.google)}
-        </Button>
+        </button>
       </form>
       <p className="my-5 flex items-center gap-3 font-mono text-[11px] text-ink/60 before:h-px before:flex-1 before:bg-ink/20 after:h-px after:flex-1 after:bg-ink/20">
         {both(copy.or)}
@@ -57,9 +57,10 @@ export function SignInForms({ next }: { next: string }) {
             className="min-h-10 border-2 border-ink bg-paper focus-visible:border-signal"
           />
         </div>
-        <Button type="submit" variant="ink" className="min-h-10 w-full">
+        {/* The taiyaki's motion on the ink primary: it steps forward on hover and sinks on press. */}
+        <button type="submit" className="lift focus-ring min-h-10 w-full border-2 border-ink bg-ink px-4 font-mono text-xs text-paper shadow-[3px_3px_0_var(--signal)]">
           {both(copy.send)}
-        </Button>
+        </button>
       </form>
     </>
   );

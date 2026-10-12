@@ -90,6 +90,7 @@ Importing `render.ts` registers `tsx-hooks.ts` with `module.register`. The hooks
 
 - they resolve `@/` and extensionless relative imports (`./x` → `.ts`, `.tsx` or `index`);
 - they compile `.tsx` with the project's own TypeScript (`transpileModule`);
+- they swap `next/image` for `next-image-stub.ts`, a plain `<img>` with the same `src`;
 - they swap `next/link` and `next/navigation` for `next-stub.ts`. Its `usePathname` answers `navigationStub.pathname` (`"/"` by default) and its `useLinkStatus` answers `navigationStub.linkPending` (`false`); a test that sets either resets it afterwards. Its `useRouter` has `push`, `refresh` and `prefetch`, all inert.
 
 `render(element)` returns a linkedom `Document`. Import `render.ts` first, then the component with `await import("./x.tsx")`.

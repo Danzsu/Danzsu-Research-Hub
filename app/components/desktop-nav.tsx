@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { ChevronsLeft, ChevronsRight, Radar } from "lucide-react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { BrandMark } from "./brand-mark";
 import { activeNavId, PRIMARY_NAV } from "@/lib/nav";
 import type { NavMode } from "@/lib/nav-mode";
 import { useLanguage } from "./language-context";
@@ -65,9 +66,7 @@ export function DesktopNav({ email, onSearch, onHelp, mode, onToggle, children }
           aria-label="NEON NEWS RADAR"
           className={`press-ink focus-ring flex items-center gap-3 border-b border-paper/15 ${rail ? "justify-center p-3" : "p-5"}`}
         >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full border border-signal bg-signal text-ink">
-            <Radar className="size-5" />
-          </span>
+          <BrandMark className="size-10" />
           {!rail && (
             <span className="font-display text-2xl leading-none tracking-tight">
               NEON
