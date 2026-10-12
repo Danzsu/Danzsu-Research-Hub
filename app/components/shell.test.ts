@@ -301,6 +301,14 @@ test("ArchiveView lists every preview issue", () => {
   );
 });
 
+// Polish 2. Kills the archive's empty note left outside the shared EmptyState, or without its way back.
+test("an empty archive says so in the shared empty state, with a link back to the Radar", () => {
+  const doc = withShellProviders(ArchiveView, { issues: [] });
+  const box = doc.querySelector(".border-dashed");
+  assert.match(box?.textContent ?? "", /No closed week yet/);
+  assert.equal(box?.querySelector('a[href="/"]')?.textContent, "Go to the Radar →");
+});
+
 test("PostImage keeps the pre-load placeholder behind the img until it settles", () => {
   const placeholder = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   const doc = render(

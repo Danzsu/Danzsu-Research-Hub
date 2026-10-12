@@ -825,7 +825,7 @@ A multi-line field, from `app/(app)/library/[id]/post-editor.tsx`:
 
 ### Empty states
 
-An empty view says what to do next, in one component (`EmptyState`, `app/components/empty-state.tsx`, 2a spec D8): a dashed box, an optional signal icon, a sentence at most 75ch wide and, where there is one, a 40px link or `brutal` button. Two tones, `cream` (the Radar) and `ink` (the Library, the GitHub page, the collection):
+An empty view says what to do next, in one component (`EmptyState`, `app/components/empty-state.tsx`, 2a spec D8): a dashed box, an optional signal icon, a sentence at most 75ch wide and, where there is one, a 40px link or `brutal` button. Two tones, `cream` (the Radar) and `ink` (the Library, the GitHub page, the collection, the archive):
 
 ```tsx app/components/empty-state.tsx
     <div className={`flex flex-col items-center gap-3 border-2 border-dashed p-10 text-center font-mono text-sm ${frame}`}>

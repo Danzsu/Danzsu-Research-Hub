@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Archive, CalendarDays, Clock3 } from "lucide-react";
+import { EmptyState } from "@/app/components/empty-state";
 import { LocalizedText } from "@/app/components/language-context";
 import { PendingDot } from "@/app/components/nav-parts";
 import { PageHero } from "@/app/components/page-header";
@@ -26,15 +27,15 @@ export function ArchiveView({ issues }: { issues: ArchiveIssue[] }) {
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="WEEKLY FREEZE / HETI ZÁRÁS" title="ARCHIVE" lead={<LocalizedText value={copy.lead} />} />
       <section className="mx-auto max-w-[1600px] px-4 py-10 @container sm:px-10">
-        <div className="grid gap-5 @[48rem]:grid-cols-2 @[72rem]:grid-cols-3 @[96rem]:grid-cols-4">
         {!issues.length && (
-          <p className="font-mono text-sm text-paper/55 @[48rem]:col-span-2 @[72rem]:col-span-3 @[96rem]:col-span-4">
+          <EmptyState tone="ink" icon={Archive}>
             <LocalizedText value={copy.empty} />{" "}
             <Link href="/" className="focus-ring inline-flex min-h-10 items-center text-signal underline">
               <LocalizedText value={copy.toRadar} />
             </Link>
-          </p>
+          </EmptyState>
         )}
+        <div className="grid gap-5 @[48rem]:grid-cols-2 @[72rem]:grid-cols-3 @[96rem]:grid-cols-4">
         {issues.map((issue, index) => (
           <Link
             key={issue.id}
