@@ -238,6 +238,13 @@
     - [x] a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja) — elavult: a `/login` a landing-signin óta gomb nélkül (`signIn="none"`) használja a keretet;
     - [x] a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel;
     - a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül: nyitott ötlet, előbb mérni kell.
+  - **Apróságok (polish) záró reviewja (2026-10-12):**
+    - fekvő iPhone-on (`md`-től) a fix elemek nem kapják az oldalsó insetet: a sarok-taiyaki (`right-6`), a chat panel (`md:right-6`), a jobb oldali olvasópanel és a toast sávja kb. 24 px-re ül a 47 px-es kivágástól; javítás: `md:right-[calc(1.5rem+env(safe-area-inset-right))]` és társai;
+    - az olvasópanel csak félig ül a pill után a Tab-sorrendben: a pillről egy Tab az oldalra megy, nem a panelbe, és a Radix bezárja; javítás: nyitott panelnél a pill Tabja a panel első elemére;
+    - a harmadik, utolsó futásán lévő forrás kártyáján a futás alatt nem „készül…”, hanem az elem összefoglalója látszik (a claim már 3-ra emelte az `attempts`-et); javítás: a `claimed_at` is kell, és a `claimHeld` futás is függőben lévőnek számít;
+    - a hétfői „lezárt hét” bekötésének (`current-week-page.tsx`, `archived={isClosedWeek(…)}`) nincs tesztje, csak az `isClosedWeek`-nek;
+    - a `MAX_ATTEMPTS` két helyről exportálódik: az `ingest.ts` újraexportja csak az `app/api/sources/route.ts` miatt kell, az importálhatna a `util`-ból;
+    - a `fakeDb` általános upsertje az `onConflict`-tól függetlenül hozzáfűz, és a hívó `tables.rows`-át módosítja (ma minden teszt saját táblát épít, így nem bukik semmi).
 - [ ] **Responzívabb UI/UX** (döntve 2026-09-26, a taiyaki után, külön terv). Az R1 Gyors és az R2 Visszajelzés kész; hátra van az **R3 Elrendezés** (a mobil fekvő keret, a széles képernyő, a panel és a chat takarása, a taiyaki kerete ink oldalon). Mindkét értelemben:
   - gyorsabb, azonnali visszajelzés (betöltési állapotok, gyorsabb oldalváltás, például a lassú `/archive`);
   - minden képernyőméreten jó elrendezés, 360 px-től a széles monitorig.
