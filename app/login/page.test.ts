@@ -29,6 +29,10 @@ test("the login page says why a sign-in failed, in both languages, in its alert 
     ["google", "A Google-belépés nem sikerült, próbáld újra. / Google sign-in failed, try again."],
     ["1", expired],
     ["valami", expired],
+    // Polish 4, Review Focus 1: a hand-made code that names an Object.prototype member.
+    ["constructor", expired],
+    ["toString", expired],
+    ["__proto__", expired],
   ];
   for (const [error, text] of cases) assert.equal((await page({ error })).querySelector('[role="alert"]')?.textContent, text, error);
   assert.equal((await page({})).querySelector('[role="alert"]')?.textContent, "");

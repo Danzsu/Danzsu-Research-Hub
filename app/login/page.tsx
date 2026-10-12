@@ -2,6 +2,7 @@ import { ErrorLine } from "@/app/components/error-line";
 import { PublicPage } from "@/app/components/public-page";
 import { both, SignInCard, SignInForms } from "@/app/components/sign-in-forms";
 import { getLanguage } from "@/lib/language";
+import type { LoginError } from "@/lib/pipeline/util";
 import { safeNext } from "@/lib/supabase/server";
 
 // Before sign-in there is no language yet, so every line shows both, "magyar / English".
@@ -11,7 +12,7 @@ const copy = {
     "1": { hu: "A link lejárt vagy érvénytelen.", en: "The link expired or is invalid." },
     google: { hu: "A Google-belépés nem sikerült, próbáld újra.", en: "Google sign-in failed, try again." },
     not_invited: { hu: "Ez a Google-fiók nincs meghívva.", en: "This Google account isn't invited." },
-  },
+  } satisfies Record<LoginError, { hu: string; en: string }>,
 };
 
 export default async function LoginPage({
@@ -21,8 +22,9 @@ export default async function LoginPage({
 }) {
   const { next, sent, error } = await searchParams;
   const target = safeNext(next);
-  // An unknown reason is still a failed sign-in: the link message, as before Google.
-  const failure = error ? (copy.errors[error as keyof typeof copy.errors] ?? copy.errors["1"]) : null;
+  // An unknown reason is still a failed sign-in: the link message, as before Google. Own keys only, so a
+  // hand-made `?error=constructor` can't reach Object.prototype.
+  const failure = error ? copy.errors[Object.hasOwn(copy.errors, error) ? (error as LoginError) : "1"] : null;
 
   return (
     <PublicPage language={await getLanguage()} signIn="none">

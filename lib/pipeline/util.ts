@@ -311,8 +311,11 @@ export function authCallback(origin: string, next: string, via?: "google"): stri
   return callback.toString();
 }
 
+/** Why a sign-in round trip was refused (`/login?error=`): the callback writes it, the login page explains it. */
+export type LoginError = "1" | "google" | "not_invited";
+
 /** The login page after a failed sign-in: the reason the page explains (app/login/page.tsx), and the target kept. */
-export function loginWithError(origin: string, reason: "1" | "google" | "not_invited", next: string): string {
+export function loginWithError(origin: string, reason: LoginError, next: string): string {
   const login = new URL("/login", origin);
   login.searchParams.set("error", reason);
   login.searchParams.set("next", next);
