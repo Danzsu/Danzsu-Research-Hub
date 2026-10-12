@@ -62,3 +62,18 @@ test("queueMirrors queues nothing without RADAR_MIRROR_USER_ID, saying so once, 
   assert.equal(await queueMirrors(privateOnly, "2026-W40", "system-user"), 0);
   assert.deepEqual(privateOnly.sourceUpserts, []);
 });
+
+// Daily news spec N5. Kills the day's Top 10 left out below 85 points (its card would have no brief), and an
+// item outside it queued.
+test("queueMirrors also queues the items ranked in a daily Top 10, whatever their score", async () => {
+  const db = fakeDb(undefined, {
+    rows: {
+      digest_items: [
+        { ...item("https://blog.test/daily", 60), daily_top: [{ rank: 4 }] },
+        { ...item("https://blog.test/plain", 60), daily_top: [] },
+      ],
+    },
+  });
+  assert.equal(await queueMirrors(db, "2026-W40", "system-user"), 1);
+  assert.deepEqual(db.sourceUpserts[0].values, [{ url: "https://blog.test/daily", kind: "article", submitted_by: "system-user" }]);
+});
