@@ -163,13 +163,13 @@ async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
   }));
 }
 
-// The two caches (spec 1.5; the rules are in ARCHITECTURE.md → Invariants, the mechanics in CLAUDE.md →
+// The three caches (spec 1.5; the rules are in ARCHITECTURE.md → Invariants, the mechanics in CLAUDE.md →
 // Server path). A cached function may not
-// read cookies, so both read with the admin client: only the content tables and the archive_issues view,
+// read cookies, so all three read with the admin client: only the content tables and the archive_issues view,
 // which every member may read through RLS anyway. They hold content only, never the viewer, and are
-// reachable only through archivedWeek and archiveList, which take a signed-in Reader.
-// ⚠️ Next's data cache outlives a deploy (unstable_cache.md): bump the key's version whenever RadarData
-// or ArchiveIssue changes shape, or a deploy serves the old shape for up to a day. v2: items gained addedAt.
+// reachable only through archivedWeek, currentRadar and archiveList, which take a signed-in Reader.
+// ⚠️ Next's data cache outlives a deploy (unstable_cache.md): bump the keys' versions whenever RadarData
+// (both `closed-week` and `current-radar`) or ArchiveIssue changes shape, or a deploy serves the old shape for up to a day. v2: items gained addedAt.
 // v3: githubTop10 rows became objects with stars, language and score.
 const ONE_DAY = 86_400;
 /** The daily cron's revalidateTag drops the archive list with this tag. */
