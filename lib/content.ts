@@ -380,10 +380,13 @@ export async function getPost(db: SupabaseClient, id: number): Promise<Post | nu
 
 export type SubmittedSource = { id: number; url: string; kind: string; status: string; error: string | null; createdAt: string };
 
-export async function getOpenSources(db: SupabaseClient): Promise<SubmittedSource[]> {
+/** The reader's own unfinished submissions: another member's, or the mirror's queue, would keep the Library
+ *  refreshing while it waits for them. */
+export async function getOpenSources(db: SupabaseClient, viewerId: string): Promise<SubmittedSource[]> {
   const { data, error } = await db
     .from("sources")
     .select("id, url, kind, status, error, created_at")
+    .eq("submitted_by", viewerId)
     .neq("status", "done")
     .order("created_at", { ascending: false })
     .limit(20);

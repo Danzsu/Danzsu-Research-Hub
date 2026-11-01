@@ -133,9 +133,21 @@ test("the Library's content reads throw on a failed query, with the PostgREST er
   const withCause = (what: string) => (e: unknown) => e instanceof Error && e.message === `${what} query failed: connection failure` && e.cause === error;
   await assert.rejects(getPosts(fakeDb(undefined, { tableErrors: { posts: error } })), withCause("posts"));
   await assert.rejects(getPost(fakeDb(undefined, { postError: error }), 7), withCause("post"));
-  await assert.rejects(getOpenSources(fakeDb(undefined, { sourceSelectError: error })), withCause("open sources"));
+  await assert.rejects(getOpenSources(fakeDb(undefined, { sourceSelectError: error }), "me"), withCause("open sources"));
   assert.equal(await getPost(fakeDb(), 7), null, "no row is still a 404");
   assert.deepEqual((await getPosts(fakeDb(undefined, { rows: { posts: [{ id: 3 }] } }))).map((post) => post.id), [3]);
+});
+
+// 2026-11-01 review. Kills the Library's open list showing every member's and the mirror's sources: one
+// pending row of the mirror kept every reader's Library refreshing every 5 s.
+test("the Library's open list is the reader's own unfinished sources", async () => {
+  const sources = [
+    { id: 1, submitted_by: "me", status: "pending", created_at: "2026-11-01T10:00:00Z" },
+    { id: 2, submitted_by: "mirror", status: "pending", created_at: "2026-11-01T11:00:00Z" },
+    { id: 3, submitted_by: "me", status: "done", created_at: "2026-11-01T12:00:00Z" },
+    { id: 4, submitted_by: "me", status: "failed", created_at: "2026-11-01T13:00:00Z" },
+  ];
+  assert.deepEqual((await getOpenSources(fakeDb(undefined, { sources }), "me")).map((source) => source.id), [4, 1]);
 });
 
 // R2 spec 2. Kills the reader's own marks failing the page: the dimming is all their failure costs.
