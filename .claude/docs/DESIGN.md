@@ -652,7 +652,7 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClas
 ```
 
 ```tsx app/components/story-card.tsx
-<span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
+<span className="font-display text-4xl text-signal sm:text-5xl">{String(rank).padStart(2, "0")}</span>
 ```
 
 ```tsx app/components/story-card.tsx

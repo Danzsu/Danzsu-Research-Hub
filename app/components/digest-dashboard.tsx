@@ -360,7 +360,8 @@ export function DigestDashboard(
                     <span>
                       {t.updated}: {issue.updated}
                     </span>
-                    <span>{t.schedule}</span>
+                    {/* The phone keeps one line: the update time says enough there. */}
+                    <span className="hidden sm:inline">{t.schedule}</span>
                   </div>
                   <h1 className="max-w-4xl font-display text-[clamp(2.6rem,15cqi,8rem)] leading-[0.77] tracking-[-0.07em]">
                     {dailyView ? t.dailyTitle : companies ? t.companiesTitle : "AI WEEKLY"}

@@ -122,8 +122,8 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
       data-saved={state.saved || undefined}
       className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
-      <div className="mb-6 flex items-start justify-between">
-        <span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
+      <div className="mb-4 flex items-start justify-between sm:mb-6">
+        <span className="font-display text-4xl text-signal sm:text-5xl">{String(rank).padStart(2, "0")}</span>
         <span className="border border-ink px-2 py-1 font-mono text-[11px]">{item.score}/100</span>
       </div>
       <CardText {...props} titleClassName="text-2xl leading-[1.02]" />
