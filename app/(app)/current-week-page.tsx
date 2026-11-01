@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
-import { getRadar, getRatings, getReaderSeed } from "@/lib/content";
+import { currentRadar, getRatings, getReaderSeed } from "@/lib/content";
 import { readHerePosts } from "@/lib/my-sources";
 import { isClosedWeek } from "@/lib/pipeline/util";
 import { radarTargets } from "@/lib/ratings";
@@ -10,8 +10,7 @@ import { getReader } from "@/lib/supabase/server";
 export async function CurrentWeekPage({ path, scope }: { path: string; scope?: "companies" }) {
   const reader = await getReader();
   if (!reader) redirect(`/login?next=${path}`);
-  const radar = await getRadar(reader.db);
-  if (!radar) notFound(); // unreachable: without an issue id getRadar always returns data
+  const radar = await currentRadar(reader);
   // After the Radar, not beside it: both need its answer (the week's id, its items). Beside each other.
   const [seed, posts, ratings] = await Promise.all([
     getReaderSeed(reader.db, radar.issue.id),

@@ -1,7 +1,7 @@
 import { revalidateTag } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { isCronRequest, jsonError } from "@/lib/api";
-import { ARCHIVE_TAG } from "@/lib/content";
+import { ARCHIVE_TAG, RADAR_TAG } from "@/lib/content";
 import { runDaily } from "@/lib/pipeline/daily";
 import { retryPendingSources } from "@/lib/pipeline/ingest";
 import { queueMirrors } from "@/lib/pipeline/mirror";
@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
   // real backstop. { expire: 0 }: when it does run, the next /archive refills the list at once instead
   // of serving one more stale day.
   revalidateTag(ARCHIVE_TAG, { expire: 0 });
+  // The current week too: this run wrote its new items, the Top 3 and the repos.
+  revalidateTag(RADAR_TAG, { expire: 0 });
   const retried = await retryPendingSources(db, start + maxDuration * 1000);
   if (!digest) return jsonError(500, "daily_failed", { retriedSources: retried, mirrored });
   return NextResponse.json({ ...digest, mirrored, retriedSources: retried });

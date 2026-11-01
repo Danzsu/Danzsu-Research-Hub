@@ -9,6 +9,7 @@ import { resetRoute, routeStub, signedIn } from "./test/route-hooks.ts";
 const {
   archivedWeek,
   archiveList,
+  currentRadar,
   getDaily,
   getFavorites,
   getGithubRepos,
@@ -225,6 +226,20 @@ test("archivedWeek reads a closed week through the one-day cache and the admin c
   assert.deepEqual(radar, { issue: { id: "2026-W38", label: "2026 / W38", updated: "09. 20. 07:00", archiveAt: "09. 20." }, items: [], githubTop10: [] });
   assert.equal(routeStub.adminCalls, 1);
   assert.deepEqual(routeStub.cached, [{ keyParts: ["closed-week", "v4"], options: { revalidate: 86400 }, args: ["2026-W38"] }]);
+});
+
+// 2026-11-01 review. Kills the current week read live on every page view (the same rows for every reader),
+// read as the reader inside the shared cache, or cached without the tag the daily cron drops.
+test("currentRadar reads the latest week through the tagged cache and the admin client", async () => {
+  resetRoute();
+  routeStub.admin = fakeDb(undefined, { rows: { issues: [issueRow("2026-W39")] } });
+  const reader = signedIn(untouchable());
+  routeStub.reader = reader;
+  assert.equal((await currentRadar(reader)).issue.id, "2026-W39");
+  assert.equal(routeStub.adminCalls, 1);
+  assert.deepEqual(routeStub.cached, [{ keyParts: ["current-radar", "v1"], options: { revalidate: 3600, tags: ["radar"] }, args: [] }]);
+  // @ts-expect-error the entry point takes a Reader, never null
+  await assert.rejects(currentRadar(null), /signed-in reader/);
 });
 
 // Kills `<` → `<=`: the week still being collected would be frozen for a day, and a reader would miss

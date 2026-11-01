@@ -174,9 +174,14 @@ async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
 const ONE_DAY = 86_400;
 /** The daily cron's revalidateTag drops the archive list with this tag. */
 export const ARCHIVE_TAG = "archive";
+/** ...and the current week with this one: only that run writes its items, Top 3 and repos. */
+export const RADAR_TAG = "radar";
 
 // A closed week never changes, so it needs no tag: a day later Next refills it in the background.
 const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v4"], { revalidate: ONE_DAY });
+// The current week is the same for every reader and changes only when the daily run writes it; the hour is
+// the backstop for a run whose revalidateTag never applied.
+const cachedCurrentRadar = unstable_cache(() => getRadar(createAdminClient()), ["current-radar", "v1"], { revalidate: 3600, tags: [RADAR_TAG] });
 const cachedArchive = unstable_cache(() => getArchive(createAdminClient()), ["archive-list", "v1"], { revalidate: ONE_DAY, tags: [ARCHIVE_TAG] });
 
 /** The type keeps a signed-out caller away from the caches; this keeps one whose types were cast. */
@@ -193,6 +198,13 @@ export async function archivedWeek(reader: Reader, week: string, now = new Date(
   if (!isoWeekMonday(week)) return null;
   assertSignedIn(reader);
   return isClosedWeek(week, now) ? closedWeek(week) : getRadar(reader.db, week);
+}
+
+/** The latest week (`/`, /companies), from its cache until the daily cron drops it. */
+export async function currentRadar(reader: Reader): Promise<RadarData> {
+  assertSignedIn(reader);
+  // Without an issue id getRadar always answers: an empty current week before the first run.
+  return (await cachedCurrentRadar()) as RadarData;
 }
 
 /** The /archive list, from its cache until the daily cron drops it. */
