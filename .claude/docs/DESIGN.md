@@ -685,7 +685,7 @@ export const dislikedClass = "has-[[data-rating=down]]:border-dashed";
 
 A Library card is one link, which can't hold a button, so it shows `RatingBadge` instead: the value's icon (the heart filled) with its name sr-only, and nothing when unrated.
 
-The filter chips (`FilterChips`, `app/components/filter-chips.tsx`) are the filter rows of the GitHub page and the collection: 40px links on ink with a `border-paper/30` frame and `press-ink`, the current one `aria-current="page"` with a signal border and text, each with its pending dot.
+The filter chips (`FilterChips`, `app/components/filter-chips.tsx`) are the filter rows of the GitHub page and the collection, and the Library's tabs (`LibraryTabs`, `library-tabs.tsx`: Posztok · Archívum · Gyűjtemény, under the hero of each of the three pages, since the archive and the collection left the menu): 40px links on ink with a `border-paper/30` frame and `press-ink`, the current one `aria-current="page"` with a signal border and text, each with its pending dot.
 
 ### Repo card
 

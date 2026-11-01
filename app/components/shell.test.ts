@@ -292,6 +292,16 @@ test("LibraryView lists every preview post, its mirrored badge and the pending/f
   assert.ok(text.includes("FAILED")); // previewSources' failed row
 });
 
+// 2026-11-01 review. Kills the archive and the collection left without their way into the Library's other
+// tabs (they left the menu), or a tab marked on the wrong page.
+test("the Library, the archive and the collection share one row of tabs, the page's own marked", () => {
+  const tabs = (doc: Document) =>
+    [...doc.querySelectorAll('nav[aria-label="Library sections"] a')].map((tab) => [tab.getAttribute("href"), tab.getAttribute("aria-current")]);
+  const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, ratings: {}, preview: { failWrites: false } });
+  assert.deepEqual(tabs(library), [["/library", "page"], ["/archive", null], ["/collection", null]]);
+  assert.deepEqual(tabs(withShellProviders(ArchiveView, { issues: previewArchive })), [["/library", null], ["/archive", "page"], ["/collection", null]]);
+});
+
 test("ArchiveView lists every preview issue", () => {
   const doc = withShellProviders(ArchiveView, { issues: previewArchive });
   const headings = [...doc.querySelectorAll("h2")].map((heading) => heading.textContent);

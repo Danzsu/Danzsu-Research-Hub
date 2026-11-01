@@ -3,6 +3,7 @@ import { ExternalLink, Heart } from "lucide-react";
 import { EmptyState } from "@/app/components/empty-state";
 import { FilterChips } from "@/app/components/filter-chips";
 import { LocalizedText } from "@/app/components/language-context";
+import { LibraryTabs } from "@/app/components/library-tabs";
 import { PageHero } from "@/app/components/page-header";
 import { RatingControl } from "@/app/components/rating-control";
 import type { Favorite } from "@/lib/content";
@@ -38,6 +39,7 @@ export function CollectionView({ favorites, kind }: { favorites: Favorite[]; kin
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="FAVOURITES / KEDVENCEK" title="GYŰJTEMÉNY" lead={<LocalizedText value={copy.lead} />} />
+      <LibraryTabs current="collection" />
       <section className="mx-auto grid max-w-[1600px] gap-6 px-4 py-10 sm:px-10">
         <FilterChips label={copy.label} chips={chips} />
         {!shown.length && (

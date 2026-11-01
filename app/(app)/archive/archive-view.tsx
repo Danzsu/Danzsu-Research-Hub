@@ -3,6 +3,7 @@ import { Archive, CalendarDays, Clock3 } from "lucide-react";
 import { EmptyState } from "@/app/components/empty-state";
 import { LocalizedText } from "@/app/components/language-context";
 import { PendingDot } from "@/app/components/nav-parts";
+import { LibraryTabs } from "@/app/components/library-tabs";
 import { PageHero } from "@/app/components/page-header";
 import type { ArchiveIssue } from "@/data/digest-types";
 
@@ -26,6 +27,7 @@ export function ArchiveView({ issues }: { issues: ArchiveIssue[] }) {
   return (
     <main className="min-h-dvh bg-ink text-paper">
       <PageHero eyebrow="WEEKLY FREEZE / HETI ZÁRÁS" title="ARCHIVE" lead={<LocalizedText value={copy.lead} />} />
+      <LibraryTabs current="archive" />
       <section className="mx-auto max-w-[1600px] px-4 py-10 @container sm:px-10">
         {!issues.length && (
           <EmptyState tone="ink" icon={Archive}>
