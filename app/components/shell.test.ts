@@ -366,29 +366,26 @@ test("AppShell carries the taiyaki, and LinkChat's top level renders without a r
   withShellProviders(LinkChat, { open: true, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
 });
 
-// Kills the bar's old order: Archívum or Keresés in the bar, and no taiyaki between Napi and Könyvtár (daily news spec N7).
-test("the mobile bar reads Radar, Napi, the taiyaki, Könyvtár, Több", () => {
+// 2026-11-01 review. Kills the bar's old order: Napi or Több in the bar, and no taiyaki between Keresés and Könyvtár.
+test("the mobile bar reads Radar, Keresés, the taiyaki, Könyvtár, Fiók", () => {
   const doc = shell();
   const slots = [...doc.querySelectorAll("#mobile-nav > *")].map((slot) => slot.getAttribute("aria-label") ?? slot.textContent);
-  assert.deepEqual(slots, ["Radar", "Napi", "Link bedobása", "Könyvtár", "Több"]);
+  assert.deepEqual(slots, ["Radar", "Keresés", "Link bedobása", "Könyvtár", "Fiók"]);
 });
 
-// Kills a "Több" slot without the active mark on an Archívum page, or with it on another page. The
-// sheet itself (Archívum's aria-current) is portalled, so it never reaches this markup: Playwright checks it.
-test("the Több slot carries the active mark on Archívum's pages only", (t) => {
+// Kills a section left unmarked on its sub-pages: the Radar on /daily, the Library on an archive week.
+test("the sidebar marks the section a page belongs to", (t) => {
   t.after(() => {
     navigationStub.pathname = "/";
   });
-  const moreSlot = (pathname: string) => {
+  const current = (pathname: string) => {
     navigationStub.pathname = pathname;
-    const doc = shell();
-    const slot = doc.querySelector("#mobile-nav > :last-child");
-    return [slot?.textContent, slot?.getAttribute("data-active") ?? null];
+    return [...shell("en").querySelectorAll('aside nav a[aria-current="page"]')].map((link) => link.textContent?.trim());
   };
-  assert.deepEqual(moreSlot("/archive/2026-W38"), ["Több", "true"]);
-  assert.deepEqual(moreSlot("/archive"), ["Több", "true"]);
-  assert.deepEqual(moreSlot("/companies"), ["Több", "true"]);
-  assert.deepEqual(moreSlot("/library"), ["Több", null]);
+  assert.deepEqual(current("/daily"), ["Radar"]);
+  assert.deepEqual(current("/github"), ["Radar"]);
+  assert.deepEqual(current("/archive/2026-W38"), ["Library"]);
+  assert.deepEqual(current("/collection"), ["Library"]);
 });
 
 // Spec 2.1. Kills the dot left out of a nav link (a slow tap would show nothing again), put in the
@@ -398,13 +395,13 @@ test("every nav link carries one hidden pending dot, the search button none, and
     navigationStub.linkPending = false;
   });
   const doc = shell("en");
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1, 1, 1, 1]); // Radar, Daily, AI companies, Library, GitHub, Archive, Collection
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1, 1]); // Radar, Daily, Library
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1]); // Radar, Library
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
   const searchButtons = [...doc.querySelectorAll("aside nav button, #mobile-nav > button")].filter((button) => button.textContent?.startsWith("Search"));
-  assert.deepEqual(hiddenSpanCounts(searchButtons), [0]); // the sidebar's; the Több sheet's is portalled
+  assert.deepEqual(hiddenSpanCounts(searchButtons), [0, 0]); // the sidebar's and the bar's
   assert.equal(doc.querySelectorAll("[data-pending]").length, 0);
   navigationStub.linkPending = true;
-  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 10);
+  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 4);
 });
 
 // Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.

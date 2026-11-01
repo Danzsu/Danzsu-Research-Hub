@@ -32,7 +32,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - the language: `language-context`, `language-toggle`;
   - the Radar: `digest-dashboard`, `story-card`, `reader-panel`, `tag`;
   - the ratings: `rating-control` (`RatingsProvider`, `RatingControl`, `RatingBadge`), `rating-classes` (the pressed and 👎 class strings, a plain module so server components can use them), `repo-card` (a repo on paper: the Top 10 and the GitHub page), and `filter-chips`, the link rows of the GitHub page's and the collection's filters;
-  - the kit (2a): `card-toolbar` (a card's ratings, Later and to-do as one unit), `account-menu` (the sidebar's foot and the Több sheet's account rows), `empty-state`, `stat-tile`, `kbd`;
+  - the kit (2a): `card-toolbar` (a card's ratings, Later and to-do as one unit), `account-menu` (the sidebar's foot and the Fiók sheet's account rows), `empty-state`, `stat-tile`, `kbd`;
   - the title bands: `page-header` (`PageHero`, `StatusCard`);
   - the post renderer: `post-blocks`, `post-image`;
   - the hooks: `use-reader-state`, `use-shortcuts`, `use-model-context-tools`.
@@ -54,7 +54,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `content.ts`, which turns DB rows into content types, and holds the two content caches;
   - reader state: `reader-store.ts`, `state.ts`, `feed.ts`, and the ratings store, `ratings.ts`;
   - the link chat: `link-chat.ts` (the message parser, the thread and its store, the HTTP and in-memory transports), `my-sources.ts` (the reader's own submissions and their retry), `source-kinds.ts` (the kind names, `SOURCE_KIND_LABELS`);
-  - the shell's data: `nav.ts`, `nav-mode.ts`, `keymap.ts`, `undo-queue.ts`, `idle-prefetch.ts` (the "Több" sheet's prefetch);
+  - the shell's data: `nav.ts`, `nav-mode.ts`, `keymap.ts`, `undo-queue.ts`;
   - `media.ts` (the bucket and its key format), `public-paths.ts`, `api.ts` (`jsonError`, `postRoute`), `language.ts`;
   - `supabase/server.ts`, the Supabase clients;
   - `fixtures.ts`, the preview's data.

@@ -193,7 +193,7 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`config/`](config/) | The daily sources (`sources.ts`), the env template, and `README.md`: where every setting lives |
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
-| [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, translation, the model client, content queries and their caches, the link chat's logic and your own submissions, the ratings store (`ratings`), the language cookie, Supabase clients, and `idle-prefetch` (the mobile "More" sheet's idle prefetch) |
+| [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, translation, the model client, content queries and their caches, the link chat's logic and your own submissions, the ratings store (`ratings`), the language cookie, and Supabase clients |
 | [`lib/test/`](lib/test/) | The offline render harness for component tests, `doc-file.ts` (reads a guide under `.claude/docs/` for the doc tests), the route-handler stubs (`route-hooks.ts`), the sign-in routes' Supabase auth stub (`fake-auth.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [DESIGN.md](.claude/docs/DESIGN.md#dos-and-donts)) |

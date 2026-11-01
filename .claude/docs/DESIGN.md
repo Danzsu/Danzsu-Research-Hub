@@ -313,12 +313,12 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 |     RADAR | [Current radar] [Local LLM Lab] [Research] ...     |  chip bar, sticky
 +-----------+  +----------------------------------------------+  |
 | # Radar   |  | AI WEEKLY//                    Weekly close  |  |  hero, ink
-|   Library |  +----------------------------------------------+  |
-|   Search  |  TOP 3 · MUST READ                                 |
-|   Archive |  +-01-----------+ +-02-----------+ +-03-----------+|  @3xl: three across
-|   GitHub  |  +--------------+ +--------------+ +--------------+|
+|   Search  |  +----------------------------------------------+  |
+|   Library |  TOP 3 · MUST READ                                 |
+|           |  +-01-----------+ +-02-----------+ +-03-----------+|  @3xl: three across
+|           |  +--------------+ +--------------+ +--------------+|
 +-----------+  THE WEEK'S LIVE SIGNAL                            |
-|   Archive |  +meta+-----------------------------------------+  |  story cards
+|           |  +meta+-----------------------------------------+  |  story cards
 | (D) user@ |  +----+-----------------------------------------+  |  account menu
 | <<        |                                                    |  collapse
 +-----------+----------------------------------------------------+
@@ -342,7 +342,7 @@ In the rail, the ink column shrinks to `w-14`: only the icons stay, each with it
 |                              |
 |   [ Marked read    UNDO ]    |  toast lane, above the bar
 +------------------------------+
-| Radar Napi [TY] Libr.  More  |  bottom bar, 5 x 64px, ink; [TY] the taiyaki, raised 16px
+| Radar Kere. [TY] Libr. Fiók  |  bottom bar, 5 x 64px, ink; [TY] the taiyaki, raised 16px
 +------------------------------+
 ```
 
@@ -475,9 +475,9 @@ The tooltip (`NavTooltip`):
 className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap border-2 border-ink bg-paper px-2 py-1 font-mono text-xs text-ink opacity-0 shadow-[3px_3px_0_var(--ink)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
 ```
 
-### Bottom bar and the "Több" sheet
+### Bottom bar and the "Fiók" sheet
 
-Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The slots are Radar, Napi, the taiyaki, Library and Több; Keresés sits in the "Több" sheet (it is a placeholder until search lands). The active slot, the open "Több", or "Több" on an AI cégek, GitHub repók, Archívum or Gyűjtemény page (`data-active`) turns signal:
+Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The slots are the three sections (Radar, Keresés, the taiyaki, Library) and Fiók; the Radar's views and the Library's tabs live on their pages, not in the bar (2026-11-01 review). The active section's slot, or the open "Fiók", turns signal:
 
 ```tsx app/components/app-shell.tsx
 className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-paper md:hidden"
@@ -485,24 +485,13 @@ className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-sign
 
 ```tsx app/components/app-shell.tsx
 const slotClass =
-  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[state=open]:text-signal";
 ```
 
-"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek, Archívum and Gyűjtemény (the primary items marked `mobileMore` in `lib/nav.ts`), and the account rows (the language, the shortcuts help, sign out: `AccountRows`, `account-menu.tsx`). It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
+"Fiók" is a cream bottom Sheet holding a display title with its `//` and the account rows (the language, the shortcuts help, sign out: `AccountRows`, `account-menu.tsx`):
 
 ```tsx app/components/app-shell.tsx
-        <SheetContent
-          side="bottom"
-          closeLabel={t.close}
-          // Radix skips links when it picks the first control, which would land on the language toggle.
-          onOpenAutoFocus={(event) => {
-            const first = moreList.current?.querySelector("a");
-            if (!first) return;
-            event.preventDefault();
-            first.focus();
-          }}
           className="max-h-[85dvh] gap-5 overflow-y-auto border-t-2 border-ink bg-cream p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] text-ink"
-        >
 ```
 
 The Sheet's close button, and the one in dialogs, is a 40px square with a 2px ink border, paper turning signal on hover (`components/ui/sheet.tsx`, `dialog.tsx`). Shell dialogs are cream, with a signal shadow: `className="border-2 border-ink bg-cream text-ink shadow-[8px_8px_0_var(--signal)]"` (`shell-dialogs.tsx`).
@@ -613,7 +602,7 @@ className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-ce
 
 ### Pressed state
 
-Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show); a signal child of one (the logo's RADAR, a card's icon, an archive card's number) turns ink with it (`group-active:`), or it would vanish. The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links and the sheets' close buttons carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show); a signal child of one (the logo's RADAR, a card's icon, an archive card's number) turns ink with it (`group-active:`), or it would vanish. The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
 
 ```css app/globals.css
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }

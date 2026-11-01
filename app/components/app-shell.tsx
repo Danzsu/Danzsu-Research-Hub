@@ -1,14 +1,13 @@
 "use client";
 
 import { MotionConfig } from "motion/react";
-import { usePathname, useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
-import { Menu } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
+import { UserRound } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
-import { prefetchWhenIdle } from "@/lib/idle-prefetch";
 import { memorySend, postState } from "@/lib/reader-store";
-import { activeNavId, inMobileMore, MOBILE_BAR_NAV, MOBILE_CHAT_SLOT, MOBILE_MORE_NAV, type NavItem } from "@/lib/nav";
+import { activeNavId, MOBILE_CHAT_SLOT, PRIMARY_NAV, type NavItem } from "@/lib/nav";
 import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
@@ -22,8 +21,8 @@ import { toasts, UndoToast } from "./undo-toast";
 import { useShortcuts } from "./use-shortcuts";
 
 const copy = {
-  hu: { nav: "Menü", more: "Több", close: "Bezárás" },
-  en: { nav: "Menu", more: "More", close: "Close" },
+  hu: { nav: "Menü", account: "Fiók", close: "Bezárás" },
+  en: { nav: "Menu", account: "Account", close: "Close" },
 };
 
 /** Mirrors persistLanguage (language-context.tsx): same cookie shape, read back on the server by getNavMode (lib/language.ts). */
@@ -180,29 +179,16 @@ export function AppShell({
   );
 }
 
-/** The "Több" sheet's pages: the sheet is closed, so Next's viewport prefetch never sees their links. */
-const MORE_HREFS = MOBILE_MORE_NAV.flatMap((item) => (item.href ? [item.href] : []));
-
 const slotClass =
-  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[state=open]:text-signal";
 
-/** Below md: five slots in thumb reach, the taiyaki raised in the middle. "Több" holds the mobileMore pages and
- *  the account rows (language, help, sign-out); on their pages its slot carries the active mark. */
+/** Below md: five slots in thumb reach: the three sections, the taiyaki raised in the middle, and "Fiók" with the
+ *  account rows (language, help, sign-out). */
 function MobileNav({ email, onSearch, onHelp, chat }: { email: string; onSearch: () => void; onHelp: () => void; chat: ReactNode }) {
   const { language } = useLanguage();
   const active = activeNavId(usePathname());
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreList = useRef<HTMLUListElement>(null);
-  const router = useRouter();
+  const [accountOpen, setAccountOpen] = useState(false);
   const t = copy[language];
-  // Production only, like Next's own prefetch: in development it would fetch the real pages from the
-  // offline preview, which must never reach real data (ARCHITECTURE.md → Invariants).
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
-    // Next 16.3.4 types `kind` as required, but the router defaults it to "auto" (app-router-instance.js),
-    // which the docs' `{ onInvalidate }` form relies on.
-    return prefetchWhenIdle(MORE_HREFS, (href, options) => router.prefetch(href, options as Parameters<typeof router.prefetch>[1]));
-  }, [router]);
   const slot = (item: NavItem) => (
     <NavEntry key={item.id} item={item} active={active === item.id} onSearch={onSearch} className={slotClass} iconClass="size-5" dotOnIcon />
   );
@@ -212,56 +198,30 @@ function MobileNav({ email, onSearch, onHelp, chat }: { email: string; onSearch:
       aria-label={t.nav}
       className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-paper md:hidden"
     >
-      {MOBILE_BAR_NAV.slice(0, MOBILE_CHAT_SLOT).map(slot)}
+      {PRIMARY_NAV.slice(0, MOBILE_CHAT_SLOT).map(slot)}
       {chat}
-      {MOBILE_BAR_NAV.slice(MOBILE_CHAT_SLOT).map(slot)}
-      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetTrigger className={slotClass} data-active={inMobileMore(active) || undefined}>
-          <Menu className="size-5" />
-          <span>{t.more}</span>
+      {PRIMARY_NAV.slice(MOBILE_CHAT_SLOT).map(slot)}
+      <Sheet open={accountOpen} onOpenChange={setAccountOpen}>
+        <SheetTrigger className={slotClass}>
+          <UserRound className="size-5" />
+          <span>{t.account}</span>
         </SheetTrigger>
         <SheetContent
           side="bottom"
           closeLabel={t.close}
-          // Radix skips links when it picks the first control, which would land on the language toggle.
-          onOpenAutoFocus={(event) => {
-            const first = moreList.current?.querySelector("a");
-            if (!first) return;
-            event.preventDefault();
-            first.focus();
-          }}
           className="max-h-[85dvh] gap-5 overflow-y-auto border-t-2 border-ink bg-cream p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] text-ink"
         >
           <SheetHeader className="p-0 pr-12">
             <SheetTitle className="font-display text-2xl">
-              {t.more}
+              {t.account}
               <span className="text-signal">{"//"}</span>
             </SheetTitle>
           </SheetHeader>
-          {/* The active entry is ink with a signal bar and wash, like the sidebar's: small signal text on cream
-              is under 3:1 (DESIGN.md → Colors). The bar hangs in the sheet's padding, so the icons stay in line. */}
-          <ul ref={moreList} className="border-b-2 border-ink pb-4">
-            {MOBILE_MORE_NAV.map((item) => (
-              <li key={item.id}>
-                <NavEntry
-                  item={item}
-                  active={active === item.id}
-                  onSearch={() => {
-                    setMoreOpen(false);
-                    onSearch();
-                  }}
-                  onClick={() => setMoreOpen(false)}
-                  className="press focus-ring -ml-3.5 flex min-h-10 items-center gap-3 border-l-2 border-transparent pl-3 font-mono text-sm aria-[current=page]:border-signal aria-[current=page]:bg-signal/10"
-                  iconClass="size-4"
-                />
-              </li>
-            ))}
-          </ul>
           {/* The account rows (2a spec D5): the language, the shortcuts help (which closes the sheet first) and sign out. */}
           <AccountRows
             email={email}
             onHelp={() => {
-              setMoreOpen(false);
+              setAccountOpen(false);
               onHelp();
             }}
           />
