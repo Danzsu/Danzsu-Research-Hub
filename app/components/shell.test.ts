@@ -593,4 +593,8 @@ test("the weekly view marks the items of a daily Top 10", () => {
   const doc = withShellProviders(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } });
   const marked = [...doc.querySelectorAll("article[data-card-id]")].filter((card) => /DAY TOP · 4\./.test(card.textContent ?? "")).map((card) => card.getAttribute("data-card-id"));
   assert.deepEqual([...new Set(marked)], ["companies-2026-W39-mistral"]);
+  // 2026-11-01 review. Kills the badge glued to the source name ("DAY TOP · 2.The Decoder"): one gapped row.
+  const badge = [...doc.querySelectorAll("p")].find((line) => /DAY TOP · 4\./.test(line.textContent ?? ""))!;
+  assert.match(badge.parentElement!.className, /\bflex\b.*\bgap-2\b/);
+  assert.ok(badge.parentElement!.querySelector("a[data-card-open]"));
 });
