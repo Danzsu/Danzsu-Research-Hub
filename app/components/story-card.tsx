@@ -211,9 +211,10 @@ function CardFooter({ item, state, hasTodo, language, actions, postId, rating }:
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
       {/* Read-here spec 1: our own post when there is one; otherwise the chat sends the link, unless a submission would refuse it. */}
+      {/* prefetch off: 25 cards would each fetch a post page on every visit; the post skeleton covers the wait. */}
       {postId !== undefined ? (
         <Button asChild variant="brutal" className="min-h-10">
-          <Link href={`/library/${postId}`} onClick={() => actions.onOpen(item)}>
+          <Link href={`/library/${postId}`} prefetch={false} onClick={() => actions.onOpen(item)}>
             <BookOpen /> {t.readHere} <PendingDot />
           </Link>
         </Button>
