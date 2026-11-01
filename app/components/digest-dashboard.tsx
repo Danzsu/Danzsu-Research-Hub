@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
@@ -25,6 +27,7 @@ import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-sto
 import { usePanel } from "./app-shell";
 import { EmptyState } from "./empty-state";
 import { useLanguage } from "./language-context";
+import { PendingDot } from "./nav-parts";
 import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
@@ -40,7 +43,7 @@ const copy = {
     live: "ÉLŐ KIADÁS",
     dailyList: "NAPI LISTA",
     archived: "LEZÁRT KIADÁS",
-    categories: "Kategóriák",
+    categories: "Nézetek",
     panel: "Haladás és to-do",
     updated: "Napi frissítés",
     schedule: "NAPI 13:00 UTC · ZÁRÁS VAS 24:00",
@@ -64,12 +67,13 @@ const copy = {
     companiesFeed: "A HÉT TÖBBI CÉGES HÍRE",
     emptyCompanies: "Ezen a héten még nincs céges hír, a napi futás tölti fel.",
     emptyCompaniesAll: "A hét minden céges híre fent, a napi Top 5-ben van.",
-    all: "Aktuális radar",
-    local: "Local LLM Lab",
-    research: "Kutatási radar",
+    all: "Heti",
+    daily: "Napi",
+    local: "Local LLM",
+    research: "Kutatás",
     companies: "AI cégek",
-    github: "GitHub Top 10",
-    saved: "Mentve későbbre",
+    github: "GitHub",
+    saved: "Mentett",
     mustRead: "TOP 3 · KÖTELEZŐ",
     feed: "A HÉT ÉLŐ ADATFOLYAMA",
     sample: "Ez a heti kiadás még üres — a napi automatikus futás tölti fel.",
@@ -77,6 +81,7 @@ const copy = {
     emptySaved: "Még nincs mentett hír. A kártyák Később gombjával gyűjtheted ide.",
     emptyCategory: "Ebben a kategóriában ezen a héten nincs hír.",
     emptyGithub: "Ezen a héten még nincs GitHub-lista, a napi futás tölti fel.",
+    allRepos: "Minden repó →",
     showAll: "Összes hír",
     close: "Bezárás",
   },
@@ -84,7 +89,7 @@ const copy = {
     live: "LIVE ISSUE",
     dailyList: "DAILY LIST",
     archived: "ARCHIVED ISSUE",
-    categories: "Categories",
+    categories: "Views",
     panel: "Progress & to-do",
     updated: "Daily refresh",
     schedule: "DAILY 13:00 UTC · FREEZE SUN 24:00",
@@ -107,12 +112,13 @@ const copy = {
     companiesFeed: "THE WEEK'S OTHER COMPANY NEWS",
     emptyCompanies: "No company news this week yet; the daily run fills it.",
     emptyCompaniesAll: "Every company story this week is up top, in the daily Top 5.",
-    all: "Current radar",
-    local: "Local LLM Lab",
-    research: "Research radar",
+    all: "Weekly",
+    daily: "Daily",
+    local: "Local LLM",
+    research: "Research",
     companies: "AI companies",
-    github: "GitHub Top 10",
-    saved: "Saved for later",
+    github: "GitHub",
+    saved: "Saved",
     mustRead: "TOP 3 · MUST READ",
     feed: "THE WEEK'S LIVE SIGNAL",
     sample: "This week's issue is still empty — the daily automated run fills it.",
@@ -120,19 +126,27 @@ const copy = {
     emptySaved: "Nothing saved yet. Collect stories here with the Later button on a card.",
     emptyCategory: "No story in this category this week.",
     emptyGithub: "No GitHub list this week yet; the daily run fills it.",
+    allRepos: "All repos →",
     showAll: "All stories",
     close: "Close",
   },
 } as const;
 
-const filters: { id: Filter; icon: LucideIcon }[] = [
-  { id: "all", icon: Radar },
+// The Radar's views, in the band beside the week (2026-11-01 review). A view with a `page` is a page of its own
+// for the current week; a closed week has no daily list or companies page, so there every chip filters it.
+const views: { id: Filter | "daily"; icon: LucideIcon; page?: string }[] = [
+  { id: "all", icon: Radar, page: "/" },
+  { id: "daily", icon: Sunset, page: "/daily" },
   { id: "local", icon: Zap },
   { id: "research", icon: FlaskConical },
-  { id: "companies", icon: Building2 },
+  { id: "companies", icon: Building2, page: "/companies" },
   { id: "github", icon: GitFork },
   { id: "saved", icon: Bookmark },
 ];
+const isFilter = (value: string | null): value is Filter => views.some((view) => view.id === value && view.id !== "daily");
+
+const chipClass =
+  "press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal aria-[current=page]:bg-signal";
 
 export function DigestDashboard(
   props: {
@@ -154,10 +168,14 @@ export function DigestDashboard(
   const { issue, githubTop10, archived = false } = props;
   const companies = props.scope === "companies";
   const dailyView = props.scope === "daily";
+  // The weekly Radar and a closed week filter in place; /daily and /companies link their filter chips to the Radar.
+  const filtersHere = !companies && !dailyView;
   // Memoized: a fresh array each render would re-register the WebMCP tools (their effect keys on the ids).
   const items = useMemo(() => (companies ? props.items.filter((item) => item.category === "companies") : props.items), [companies, props.items]);
   const { language } = useLanguage();
-  const [filter, setFilter] = useState<Filter>("all");
+  // Another view's filter chip links here with ?filter=; on this page the chips then switch in place.
+  const requested = useSearchParams().get("filter");
+  const [filter, setFilter] = useState<Filter>(() => (isFilter(requested) ? requested : "all"));
   const { store, states, loadedStates, todos, syncing } = useReaderState(props);
   const readHere = useReadHere();
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
@@ -246,14 +264,40 @@ export function DigestDashboard(
 
   return (
     <div className="min-w-0 bg-cream text-ink @container">
-      <header className="radar-header sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      {/* One band: the week, its views and the panel pill. A row from md up; below it the views scroll on a row of their own. */}
+      <header className="radar-header sticky top-0 z-20 flex flex-wrap items-center gap-x-3 border-b-2 border-ink bg-cream px-4 sm:px-7 md:h-16 md:flex-nowrap">
+        <div className="flex h-14 min-w-0 flex-1 items-center gap-2 sm:gap-3 md:h-auto md:flex-none">
           {!archived && <span className="live-pulse shrink-0" />}
           <div className="min-w-0">
             <p className="truncate font-mono text-[11px] tracking-[0.18em] text-signal">{archived ? t.archived : dailyView ? t.dailyList : t.live}</p>
-            <p className="font-display text-lg leading-none">{issue.label}</p>
+            <p className="whitespace-nowrap font-display text-lg leading-none">{issue.label}</p>
           </div>
         </div>
+        <nav aria-label={t.categories} className="order-last flex basis-full gap-2 overflow-x-auto pb-2 scrollbar-none md:order-none md:min-w-0 md:flex-1 md:basis-auto md:pb-0">
+          {views
+            .filter((view) => !(archived && view.id === "daily"))
+            .map(({ id, icon: Icon, page }) => {
+              const label = (
+                <>
+                  <Icon className="size-3.5" /> {t[id]}
+                </>
+              );
+              if (filtersHere && id !== "daily" && (archived || !page || id === "all")) {
+                return (
+                  <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id as Filter)} className={chipClass}>
+                    {label}
+                  </button>
+                );
+              }
+              const current = (id === "daily" && dailyView) || (id === "companies" && companies);
+              return (
+                <Link key={id} href={page ?? `/?filter=${id}`} aria-current={current ? "page" : undefined} className={chipClass}>
+                  {label}
+                  <PendingDot />
+                </Link>
+              );
+            })}
+        </nav>
         {/* Non-modal, so the undo toast above it stays clickable, reachable by Tab and announced. */}
         <Sheet modal={false} open={panelLayer.open} onOpenChange={panelLayer.setOpen}>
           <SheetTrigger asChild>
@@ -293,27 +337,7 @@ export function DigestDashboard(
       </header>
 
       <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 @[95rem]:grid-cols-[minmax(0,1fr)_330px]">
-        {/* The chip bar belongs to this column, so the panel beside it is not covered. */}
         <div className="min-w-0">
-          {!companies && !dailyView && (
-            <nav
-              aria-label={t.categories}
-              className="radar-chips sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
-            >
-              {filters.map(({ id, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={filter === id}
-                  onClick={() => setFilter(id)}
-                  className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal"
-                >
-                  <Icon className="size-3.5" /> {t[id]}
-                </button>
-              ))}
-            </nav>
-          )}
-
           <main className="min-w-0 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
             <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-6 text-paper sm:px-8 sm:py-9">
               <div className="signal-grid" aria-hidden="true" />
@@ -366,6 +390,9 @@ export function DigestDashboard(
                 ) : (
                   <EmptyState tone="cream" icon={GitFork}>{t.emptyGithub}</EmptyState>
                 )}
+                <Link href="/github" className="focus-ring mt-4 inline-flex min-h-10 items-center font-mono text-xs underline hover:text-signal">
+                  {t.allRepos}
+                </Link>
               </section>
             ) : (
               <>

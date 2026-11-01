@@ -78,8 +78,8 @@ export function StoryCard(props: CardProps) {
       {...cardFocus(item.id)}
       id={props.rank ? `daily-${props.rank}` : undefined}
       data-saved={state.saved || undefined}
-      // scroll-mt-20: the daily index jumps here, clear of the 64px sticky header.
-      className={`focus-ring story-card max-w-[900px] scroll-mt-20 border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+      // scroll-mt: the daily index jumps here, clear of the sticky band (two rows, about 106px, below md; 64px from md).
+      className={`focus-ring story-card max-w-[900px] scroll-mt-28 border-2 md:scroll-mt-20 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
         {/* A row of meta on narrow screens, the 96px gutter from lg up. */}

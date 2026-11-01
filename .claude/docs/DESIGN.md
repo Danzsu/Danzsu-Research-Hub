@@ -220,7 +220,7 @@ The roles of the brand tokens:
 | --- | --- | --- |
 | ink | `#141414` | text, every 2px border, most offset shadows; the dark surfaces: the navigation, the Library and Archive pages, code blocks, the undo toast, the Radar hero |
 | paper | `#fbefca` | the body background; the card surface (story, must-read, repo, image frame, form cards); light text on ink |
-| cream | `#f8e8b4` | the working surface: the Radar column with its header and chip bar, `PageHero`, `StatusCard`, the post article, sheets and dialogs |
+| cream | `#f8e8b4` | the working surface: the Radar column with its band, `PageHero`, `StatusCard`, the post article, sheets and dialogs |
 | signal | `#f15f22` | the one accent: the `//` after titles, eyebrows, source labels and inline links, the active nav entry, the focus outline, the hover state (an 8px signal shadow, or a card that turns signal), the rank numerals, the progress bar, the live dot, the failed toast, the pressed chip |
 | cyan | `#59e1e8` | rare: only the Library's PROCESSING status and the `/// DAILY 18:00 → SUN FREEZE` caption on the Radar hero grid |
 
@@ -289,7 +289,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
   - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, with the taiyaki raised 16px out of its centre slot; the content column's bottom padding clears both (Components → Page shell).
   - The iPhone's safe areas: `viewportFit: "cover"` (`app/layout.tsx`) turns the `env(safe-area-inset-*)` values on; without it they read 0. The bar, the bottom sheets and the toast clear the home indicator. In landscape the body pads to the side insets, its background clipped to its content, so the strip beside the notch shows the html's ink; the bar pads too. From `md` up the fixed elements (the corner taiyaki, the right-side sheets) don't add the side insets yet.
   - From `md` up, the desktop nav takes its place: a 256px sidebar (`w-64`) or a 56px icon rail (`w-14`).
-  - The Radar's categories are a sticky chip bar at every width.
+  - The Radar's views are chips in one sticky band with the week and the panel pill (2026-11-01 review): Heti, Napi and AI cégek are pages of the current week, Local LLM, Kutatás, GitHub and Mentett filter it in place (on /daily and /companies they link to the Radar with `?filter=`); a closed week filters with all of them. A row from `md` up; below it the views scroll on a row of their own.
 - **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md`, and a 330px column once the Radar's own column is 95rem wide (`@[95rem]`, R3 §2: the nav and the viewport decide together). It is non-modal, so the undo toast stays usable while it is open.
 - **Touch targets are at least 40px** (`min-h-10`, or `size-10 sm:size-8` for icon buttons, which may shrink to 32px from `sm` up).
 - **Use `dvh`, not `vh`.**
@@ -308,9 +308,9 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 
 ```text
 +-----------+----------------------------------------------------+
-| (o) NEON  | * LIVE ISSUE  2026 / W39             [ 42% · 2 ]   |  header, sticky, cream
+| (o) NEON  | * LIVE 2026/W39 [Heti][Napi][Local]... [42% · 2]   |  one band, sticky, cream
 |     NEWS  +----------------------------------------------------+
-|     RADAR | [Current radar] [Local LLM Lab] [Research] ...     |  chip bar, sticky
+|     RADAR |                                                    |
 +-----------+  +----------------------------------------------+  |
 | # Radar   |  | AI WEEKLY//                    Weekly close  |  |  hero, ink
 |   Search  |  +----------------------------------------------+  |
@@ -331,8 +331,8 @@ In the rail, the ink column shrinks to `w-14`: only the icons stay, each with it
 
 ```text
 +------------------------------+
-| * LIVE ISSUE 2026 / W39 [42%]|  header, sticky
-| [Current radar] [Local L... >|  chip bar, scrolls sideways
+| * LIVE ISSUE 2026 / W39 [42%]|  one band, sticky: the week and the pill,
+| [Heti] [Napi] [Local L...   >|  then the views, scrolling sideways
 |                              |
 |  AI WEEKLY//                 |  hero, ink
 |  TOP 3 · MUST READ           |
@@ -369,8 +369,7 @@ Shadows are hard offsets with zero blur:
 - **One overlay at a time** (R3 §4): the Radar's reader panel and the link chat never show together; opening one closes the other (`createShellLayers`, `app-shell.tsx`, which both read through `PanelContext` and the chat's open state). The panel's column keeps `pb-24` at its foot, so the corner taiyaki covers no to-do.
 - **The `motion` library** (`motion/react`, pinned; `MotionConfig reducedMotion="user"` in the shell) runs the three motions CSS can't (2a spec D7): the rating press (the pressed button's icon alone mounts at 0.88 and springs back to 1 in 180ms, `rating-control.tsx`; a spring takes two keyframes only), the toast's enter and exit (`AnimatePresence` in `popLayout` mode, 160ms, `undo-toast.tsx`), and the taiyaki's turn when its panel opens (`link-chat.tsx`). Sheets and dialogs keep their Radix 160ms CSS animations. Nothing else animates on its own. Under reduced motion all three stand still: `reducedMotion="user"` stops the press and the turn, and the toast sets its own fade to 0ms (`useReducedMotionConfig`), since that setting leaves opacity alone.
 - **Layering.** From bottom to top:
-  - the chip bar, `z-10`, sticky under the header;
-  - the Radar header, `z-20`;
+  - the Radar band, `z-20`;
   - the desktop aside, `z-30`, so the rail's tooltips paint over both of those;
   - the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel below `@[95rem]`, covers the button until it closes);
   - sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;
@@ -592,10 +591,10 @@ The keyboard focus style, defined as an `@utility` in `app/globals.css`:
 }
 ```
 
-Every custom interactive element carries it. On a signal-coloured control, override the colour with `--focus`, as the category chips do (`digest-dashboard.tsx`):
+Every custom interactive element carries it. On a signal-coloured control, override the colour with `--focus`, as the Radar's view chips do (`digest-dashboard.tsx`):
 
 ```tsx app/components/digest-dashboard.tsx
-className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal"
+  "press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal aria-[current=page]:bg-signal";
 ```
 
 `Button` and `Input` keep shadcn's own 3px `ring/50` focus ring.
@@ -628,7 +627,7 @@ export function Tag({ tag }: { tag: string }) {
 `/daily` is `DigestDashboard` with `scope="daily"` (daily news spec N7): the weekly UI, reshaped for one day's Top 10.
 
 - **Header and hero:** the header reads NAPI LISTA / DAILY LIST over the day (`2026. 09. 24.`); the hero is "NAPI//" with its lead, then one mono line with the count ("5 hír · ebből 2 rövid") and, in signal, "Korábbi lista (…) — a mai 18:00-ra készül." when the list isn't today's. No category chips, no Top 3 grid, no archive box.
-- **The index:** a paper box with a 2px ink frame, one mono line per card (the rank in signal, the title, the score), each an anchor to its card (`#daily-N`). The cards carry `scroll-mt-20`, so a jump lands clear of the 64px sticky header.
+- **The index:** a paper box with a 2px ink frame, one mono line per card (the rank in signal, the title, the score), each an anchor to its card (`#daily-N`). The cards carry `scroll-mt-28` (`md:scroll-mt-20`), so a jump lands clear of the sticky band: two rows below `md`, 64px from it.
 - **The cards:** `StoryCard` with a `rank`: the rank in display type, signal, at the top of the meta gutter; a signal SHORT / RÖVID mark under the minutes for a read of at most 15 minutes; and the long text (`DailyBrief`) in place of the summary: the brief's paragraphs, or the post's summary and its FŐ PONTOK list, or the item's summary with "A részletes összefoglaló készül…" under it. Lines stop at `75ch`.
 - **The weekly mark:** on the Radar, a card ranked in a daily Top 10 shows a 1px ink-framed "NAP TOP · N." / "DAY TOP · N." above its source link; the daily page itself shows none.
 - **Empty:** `EmptyState` with "Még nincs napi lista. Az első este 18:00-ra készül el."
@@ -661,7 +660,7 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClas
 ```
 
 ```tsx app/components/story-card.tsx
-className={`focus-ring story-card max-w-[900px] scroll-mt-20 border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+className={`focus-ring story-card max-w-[900px] scroll-mt-28 border-2 md:scroll-mt-20 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
@@ -770,7 +769,7 @@ How they behave is in CLAUDE.md → App shell and navigation; their timing is in
     <div aria-hidden="true" className="refresh-bar pointer-events-none fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden">
 ```
 
-- **The skeletons** (`app/components/page-skeletons.tsx`) have one root each, the page's own surface, so the shell's `md:[&>:last-child]:pb-24` lands on it (Page shell). The bands (the Radar's header, chip bar and ink hero, `HeroBand`, the post's cream article) paint at once; the placeholders, the house `Skeleton` with `rounded-none`, `bg-paper/10` on ink and the default `bg-primary/10` on cream and paper, sit in `.skeleton-fill` groups. A `role="status"` line says "Betöltés…" / "Loading…" to assistive tech only. The Radar's root:
+- **The skeletons** (`app/components/page-skeletons.tsx`) have one root each, the page's own surface, so the shell's `md:[&>:last-child]:pb-24` lands on it (Page shell). The bands (the Radar's band and ink hero, `HeroBand`, the post's cream article) paint at once; the placeholders, the house `Skeleton` with `rounded-none`, `bg-paper/10` on ink and the default `bg-primary/10` on cream and paper, sit in `.skeleton-fill` groups. A `role="status"` line says "Betöltés…" / "Loading…" to assistive tech only. The Radar's root:
 
 ```tsx app/components/page-skeletons.tsx
     <div className="min-h-dvh min-w-0 bg-cream text-ink" aria-busy="true">

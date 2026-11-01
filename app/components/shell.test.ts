@@ -157,7 +157,7 @@ test("DigestDashboard with scope companies shows the latest run's company Top 5,
     preview: { data: previewReader, failWrites: false },
   });
   const ids = (selector: string) => [...doc.querySelectorAll(selector)].map((card) => card.getAttribute("data-card-id"));
-  assert.equal(doc.querySelector('nav[aria-label="Categories"]'), null);
+  assert.equal(doc.querySelector('header nav[aria-label="Views"] [aria-current="page"]')?.textContent?.trim(), "AI companies");
   assert.deepEqual(ids(".must-card"), [
     "companies-2026-W39-must-2",
     "companies-2026-W39-mistral",
@@ -532,7 +532,7 @@ test("the daily view lists its cards in rank order, each with an anchor the inde
   assert.deepEqual([...doc.querySelectorAll("article[id]")].map((card) => card.id), ["daily-1", "daily-2", "daily-3", "daily-4", "daily-5"]);
   assert.deepEqual([...doc.querySelectorAll(`nav[aria-label="The day's stories"] a`)].map((link) => link.getAttribute("href")), ["#daily-1", "#daily-2", "#daily-3", "#daily-4", "#daily-5"]);
   assert.match(doc.body.textContent ?? "", /THE DAY'S 10/);
-  assert.equal(doc.querySelector('nav[aria-label="Categories"]'), null);
+  assert.equal(doc.querySelector('header nav[aria-label="Views"] [aria-current="page"]')?.textContent?.trim(), "Daily");
   assert.match(doc.body.textContent ?? "", /5 stories · 2 short/);
   assert.match(doc.querySelector("header")?.textContent ?? "", /DAILY LIST/);
   // Final review: the index rows are touch targets too (DESIGN.md: 40px).
@@ -595,3 +595,40 @@ test("the weekly view marks the items of a daily Top 10", () => {
   assert.match(badge.parentElement!.className, /\bflex\b.*\bgap-2\b/);
   assert.ok(badge.parentElement!.querySelector("a[data-card-open]"));
 });
+
+// 2026-11-01 review. Kills the week's header and the chip bar back as two bands, a Radar view left out of the
+// chips (Daily, AI companies), a filter that leaves the page it could switch in place, and the GitHub chip
+// without its way to the full repo list.
+test("one band holds the week and the views: pages are links, filters switch in place, and elsewhere lead to the Radar", (t) => {
+  t.after(() => {
+    navigationStub.search = "";
+  });
+  const chips = (doc: Document) =>
+    [...doc.querySelectorAll('header nav[aria-label="Views"] > *')].map((chip) => [chip.textContent?.trim(), chip.tagName === "A" ? chip.getAttribute("href") : chip.getAttribute("aria-pressed")]);
+  const props = { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } };
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, props)), [
+    ["Weekly", "true"],
+    ["Daily", "/daily"],
+    ["Local LLM", "false"],
+    ["Research", "false"],
+    ["AI companies", "/companies"],
+    ["GitHub", "false"],
+    ["Saved", "false"],
+  ]);
+  assert.equal(viewNavCount(withShellProviders(DigestDashboard, props)), 1);
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, { ...props, scope: "companies" })).slice(2, 4), [
+    ["Local LLM", "/?filter=local"],
+    ["Research", "/?filter=research"],
+  ]);
+  // A closed week has no daily list or companies page of its own: every chip filters it.
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, { ...props, archived: true })).map(([, value]) => value), ["true", "false", "false", "false", "false", "false"]);
+  // Arriving from another view with ?filter=github: the GitHub chip is on, with the link to every repo.
+  navigationStub.search = "filter=github";
+  const github = withShellProviders(DigestDashboard, props);
+  assert.deepEqual(chips(github)[5], ["GitHub", "true"]);
+  assert.ok(github.querySelector('main a[href="/github"]'));
+});
+
+/** The page's navs labelled Views: the one band, not a second bar below the header. */
+const viewNavCount = (doc: Document) => doc.querySelectorAll('nav[aria-label="Views"]').length;
+
