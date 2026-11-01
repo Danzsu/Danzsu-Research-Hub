@@ -238,6 +238,10 @@
     - [x] a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja) — elavult: a `/login` a landing-signin óta gomb nélkül (`signIn="none"`) használja a keretet;
     - [x] a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel;
     - a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül: nyitott ötlet, előbb mérni kell.
+  - **Sebesség és hibák (fix-speed) záró reviewja (2026-11-02):**
+    - a lezárt elakadt forrás hibaszövege („No run finished it in 3 attempts.”) nyers angol mondat a chatben és a Library-ben, és teszt nem nézi;
+    - a záró teszt nem bukik, ha a lezáró update-ből kimarad a `.eq("status", "pending")` őr; olcsó extra őr lehet a `.gte("attempts", MAX_ATTEMPTS)` is;
+    - a Library nyitott listája nem szűr `attempts < MAX_ATTEMPTS`-re: egy elakadt saját forrás 16 UTC és a másnapi 13 UTC-s futás között még elindítja a beküldő 5 mp-es frissítését (legfeljebb 10 percig).
   - **Apróságok (polish) záró reviewja (2026-10-12):**
     - fekvő iPhone-on (`md`-től) a fix elemek nem kapják az oldalsó insetet: a sarok-taiyaki (`right-6`), a chat panel (`md:right-6`), a jobb oldali olvasópanel és a toast sávja kb. 24 px-re ül a 47 px-es kivágástól; javítás: `md:right-[calc(1.5rem+env(safe-area-inset-right))]` és társai;
     - az olvasópanel csak félig ül a pill után a Tab-sorrendben: a pillről egy Tab az oldalra megy, nem a panelbe, és a Radix bezárja; javítás: nyitott panelnél a pill Tabja a panel első elemére;
