@@ -166,6 +166,25 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
   return true;
 }
 
+/** Kept on a source closed by closeStuckSources: the submitter sees it, with a retry. */
+export const STUCK_SOURCE_ERROR = `No run finished it in ${MAX_ATTEMPTS} attempts.`;
+
+/** Sources left `pending` after MAX_ATTEMPTS runs, each killed before it could fail: no run takes them any
+ *  more, so they are closed as failed (the submitter can retry), unless a run holds one right now. */
+async function closeStuckSources(db: SupabaseClient, now = Date.now()) {
+  const { data, error } = await db.from("sources").select("id, claimed_at").eq("status", "pending").gte("attempts", MAX_ATTEMPTS).limit(50);
+  if (error) return console.warn("stuck sources lookup failed", error);
+  for (const row of data ?? []) {
+    if (claimHeld(row.claimed_at as string | null, now)) continue;
+    const { error: closeError } = await db
+      .from("sources")
+      .update({ status: "failed", error: STUCK_SOURCE_ERROR, claimed_at: null })
+      .eq("id", row.id)
+      .eq("status", "pending");
+    if (closeError) console.warn("closing a stuck source failed", row.id, closeError);
+  }
+}
+
 /**
  * Sources that never finished (e.g. the function was killed) or failed fewer than MAX_ATTEMPTS
  * times. `deadline` (epoch ms, e.g. from the cron route's own maxDuration) stops the loop from
@@ -177,6 +196,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
  * cron run: the mirror crons (`/api/cron/mirror`) give the queue three more 300 s budgets a day.
  */
 export async function retryPendingSources(db: SupabaseClient, deadline?: number): Promise<number> {
+  await closeStuckSources(db);
   const { data, error } = await db
     .from("sources")
     .select("id, attempts")

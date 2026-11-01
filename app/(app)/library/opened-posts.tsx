@@ -27,7 +27,7 @@ function subscribe(listener: () => void) {
 export function PostCardLink({ postId, read, className, children }: { postId: number; read: boolean; className: string; children: ReactNode }) {
   const openedHere = useSyncExternalStore(subscribe, () => opened, () => none).has(postId);
   return (
-    <Link href={`/library/${postId}`} className={`${className} ${read || openedHere ? "story-read" : ""}`}>
+    <Link href={`/library/${postId}`} prefetch={false} className={`${className} ${read || openedHere ? "story-read" : ""}`}>
       {children}
     </Link>
   );

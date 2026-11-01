@@ -616,6 +616,19 @@ test("retryPendingSources() counts only the sources it claimed, not one another 
   assert.equal(await retryPendingSources(db), 1);
 });
 
+// 2026-11-01 review. Kills a source left `pending` for good after MAX_ATTEMPTS killed runs: no run takes
+// it, so the Library kept refreshing and the chat kept saying "processing". It is closed as failed (with a
+// retry), unless a run holds it right now.
+test("retryPendingSources() closes the sources that ran out of attempts, but not one a run holds", async (t) => {
+  mockFetch(t, async () => new Response("", { status: 404 }));
+  const stuck = { ...newSource(70), status: "pending", attempts: 3, claimed_at: null };
+  const held = { ...newSource(71), status: "pending", attempts: 3, claimed_at: new Date(Date.now() - 60_000).toISOString() };
+  const db = fakeDb(undefined, { sources: [stuck, held], post: null });
+  assert.equal(await retryPendingSources(db), 0);
+  assert.deepEqual(db.sourceUpdates.map((update) => update.status), ["failed"]);
+  assert.deepEqual(db.eqCalls.filter((call) => call.column === "id").map((call) => call.value), [70]);
+});
+
 // Final review I1. Kills a queue run that takes over a source another run finished after the listing:
 // the listing's attempts are stale by then, and the finished post would be rebuilt (a second model
 // bill, and a translation thrown away).

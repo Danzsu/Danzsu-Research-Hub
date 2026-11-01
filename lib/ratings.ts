@@ -64,7 +64,6 @@ export function createRatingStore(send: (write: RatingWrite) => Promise<unknown>
         listeners.delete(listener);
       };
     },
-    getSnapshot: () => rated,
     valueOf,
     press(target: RatingTarget, fallback: RatingValue | null, pressed: RatingValue): Promise<void> {
       const key = ratingKey(target);

@@ -65,7 +65,7 @@ test("a failed digest still retries the pending sources, and answers 500 with th
   const response = await GET(cronRequest("Bearer s3cret"));
 
   assert.deepEqual([response.status, await response.json()], [500, { error: "daily_failed", retriedSources: 1, mirrored: 0 }]);
-  assert.deepEqual(routeStub.revalidated, [["archive", { expire: 0 }]]);
+  assert.deepEqual(routeStub.revalidated, [["archive", { expire: 0 }], ["radar", { expire: 0 }]]);
 });
 
 // Spec 1.5. Kills the revalidateTag call dropped, given the deprecated one-argument form (or "max",
@@ -82,7 +82,7 @@ test("a good cron run answers the digest and drops the archive list's cache at o
   const response = await GET(cronRequest("Bearer s3cret"));
 
   assert.deepEqual([response.status, await response.json()], [200, { issue: isoWeek(new Date()).id, candidates: 0, shortlisted: 0, inserted: 0, repos: 0, daily: 0, mirrored: 0, retriedSources: 0 }]);
-  assert.deepEqual(routeStub.revalidated, [["archive", { expire: 0 }]]);
+  assert.deepEqual(routeStub.revalidated, [["archive", { expire: 0 }], ["radar", { expire: 0 }]]);
   assert.equal(warn.mock.callCount(), feeds.length); // each feed's 404
 });
 

@@ -33,6 +33,9 @@ test("the mirror cron works the pending sources and says how many it took", asyn
   onePendingSource();
   const response = await GET(cronRequest("Bearer s3cret"));
   assert.deepEqual([response.status, await response.json()], [200, { processed: 1 }]);
+  // Package A review #2. Kills the backstop dropped: a daily run killed at 300 s never applies its own
+  // revalidation, and the current week would stay cached for up to an hour.
+  assert.deepEqual(routeStub.revalidated, [["radar", { expire: 0 }]]);
 });
 
 // Kills the route's own deadline dropped (`retryPendingSources(db)`): with 181 s of its 300 s gone,

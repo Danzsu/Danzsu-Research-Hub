@@ -101,7 +101,7 @@ export type PostgrestErrorShape = { code: string; message: string; details: stri
 
 export const pgError = (code: string, message: string, details: string | null = null): PostgrestErrorShape => ({ code, message, details, hint: null });
 
-type Filter = { column: string; op: "eq" | "neq" | "lt" | "in"; value: unknown };
+type Filter = { column: string; op: "eq" | "neq" | "lt" | "gte" | "in"; value: unknown };
 
 /** One call on a select chain, as `queries` records it: the method, then its arguments. */
 type ChainCall = [method: string, ...args: unknown[]];
@@ -117,6 +117,7 @@ function passes(row: Record<string, unknown>, { column, op, value }: Filter): bo
   if (op === "in") return (value as unknown[]).includes(row[column]);
   if (op === "eq") return row[column] === value;
   if (op === "neq") return row[column] !== value;
+  if (op === "gte") return (row[column] as number) >= (value as number);
   return (row[column] as number) < (value as number);
 }
 
@@ -155,6 +156,7 @@ function sourcesQuery(
     eq: filter("eq"),
     neq: filter("neq"),
     lt: filter("lt"),
+    gte: filter("gte"),
     in: filter("in"),
     order: (column: string, { ascending = true }: { ascending?: boolean } = {}) => {
       sortBy = { column, ascending };

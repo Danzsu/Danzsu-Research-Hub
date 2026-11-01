@@ -126,26 +126,28 @@ function CardText({ item, language, actions, rank, brief, titleClassName }: Card
   const t = copy[language];
   return (
     <>
-      {rank === undefined && item.dailyRank !== undefined && (
-        <p className="mb-1 inline-block border border-ink px-1.5 font-mono text-[11px] text-ink">
-          {t.dayTop} · {item.dailyRank}.
-        </p>
-      )}
-      {/* The source is the meta row's link (2a spec D1), and the `o` shortcut's target (data-card-open). */}
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noreferrer"
-        data-card-open
-        onClick={() => actions.onOpen(item)}
-        onAuxClick={(event) => {
-          if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
-        }}
-        className="focus-ring inline-flex min-h-10 items-center gap-1 font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere] hover:underline"
-      >
-        {item.source} <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
-        <span className="sr-only">({t.open})</span>
-      </a>
+      <div className="flex flex-wrap items-center gap-2">
+        {rank === undefined && item.dailyRank !== undefined && (
+          <p className="border border-ink px-1.5 font-mono text-[11px] text-ink">
+            {t.dayTop} · {item.dailyRank}.
+          </p>
+        )}
+        {/* The source is the meta row's link (2a spec D1), and the `o` shortcut's target (data-card-open). */}
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noreferrer"
+          data-card-open
+          onClick={() => actions.onOpen(item)}
+          onAuxClick={(event) => {
+            if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
+          }}
+          className="focus-ring inline-flex min-h-10 items-center gap-1 font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere] hover:underline"
+        >
+          {item.source} <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+          <span className="sr-only">({t.open})</span>
+        </a>
+      </div>
       <h2 className={`mt-3 font-display [overflow-wrap:anywhere] ${titleClassName}`}>{item.title[language]}</h2>
       <CardBody item={item} brief={brief} language={language} />
       <div className="mt-5 border-l-4 border-signal pl-4">
@@ -209,9 +211,10 @@ function CardFooter({ item, state, hasTodo, language, actions, postId, rating }:
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
       {/* Read-here spec 1: our own post when there is one; otherwise the chat sends the link, unless a submission would refuse it. */}
+      {/* prefetch off: 25 cards would each fetch a post page on every visit; the post skeleton covers the wait. */}
       {postId !== undefined ? (
         <Button asChild variant="brutal" className="min-h-10">
-          <Link href={`/library/${postId}`} onClick={() => actions.onOpen(item)}>
+          <Link href={`/library/${postId}`} prefetch={false} onClick={() => actions.onOpen(item)}>
             <BookOpen /> {t.readHere} <PendingDot />
           </Link>
         </Button>

@@ -1,5 +1,7 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { isCronRequest, jsonError } from "@/lib/api";
+import { RADAR_TAG } from "@/lib/content";
 import { retryPendingSources } from "@/lib/pipeline/ingest";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -12,6 +14,8 @@ export const maxDuration = 300;
 export async function GET(request: NextRequest) {
   const start = Date.now();
   if (!isCronRequest(request)) return jsonError(401, "unauthorized");
+  // A backstop for the daily run's own revalidation, which a run killed at its time limit never applies.
+  revalidateTag(RADAR_TAG, { expire: 0 });
   const processed = await retryPendingSources(createAdminClient(), start + maxDuration * 1000);
   return NextResponse.json({ processed });
 }

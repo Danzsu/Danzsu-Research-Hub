@@ -163,20 +163,25 @@ async function getArchive(db: SupabaseClient): Promise<ArchiveIssue[]> {
   }));
 }
 
-// The two caches (spec 1.5; the rules are in ARCHITECTURE.md → Invariants, the mechanics in CLAUDE.md →
+// The three caches (spec 1.5; the rules are in ARCHITECTURE.md → Invariants, the mechanics in CLAUDE.md →
 // Server path). A cached function may not
-// read cookies, so both read with the admin client: only the content tables and the archive_issues view,
+// read cookies, so all three read with the admin client: only the content tables and the archive_issues view,
 // which every member may read through RLS anyway. They hold content only, never the viewer, and are
-// reachable only through archivedWeek and archiveList, which take a signed-in Reader.
-// ⚠️ Next's data cache outlives a deploy (unstable_cache.md): bump the key's version whenever RadarData
-// or ArchiveIssue changes shape, or a deploy serves the old shape for up to a day. v2: items gained addedAt.
+// reachable only through archivedWeek, currentRadar and archiveList, which take a signed-in Reader.
+// ⚠️ Next's data cache outlives a deploy (unstable_cache.md): bump the keys' versions whenever RadarData
+// (both `closed-week` and `current-radar`) or ArchiveIssue changes shape, or a deploy serves the old shape for up to a day. v2: items gained addedAt.
 // v3: githubTop10 rows became objects with stars, language and score.
 const ONE_DAY = 86_400;
 /** The daily cron's revalidateTag drops the archive list with this tag. */
 export const ARCHIVE_TAG = "archive";
+/** ...and the current week with this one: only that run writes its items, Top 3 and repos. */
+export const RADAR_TAG = "radar";
 
 // A closed week never changes, so it needs no tag: a day later Next refills it in the background.
 const closedWeek = unstable_cache((week: string) => getRadar(createAdminClient(), week), ["closed-week", "v4"], { revalidate: ONE_DAY });
+// The current week is the same for every reader and changes only when the daily run writes it; the hour is
+// the backstop for a run whose revalidateTag never applied.
+const cachedCurrentRadar = unstable_cache(() => getRadar(createAdminClient()), ["current-radar", "v1"], { revalidate: 3600, tags: [RADAR_TAG] });
 const cachedArchive = unstable_cache(() => getArchive(createAdminClient()), ["archive-list", "v1"], { revalidate: ONE_DAY, tags: [ARCHIVE_TAG] });
 
 /** The type keeps a signed-out caller away from the caches; this keeps one whose types were cast. */
@@ -193,6 +198,13 @@ export async function archivedWeek(reader: Reader, week: string, now = new Date(
   if (!isoWeekMonday(week)) return null;
   assertSignedIn(reader);
   return isClosedWeek(week, now) ? closedWeek(week) : getRadar(reader.db, week);
+}
+
+/** The latest week (`/`, /companies), from its cache until the daily cron drops it. */
+export async function currentRadar(reader: Reader): Promise<RadarData> {
+  assertSignedIn(reader);
+  // Without an issue id getRadar always answers: an empty current week before the first run.
+  return (await cachedCurrentRadar()) as RadarData;
 }
 
 /** The /archive list, from its cache until the daily cron drops it. */
@@ -380,10 +392,13 @@ export async function getPost(db: SupabaseClient, id: number): Promise<Post | nu
 
 export type SubmittedSource = { id: number; url: string; kind: string; status: string; error: string | null; createdAt: string };
 
-export async function getOpenSources(db: SupabaseClient): Promise<SubmittedSource[]> {
+/** The reader's own unfinished submissions: another member's, or the mirror's queue, would keep the Library
+ *  refreshing while it waits for them. */
+export async function getOpenSources(db: SupabaseClient, viewerId: string): Promise<SubmittedSource[]> {
   const { data, error } = await db
     .from("sources")
     .select("id, url, kind, status, error, created_at")
+    .eq("submitted_by", viewerId)
     .neq("status", "done")
     .order("created_at", { ascending: false })
     .limit(20);
