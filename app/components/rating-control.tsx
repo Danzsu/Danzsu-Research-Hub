@@ -29,15 +29,14 @@ export function RatingsProvider({ send, children }: PropsWithChildren<{ send: (w
   return <RatingsContext value={store}>{children}</RatingsContext>;
 }
 
-const noneRated: ReadonlyMap<string, RatingValue | null> = new Map();
-
-/** The value the reader sees: what this tab set, else the page's render (G1 spec 3). */
+/** The value the reader sees: what this tab set, else the page's render (G1 spec 3). The snapshot is this
+ *  target's value alone, so a press re-renders only its own control, not every card's. */
 function useRating(target: RatingTarget, initial: RatingValue | null) {
   const store = useContext(RatingsContext);
   if (!store) throw new Error("RatingControl must be used inside RatingsProvider (app/components/app-shell.tsx)");
-  const rated = useSyncExternalStore(store.subscribe, store.getSnapshot, () => noneRated);
   const key = ratingKey(target);
-  return { store, value: rated.has(key) ? (rated.get(key) ?? null) : initial };
+  const value = useSyncExternalStore(store.subscribe, () => store.valueOf(key, initial), () => initial);
+  return { store, value };
 }
 
 /** 👎 👍 ❤ for one item, post or repo. Its data-rating lets the card around it dim for a 👎 (dislikedClass). */
