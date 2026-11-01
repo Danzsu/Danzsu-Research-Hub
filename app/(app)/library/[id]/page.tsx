@@ -23,9 +23,9 @@ export default async function PostPage({
   const query = await searchParams;
   const language = await getLanguage();
   const postId = parseId(id);
-  const post = postId ? await getPost(reader.db, postId) : null;
+  // Beside each other: the rating needs only the id, which the URL already gives.
+  const [post, ratings] = postId ? await Promise.all([getPost(reader.db, postId), getRatings(reader.db, [{ kind: "post", id: String(postId) }])]) : [null, {}];
   if (!post) notFound();
-  const ratings = await getRatings(reader.db, [{ kind: "post", id: String(post.id) }]);
 
   return (
     <main className="min-h-dvh bg-ink text-paper">
