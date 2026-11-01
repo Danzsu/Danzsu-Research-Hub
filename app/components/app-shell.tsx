@@ -2,7 +2,7 @@
 
 import { MotionConfig } from "motion/react";
 import { usePathname } from "next/navigation";
-import { createContext, useCallback, useContext, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { UserRound } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Language } from "@/data/digest-types";
@@ -11,7 +11,7 @@ import { activeNavId, MOBILE_CHAT_SLOT, PRIMARY_NAV, type NavItem } from "@/lib/
 import type { NavMode } from "@/lib/nav-mode";
 import { DesktopNav } from "./desktop-nav";
 import { LanguageProvider, useLanguage } from "./language-context";
-import { LinkChat, ReadHereContext, TaiyakiButton, type ChatPreview, type ReadHere } from "./link-chat";
+import { LinkChat, TaiyakiButton, type ChatPreview } from "./link-chat";
 import { AccountRows } from "./account-menu";
 import { NavEntry } from "./nav-parts";
 import { RatingsProvider } from "./rating-control";
@@ -99,14 +99,6 @@ export function AppShell({
     chatOpener.current = event.currentTarget;
     setChatOpen(!chatOpen);
   };
-  // A card's "Olvasd itt" (read-here spec 1): the chat opens with the card's link, and the card's button
-  // gets the focus back, like a taiyaki does. The link waits here until the open panel takes it.
-  const [queuedLink, setQueuedLink] = useState<string | null>(null);
-  const readHere = useCallback<ReadHere>((url, opener) => {
-    chatOpener.current = opener;
-    setQueuedLink(url);
-    setChatOpen(true);
-  }, [setChatOpen]);
   const openSearch = () => setSearchOpen(true);
   const openHelp = () => setHelpOpen(true);
   const toggleNav = () => {
@@ -132,7 +124,6 @@ export function AppShell({
       {/* The preview's ratings stay in memory, like its other writes. */}
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
-          <ReadHereContext value={readHere}>
             <PanelContext value={panel}>
             <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
               {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
@@ -141,7 +132,6 @@ export function AppShell({
               <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
             </DesktopNav>
             </PanelContext>
-          </ReadHereContext>
           <MobileNav
             email={email}
             onSearch={openSearch}
@@ -166,8 +156,6 @@ export function AppShell({
             onOpenChange={setChatOpen}
             opener={chatOpener}
             preview={chatPreview}
-            queuedLink={queuedLink}
-            onQueuedLinkTaken={() => setQueuedLink(null)}
           />
           <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
           <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />

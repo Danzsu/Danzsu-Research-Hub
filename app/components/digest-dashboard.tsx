@@ -17,9 +17,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import type { CurrentIssue, DailyBrief, DigestItem, GithubTopEntry } from "@/data/digest-types";
+import type { CurrentIssue, DailyBrief, DigestItem, GithubTopEntry, LibraryCopy } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
+import { httpTransport, memoryTransport } from "@/lib/link-chat";
 import { SHORT_MINUTES } from "@/lib/pipeline/daily-top";
 import { ratingKey, type Ratings } from "@/lib/ratings";
 import { repoStats } from "@/lib/repo-format";
@@ -32,7 +33,6 @@ import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
 import { tabPastPanel } from "./tab-past-panel";
-import { useReadHere } from "./link-chat";
 import { isUndoToast, toasts } from "./undo-toast";
 import { useModelContextTools } from "./use-model-context-tools";
 import { useReaderState } from "./use-reader-state";
@@ -157,8 +157,8 @@ export function DigestDashboard(
     archived?: boolean;
     /** /companies: the week's company news only, the latest day's Top 5 first, no category bar. */
     scope?: "companies" | "daily";
-    /** Item id → its Library post (readHerePosts): the cards' "Olvasd itt" opens it. */
-    posts?: Record<string, number>;
+    /** Item id → its Library copy (readHerePosts): a card's Read here opens the post, or says it is being made. */
+    posts?: Record<string, LibraryCopy>;
     /** The page's ratings by ratingKey (getRatings): the cards' and repos' initial values. */
     ratings?: Ratings;
     /** /daily (daily news spec N7): whether the list is today's, and each card's long text. */
@@ -177,7 +177,8 @@ export function DigestDashboard(
   const requested = useSearchParams().get("filter");
   const [filter, setFilter] = useState<Filter>(() => (isFilter(requested) ? requested : "all"));
   const { store, states, loadedStates, todos, syncing } = useReaderState(props);
-  const readHere = useReadHere();
+  // Save here sends the item's URL as a submission; the preview keeps it in memory, like its other writes.
+  const [transport] = useState(() => (props.preview ? memoryTransport([], props.preview.failWrites) : httpTransport));
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
   useModelContextTools(store, itemIds);
   const isMobile = useIsMobile();
@@ -202,7 +203,17 @@ export function DigestDashboard(
       }
     },
     onToggle: (itemId, flag) => store.toggleFlag(itemId, flag),
-    onReadHere: (item, opener) => readHere(item.url, opener),
+    async onSaveHere(item) {
+      try {
+        const { status, body } = await transport.submit(item.url, null);
+        if (status === 202 || (status === 409 && body.queued)) return "pending";
+        if (status === 409 && typeof body.postId === "number") return body.postId;
+      } catch {
+        // Offline: the failed toast below.
+      }
+      toasts.show({ kind: "failed" });
+      return null;
+    },
     onAddTodo(item) {
       if (store.addTodo(item.title[language], item.id)) toasts.show({ kind: "todoAdded" });
     },
@@ -230,7 +241,7 @@ export function DigestDashboard(
     item,
     state: states[item.id] ?? EMPTY_ITEM_STATE,
     hasTodo: itemsWithTodo.has(item.id),
-    postId: props.posts?.[item.id],
+    library: props.posts?.[item.id],
     rating: props.ratings?.[ratingKey({ kind: "item", id: item.id })] ?? null,
     brief: props.daily?.briefs[item.id],
     language,

@@ -391,7 +391,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
 
 ### Page shell
 
-`app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar and the taiyaki, and the refresh bar's provider, the "Olvasd itt" context around the page, the two taiyaki buttons, the link chat, the dialogs and the toast are mounted once:
+`app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar and the taiyaki, and the refresh bar's provider, the two taiyaki buttons, the link chat, the dialogs and the toast are mounted once:
 
 ```tsx app/components/app-shell.tsx
     <LanguageProvider initial={language}>
@@ -400,7 +400,6 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
       {/* The preview's ratings stay in memory, like its other writes. */}
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
-          <ReadHereContext value={readHere}>
             <PanelContext value={panel}>
             <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
               {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
@@ -409,7 +408,6 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
               <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
             </DesktopNav>
             </PanelContext>
-          </ReadHereContext>
           <MobileNav
             email={email}
             onSearch={openSearch}
@@ -434,8 +432,6 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
             onOpenChange={setChatOpen}
             opener={chatOpener}
             preview={chatPreview}
-            queuedLink={queuedLink}
-            onQueuedLinkTaken={() => setQueuedLink(null)}
           />
           <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
           <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
@@ -568,10 +564,10 @@ In use (`app/(app)/library/library-view.tsx`):
         "icon-lg": "size-10",
 ```
 
-The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Olvasd itt button does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
+The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Original and Olvasd itt buttons do (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
 
 ```tsx app/components/story-card.tsx
-        <Button asChild variant="brutal" className="min-h-10">
+      <Button asChild variant="brutal" className="min-h-10">
 ```
 
 ```tsx app/components/rating-classes.ts
@@ -672,7 +668,7 @@ className={`focus-ring story-card max-w-[900px] scroll-mt-28 border-2 md:scroll-
   | 👎 | a dashed frame, nothing dimmer (`dislikedClass`, `rating-classes.ts`) | the card's `has-[[data-rating=down]]` |
   | Saved for later | a 4px signal bar on the left edge (`data-saved`, `.story-card[data-saved]::before`) | `globals.css` |
 
-- **story-card** has a 96px meta gutter from `lg`, the source as a link in its meta row (also the `o` shortcut's target, `data-card-open`), and one row of actions at the bottom (2a spec D1): Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link) as the one primary action, then the tool unit (`CardToolbar`, `card-toolbar.tsx`: 👎 👍 ❤, Later, to-do, one flex unit that wraps as a whole), and Read last on the right.
+- **story-card** has a 96px meta gutter from `lg`, the source's name in its meta row, and one row of actions at the bottom (2a spec D1, 2026-11-01 review): Eredeti / Original (`brutal`, `ExternalLink`, a new tab; the `o` shortcut's target, `data-card-open`) and Olvasd itt (`brutal`, `BookOpen`: the post's link with the pending dot; "Készül…" in a dashed box while a run makes the copy; else Mentsd ide, which submits the URL and shows what came of it), then the tool unit (`CardToolbar`, `card-toolbar.tsx`: 👎 👍 ❤, Later, to-do, one flex unit that wraps as a whole), and Read last on the right.
 - **Both** dim to 58% once read, and take focus for j/k (`tabIndex={-1}` plus `focus-ring`).
 
 ### `RatingControl` and the filter chips

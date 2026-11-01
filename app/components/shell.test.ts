@@ -37,7 +37,7 @@ const { PostImage } = await import("./post-image.tsx");
 const { Progress } = await import("../../components/ui/progress.tsx");
 const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
-const { CHAT_PANEL_ID, LinkChat, ReadHereContext, TaiyakiButton } = await import("./link-chat.tsx");
+const { CHAT_PANEL_ID, LinkChat, TaiyakiButton } = await import("./link-chat.tsx");
 const { RefreshBar, RefreshProvider } = await import("./refresh-bar.tsx");
 const { RatingsProvider } = await import("./rating-control.tsx");
 const sendNothing = { send: async () => ({}) };
@@ -45,11 +45,11 @@ const { PostToolbar } = await import("../(app)/library/[id]/post-toolbar.tsx");
 const { useReaderState } = await import("./use-reader-state.ts");
 
 const noop = () => {};
-const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop, onReadHere: noop };
+const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop, onSaveHere: async () => null };
 /** Each element's own count of `span[aria-hidden="true"]` descendants (the pending dot). */
 const hiddenSpanCounts = (elements: Element[]) => elements.map((element) => element.querySelectorAll('span[aria-hidden="true"]').length);
 /** Wraps a component in the providers the shell gives it: the language (LocalizedText, SubmitForm,
- *  DigestDashboard), the refresh bar (SubmitForm, LinkChat) and "Olvasd itt" (DigestDashboard). */
+ *  DigestDashboard) and the refresh bar (SubmitForm, LinkChat). */
 const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P, language: "hu" | "en" = "en") =>
   render(
     createElement(
@@ -61,7 +61,7 @@ const withShellProviders = <P extends object>(Component: ComponentType<P>, props
         createElement(
           RefreshProvider,
           null,
-          createElement(ReadHereContext, { value: noop }, createElement(PanelContext, { value: { open: false, setOpen: () => {} } }, createElement(Component, props))),
+          createElement(PanelContext, { value: { open: false, setOpen: () => {} } }, createElement(Component, props)),
         ),
       ),
     ),
@@ -232,19 +232,20 @@ test("useReaderState routes a preview source's writes through createSourceStore,
   assert.equal(fetchCalls, 0);
 });
 
-// 2a spec D1 and Review Focus 2. Kills the source link gone from the meta row (and with it the `o` shortcut's
-// target), two primary buttons, and a Read toggle anywhere but last.
-test("StoryCard puts the source in its meta row, one Read here button, the toolbar, then Read last", () => {
+// 2026-11-01 review. Kills the original left as a small link in the meta row (the reader missed it), opened in this
+// tab, or no longer the `o` shortcut's target; and the Read toggle anywhere but last.
+test("StoryCard opens the original from its first button, in a new tab, and keeps Read last", () => {
   const item = previewItems.find((candidate) => !candidate.mustRead)!;
   const doc = withShellProviders(StoryCard, { item, state: { read: false, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: null });
   const article = doc.querySelector("article.story-card")!;
   assert.equal(article.getAttribute("data-card-id"), item.id);
-  assert.equal(article.classList.contains("story-read"), false);
-  assert.equal(article.querySelector("[data-card-open]")?.getAttribute("href"), item.url);
-  assert.equal(article.querySelectorAll('a[href^="http"]').length, 1, "the source link, once, in the meta row");
+  const original = article.querySelector("[data-card-open]")!;
+  assert.deepEqual([original.tagName, original.getAttribute("href"), original.getAttribute("target")], ["A", item.url, "_blank"]);
+  assert.match(original.textContent ?? "", /Original/);
+  assert.equal(article.querySelectorAll('a[href^="http"]').length, 1, "the original, once");
+  assert.ok((article.textContent ?? "").includes(item.source), "the source still named");
   assert.equal(article.querySelectorAll("[data-card-toolbar]").length, 1);
-  const buttons = [...article.querySelectorAll("button")];
-  assert.match(buttons.at(-1)?.textContent ?? "", /Read/);
+  assert.match([...article.querySelectorAll("button")].at(-1)?.textContent ?? "", /Read/);
   assert.equal(article.querySelectorAll("button[aria-pressed]").length, 5); // Later + Read + the three rating toggles
 });
 
@@ -440,48 +441,34 @@ test("useRefresh outside RefreshProvider throws, naming where the provider lives
   assert.throws(() => render(createElement(PostToolbar, props)), /RefreshProvider \(app\/components\/app-shell\.tsx\)/);
 });
 
-// Read-here spec 1. Kills the link to the post missing (the reader would be sent through the chat for
-// a post that exists), the chat button offered for a URL a submission refuses (its send would only
-// say "invalid_url"), and the button missing for a public link.
-test("a card's Read here opens the Library post when there is one, asks the chat for a public link, and is absent otherwise", () => {
-  const card = (url: string, postId?: number) =>
-    withShellProviders(StoryCard, { item: digestItem("local-2026w40-x-1", { url }), state: EMPTY_ITEM_STATE, hasTodo: false, language: "en", actions: cardActions, postId, rating: null });
+// 2026-11-01 review. Kills Read here sending the reader through the chat: it is the post when there is one, a
+// "Preparing…" note while one is being made (the mirror queued it), a "Save here" button otherwise, and nothing
+// for a URL a submission refuses.
+test("a card's Read here is the post, Preparing… while it is made, Save here otherwise", () => {
+  const card = (url: string, library?: number | "pending") =>
+    withShellProviders(StoryCard, { item: digestItem("local-2026w40-x-1", { url }), state: EMPTY_ITEM_STATE, hasTodo: false, language: "en", actions: cardActions, library, rating: null });
+  const buttons = (doc: Document) => [...doc.querySelectorAll("button")].map((button) => button.textContent?.trim()).filter((text) => /here|Preparing/.test(text ?? ""));
   assert.equal(card("https://blog.test/a", 7).querySelector('a[href="/library/7"]')?.textContent?.trim(), "Read here");
-  const buttons = [...card("https://blog.test/a").querySelectorAll("button")].filter((button) => button.textContent?.trim() === "Read here");
-  assert.equal(buttons.length, 1);
-  assert.equal(card("http://10.0.0.1/a").body.textContent?.includes("Read here"), false);
+  const pending = card("https://blog.test/a", "pending");
+  assert.match(pending.body.textContent ?? "", /Preparing…/);
+  assert.deepEqual(buttons(pending), []);
+  assert.deepEqual(buttons(card("https://blog.test/a")), ["Save here"]);
+  assert.doesNotMatch(card("http://10.0.0.1/a").body.textContent ?? "", /Save here|Read here/);
 });
 
-// Read-here spec 1. Kills `posts` not reaching the cards, or reaching the wrong one.
-test("DigestDashboard gives each card its Library post from `posts`", () => {
-  const item = previewItems.find((candidate) => !candidate.mustRead)!;
+// Kills `posts` not reaching the cards, or reaching the wrong one.
+test("DigestDashboard gives each card its Library post, or its pending note, from `posts`", () => {
+  const [first, second] = previewItems.filter((candidate) => !candidate.mustRead);
   const doc = withShellProviders(DigestDashboard, {
     issue: previewIssue,
     items: previewItems,
     githubTop10: previewGithub,
     preview: { data: previewReader, failWrites: false },
-    posts: { [item.id]: 42 },
+    posts: { [first.id]: 42, [second.id]: "pending" },
   });
-  assert.equal(doc.querySelector(`[data-card-id="${item.id}"] a[href="/library/42"]`)?.textContent?.trim(), "Read here");
+  assert.equal(doc.querySelector(`[data-card-id="${first.id}"] a[href="/library/42"]`)?.textContent?.trim(), "Read here");
   assert.equal(doc.querySelectorAll('a[href^="/library/"]').length, 1);
-});
-
-// Like useRefresh. Kills a useReadHere that quietly does nothing without the shell: the button would
-// mark the story read and open nothing.
-test("useReadHere outside AppShell throws, naming where the provider lives", () => {
-  const bare = () =>
-    render(
-      createElement(
-        LanguageProvider,
-        { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-        createElement(
-          RatingsProvider,
-          sendNothing,
-          createElement(RefreshProvider, null, createElement(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } })),
-        ),
-      ),
-    );
-  assert.throws(bare, /useReadHere must be used inside AppShell \(app\/components\/app-shell\.tsx\)/);
+  assert.match(doc.querySelector(`[data-card-id="${second.id}"]`)?.textContent ?? "", /Preparing…/);
 });
 
 // G1 spec 3. Kills the rating group missing from a card, and a card that ignores the page's ratings.
@@ -603,7 +590,7 @@ test("the weekly view marks the items of a daily Top 10", () => {
   // 2026-11-01 review. Kills the badge glued to the source name ("DAY TOP · 2.The Decoder"): one gapped row.
   const badge = [...doc.querySelectorAll("p")].find((line) => /DAY TOP · 4\./.test(line.textContent ?? ""))!;
   assert.match(badge.parentElement!.className, /\bflex\b.*\bgap-2\b/);
-  assert.ok(badge.parentElement!.querySelector("a[data-card-open]"));
+  assert.equal(badge.nextElementSibling?.textContent, "example.test", "the source's name, beside the badge");
 });
 
 // 2026-11-01 review. Kills the week's header and the chip bar back as two bands, a Radar view left out of the

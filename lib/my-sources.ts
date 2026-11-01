@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Localized } from "../data/digest-types.ts";
+import type { LibraryCopy, Localized } from "../data/digest-types.ts";
 import { readOverrides } from "./overrides.ts";
-import { inChunks, MINE_LIMIT, parseSubmittedUrl, type SourceKind } from "./pipeline/util.ts";
+import { inChunks, MAX_ATTEMPTS, MINE_LIMIT, parseSubmittedUrl, type SourceKind } from "./pipeline/util.ts";
 import { shownTitle } from "./post-view.ts";
 
 // The reader's own submissions, for the taiyaki link chat: GET /api/sources/mine lists them, and
@@ -137,19 +137,26 @@ export async function itemSources(db: SupabaseClient, items: { id: string; url: 
   return byItem;
 }
 
+/** A source row's Library copy (`url, status, attempts, posts(...)`): its post, "pending" while a run can still
+ *  make one, else none (a failed or stuck source: Save here sends it again). */
+export function libraryCopy(row: Record<string, unknown>): LibraryCopy | undefined {
+  const post = embeddedPost(row.posts);
+  if (post) return post.id;
+  return row.status === "pending" && (row.attempts as number) < MAX_ATTEMPTS ? "pending" : undefined;
+}
+
 /**
- * Item id → the Library post already made from its URL: a card's "Olvasd itt" opens it (read-here
- * spec 1). The URLs go through parseSubmittedUrl, as a submission's and the mirror's do, so both sides
- * compare the same string. A failed lookup answers {} and is logged: the card then offers the chat,
- * whose 409 still points at the post. Never cached: a post can appear any day, for an open week or a
- * closed one.
+ * Item id → its Library copy: a card's Read here opens the post, or says it is being made. The URLs go through
+ * parseSubmittedUrl, as a submission's and the mirror's do, so both sides compare the same string. A failed
+ * lookup answers {} and is logged: the card then offers Save here, whose 409 still points at the post. Never
+ * cached: a post can appear any day, for an open week or a closed one.
  */
-export async function readHerePosts(db: SupabaseClient, items: { id: string; url: string }[]): Promise<Record<string, number>> {
-  const sources = await itemSources(db, items, "url, posts(id)");
-  const posts: Record<string, number> = {};
+export async function readHerePosts(db: SupabaseClient, items: { id: string; url: string }[]): Promise<Record<string, LibraryCopy>> {
+  const sources = await itemSources(db, items, "url, status, attempts, posts(id)");
+  const copies: Record<string, LibraryCopy> = {};
   for (const [id, row] of sources ?? []) {
-    const post = embeddedPost(row.posts);
-    if (post) posts[id] = post.id;
+    const copy = libraryCopy(row);
+    if (copy !== undefined) copies[id] = copy;
   }
-  return posts;
+  return copies;
 }

@@ -101,6 +101,10 @@ export type CurrentIssue = {
 
 /** A daily Top 10 card's long text (daily news spec N5, N8): the post's brief, else its summary and key points,
  *  else "being written" while its source waits. No entry: the item's own summary. */
+/** An item's Library copy: the post's id, or "pending" while a run is making it (the mirror queued it, or a reader
+ *  saved it). A card's Read here opens the one, says Preparing… for the other, and offers Save here without either. */
+export type LibraryCopy = number | "pending";
+
 export type DailyBrief =
   | { kind: "brief"; paragraphs: Record<Language, string[]> }
   | { kind: "post"; summary: Localized; keyPoints: Record<Language, string[]> }
