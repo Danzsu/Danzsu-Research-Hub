@@ -238,6 +238,12 @@
     - [x] a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja) — elavult: a `/login` a landing-signin óta gomb nélkül (`signIn="none"`) használja a keretet;
     - [x] a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel;
     - a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül: nyitott ötlet, előbb mérni kell.
+  - **Hibrid pipeline (C1, 2026-11-14), hátra:**
+    - a pontskála élő beállítása: az első hét után megnézni, hány hír ér el 85-öt (a Library-tükrözés és a Top 3 ezen áll), és szükség esetén a `finalScore` súlyait (`rank.ts`) igazítani;
+    - a Decision 1 még csak 2 napos és v1beta: ha elbukik, a szabály-pontszám dönt (a napló: „decisions failed, scoring by the rules alone”);
+    - határeseti duplikátumok: két közepesen hasonló cím (Jaccard 0,35–0,6) eldönthető lenne egy igen/nem Decision-kérdéssel („ugyanarról szól?”);
+    - a GitHub top 10 még a `daily_curate`-ben készül; szabállyal is menne (csillag, leírás, awesome-listák névminta alapján);
+    - C2: az eredeti nyelvű tartalom, a fordítás eltávolítása (a `hu` mezők a promptokból, a Fordítás gomb, a `translate` route).
   - **Hibaaudit (2026-11-13), halasztva:**
     - egy képnek csak a legnagyobb `srcset`-jelöltje próbálkozik: ha az 5 MB fölött van, a kisebbek nélkül „Image unavailable” lesz (`html-images.ts`, `images.ts`);
     - a `urlKey` a régi, már tárolt sorokat csak a kulcson keresztül találja meg; a `sources.url` egyedisége a tárolt alakon marad, így egy régi, `utm_`-os sor és az új, tiszta alak két sor lehet;
