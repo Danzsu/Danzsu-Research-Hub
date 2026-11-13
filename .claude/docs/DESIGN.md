@@ -806,8 +806,8 @@ A multi-line field, from `app/(app)/library/[id]/post-editor.tsx`:
 ```tsx app/(app)/library/[id]/post-editor.tsx
                 <Textarea
                   id={summaryId(lang)}
-                  value={summary[lang]}
-                  onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })}
+                  value={originalText(summary)}
+                  onChange={(e) => setSummary(inBoth(e.target.value))}
                   rows={5}
                   className="border-2 border-ink bg-paper"
 ```

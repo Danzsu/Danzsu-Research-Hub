@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { BookOpen, Check, Clock3, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { DailyBrief, DigestItem, Language, LibraryCopy } from "@/data/digest-types";
+import { originalList, originalText, type DailyBrief, type DigestItem, type Language, type LibraryCopy } from "@/data/digest-types";
 import { nextCardIndex } from "@/lib/keymap";
 import { SHORT_MINUTES } from "@/lib/pipeline/daily-top";
 import { parseSubmittedUrl } from "@/lib/pipeline/util";
@@ -149,11 +149,11 @@ function CardText({ item, language, rank, brief, titleClassName }: CardProps & {
         {/* The source's name; the card's Original button opens it. */}
         <span className="flex min-h-10 items-center font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere]">{item.source}</span>
       </div>
-      <h2 className={`mt-3 font-display [overflow-wrap:anywhere] ${titleClassName}`}>{item.title[language]}</h2>
+      <h2 className={`mt-3 font-display [overflow-wrap:anywhere] ${titleClassName}`}>{originalText(item.title)}</h2>
       <CardBody item={item} brief={brief} language={language} />
       <div className="mt-5 border-l-4 border-signal pl-4">
         <p className="font-mono text-[11px] tracking-[0.15em] text-signal">{t.why}</p>
-        <p className="mt-1 text-sm leading-6">{item.why[language]}</p>
+        <p className="mt-1 text-sm leading-6">{originalText(item.why)}</p>
       </div>
       {item.tags.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">
@@ -174,7 +174,7 @@ function CardBody({ item, brief, language }: { item: DigestItem; brief?: DailyBr
   if (brief?.kind === "brief") {
     return (
       <div className="mt-4 max-w-[75ch] space-y-3 text-base leading-7 text-ink/80">
-        {brief.paragraphs[language].map((paragraph, index) => (
+        {originalList(brief.paragraphs).map((paragraph, index) => (
           <p key={index}>{paragraph}</p>
         ))}
       </div>
@@ -183,12 +183,12 @@ function CardBody({ item, brief, language }: { item: DigestItem; brief?: DailyBr
   if (brief?.kind === "post") {
     return (
       <>
-        <p className={text}>{brief.summary[language]}</p>
-        {brief.keyPoints[language].length > 0 && (
+        <p className={text}>{originalText(brief.summary)}</p>
+        {originalList(brief.keyPoints).length > 0 && (
           <div className="mt-4 max-w-[75ch]">
             <p className="font-mono text-[11px] tracking-[0.15em] text-ink/55">{t.keyPoints}</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6">
-              {brief.keyPoints[language].map((point) => (
+              {originalList(brief.keyPoints).map((point) => (
                 <li key={point}>{point}</li>
               ))}
             </ul>
@@ -199,7 +199,7 @@ function CardBody({ item, brief, language }: { item: DigestItem; brief?: DailyBr
   }
   return (
     <>
-      <p className={text}>{item.summary[language]}</p>
+      <p className={text}>{originalText(item.summary)}</p>
       {brief?.kind === "pending" && <p className="mt-2 font-mono text-xs text-ink/55">{t.briefPending}</p>}
     </>
   );

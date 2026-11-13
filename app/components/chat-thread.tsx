@@ -4,7 +4,7 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import type { Language } from "@/data/digest-types";
+import { originalText, type Language } from "@/data/digest-types";
 import { toThread, type ChatEntry, type ChatNotice, type ChatSnapshot, type OutgoingMessage } from "@/lib/link-chat";
 import { SOURCE_KIND_LABELS } from "@/lib/source-kinds";
 import { TaiyakiIcon } from "./taiyaki-icon";
@@ -149,7 +149,7 @@ function Reply({ entry, retrying, refusal, ...actions }: ThreadActions & { entry
   if (reply.state === "done") {
     return (
       <>
-        <p className="font-bold">{reply.title[language]}</p>
+        <p className="font-bold">{originalText(reply.title)}</p>
         <Link href={`/library/${reply.postId}`} onClick={onOpenPost} className={action}>
           {t.done}
         </Link>

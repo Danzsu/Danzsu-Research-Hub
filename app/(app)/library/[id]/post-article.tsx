@@ -2,7 +2,7 @@ import { ExternalLink } from "lucide-react";
 import { PostBlocks } from "@/app/components/post-blocks";
 import { Tag } from "@/app/components/tag";
 import { Button } from "@/components/ui/button";
-import type { Language } from "@/data/digest-types";
+import { originalList, originalText, type Language } from "@/data/digest-types";
 import { safeHref } from "@/lib/blocks";
 import { hostOf } from "@/lib/pipeline/util";
 import { readMinutes } from "@/lib/post-row";
@@ -45,7 +45,7 @@ export function PostArticle({ post, language, query, canEdit, rating }: { post: 
             {post.publishedAt && <span className="text-ink/60">{post.publishedAt}</span>}
             {minutes !== null && <span className="text-ink/60">{minutes} {t.min}</span>}
           </p>
-          <h1 className="mt-4 font-display text-[clamp(1.9rem,6vw,4.6rem)] leading-[0.95] tracking-[-0.05em] [overflow-wrap:anywhere]">{post.title[language]}</h1>
+          <h1 className="mt-4 font-display text-[clamp(1.9rem,6vw,4.6rem)] leading-[0.95] tracking-[-0.05em] [overflow-wrap:anywhere]">{originalText(post.title)}</h1>
           <PostNotices post={post} language={language} originalHref={originalHref} canEdit={canEdit} />
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <PostToolbar
@@ -70,12 +70,12 @@ export function PostArticle({ post, language, query, canEdit, rating }: { post: 
           )}
         </header>
 
-        <p className="mt-8 max-w-[75ch] text-lg leading-8">{post.summary[language]}</p>
-        {post.keyPoints[language].length > 0 && (
+        <p className="mt-8 max-w-[75ch] text-lg leading-8">{originalText(post.summary)}</p>
+        {originalList(post.keyPoints).length > 0 && (
           <div className="mt-8 max-w-[75ch] border-l-4 border-signal pl-5">
             <p className="font-mono text-[11px] tracking-[0.15em] text-signal">{labels.keyPoints}</p>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7">
-              {post.keyPoints[language].map((point) => <li key={point}>{point}</li>)}
+              {originalList(post.keyPoints).map((point) => <li key={point}>{point}</li>)}
             </ul>
           </div>
         )}

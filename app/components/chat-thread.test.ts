@@ -36,7 +36,7 @@ test("the thread greets first, then shows each submission oldest first with the 
   const [greeting, done, failed, pending] = items(doc);
   assert.equal(items(doc).length, 1 + previewMySources.length);
   assert.match(greeting, /Dobj be egy linket!/);
-  assert.equal(done, `Te: https://example.test/posts/-1Hosszú megjegyzés: ${LONG_WORD}Taiyaki: ${LONG_WORD} – készKÉSZ · MEGNYITÁS →`);
+  assert.equal(done, `Te: https://example.test/posts/-1Hosszú megjegyzés: ${LONG_WORD}Taiyaki: ${LONG_WORD} – doneKÉSZ · MEGNYITÁS →`);
   assert.equal(failed, `Te: ${LONG_URL}Taiyaki: Nem sikerült feldolgozni.fetch 404: ${LONG_URL}ÚJRA`);
   assert.equal(pending, "Te: https://arxiv.org/abs/2609.01234A módszertan-részre figyelj.Taiyaki: Megkaptam, arXiv-tanulmány.FELDOLGOZÁS…");
   assert.equal(doc.querySelector('a[href="/library/-1"]')?.textContent, "KÉSZ · MEGNYITÁS →");

@@ -39,18 +39,14 @@ test("PostEditor labels each title and summary field through for/id, with the re
     return [label.textContent, field?.tagName, field?.getAttribute("lang")];
   });
   assert.deepEqual(targets, [
-    ["Title (HU)", "INPUT", "hu"],
-    ["Summary (HU)", "TEXTAREA", "hu"],
-    ["Title (EN)", "INPUT", "en"],
-    ["Summary (EN)", "TEXTAREA", "en"],
+    ["Title", "INPUT", "en"],
+    ["Summary", "TEXTAREA", "en"],
   ]);
   for (const label of labels) assert.equal(label.querySelector("button"), null, label.textContent!);
   const resets = [...doc.querySelectorAll("button")].filter((button) => button.textContent === "Original");
   assert.deepEqual(resets.map((button) => button.getAttribute("aria-label")), [
-    "Original title (HU)",
-    "Original summary (HU)",
-    "Original title (EN)",
-    "Original summary (EN)",
+    "Original title",
+    "Original summary",
   ]);
 });
 
@@ -64,11 +60,11 @@ test("PostEditor puts its fields in a form whose one submit button is Save, so E
   const form = renderEditor().querySelector("form");
   assert.ok(form);
   const fields = [...form.querySelectorAll("input, textarea")];
-  assert.equal(fields.length, 4);
+  assert.equal(fields.length, 2);
   assert.ok(fields.every((field) => field.hasAttribute("required")));
   const buttons = [...form.querySelectorAll("button")];
   assert.deepEqual(buttons.filter((button) => button.getAttribute("type") === "submit").map((button) => button.textContent), ["Save"]);
   // A button with no type would submit the form too: re-extract and the resets must say "button".
-  assert.deepEqual(buttons.filter((button) => button.getAttribute("type") !== "submit").map((button) => button.getAttribute("type")), Array(5).fill("button"));
+  assert.deepEqual(buttons.filter((button) => button.getAttribute("type") !== "submit").map((button) => button.getAttribute("type")), Array(3).fill("button"));
   assert.equal(form.querySelectorAll("button[aria-pressed]").length, 0); // the hide toggles sit outside the form
 });

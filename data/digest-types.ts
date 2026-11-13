@@ -36,6 +36,16 @@ export const digestTags = [
 /** A string that exists in both site languages. */
 export type Localized = Record<Language, string>;
 
+/** A content text as written: the source's own language, never a translation (2026-11-01 decision). New rows hold the
+ *  original in both slots; an older row's `en` is the original it was translated from, else its `hu`. */
+export const originalText = (value: Localized): string => value.en || value.hu;
+
+/** A text written once, in the source's language, as the two slots every content field holds. */
+export const inBoth = (text: string): Localized => ({ hu: text, en: text });
+
+/** The same for a list of paragraphs or points. */
+export const originalList = (value: Record<Language, string[]>): string[] => (value.en.length ? value.en : value.hu);
+
 export type DigestItem = {
   /**
    * ⚠️ STABLE FOREVER. This value is stored as `item_states.item_id`, half of a

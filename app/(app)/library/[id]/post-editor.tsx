@@ -9,7 +9,7 @@ import { useRefresh } from "@/app/components/refresh-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Language } from "@/data/digest-types";
+import { inBoth, originalText, type Language } from "@/data/digest-types";
 import { SUMMARY_MAX, TITLE_MAX } from "@/lib/pipeline/util";
 import { editPayload, rebaseDrafts, type Post, type PostQuery } from "@/lib/post-view";
 import { RefreshWhileProcessing } from "../refresh-while-processing";
@@ -19,8 +19,8 @@ const copy = {
     title: "Cím",
     summary: "Összefoglaló",
     original: "Eredeti",
-    resetTitle: (lang: string) => `Eredeti cím (${lang})`,
-    resetSummary: (lang: string) => `Eredeti összefoglaló (${lang})`,
+    resetTitle: "Eredeti cím",
+    resetSummary: "Eredeti összefoglaló",
     save: "Mentés",
     cancel: "Mégse",
     saving: "Mentés…",
@@ -35,8 +35,8 @@ const copy = {
     title: "Title",
     summary: "Summary",
     original: "Original",
-    resetTitle: (lang: string) => `Original title (${lang})`,
-    resetSummary: (lang: string) => `Original summary (${lang})`,
+    resetTitle: "Original title",
+    resetSummary: "Original summary",
     save: "Save",
     cancel: "Cancel",
     saving: "Saving…",
@@ -156,19 +156,19 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
         }}
       >
         <div className="grid gap-4 border-2 border-ink bg-paper p-5 sm:grid-cols-2">
-          {(["hu", "en"] as const).map((lang) => (
-            <div key={lang} className="space-y-3">
+          {(["en"] as const).map((lang) => (
+            <div key={lang} className="space-y-3 sm:col-span-2">
               <FieldRow
                 htmlFor={titleId(lang)}
-                label={`${t.title} (${lang.toUpperCase()})`}
-                resetLabel={t.resetTitle(lang.toUpperCase())}
+                label={t.title}
+                resetLabel={t.resetTitle}
                 resetText={t.original}
-                onReset={() => setTitle({ ...title, [lang]: post.generatedTitle[lang] })}
+                onReset={() => setTitle(inBoth(post.generatedTitle.en || post.generatedTitle.hu))}
               >
                 <Input
                   id={titleId(lang)}
-                  value={title[lang]}
-                  onChange={(e) => setTitle({ ...title, [lang]: e.target.value })}
+                  value={originalText(title)}
+                  onChange={(e) => setTitle(inBoth(e.target.value))}
                   className="min-h-10 border-2 border-ink bg-paper"
                   required
                   maxLength={TITLE_MAX}
@@ -177,15 +177,15 @@ export function PostEditor({ post, language, query, videoStart }: { post: Post; 
               </FieldRow>
               <FieldRow
                 htmlFor={summaryId(lang)}
-                label={`${t.summary} (${lang.toUpperCase()})`}
-                resetLabel={t.resetSummary(lang.toUpperCase())}
+                label={t.summary}
+                resetLabel={t.resetSummary}
                 resetText={t.original}
-                onReset={() => setSummary({ ...summary, [lang]: post.generatedSummary[lang] })}
+                onReset={() => setSummary(inBoth(post.generatedSummary.en || post.generatedSummary.hu))}
               >
                 <Textarea
                   id={summaryId(lang)}
-                  value={summary[lang]}
-                  onChange={(e) => setSummary({ ...summary, [lang]: e.target.value })}
+                  value={originalText(summary)}
+                  onChange={(e) => setSummary(inBoth(e.target.value))}
                   rows={5}
                   className="border-2 border-ink bg-paper"
                   required
