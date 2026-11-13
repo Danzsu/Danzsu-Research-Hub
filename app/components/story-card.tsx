@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { BookOpen, Check, Clock3, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DailyBrief, DigestItem, Language, LibraryCopy } from "@/data/digest-types";
@@ -26,6 +26,8 @@ const copy = {
     saveHere: "Mentsd ide",
     saving: "Mentés…",
     preparing: "Készül…",
+    unavailable: "Itt nem érhető el",
+    savedReady: "Már megvan: olvasd itt.",
     read: "Olvasott",
     short: "RÖVID",
     dayTop: "NAP TOP",
@@ -42,6 +44,8 @@ const copy = {
     saveHere: "Save here",
     saving: "Saving…",
     preparing: "Preparing…",
+    unavailable: "Not available here",
+    savedReady: "Already there: read it here.",
     read: "Read",
     short: "SHORT",
     dayTop: "DAY TOP",
@@ -88,8 +92,8 @@ export function StoryCard(props: CardProps) {
       {...cardFocus(item.id)}
       id={props.rank ? `daily-${props.rank}` : undefined}
       data-saved={state.saved || undefined}
-      // scroll-mt: the daily index jumps here, clear of the sticky band (two rows, about 106px, below md; 64px from md).
-      className={`focus-ring story-card max-w-[900px] scroll-mt-28 border-2 md:scroll-mt-20 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+      // scroll-mt: the daily index jumps here, clear of the sticky band (up to three rows below a 72rem column; 64px from it).
+      className={`focus-ring story-card max-w-[900px] scroll-mt-44 border-2 @[72rem]:scroll-mt-20 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
         {/* A row of meta on narrow screens, the 96px gutter from lg up. */}
@@ -245,14 +249,27 @@ function CardFooter({ item, state, hasTodo, language, actions, library, rating }
   );
 }
 
-/** Read here, by the item's Library copy: the post; "Preparing…" while one is made; else Save here, which submits
- *  the URL and then shows what came of it on the card. Nothing for a URL a submission would refuse. */
+/** Read here, by the item's Library copy: the post; a note while one is made, or once none will be; else Save here,
+ *  which submits the URL and shows what came of it on the card. Nothing for a URL a submission would refuse. */
 function ReadHere({ item, language, actions, library }: Pick<CardProps, "item" | "language" | "actions" | "library">) {
   const t = copy[language];
   const [saved, setSaved] = useState<LibraryCopy | "saving" | undefined>(undefined);
+  // One region for the card's whole life: a region that mounts with its text is often not announced.
+  const [announced, setAnnounced] = useState("");
   const shown = library ?? saved;
+  const live = (
+    <span aria-live="polite" className="sr-only">
+      {announced}
+    </span>
+  );
+  const note = (text: string) => (
+    <span className="inline-flex min-h-10 items-center gap-2 border-2 border-dashed border-ink/40 px-3 font-mono text-xs text-ink/60">
+      <BookOpen className="size-4" aria-hidden="true" /> {text}
+    </span>
+  );
+  let control: ReactNode;
   if (typeof shown === "number") {
-    return (
+    control = (
       <Button asChild variant="brutal" className="min-h-10">
         {/* prefetch off: 25 cards would each fetch a post page on every visit; the post skeleton covers the wait. */}
         <Link href={`/library/${shown}`} prefetch={false} onClick={() => actions.onOpen(item)}>
@@ -260,28 +277,37 @@ function ReadHere({ item, language, actions, library }: Pick<CardProps, "item" |
         </Link>
       </Button>
     );
-  }
-  if (shown === "pending") {
-    return (
-      <span role="status" className="inline-flex min-h-10 items-center gap-2 border-2 border-dashed border-ink/40 px-3 font-mono text-xs text-ink/60">
-        <BookOpen className="size-4" aria-hidden="true" /> {t.preparing}
-      </span>
+  } else if (shown === "pending") {
+    control = note(t.preparing);
+  } else if (shown === "unavailable") {
+    control = note(t.unavailable);
+  } else if (parseSubmittedUrl(item.url)) {
+    control = (
+      <Button
+        variant="brutal"
+        className="min-h-10"
+        aria-disabled={shown === "saving"}
+        onClick={async (event) => {
+          if (shown === "saving") return;
+          // The button goes when the answer lands: the focus then moves to the card, so j/k go on from here.
+          const card = event.currentTarget.closest<HTMLElement>(CARD);
+          setSaved("saving");
+          const result = await actions.onSaveHere(item);
+          setSaved(result ?? undefined);
+          if (result === null) return;
+          setAnnounced(typeof result === "number" ? t.savedReady : result === "pending" ? t.preparing : t.unavailable);
+          requestAnimationFrame(() => card?.focus());
+        }}
+      >
+        <BookOpen /> {shown === "saving" ? t.saving : t.saveHere}
+      </Button>
     );
   }
-  if (!parseSubmittedUrl(item.url)) return null;
   return (
-    <Button
-      variant="brutal"
-      className="min-h-10"
-      aria-disabled={shown === "saving"}
-      onClick={async () => {
-        if (shown === "saving") return;
-        setSaved("saving");
-        setSaved((await actions.onSaveHere(item)) ?? undefined);
-      }}
-    >
-      <BookOpen /> {shown === "saving" ? t.saving : t.saveHere}
-    </Button>
+    <>
+      {control}
+      {live}
+    </>
   );
 }
 

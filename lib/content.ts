@@ -131,7 +131,7 @@ export async function getDaily(db: SupabaseClient, now = new Date()): Promise<Da
   for (const [id, source] of sources ?? []) {
     const post = source.posts as { id: number; brief: unknown; summary: Localized; key_points: Record<Language, string[]>; overrides: unknown } | null;
     const copy = libraryCopy(source);
-    if (copy !== undefined) posts[id] = copy;
+    posts[id] = copy;
     if (post) {
       const brief = readBrief(post.brief);
       briefs[id] = brief

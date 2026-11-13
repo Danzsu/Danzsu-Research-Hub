@@ -12,6 +12,7 @@ const copy = {
     todoAdded: "Hozzáadva a teendőkhöz",
     todoDeleted: "Teendő törölve",
     failed: "Nem sikerült menteni, a változást visszaállítottuk.",
+    notSaved: "Nem sikerült elmenteni. Próbáld újra.",
     undo: "Visszavonás",
   },
   en: {
@@ -19,11 +20,12 @@ const copy = {
     todoAdded: "Added to your to-dos",
     todoDeleted: "To-do deleted",
     failed: "Couldn't save; the change was undone.",
+    notSaved: "Couldn't save it. Try again.",
     undo: "Undo",
   },
 };
 
-export type ToastKind = "markedRead" | "todoAdded" | "todoDeleted" | "failed";
+export type ToastKind = "markedRead" | "todoAdded" | "todoDeleted" | "failed" | "notSaved";
 
 /** The app's one toast queue: `toasts.show({ kind, undo?, commit? })` from any event handler. */
 export const toasts = createToastQueue<ToastKind>();

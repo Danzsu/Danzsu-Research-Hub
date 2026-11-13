@@ -138,11 +138,11 @@ export async function itemSources(db: SupabaseClient, items: { id: string; url: 
 }
 
 /** A source row's Library copy (`url, status, attempts, posts(...)`): its post, "pending" while a run can still
- *  make one, else none (a failed or stuck source: Save here sends it again). */
-export function libraryCopy(row: Record<string, unknown>): LibraryCopy | undefined {
+ *  make one, else "unavailable": a second submission of the same URL would only be refused. */
+export function libraryCopy(row: Record<string, unknown>): LibraryCopy {
   const post = embeddedPost(row.posts);
   if (post) return post.id;
-  return row.status === "pending" && (row.attempts as number) < MAX_ATTEMPTS ? "pending" : undefined;
+  return row.status === "pending" && (row.attempts as number) < MAX_ATTEMPTS ? "pending" : "unavailable";
 }
 
 /**
@@ -154,9 +154,6 @@ export function libraryCopy(row: Record<string, unknown>): LibraryCopy | undefin
 export async function readHerePosts(db: SupabaseClient, items: { id: string; url: string }[]): Promise<Record<string, LibraryCopy>> {
   const sources = await itemSources(db, items, "url, status, attempts, posts(id)");
   const copies: Record<string, LibraryCopy> = {};
-  for (const [id, row] of sources ?? []) {
-    const copy = libraryCopy(row);
-    if (copy !== undefined) copies[id] = copy;
-  }
+  for (const [id, row] of sources ?? []) copies[id] = libraryCopy(row);
   return copies;
 }

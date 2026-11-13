@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { duplicateSource, listMySources, readHerePosts, retrySource } from "./my-sources.ts";
+import { duplicateSource, libraryCopy, listMySources, readHerePosts, retrySource } from "./my-sources.ts";
 import { fakeDb, pgError } from "./pipeline/fake-db.ts";
 import { MINE_LIMIT } from "./pipeline/util.ts";
 
@@ -161,7 +161,7 @@ test("readHerePosts maps each item to the post made from its normalized URL, and
   const db = fakeDb(undefined, {
     sources: [
       { id: 1, url: "https://blog.test/a", posts: { id: 11 } },
-      { id: 2, url: "https://blog.test/queued", posts: null },
+      { id: 2, url: "https://blog.test/queued", status: "pending", attempts: 0, posts: null },
     ],
   });
   const posts = await readHerePosts(db, [
@@ -170,7 +170,7 @@ test("readHerePosts maps each item to the post made from its normalized URL, and
     { id: "local-2026w40-new-3", url: "https://blog.test/new" },
     { id: "local-2026w40-private-4", url: "http://10.0.0.1/x" },
   ]);
-  assert.deepEqual(posts, { "local-2026w40-a-1": 11 });
+  assert.deepEqual(posts, { "local-2026w40-a-1": 11, "local-2026w40-queued-2": "pending" });
 });
 
 // Kills the lookup cut to its first chunk: a busy week's 31st story would never find its post.
@@ -188,4 +188,13 @@ test("readHerePosts answers {} and logs once when the lookup fails, so the cards
   const db = fakeDb(undefined, { sourceSelectError: pgError("08006", "connection failure") });
   assert.deepEqual(await readHerePosts(db, [{ id: "a", url: "https://blog.test/a" }]), {});
   assert.equal(warn.mock.callCount(), 1);
+});
+
+// B review #2. Kills Save here offered for a source no run will make again (failed, or stuck after its
+// attempts): the submission would only answer a bare 409, every time.
+test("libraryCopy: the post, pending while a run can still make it, unavailable once none will", () => {
+  assert.equal(libraryCopy({ status: "done", posts: { id: 7 } }), 7);
+  assert.equal(libraryCopy({ status: "pending", attempts: 1, posts: null }), "pending");
+  assert.equal(libraryCopy({ status: "pending", attempts: 3, posts: null }), "unavailable");
+  assert.equal(libraryCopy({ status: "failed", attempts: 1, posts: null }), "unavailable");
 });

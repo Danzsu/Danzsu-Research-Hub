@@ -155,6 +155,9 @@ export function DigestDashboard(
     githubTop10: GithubTopEntry[];
     /** A closed week opened from /archive: same reading UI, no "live" framing. */
     archived?: boolean;
+    /** Opened from /archive: a past week has no daily list or companies page of its own, so every view chip filters
+     *  it. Not the same as `archived`, which the current week also is on a Monday until the run opens the new one. */
+    fromArchive?: boolean;
     /** /companies: the week's company news only, the latest day's Top 5 first, no category bar. */
     scope?: "companies" | "daily";
     /** Item id → its Library copy (readHerePosts): a card's Read here opens the post, or says it is being made. */
@@ -165,7 +168,7 @@ export function DigestDashboard(
     daily?: { today: boolean; late: boolean; briefs: Record<string, DailyBrief> };
   } & ReaderSource,
 ) {
-  const { issue, githubTop10, archived = false } = props;
+  const { issue, githubTop10, archived = false, fromArchive = false } = props;
   const companies = props.scope === "companies";
   const dailyView = props.scope === "daily";
   // The weekly Radar and a closed week filter in place; /daily and /companies link their filter chips to the Radar.
@@ -207,11 +210,12 @@ export function DigestDashboard(
       try {
         const { status, body } = await transport.submit(item.url, null);
         if (status === 202 || (status === 409 && body.queued)) return "pending";
-        if (status === 409 && typeof body.postId === "number") return body.postId;
+        if (status === 409) return typeof body.postId === "number" ? body.postId : "unavailable";
       } catch {
-        // Offline: the failed toast below.
+        // Offline: the toast below.
       }
-      toasts.show({ kind: "failed" });
+      // Signed out, refused or out of reach: nothing changed, so the button stays for another try.
+      toasts.show({ kind: "notSaved" });
       return null;
     },
     onAddTodo(item) {
@@ -275,25 +279,26 @@ export function DigestDashboard(
 
   return (
     <div className="min-w-0 bg-cream text-ink @container">
-      {/* One band: the week, its views and the panel pill. A row from md up; below it the views scroll on a row of their own. */}
-      <header className="radar-header sticky top-0 z-20 flex flex-wrap items-center gap-x-3 border-b-2 border-ink bg-cream px-4 sm:px-7 md:h-16 md:flex-nowrap">
-        <div className="flex h-14 min-w-0 flex-1 items-center gap-2 sm:gap-3 md:h-auto md:flex-none">
+      {/* One band: the week, its views and the panel pill. One row once the column is 72rem wide; narrower, the views
+          take a row of their own, wrapping from md (a mouse can't scroll a hidden scrollbar) and scrolling on a phone. */}
+      <header className="radar-header sticky top-0 z-20 flex flex-wrap items-center gap-x-3 border-b-2 border-ink bg-cream px-4 sm:px-7 @[72rem]:h-16 @[72rem]:flex-nowrap">
+        <div className="flex h-14 min-w-0 flex-1 items-center gap-2 sm:gap-3 @[72rem]:h-auto @[72rem]:flex-none">
           {!archived && <span className="live-pulse shrink-0" />}
           <div className="min-w-0">
             <p className="truncate font-mono text-[11px] tracking-[0.18em] text-signal">{archived ? t.archived : dailyView ? t.dailyList : t.live}</p>
             <p className="whitespace-nowrap font-display text-lg leading-none">{issue.label}</p>
           </div>
         </div>
-        <nav aria-label={t.categories} className="order-last flex basis-full gap-2 overflow-x-auto pb-2 scrollbar-none md:order-none md:min-w-0 md:flex-1 md:basis-auto md:pb-0">
+        <nav aria-label={t.categories} className="order-last flex basis-full gap-2 overflow-x-auto pb-2 scrollbar-none md:flex-wrap md:overflow-visible @[72rem]:order-none @[72rem]:min-w-0 @[72rem]:flex-1 @[72rem]:flex-nowrap @[72rem]:basis-auto @[72rem]:pb-0">
           {views
-            .filter((view) => !(archived && view.id === "daily"))
+            .filter((view) => !(fromArchive && view.id === "daily"))
             .map(({ id, icon: Icon, page }) => {
               const label = (
                 <>
                   <Icon className="size-3.5" /> {t[id]}
                 </>
               );
-              if (filtersHere && id !== "daily" && (archived || !page || id === "all")) {
+              if (filtersHere && id !== "daily" && (fromArchive || !page || id === "all")) {
                 return (
                   <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id as Filter)} className={chipClass}>
                     {label}

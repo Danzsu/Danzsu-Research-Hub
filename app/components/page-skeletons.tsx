@@ -21,9 +21,9 @@ function Busy() {
  *  rows below md), the ink hero, the Top 3 and three stories. */
 export function RadarSkeleton() {
   return (
-    <div className="min-h-dvh min-w-0 bg-cream text-ink" aria-busy="true">
+    <div className="min-h-dvh min-w-0 bg-cream text-ink @container" aria-busy="true">
       <Busy />
-      <div className="h-[6.5rem] border-b-2 border-ink md:h-16" />
+      <div className="h-[6.625rem] border-b-2 border-ink @[72rem]:h-16" />
       <div className="px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
         <div className="h-56 border-2 border-ink bg-ink sm:h-64" />
         <div className="skeleton-fill mt-9 space-y-4 @container">

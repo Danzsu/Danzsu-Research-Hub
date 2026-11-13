@@ -238,6 +238,12 @@
     - [x] a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja) — elavult: a `/login` a landing-signin óta gomb nélkül (`signIn="none"`) használja a keretet;
     - [x] a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel;
     - a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül: nyitott ötlet, előbb mérni kell.
+  - **Navigáció (nav-reshape) záró reviewja (2026-11-13):**
+    - a Radar szekció-link `aria-current="page"`-et kap a `/daily`-n és a `/github`-on is, ahol nem az az oldal; `aria-current="true"` pontosabb lenne;
+    - a sávban a pill DOM-sorrendben a chipek után van, de mobilon felettük látszik (`order-last`): a Tab-sorrend eltér a látványtól;
+    - a `?filter=` az URL-ben marad, amikor az olvasó helyben vált chipet, így egy újratöltés a megérkezéskori szűrőt hozza vissza;
+    - a Library-kártya „Mentsd ide” után „Készül…” marad, amíg az oldal újra nem töltődik (nincs frissítés);
+    - a terv 5. pontja (kétsoros kártyalábléc 360 px-en) nincs meg, csak a sima `flex-wrap`.
   - **Sebesség és hibák (fix-speed) záró reviewja (2026-11-02):**
     - a lezárt elakadt forrás hibaszövege („No run finished it in 3 attempts.”) nyers angol mondat a chatben és a Library-ben, és teszt nem nézi;
     - a záró teszt nem bukik, ha a lezáró update-ből kimarad a `.eq("status", "pending")` őr; olcsó extra őr lehet a `.gte("attempts", MAX_ATTEMPTS)` is;

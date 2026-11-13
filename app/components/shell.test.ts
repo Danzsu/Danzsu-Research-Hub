@@ -445,7 +445,7 @@ test("useRefresh outside RefreshProvider throws, naming where the provider lives
 // "Preparing…" note while one is being made (the mirror queued it), a "Save here" button otherwise, and nothing
 // for a URL a submission refuses.
 test("a card's Read here is the post, Preparing… while it is made, Save here otherwise", () => {
-  const card = (url: string, library?: number | "pending") =>
+  const card = (url: string, library?: number | "pending" | "unavailable") =>
     withShellProviders(StoryCard, { item: digestItem("local-2026w40-x-1", { url }), state: EMPTY_ITEM_STATE, hasTodo: false, language: "en", actions: cardActions, library, rating: null });
   const buttons = (doc: Document) => [...doc.querySelectorAll("button")].map((button) => button.textContent?.trim()).filter((text) => /here|Preparing/.test(text ?? ""));
   assert.equal(card("https://blog.test/a", 7).querySelector('a[href="/library/7"]')?.textContent?.trim(), "Read here");
@@ -454,6 +454,12 @@ test("a card's Read here is the post, Preparing… while it is made, Save here o
   assert.deepEqual(buttons(pending), []);
   assert.deepEqual(buttons(card("https://blog.test/a")), ["Save here"]);
   assert.doesNotMatch(card("http://10.0.0.1/a").body.textContent ?? "", /Save here|Read here/);
+  // B review #2-3: a copy no run will make is a note, not a button; and the card keeps one live region, so what
+  // Save here did is announced (a region that mounts with its text often isn't).
+  const unavailable = card("https://blog.test/a", "unavailable");
+  assert.match(unavailable.body.textContent ?? "", /Not available here/);
+  assert.deepEqual(buttons(unavailable), []);
+  assert.equal(card("https://blog.test/a").querySelectorAll('article span[aria-live="polite"]').length, 1);
 });
 
 // Kills `posts` not reaching the cards, or reaching the wrong one.
@@ -617,8 +623,10 @@ test("one band holds the week and the views: pages are links, filters switch in 
     ["Local LLM", "/?filter=local"],
     ["Research", "/?filter=research"],
   ]);
-  // A closed week has no daily list or companies page of its own: every chip filters it.
-  assert.deepEqual(chips(withShellProviders(DigestDashboard, { ...props, archived: true })).map(([, value]) => value), ["true", "false", "false", "false", "false", "false"]);
+  // A week opened from the archive has no daily list or companies page of its own: every chip filters it.
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, { ...props, archived: true, fromArchive: true })).map(([, value]) => value), ["true", "false", "false", "false", "false", "false"]);
+  // B review #1. On a Monday the current week shows as closed until the run, and its pages must stay reachable.
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, { ...props, archived: true }))[1], ["Daily", "/daily"]);
   // Arriving from another view with ?filter=github: the GitHub chip is on, with the link to every repo.
   navigationStub.search = "filter=github";
   const github = withShellProviders(DigestDashboard, props);

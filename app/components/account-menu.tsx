@@ -51,7 +51,7 @@ function Email({ email }: { email: string }) {
 }
 
 /** The three rows every account surface shows (2a spec D5): the language, the shortcuts help, sign out. This
- *  is the Több sheet's form, where Tab reaches each control; the desktop menu renders them as menu items. */
+ *  is the Fiók sheet's form, where Tab reaches each control; the desktop menu renders them as menu items. */
 export function AccountRows({ email, onHelp }: { email: string; onHelp: () => void }) {
   const { language } = useLanguage();
   const t = copy[language];

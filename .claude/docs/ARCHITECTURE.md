@@ -90,6 +90,7 @@ Breaking one of these is a bug even when every test passes.
 - **The offline preview never reaches real data.** Local dev points at the production project, so preview writes send nothing:
   - reader state and ratings go through `memorySend`;
   - the Library form goes through `memoryTransport` with no seed (`preview` on `LibraryView`);
+  - a card's Save here goes through `memoryTransport` too (`preview` on the dashboard);
   - the link chat goes through `memoryTransport` (`chatPreview` on `AppShell`, seeded from `previewMySources`);
   - the post page's `MarkPostRead` gets `preview`;
   - under `fail=1`, every write fails.

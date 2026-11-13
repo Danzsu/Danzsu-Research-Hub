@@ -289,7 +289,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
   - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, with the taiyaki raised 16px out of its centre slot; the content column's bottom padding clears both (Components → Page shell).
   - The iPhone's safe areas: `viewportFit: "cover"` (`app/layout.tsx`) turns the `env(safe-area-inset-*)` values on; without it they read 0. The bar, the bottom sheets and the toast clear the home indicator. In landscape the body pads to the side insets, its background clipped to its content, so the strip beside the notch shows the html's ink; the bar pads too. From `md` up the fixed elements (the corner taiyaki, the right-side sheets) don't add the side insets yet.
   - From `md` up, the desktop nav takes its place: a 256px sidebar (`w-64`) or a 56px icon rail (`w-14`).
-  - The Radar's views are chips in one sticky band with the week and the panel pill (2026-11-01 review): Heti, Napi and AI cégek are pages of the current week, Local LLM, Kutatás, GitHub and Mentett filter it in place (on /daily and /companies they link to the Radar with `?filter=`); a closed week filters with all of them. A row from `md` up; below it the views scroll on a row of their own.
+  - The Radar's views are chips in one sticky band with the week and the panel pill (2026-11-01 review): Heti, Napi and AI cégek are pages of the current week, Local LLM, Kutatás, GitHub and Mentett filter it in place (on /daily and /companies they link to the Radar with `?filter=`); a closed week filters with all of them. One row once the Radar's column is 72rem wide; narrower, the views take a row of their own, wrapping from `md` (a mouse can't scroll a hidden scrollbar) and scrolling sideways on a phone.
 - **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md`, and a 330px column once the Radar's own column is 95rem wide (`@[95rem]`, R3 §2: the nav and the viewport decide together). It is non-modal, so the undo toast stays usable while it is open.
 - **Touch targets are at least 40px** (`min-h-10`, or `size-10 sm:size-8` for icon buttons, which may shrink to 32px from `sm` up).
 - **Use `dvh`, not `vh`.**
@@ -623,9 +623,9 @@ export function Tag({ tag }: { tag: string }) {
 `/daily` is `DigestDashboard` with `scope="daily"` (daily news spec N7): the weekly UI, reshaped for one day's Top 10.
 
 - **Header and hero:** the header reads NAPI LISTA / DAILY LIST over the day (`2026. 09. 24.`); the hero is "NAPI//" with its lead, then one mono line with the count ("5 hír · ebből 2 rövid") and, in signal, "Korábbi lista (…) — a mai 18:00-ra készül." when the list isn't today's. No category chips, no Top 3 grid, no archive box.
-- **The index:** a paper box with a 2px ink frame, one mono line per card (the rank in signal, the title, the score), each an anchor to its card (`#daily-N`). The cards carry `scroll-mt-28` (`md:scroll-mt-20`), so a jump lands clear of the sticky band: two rows below `md`, 64px from it.
+- **The index:** a paper box with a 2px ink frame, one mono line per card (the rank in signal, the title, the score), each an anchor to its card (`#daily-N`). The cards carry `scroll-mt-44` (`@[72rem]:scroll-mt-20`), so a jump lands clear of the sticky band: up to three rows below a 72rem column, 64px from it.
 - **The cards:** `StoryCard` with a `rank`: the rank in display type, signal, at the top of the meta gutter; a signal SHORT / RÖVID mark under the minutes for a read of at most 15 minutes; and the long text (`DailyBrief`) in place of the summary: the brief's paragraphs, or the post's summary and its FŐ PONTOK list, or the item's summary with "A részletes összefoglaló készül…" under it. Lines stop at `75ch`.
-- **The weekly mark:** on the Radar, a card ranked in a daily Top 10 shows a 1px ink-framed "NAP TOP · N." / "DAY TOP · N." above its source link; the daily page itself shows none.
+- **The weekly mark:** on the Radar, a card ranked in a daily Top 10 shows a 1px ink-framed "NAP TOP · N." / "DAY TOP · N." beside its source's name; the daily page itself shows none.
 - **Empty:** `EmptyState` with "Még nincs napi lista. Az első este 18:00-ra készül el."
 
 ### must-card and story-card
@@ -656,7 +656,7 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClas
 ```
 
 ```tsx app/components/story-card.tsx
-className={`focus-ring story-card max-w-[900px] scroll-mt-28 border-2 md:scroll-mt-20 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+className={`focus-ring story-card max-w-[900px] scroll-mt-44 border-2 @[72rem]:scroll-mt-20 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
@@ -768,7 +768,7 @@ How they behave is in CLAUDE.md → App shell and navigation; their timing is in
 - **The skeletons** (`app/components/page-skeletons.tsx`) have one root each, the page's own surface, so the shell's `md:[&>:last-child]:pb-24` lands on it (Page shell). The bands (the Radar's band and ink hero, `HeroBand`, the post's cream article) paint at once; the placeholders, the house `Skeleton` with `rounded-none`, `bg-paper/10` on ink and the default `bg-primary/10` on cream and paper, sit in `.skeleton-fill` groups. A `role="status"` line says "Betöltés…" / "Loading…" to assistive tech only. The Radar's root:
 
 ```tsx app/components/page-skeletons.tsx
-    <div className="min-h-dvh min-w-0 bg-cream text-ink" aria-busy="true">
+    <div className="min-h-dvh min-w-0 bg-cream text-ink @container" aria-busy="true">
 ```
 
 ### Progress bar and the reader panel

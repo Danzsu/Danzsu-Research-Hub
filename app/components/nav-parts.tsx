@@ -28,7 +28,7 @@ export function PendingDot({ className = "" }: { className?: string }) {
 
 /** A page link (aria-current when it is the active one) or, for the search slot, a button, holding the
  *  item's icon and label; `children` go after the label (the sidebar's ⌘K hint). `onClick` runs when
- *  the link is followed: the mobile "Több" sheet closes itself with it. A link carries the PendingDot:
+ *  the link is followed. A link carries the PendingDot:
  *  at the row's end, or with `dotOnIcon` (the rail, the bottom bar) on its icon's top-right corner. */
 export function NavEntry({ item, active, onSearch, onClick, className, iconClass, labelClass, dotOnIcon = false, children }: {
   item: NavItem;

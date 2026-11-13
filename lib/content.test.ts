@@ -520,7 +520,7 @@ test("getDaily gives each card the best long text there is", async () => {
     pending: { kind: "pending" },
   });
   // 2026-11-01 review: the card's Read here says Preparing… for the pending one; the failed and the stuck get Save here.
-  assert.deepEqual(daily.posts, { brief: 1, summary: 2, pending: "pending" });
+  assert.deepEqual(daily.posts, { brief: 1, summary: 2, pending: "pending", failed: "unavailable", stuck: "unavailable" });
 });
 
 // Spec N8. Kills a crash or a made-up day before the first list: no day, the current week, nothing to show.
