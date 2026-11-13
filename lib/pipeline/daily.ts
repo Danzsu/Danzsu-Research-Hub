@@ -5,7 +5,7 @@ import { digestCategories, digestTags } from "../../data/digest-types.ts";
 import { generate } from "../llm.ts";
 import { collectCandidates, collectRepos, type Candidate, type Repo } from "./collect.ts";
 import { budapestDay, budapestDayStart, pickDailyTop, type DailyCandidate } from "./daily-top.ts";
-import { errorMessage, isoWeek, itemId, type Week } from "./util.ts";
+import { errorMessage, isoWeek, itemId, urlKey, type Week } from "./util.ts";
 
 const DAY = 86_400_000;
 const SHORTLIST = 40;
@@ -28,7 +28,7 @@ const curatedSchema = z.object({
       why: localizedSchema,
     }),
   ),
-  github: z.array(z.object({ index: z.int(), focus: z.string(), score: z.int().min(0).max(100) })).max(10),
+  github: z.array(z.object({ index: z.int(), focus: z.string(), score: z.int().min(0).max(100) })),
 });
 
 const AUDIENCE =
@@ -52,7 +52,7 @@ async function shortlist(db: SupabaseClient, candidates: Candidate[]): Promise<C
       `${AUDIENCE}\nFrom the numbered list, pick up to ${SHORTLIST} items most worth their attention. ` +
         `Drop duplicates, marketing, and incremental papers. Return their numbers as "keep".\n\n${listing(candidates)}`,
     );
-    const picked = [...new Set(keep)].filter((i) => candidates[i]).map((i) => candidates[i]);
+    const picked = [...new Set(keep)].filter((i) => candidates[i]).map((i) => candidates[i]).slice(0, SHORTLIST);
     return picked.length ? picked : candidates.slice(0, SHORTLIST);
   } catch (error) {
     console.warn(`shortlist failed, keeping the first ${SHORTLIST}: ${errorMessage(error)}`);
@@ -135,11 +135,11 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
     .gte("created_at", new Date(now.getTime() - 14 * DAY).toISOString())
     .order("created_at", { ascending: false });
   if (recentError) throw recentError;
-  const known = new Set((recent ?? []).map((row) => row.url as string));
+  const known = new Set((recent ?? []).map((row) => urlKey(row.url as string)));
   const covered = (recent ?? []).map((row) => (row.title as { en?: string } | null)?.en).filter((title): title is string => Boolean(title));
 
   const [candidates, repos] = await Promise.all([
-    collectCandidates(new Date(now.getTime() - 2 * DAY), now).then((all) => all.filter((c) => !known.has(c.url))),
+    collectCandidates(new Date(now.getTime() - 2 * DAY), now).then((all) => all.filter((c) => !known.has(urlKey(c.url)))),
     collectRepos(now),
   ]);
   const picked = await shortlist(db, candidates);

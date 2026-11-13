@@ -78,13 +78,14 @@ test("curatePrompt numbers the news and repo listings the model answers with", (
 });
 
 // Only the first feed answers; every other feed, and the fixed-host APIs, are mocked too, so nothing
-// reaches the network. A URL stored in the last two weeks must not be offered to the model again.
+// reaches the network. A page stored in the last two weeks must not be offered to the model again, whatever form its
+// URL took then (2026-11-13 audit: a trailing slash and www against a tracking parameter).
 test("runDaily collects, curates and writes the week's issue, skipping URLs it already has", async (t) => {
   withGeminiKey(t);
   t.mock.method(console, "warn", () => {}); // the other feeds' 404s
   const now = new Date("2026-09-23T05:00:00Z");
   const rss = `<rss><channel>
-    <item><title>Known story</title><link>https://blog.test/known</link><pubDate>Tue, 22 Sep 2026 08:00:00 GMT</pubDate></item>
+    <item><title>Known story</title><link>https://blog.test/known?utm_source=rss</link><pubDate>Tue, 22 Sep 2026 08:00:00 GMT</pubDate></item>
     <item><title>Fresh story</title><link>https://blog.test/fresh</link><pubDate>Tue, 22 Sep 2026 09:00:00 GMT</pubDate></item>
   </channel></rss>`;
   let prompt = "";
@@ -100,7 +101,7 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
     }
     return new Response("", { status: 404 });
   });
-  const db = fakeDb(undefined, { rows: { digest_items: [{ url: "https://blog.test/known", created_at: "2026-09-20T05:00:00Z" }] } });
+  const db = fakeDb(undefined, { rows: { digest_items: [{ url: "https://www.blog.test/known/", created_at: "2026-09-20T05:00:00Z" }] } });
 
   const result = await runDaily(db, now);
 

@@ -720,6 +720,22 @@ test("retryPendingSources() starts no source with less than START_GATE_RESERVE_M
 
 // I8, I9: a finished source, or one that failed MAX_ATTEMPTS (3) times, is never retried: a poison
 // link would otherwise cost a model run every day.
+// 2026-11-13 audit. Kills one source whose own bookkeeping throws (a transient database error) ending the queue run:
+// the sources after it waited a day, and the daily route answered a crash for a digest that had worked.
+test("retryPendingSources() goes on to the next source when one throws", async (t) => {
+  mockFetch(t, async () => new Response("", { status: 404 }));
+  t.mock.method(console, "error", () => {});
+  const sources = [{ ...newSource(80, "article", "boom"), status: "pending", attempts: 0 }, { ...newSource(81, "article", "fine"), status: "pending", attempts: 0 }];
+  const db = fakeDb(undefined, { sources, post: null, pending: sources, sourceUpdateError: undefined });
+  const real = db.from.bind(db);
+  let calls = 0;
+  (db as { from: unknown }).from = (table: string) => {
+    if (table === "sources" && calls++ === 2) throw new Error("transient"); // closeStuckSources, the listing, then the first source
+    return real(table);
+  };
+  assert.equal(await retryPendingSources(db), 1);
+});
+
 test("retryPendingSources() retries only unfinished sources under the 3-attempt cap", async (t) => {
   const fetched: string[] = [];
   mockFetch(t, async (url) => {

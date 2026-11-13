@@ -508,7 +508,7 @@ test("getDaily gives each card the best long text there is", async () => {
       { url: urls[0], status: "done", posts: { id: 1, brief: { hu: ["B"], en: ["B"] }, summary: text("S"), key_points: { hu: [], en: [] }, overrides: {} } },
       { url: urls[1], status: "done", posts: { id: 2, brief: null, summary: text("S"), key_points: { hu: ["k"], en: ["k"] }, overrides: { summary: text("Mine") } } },
       { url: urls[2], status: "pending", attempts: 1, posts: null },
-      { url: urls[3], status: "failed", attempts: 1, posts: null },
+      { url: urls[3], status: "failed", attempts: 3, posts: null },
       // Polish 1, Review Focus 4: killed three times, it waits for no run any more.
       { url: urls[4], status: "pending", attempts: 3, posts: null },
     ],

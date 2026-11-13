@@ -196,5 +196,7 @@ test("libraryCopy: the post, pending while a run can still make it, unavailable 
   assert.equal(libraryCopy({ status: "done", posts: { id: 7 } }), 7);
   assert.equal(libraryCopy({ status: "pending", attempts: 1, posts: null }), "pending");
   assert.equal(libraryCopy({ status: "pending", attempts: 3, posts: null }), "unavailable");
-  assert.equal(libraryCopy({ status: "failed", attempts: 1, posts: null }), "unavailable");
+  // 2026-11-13 audit: a failed source under the cap is still retried by the queue, so it is pending, not unavailable.
+  assert.equal(libraryCopy({ status: "failed", attempts: 1, posts: null }), "pending");
+  assert.equal(libraryCopy({ status: "failed", attempts: 3, posts: null }), "unavailable");
 });

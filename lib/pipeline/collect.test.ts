@@ -102,6 +102,18 @@ test("dedupeCandidates keeps the first of each URL, ignoring a fragment and a tr
   assert.deepEqual(kept.map((c) => c.title), ["first", "other"]);
 });
 
+// 2026-11-13 audit. Kills the within-run check agreeing with nothing else: tracking parameters, www and an arXiv
+// pdf link were each a new URL.
+test("dedupeCandidates treats the forms of one page as one", () => {
+  const kept = dedupeCandidates([
+    candidate("https://blog.test/a?utm_source=rss", "first"),
+    candidate("https://www.blog.test/a/", "www"),
+    candidate("https://arxiv.org/abs/2411.01234v2", "paper"),
+    candidate("https://arxiv.org/pdf/2411.01234", "paper pdf"),
+  ]);
+  assert.deepEqual(kept.map((c) => c.title), ["first", "paper"]);
+});
+
 test("dedupeCandidates drops untitled candidates without letting them claim the URL", () => {
   const kept = dedupeCandidates([candidate("https://blog.test/a", ""), candidate("https://blog.test/a", "titled")]);
   assert.deepEqual(kept.map((c) => c.title), ["titled"]);

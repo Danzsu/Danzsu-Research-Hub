@@ -1,6 +1,6 @@
 import type { Localized } from "../data/digest-types.ts";
 import type { MySource } from "./my-sources.ts";
-import { detectSource, MINE_LIMIT, parseSubmittedUrl, safeHref, type SourceKind } from "./pipeline/util.ts";
+import { canonicalSubmittedUrl, detectSource, MINE_LIMIT, safeHref, type SourceKind } from "./pipeline/util.ts";
 
 // The taiyaki link chat's logic, framework-free so node --test runs it: a message → a submission,
 // the reader's own sources → the thread, and the live thread's polling rules. The panel
@@ -130,7 +130,7 @@ export function memoryTransport(seed: MySource[], fail: boolean, delayMs = 0): C
     },
     submit: (url, note) =>
       write(() => {
-        const parsed = parseSubmittedUrl(url);
+        const parsed = canonicalSubmittedUrl(url);
         if (!parsed) return { status: 400, body: { error: "invalid_url" } };
         const existing = sources.find((source) => source.url === parsed.toString());
         if (existing) {

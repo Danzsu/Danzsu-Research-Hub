@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { detectSource, parseSubmittedUrl, type SourceKind } from "./util.ts";
+import { canonicalSubmittedUrl, detectSource, type SourceKind } from "./util.ts";
 
 /** A Radar item scoring at least this goes into the Library by itself, with the week's Top 3 (spec 2). */
 export const MIRROR_MIN_SCORE = 85;
@@ -24,7 +24,7 @@ export async function queueMirrors(db: SupabaseClient, issueId: string, systemUs
   for (const item of data ?? []) {
     const inDailyTop = Array.isArray(item.daily_top) && item.daily_top.length > 0;
     if (item.score < MIRROR_MIN_SCORE && !item.must_read && !inDailyTop) continue;
-    const url = parseSubmittedUrl(item.url as string);
+    const url = canonicalSubmittedUrl(item.url as string);
     if (url) rows.set(url.toString(), { url: url.toString(), kind: detectSource(url), submitted_by: systemUserId });
   }
   if (!rows.size) return 0;

@@ -283,6 +283,40 @@ export function parseSubmittedUrl(raw: string): URL | null {
   return url;
 }
 
+const TRACKING_PARAMS = /^(utm_.*|fbclid|gclid|mc_cid|mc_eid|ref|ref_src)$/i;
+
+/** One form per page: no fragment, tracking parameters, `www.` or trailing slash, and arXiv's pdf, html and versioned
+ *  links as its abstract page (arXiv is https always). http and https stay apart: the fetch follows what was given. What a source row and a duplicate check compare. */
+function canonicalUrl(url: URL): URL {
+  url.hash = "";
+  url.hostname = url.hostname.replace(/^www\./, "");
+  const arxiv = arxivId(url);
+  if (arxiv) {
+    url.protocol = "https:";
+    url.pathname = `/abs/${arxiv}`;
+    url.search = "";
+    return url;
+  }
+  const x = xStatusId(url) !== null;
+  for (const name of [...url.searchParams.keys()]) {
+    if (TRACKING_PARAMS.test(name) || (x && (name === "s" || name === "t"))) url.searchParams.delete(name);
+  }
+  if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, "");
+  return url;
+}
+
+/** A submitted link as the one URL its page is stored and compared by (a source row, the mirror, a card's lookup);
+ *  null when parseSubmittedUrl refuses it. What is fetched stays parseSubmittedUrl's, as given. */
+export function canonicalSubmittedUrl(raw: string): URL | null {
+  const url = parseSubmittedUrl(raw);
+  return url && canonicalUrl(url);
+}
+
+/** `raw` as the one string its page is compared by (a stored URL as well as a new one); unparseable text stays as it is. */
+export function urlKey(raw: string): string {
+  return canonicalSubmittedUrl(raw)?.toString() ?? raw;
+}
+
 const SAME_SITE = "https://same.site";
 
 /**

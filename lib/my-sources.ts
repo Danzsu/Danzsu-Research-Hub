@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LibraryCopy, Localized } from "../data/digest-types.ts";
 import { readOverrides } from "./overrides.ts";
-import { inChunks, MAX_ATTEMPTS, MINE_LIMIT, parseSubmittedUrl, type SourceKind } from "./pipeline/util.ts";
+import { canonicalSubmittedUrl, inChunks, MAX_ATTEMPTS, MINE_LIMIT, type SourceKind } from "./pipeline/util.ts";
 import { shownTitle } from "./post-view.ts";
 
 // The reader's own submissions, for the taiyaki link chat: GET /api/sources/mine lists them, and
@@ -122,7 +122,7 @@ export async function retrySource(db: SupabaseClient, admin: SupabaseClient, vie
 export async function itemSources(db: SupabaseClient, items: { id: string; url: string }[], columns: string): Promise<Map<string, Record<string, unknown>> | null> {
   const idsByUrl = new Map<string, string[]>();
   for (const item of items) {
-    const url = parseSubmittedUrl(item.url)?.toString();
+    const url = canonicalSubmittedUrl(item.url)?.toString();
     if (url) idsByUrl.set(url, [...(idsByUrl.get(url) ?? []), item.id]);
   }
   const answers = await inChunks([...idsByUrl.keys()], (chunk) => db.from("sources").select(columns).in("url", chunk));
@@ -142,12 +142,13 @@ export async function itemSources(db: SupabaseClient, items: { id: string; url: 
 export function libraryCopy(row: Record<string, unknown>): LibraryCopy {
   const post = embeddedPost(row.posts);
   if (post) return post.id;
-  return row.status === "pending" && (row.attempts as number) < MAX_ATTEMPTS ? "pending" : "unavailable";
+  // The queue takes every unfinished source under MAX_ATTEMPTS, a failed one too (retryPendingSources).
+  return row.status !== "done" && (row.attempts as number) < MAX_ATTEMPTS ? "pending" : "unavailable";
 }
 
 /**
  * Item id → its Library copy: a card's Read here opens the post, or says it is being made. The URLs go through
- * parseSubmittedUrl, as a submission's and the mirror's do, so both sides compare the same string. A failed
+ * canonicalSubmittedUrl, as a submission's and the mirror's do, so both sides compare the same string. A failed
  * lookup answers {} and is logged: the card then offers Save here, whose 409 still points at the post. Never
  * cached: a post can appear any day, for an open week or a closed one.
  */

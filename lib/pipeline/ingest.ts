@@ -210,7 +210,13 @@ export async function retryPendingSources(db: SupabaseClient, deadline?: number)
   for (const row of data ?? []) {
     if (deadline !== undefined && deadline - Date.now() < START_GATE_RESERVE_MS) break;
     // Counts the runs that claimed their source: one another run holds is skipped, not counted.
-    if (await processSource(db, row.id as number, { deadline, expectedAttempts: row.attempts as number })) processed++;
+    try {
+      if (await processSource(db, row.id as number, { deadline, expectedAttempts: row.attempts as number })) processed++;
+    } catch (error) {
+      // Its bookkeeping threw (a database hiccup), which processSource's own failure path can't record: the
+      // rest of the queue still runs, and the claim's lease frees this source.
+      console.error(`source ${row.id} could not be processed`, error);
+    }
   }
   return processed;
 }

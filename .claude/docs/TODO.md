@@ -238,6 +238,10 @@
     - [x] a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja) — elavult: a `/login` a landing-signin óta gomb nélkül (`signIn="none"`) használja a keretet;
     - [x] a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel;
     - a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül: nyitott ötlet, előbb mérni kell.
+  - **Hibaaudit (2026-11-13), halasztva:**
+    - egy képnek csak a legnagyobb `srcset`-jelöltje próbálkozik: ha az 5 MB fölött van, a kisebbek nélkül „Image unavailable” lesz (`html-images.ts`, `images.ts`);
+    - a `urlKey` a régi, már tárolt sorokat csak a kulcson keresztül találja meg; a `sources.url` egyedisége a tárolt alakon marad, így egy régi, `utm_`-os sor és az új, tiszta alak két sor lehet;
+    - a dátum nélküli feed-bejegyzések minden futásban újra felkínálódnak, amíg el nem tárolódnak (a teszt szándékosan megtartja őket).
   - **Navigáció (nav-reshape) záró reviewja (2026-11-13):**
     - a Radar szekció-link `aria-current="page"`-et kap a `/daily`-n és a `/github`-on is, ahol nem az az oldal; `aria-current="true"` pontosabb lenne;
     - a sávban a pill DOM-sorrendben a chipek után van, de mobilon felettük látszik (`order-last`): a Tab-sorrend eltér a látványtól;

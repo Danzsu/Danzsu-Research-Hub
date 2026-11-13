@@ -23,6 +23,7 @@ import {
   mapLimited,
   parseId,
   parseSubmittedUrl,
+  urlKey,
   publishedDate,
   publishedLabel,
   safeNext,
@@ -100,6 +101,19 @@ test("weekItemPattern matches itemId's ids of that week in every category, and n
   const w53 = isoWeek(new Date("2026-12-31T00:00:00Z"));
   assert.ok(likes(itemId("local", w53, "Year end", "https://a.example/3"), weekItemPattern("2026-W53")!));
   for (const bad of ["2026-W54", "2027-W53", "2026-38", "2026w38", "", "%"]) assert.equal(weekItemPattern(bad), null, bad);
+});
+
+// 2026-11-13 audit. Kills one page stored twice: tracking parameters, a trailing slash, http, www and arXiv's
+// pdf / version forms each made a different string, so a Library post and a Radar item were duplicated.
+test("urlKey gives one string to every form of the same page", () => {
+  const same = (key: string, ...others: string[]) => others.forEach((other) => assert.equal(urlKey(other), key, other));
+  same("https://a.com/x", "https://a.com/x?utm_source=rss&utm_medium=x", "https://a.com/x/", "https://www.a.com/x#top", "https://A.com/x?fbclid=1");
+  same("https://arxiv.org/abs/2411.01234", "https://arxiv.org/pdf/2411.01234", "https://arxiv.org/abs/2411.01234v3", "http://arxiv.org/abs/2411.01234", "https://arxiv.org/html/2411.01234v2", "https://www.arxiv.org/pdf/2411.01234.pdf");
+  same("https://x.com/u/status/1", "https://x.com/u/status/1?s=20&t=abc");
+  // Other parameters and other pages stay apart.
+  assert.notEqual(urlKey("https://a.com/x?id=1"), urlKey("https://a.com/x?id=2"));
+  assert.equal(urlKey("https://a.com/"), "https://a.com/");
+  assert.equal(urlKey("not a url"), "not a url");
 });
 
 test("parseSubmittedUrl rejects internal and non-http targets", () => {
