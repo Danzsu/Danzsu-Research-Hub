@@ -1,5 +1,5 @@
 import { assignIds, type BlockDraft } from "./blocks.ts";
-import type { ArchiveIssue, CurrentIssue, DailyBrief, DigestItem, GithubTopEntry } from "../data/digest-types.ts";
+import type { ArchiveIssue, CurrentIssue, DailyBrief, DigestItem, GithubTopEntry, LibraryCopy } from "../data/digest-types.ts";
 import type { Favorite, GithubRepo, SubmittedSource } from "./content.ts";
 import type { MySource } from "./my-sources.ts";
 import { publishedLabel } from "./pipeline/util.ts";
@@ -260,7 +260,7 @@ export const previewReadPostIds = new Set([-2]);
 /** The preview's "Olvasd itt" links: this item already has a post (a fixture's negative id, so the real
  *  /library/-1 route 404s before any query); every other readable card asks the chat, whose preview
  *  transport never reaches the API. */
-export const previewReadHerePosts: Record<string, number> = { "local-2026-W39-read": -1 };
+export const previewReadHerePosts: Record<string, LibraryCopy> = { "local-2026-W39-read": -1, "research-2026-W39-plain": "pending" };
 
 /** The preview's ratings, one of each kind and value: a ❤ and a 👎 item, a 👍 repo, a ❤ and a 👎 post. */
 export const previewRatings: Ratings = {

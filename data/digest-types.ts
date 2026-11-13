@@ -99,6 +99,11 @@ export type CurrentIssue = {
   archiveAt: string;
 };
 
+/** An item's Library copy: the post's id; "pending" while a run can still make it (the mirror queued it, or a reader
+ *  saved it); "unavailable" once none will (its source failed, or ran out of attempts). A card's Read here opens the
+ *  post, says Preparing… or Not available here, and offers Save here with no copy at all. */
+export type LibraryCopy = number | "pending" | "unavailable";
+
 /** A daily Top 10 card's long text (daily news spec N5, N8): the post's brief, else its summary and key points,
  *  else "being written" while its source waits. No entry: the item's own summary. */
 export type DailyBrief =

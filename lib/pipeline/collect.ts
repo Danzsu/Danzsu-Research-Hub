@@ -2,7 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import type { DigestCategory } from "../../data/digest-types.ts";
 import { apiFetch, ensureOk, githubHeaders } from "./fetch.ts";
 import { dailyPapers, DEFAULT_FEED_LIMIT, feeds, githubTopics, hnNames, hnQueries } from "../../config/sources.ts";
-import { list, publishedDate, settledValues, xmlText } from "./util.ts";
+import { list, publishedDate, settledValues, urlKey, xmlText } from "./util.ts";
 
 export type Candidate = {
   url: string;
@@ -145,11 +145,11 @@ export async function collectRepos(now: Date): Promise<Repo[]> {
   return [...byName.values()].sort((a, b) => b.stars - a.stars).slice(0, 25);
 }
 
-/** First of each URL (ignoring a fragment and a trailing slash) wins; untitled candidates are dropped. */
+/** First of each page (by `urlKey`) wins; untitled candidates are dropped. */
 export function dedupeCandidates(all: Candidate[]): Candidate[] {
   const seen = new Set<string>();
   return all.filter((candidate) => {
-    const key = candidate.url.replace(/#.*$/, "").replace(/\/$/, "");
+    const key = urlKey(candidate.url);
     if (seen.has(key) || !candidate.title) return false;
     seen.add(key);
     return true;

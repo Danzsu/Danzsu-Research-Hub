@@ -100,7 +100,7 @@ test("POST /api/sources stores the link as the reader, answers 202 with its id, 
   const db = reader({ sources: [{ id: 1 }, { id: 2 }] });
   const response = await submit({ url: " https://www.youtube.com/watch?v=dQw4w9WgXcQ#t=1 ", note: `  ${"n".repeat(600)}` });
   assert.deepEqual([response.status, await response.json()], [202, { ok: true, id: 3 }]);
-  assert.deepEqual(db.sourceInserts, [{ url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", kind: "youtube", note: "n".repeat(500) }]);
+  assert.deepEqual(db.sourceInserts, [{ url: "https://youtube.com/watch?v=dQw4w9WgXcQ", kind: "youtube", note: "n".repeat(500) }]);
   assert.equal(routeStub.scheduled.length, 1);
   assert.equal(routeStub.adminCalls, 0, "the admin client is opened only when the scheduled run starts");
 

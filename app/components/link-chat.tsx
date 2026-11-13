@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type MouseEvent, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type RefObject } from "react";
 import { SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
@@ -72,33 +72,17 @@ function shownOpener(opener: HTMLElement | null): HTMLElement | null {
   return [...document.querySelectorAll<HTMLElement>(`button[aria-controls="${CHAT_PANEL_ID}"]`)].find((button) => button.getClientRects().length > 0) ?? opener;
 }
 
-/** A card's "Olvasd itt" for an article with no post yet (read-here spec 1): opens the chat and sends
- *  `url`; the button that asked gets the focus back when the chat closes, like a taiyaki. */
-export type ReadHere = (url: string, opener: HTMLButtonElement) => void;
-
-/** Given by the app shell, which owns the chat's open state. */
-export const ReadHereContext = createContext<ReadHere | null>(null);
-
-export function useReadHere(): ReadHere {
-  const readHere = useContext(ReadHereContext);
-  if (!readHere) throw new Error("useReadHere must be used inside AppShell (app/components/app-shell.tsx)");
-  return readHere;
-}
-
 /**
  * The link chat. Desktop: a non-modal panel above the corner button; only Esc and its close button
  * close it, so a link can be copied from the page behind. Mobile: a bottom Sheet. Focus goes to the
  * field on open and back to `opener` on close.
  */
-export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQueuedLinkTaken }: {
+export function LinkChat({ open, onOpenChange, opener, preview }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The button that opened the panel. */
   opener: RefObject<HTMLButtonElement | null>;
   preview?: ChatPreview;
-  /** A card's "Olvasd itt" link, sent once the panel is open. */
-  queuedLink?: string | null;
-  onQueuedLinkTaken?: () => void;
 }) {
   const { language } = useLanguage();
   const pathname = usePathname();
@@ -175,17 +159,6 @@ export function LinkChat({ open, onOpenChange, opener, preview, queuedLink, onQu
     // Send pressed from the keyboard has the focus; the next link goes in the field.
     input.current?.focus();
   }
-
-  // A card's "Olvasd itt" (read-here spec 1): its link goes in once the panel is open, as if the reader
-  // had pasted it. The field keeps whatever the reader was typing. It waits for a send still on its way
-  // (chat.send refuses a second one), so a second card clicked right after the first still goes in.
-  const takeQueuedLink = useEffectEvent((link: string) => {
-    onQueuedLinkTaken?.();
-    void submit(link);
-  });
-  useEffect(() => {
-    if (open && queuedLink && !snapshot.sending) takeQueuedLink(queuedLink);
-  }, [open, queuedLink, snapshot.sending]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={isMobile}>

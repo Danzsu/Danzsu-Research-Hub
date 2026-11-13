@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { ArchiveView } from "@/app/(app)/archive/archive-view";
 import { GithubView } from "@/app/(app)/github/github-view";
 import { CollectionView } from "@/app/(app)/collection/collection-view";
+import { SearchView } from "@/app/(app)/search/search-view";
+import { previewSearchHits } from "@/lib/search-fixtures";
 import { LibraryView } from "@/app/(app)/library/library-view";
 import { AppShell } from "@/app/components/app-shell";
 import { DigestDashboard } from "@/app/components/digest-dashboard";
@@ -76,6 +78,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
       {view === "archive-empty" && <ArchiveView issues={[]} />}
       {view === "github" && <GithubView repos={previewGithubRepos} more languages={["C++", "Python", "Rust"]} filters={{ page: 1 }} />}
       {view === "collection" && <CollectionView favorites={previewFavorites} />}
+      {view === "search" && <SearchView query="cache" hits={previewSearchHits} />}
       {view === "radar-loading" && <RadarSkeleton />}
       {view === "library-loading" && <ListSkeleton form />}
       {view === "archive-loading" && <ListSkeleton />}

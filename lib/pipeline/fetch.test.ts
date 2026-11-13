@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import dns from "node:dns/promises";
 import { test, type TestContext } from "node:test";
-import { apiFetch, ensureOk, FetchError, readLimited, safeFetch, USER_AGENT } from "./fetch.ts";
+import { apiFetch, ensureOk, FetchError, readLimited, readText, safeFetch, USER_AGENT } from "./fetch.ts";
 import { endlessBody, mockDns, mockFetch, TEST_HOST, TEST_IP } from "./mock-fetch.ts";
 
 // A public IP literal: dns.lookup() resolves it locally without a real DNS query, so these
@@ -191,4 +191,16 @@ test("apiFetch sends this app's user agent and keeps the caller's own headers", 
   });
   await apiFetch("https://api.github.com/x", { headers: { accept: "application/json" } });
   assert.deepEqual(headers, { "user-agent": USER_AGENT, accept: "application/json" });
+});
+
+// 2026-11-13 audit. Kills a page in another charset decoded as UTF-8: ő and ű became replacement characters in the
+// mirrored text, the title and the summary's input.
+test("readText decodes the charset the Content-Type names, and falls back to UTF-8", async () => {
+  const latin2 = new Uint8Array([0xf5, 0xfb]); // "őű" in iso-8859-2
+  const body = (type: string) => new Response(latin2, { headers: { "content-type": type } });
+  assert.equal(await readText(body("text/html; charset=iso-8859-2"), 100), "őű");
+  assert.equal(await readText(body('text/html; charset="ISO-8859-2"'), 100), "őű");
+  assert.match(await readText(body("text/html"), 100), /�/);
+  assert.match(await readText(body("text/html; charset=nonsense"), 100), /�/);
+  assert.equal(await readText(new Response("árvíz", { headers: { "content-type": "text/html; charset=utf-8" } }), 100), "árvíz");
 });

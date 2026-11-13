@@ -37,7 +37,7 @@ const { PostImage } = await import("./post-image.tsx");
 const { Progress } = await import("../../components/ui/progress.tsx");
 const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
-const { CHAT_PANEL_ID, LinkChat, ReadHereContext, TaiyakiButton } = await import("./link-chat.tsx");
+const { CHAT_PANEL_ID, LinkChat, TaiyakiButton } = await import("./link-chat.tsx");
 const { RefreshBar, RefreshProvider } = await import("./refresh-bar.tsx");
 const { RatingsProvider } = await import("./rating-control.tsx");
 const sendNothing = { send: async () => ({}) };
@@ -45,11 +45,11 @@ const { PostToolbar } = await import("../(app)/library/[id]/post-toolbar.tsx");
 const { useReaderState } = await import("./use-reader-state.ts");
 
 const noop = () => {};
-const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop, onReadHere: noop };
+const cardActions = { onOpen: noop, onToggle: noop, onAddTodo: noop, onSaveHere: async () => null };
 /** Each element's own count of `span[aria-hidden="true"]` descendants (the pending dot). */
 const hiddenSpanCounts = (elements: Element[]) => elements.map((element) => element.querySelectorAll('span[aria-hidden="true"]').length);
 /** Wraps a component in the providers the shell gives it: the language (LocalizedText, SubmitForm,
- *  DigestDashboard), the refresh bar (SubmitForm, LinkChat) and "Olvasd itt" (DigestDashboard). */
+ *  DigestDashboard) and the refresh bar (SubmitForm, LinkChat). */
 const withShellProviders = <P extends object>(Component: ComponentType<P>, props: P, language: "hu" | "en" = "en") =>
   render(
     createElement(
@@ -61,7 +61,7 @@ const withShellProviders = <P extends object>(Component: ComponentType<P>, props
         createElement(
           RefreshProvider,
           null,
-          createElement(ReadHereContext, { value: noop }, createElement(PanelContext, { value: { open: false, setOpen: () => {} } }, createElement(Component, props))),
+          createElement(PanelContext, { value: { open: false, setOpen: () => {} } }, createElement(Component, props)),
         ),
       ),
     ),
@@ -157,7 +157,7 @@ test("DigestDashboard with scope companies shows the latest run's company Top 5,
     preview: { data: previewReader, failWrites: false },
   });
   const ids = (selector: string) => [...doc.querySelectorAll(selector)].map((card) => card.getAttribute("data-card-id"));
-  assert.equal(doc.querySelector('nav[aria-label="Categories"]'), null);
+  assert.equal(doc.querySelector('header nav[aria-label="Views"] [aria-current="page"]')?.textContent?.trim(), "AI companies");
   assert.deepEqual(ids(".must-card"), [
     "companies-2026-W39-must-2",
     "companies-2026-W39-mistral",
@@ -232,19 +232,20 @@ test("useReaderState routes a preview source's writes through createSourceStore,
   assert.equal(fetchCalls, 0);
 });
 
-// 2a spec D1 and Review Focus 2. Kills the source link gone from the meta row (and with it the `o` shortcut's
-// target), two primary buttons, and a Read toggle anywhere but last.
-test("StoryCard puts the source in its meta row, one Read here button, the toolbar, then Read last", () => {
+// 2026-11-01 review. Kills the original left as a small link in the meta row (the reader missed it), opened in this
+// tab, or no longer the `o` shortcut's target; and the Read toggle anywhere but last.
+test("StoryCard opens the original from its first button, in a new tab, and keeps Read last", () => {
   const item = previewItems.find((candidate) => !candidate.mustRead)!;
   const doc = withShellProviders(StoryCard, { item, state: { read: false, saved: false }, hasTodo: false, language: "en", actions: cardActions, rating: null });
   const article = doc.querySelector("article.story-card")!;
   assert.equal(article.getAttribute("data-card-id"), item.id);
-  assert.equal(article.classList.contains("story-read"), false);
-  assert.equal(article.querySelector("[data-card-open]")?.getAttribute("href"), item.url);
-  assert.equal(article.querySelectorAll('a[href^="http"]').length, 1, "the source link, once, in the meta row");
+  const original = article.querySelector("[data-card-open]")!;
+  assert.deepEqual([original.tagName, original.getAttribute("href"), original.getAttribute("target")], ["A", item.url, "_blank"]);
+  assert.match(original.textContent ?? "", /Original/);
+  assert.equal(article.querySelectorAll('a[href^="http"]').length, 1, "the original, once");
+  assert.ok((article.textContent ?? "").includes(item.source), "the source still named");
   assert.equal(article.querySelectorAll("[data-card-toolbar]").length, 1);
-  const buttons = [...article.querySelectorAll("button")];
-  assert.match(buttons.at(-1)?.textContent ?? "", /Read/);
+  assert.match([...article.querySelectorAll("button")].at(-1)?.textContent ?? "", /Read/);
   assert.equal(article.querySelectorAll("button[aria-pressed]").length, 5); // Later + Read + the three rating toggles
 });
 
@@ -290,6 +291,16 @@ test("LibraryView lists every preview post, its mirrored badge and the pending/f
   assert.ok(text.includes("MIRRORED")); // post -1 carries meta.mirrored
   assert.ok(text.includes("PROCESSING")); // previewSources' pending row
   assert.ok(text.includes("FAILED")); // previewSources' failed row
+});
+
+// 2026-11-01 review. Kills the archive and the collection left without their way into the Library's other
+// tabs (they left the menu), or a tab marked on the wrong page.
+test("the Library, the archive and the collection share one row of tabs, the page's own marked", () => {
+  const tabs = (doc: Document) =>
+    [...doc.querySelectorAll('nav[aria-label="Library sections"] a')].map((tab) => [tab.getAttribute("href"), tab.getAttribute("aria-current")]);
+  const library = withShellProviders(LibraryView, { posts: previewPosts, open: previewSources, readIds: previewReadPostIds, ratings: {}, preview: { failWrites: false } });
+  assert.deepEqual(tabs(library), [["/library", "page"], ["/archive", null], ["/collection", null]]);
+  assert.deepEqual(tabs(withShellProviders(ArchiveView, { issues: previewArchive })), [["/library", null], ["/archive", "page"], ["/collection", null]]);
 });
 
 test("ArchiveView lists every preview issue", () => {
@@ -366,29 +377,26 @@ test("AppShell carries the taiyaki, and LinkChat's top level renders without a r
   withShellProviders(LinkChat, { open: true, onOpenChange: noop, opener: { current: null }, preview: { sources: previewMySources, failWrites: false } });
 });
 
-// Kills the bar's old order: Archívum or Keresés in the bar, and no taiyaki between Napi and Könyvtár (daily news spec N7).
-test("the mobile bar reads Radar, Napi, the taiyaki, Könyvtár, Több", () => {
+// 2026-11-01 review. Kills the bar's old order: Napi or Több in the bar, and no taiyaki between Keresés and Könyvtár.
+test("the mobile bar reads Radar, Keresés, the taiyaki, Könyvtár, Fiók", () => {
   const doc = shell();
   const slots = [...doc.querySelectorAll("#mobile-nav > *")].map((slot) => slot.getAttribute("aria-label") ?? slot.textContent);
-  assert.deepEqual(slots, ["Radar", "Napi", "Link bedobása", "Könyvtár", "Több"]);
+  assert.deepEqual(slots, ["Radar", "Keresés", "Link bedobása", "Könyvtár", "Fiók"]);
 });
 
-// Kills a "Több" slot without the active mark on an Archívum page, or with it on another page. The
-// sheet itself (Archívum's aria-current) is portalled, so it never reaches this markup: Playwright checks it.
-test("the Több slot carries the active mark on Archívum's pages only", (t) => {
+// Kills a section left unmarked on its sub-pages: the Radar on /daily, the Library on an archive week.
+test("the sidebar marks the section a page belongs to", (t) => {
   t.after(() => {
     navigationStub.pathname = "/";
   });
-  const moreSlot = (pathname: string) => {
+  const current = (pathname: string) => {
     navigationStub.pathname = pathname;
-    const doc = shell();
-    const slot = doc.querySelector("#mobile-nav > :last-child");
-    return [slot?.textContent, slot?.getAttribute("data-active") ?? null];
+    return [...shell("en").querySelectorAll('aside nav a[aria-current="page"]')].map((link) => link.textContent?.trim());
   };
-  assert.deepEqual(moreSlot("/archive/2026-W38"), ["Több", "true"]);
-  assert.deepEqual(moreSlot("/archive"), ["Több", "true"]);
-  assert.deepEqual(moreSlot("/companies"), ["Több", "true"]);
-  assert.deepEqual(moreSlot("/library"), ["Több", null]);
+  assert.deepEqual(current("/daily"), ["Radar"]);
+  assert.deepEqual(current("/github"), ["Radar"]);
+  assert.deepEqual(current("/archive/2026-W38"), ["Library"]);
+  assert.deepEqual(current("/collection"), ["Library"]);
 });
 
 // Spec 2.1. Kills the dot left out of a nav link (a slow tap would show nothing again), put in the
@@ -398,13 +406,13 @@ test("every nav link carries one hidden pending dot, the search button none, and
     navigationStub.linkPending = false;
   });
   const doc = shell("en");
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1, 1, 1, 1, 1, 1]); // Radar, Daily, AI companies, Library, GitHub, Archive, Collection
-  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1, 1]); // Radar, Daily, Library
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("aside nav a")]), [1, 1]); // Radar, Library
+  assert.deepEqual(hiddenSpanCounts([...doc.querySelectorAll("#mobile-nav > a")]), [1, 1]); // Radar, Library
   const searchButtons = [...doc.querySelectorAll("aside nav button, #mobile-nav > button")].filter((button) => button.textContent?.startsWith("Search"));
-  assert.deepEqual(hiddenSpanCounts(searchButtons), [0]); // the sidebar's; the Több sheet's is portalled
+  assert.deepEqual(hiddenSpanCounts(searchButtons), [0, 0]); // the sidebar's and the bar's
   assert.equal(doc.querySelectorAll("[data-pending]").length, 0);
   navigationStub.linkPending = true;
-  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 10);
+  assert.equal(shell("en").querySelectorAll('span[aria-hidden="true"][data-pending]').length, 4);
 });
 
 // Spec 2.1. Kills the dot missing from the week and post cards, where a tap waits on the server too.
@@ -433,48 +441,40 @@ test("useRefresh outside RefreshProvider throws, naming where the provider lives
   assert.throws(() => render(createElement(PostToolbar, props)), /RefreshProvider \(app\/components\/app-shell\.tsx\)/);
 });
 
-// Read-here spec 1. Kills the link to the post missing (the reader would be sent through the chat for
-// a post that exists), the chat button offered for a URL a submission refuses (its send would only
-// say "invalid_url"), and the button missing for a public link.
-test("a card's Read here opens the Library post when there is one, asks the chat for a public link, and is absent otherwise", () => {
-  const card = (url: string, postId?: number) =>
-    withShellProviders(StoryCard, { item: digestItem("local-2026w40-x-1", { url }), state: EMPTY_ITEM_STATE, hasTodo: false, language: "en", actions: cardActions, postId, rating: null });
+// 2026-11-01 review. Kills Read here sending the reader through the chat: it is the post when there is one, a
+// "Preparing…" note while one is being made (the mirror queued it), a "Save here" button otherwise, and nothing
+// for a URL a submission refuses.
+test("a card's Read here is the post, Preparing… while it is made, Save here otherwise", () => {
+  const card = (url: string, library?: number | "pending" | "unavailable") =>
+    withShellProviders(StoryCard, { item: digestItem("local-2026w40-x-1", { url }), state: EMPTY_ITEM_STATE, hasTodo: false, language: "en", actions: cardActions, library, rating: null });
+  const buttons = (doc: Document) => [...doc.querySelectorAll("button")].map((button) => button.textContent?.trim()).filter((text) => /here|Preparing/.test(text ?? ""));
   assert.equal(card("https://blog.test/a", 7).querySelector('a[href="/library/7"]')?.textContent?.trim(), "Read here");
-  const buttons = [...card("https://blog.test/a").querySelectorAll("button")].filter((button) => button.textContent?.trim() === "Read here");
-  assert.equal(buttons.length, 1);
-  assert.equal(card("http://10.0.0.1/a").body.textContent?.includes("Read here"), false);
+  const pending = card("https://blog.test/a", "pending");
+  assert.match(pending.body.textContent ?? "", /Preparing…/);
+  assert.deepEqual(buttons(pending), []);
+  assert.deepEqual(buttons(card("https://blog.test/a")), ["Save here"]);
+  assert.doesNotMatch(card("http://10.0.0.1/a").body.textContent ?? "", /Save here|Read here/);
+  // B review #2-3: a copy no run will make is a note, not a button; and the card keeps one live region, so what
+  // Save here did is announced (a region that mounts with its text often isn't).
+  const unavailable = card("https://blog.test/a", "unavailable");
+  assert.match(unavailable.body.textContent ?? "", /Not available here/);
+  assert.deepEqual(buttons(unavailable), []);
+  assert.equal(card("https://blog.test/a").querySelectorAll('article span[aria-live="polite"]').length, 1);
 });
 
-// Read-here spec 1. Kills `posts` not reaching the cards, or reaching the wrong one.
-test("DigestDashboard gives each card its Library post from `posts`", () => {
-  const item = previewItems.find((candidate) => !candidate.mustRead)!;
+// Kills `posts` not reaching the cards, or reaching the wrong one.
+test("DigestDashboard gives each card its Library post, or its pending note, from `posts`", () => {
+  const [first, second] = previewItems.filter((candidate) => !candidate.mustRead);
   const doc = withShellProviders(DigestDashboard, {
     issue: previewIssue,
     items: previewItems,
     githubTop10: previewGithub,
     preview: { data: previewReader, failWrites: false },
-    posts: { [item.id]: 42 },
+    posts: { [first.id]: 42, [second.id]: "pending" },
   });
-  assert.equal(doc.querySelector(`[data-card-id="${item.id}"] a[href="/library/42"]`)?.textContent?.trim(), "Read here");
+  assert.equal(doc.querySelector(`[data-card-id="${first.id}"] a[href="/library/42"]`)?.textContent?.trim(), "Read here");
   assert.equal(doc.querySelectorAll('a[href^="/library/"]').length, 1);
-});
-
-// Like useRefresh. Kills a useReadHere that quietly does nothing without the shell: the button would
-// mark the story read and open nothing.
-test("useReadHere outside AppShell throws, naming where the provider lives", () => {
-  const bare = () =>
-    render(
-      createElement(
-        LanguageProvider,
-        { initial: "en" } as ComponentProps<typeof LanguageProvider>,
-        createElement(
-          RatingsProvider,
-          sendNothing,
-          createElement(RefreshProvider, null, createElement(DigestDashboard, { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } })),
-        ),
-      ),
-    );
-  assert.throws(bare, /useReadHere must be used inside AppShell \(app\/components\/app-shell\.tsx\)/);
+  assert.match(doc.querySelector(`[data-card-id="${second.id}"]`)?.textContent ?? "", /Preparing…/);
 });
 
 // G1 spec 3. Kills the rating group missing from a card, and a card that ignores the page's ratings.
@@ -535,7 +535,7 @@ test("the daily view lists its cards in rank order, each with an anchor the inde
   assert.deepEqual([...doc.querySelectorAll("article[id]")].map((card) => card.id), ["daily-1", "daily-2", "daily-3", "daily-4", "daily-5"]);
   assert.deepEqual([...doc.querySelectorAll(`nav[aria-label="The day's stories"] a`)].map((link) => link.getAttribute("href")), ["#daily-1", "#daily-2", "#daily-3", "#daily-4", "#daily-5"]);
   assert.match(doc.body.textContent ?? "", /THE DAY'S 10/);
-  assert.equal(doc.querySelector('nav[aria-label="Categories"]'), null);
+  assert.equal(doc.querySelector('header nav[aria-label="Views"] [aria-current="page"]')?.textContent?.trim(), "Daily");
   assert.match(doc.body.textContent ?? "", /5 stories · 2 short/);
   assert.match(doc.querySelector("header")?.textContent ?? "", /DAILY LIST/);
   // Final review: the index rows are touch targets too (DESIGN.md: 40px).
@@ -596,5 +596,44 @@ test("the weekly view marks the items of a daily Top 10", () => {
   // 2026-11-01 review. Kills the badge glued to the source name ("DAY TOP · 2.The Decoder"): one gapped row.
   const badge = [...doc.querySelectorAll("p")].find((line) => /DAY TOP · 4\./.test(line.textContent ?? ""))!;
   assert.match(badge.parentElement!.className, /\bflex\b.*\bgap-2\b/);
-  assert.ok(badge.parentElement!.querySelector("a[data-card-open]"));
+  assert.equal(badge.nextElementSibling?.textContent, "example.test", "the source's name, beside the badge");
 });
+
+// 2026-11-01 review. Kills the week's header and the chip bar back as two bands, a Radar view left out of the
+// chips (Daily, AI companies), a filter that leaves the page it could switch in place, and the GitHub chip
+// without its way to the full repo list.
+test("one band holds the week and the views: pages are links, filters switch in place, and elsewhere lead to the Radar", (t) => {
+  t.after(() => {
+    navigationStub.search = "";
+  });
+  const chips = (doc: Document) =>
+    [...doc.querySelectorAll('header nav[aria-label="Views"] > *')].map((chip) => [chip.textContent?.trim(), chip.tagName === "A" ? chip.getAttribute("href") : chip.getAttribute("aria-pressed")]);
+  const props = { issue: previewIssue, items: previewItems, githubTop10: previewGithub, preview: { data: previewReader, failWrites: false } };
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, props)), [
+    ["Weekly", "true"],
+    ["Daily", "/daily"],
+    ["Local LLM", "false"],
+    ["Research", "false"],
+    ["AI companies", "/companies"],
+    ["GitHub", "false"],
+    ["Saved", "false"],
+  ]);
+  assert.equal(viewNavCount(withShellProviders(DigestDashboard, props)), 1);
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, { ...props, scope: "companies" })).slice(2, 4), [
+    ["Local LLM", "/?filter=local"],
+    ["Research", "/?filter=research"],
+  ]);
+  // A week opened from the archive has no daily list or companies page of its own: every chip filters it.
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, { ...props, archived: true, fromArchive: true })).map(([, value]) => value), ["true", "false", "false", "false", "false", "false"]);
+  // B review #1. On a Monday the current week shows as closed until the run, and its pages must stay reachable.
+  assert.deepEqual(chips(withShellProviders(DigestDashboard, { ...props, archived: true }))[1], ["Daily", "/daily"]);
+  // Arriving from another view with ?filter=github: the GitHub chip is on, with the link to every repo.
+  navigationStub.search = "filter=github";
+  const github = withShellProviders(DigestDashboard, props);
+  assert.deepEqual(chips(github)[5], ["GitHub", "true"]);
+  assert.ok(github.querySelector('main a[href="/github"]'));
+});
+
+/** The page's navs labelled Views: the one band, not a second bar below the header. */
+const viewNavCount = (doc: Document) => doc.querySelectorAll('nav[aria-label="Views"]').length;
+

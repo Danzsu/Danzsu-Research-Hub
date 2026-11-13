@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useState, type ReactNode } from "react";
 import { BookOpen, Check, Clock3, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { DailyBrief, DigestItem, Language } from "@/data/digest-types";
+import type { DailyBrief, DigestItem, Language, LibraryCopy } from "@/data/digest-types";
 import { nextCardIndex } from "@/lib/keymap";
 import { SHORT_MINUTES } from "@/lib/pipeline/daily-top";
 import { parseSubmittedUrl } from "@/lib/pipeline/util";
@@ -17,8 +20,14 @@ const copy = {
     score: "PONT",
     min: "PERC",
     why: "MIÉRT FONTOS",
-    open: "Forrás, új lapon",
+    original: "Eredeti",
+    newTab: "új lapon",
     readHere: "Olvasd itt",
+    saveHere: "Mentsd ide",
+    saving: "Mentés…",
+    preparing: "Készül…",
+    unavailable: "Itt nem érhető el",
+    savedReady: "Már megvan: olvasd itt.",
     read: "Olvasott",
     short: "RÖVID",
     dayTop: "NAP TOP",
@@ -29,8 +38,14 @@ const copy = {
     score: "SCORE",
     min: "MIN",
     why: "WHY IT MATTERS",
-    open: "Source, in a new tab",
+    original: "Original",
+    newTab: "in a new tab",
     readHere: "Read here",
+    saveHere: "Save here",
+    saving: "Saving…",
+    preparing: "Preparing…",
+    unavailable: "Not available here",
+    savedReady: "Already there: read it here.",
     read: "Read",
     short: "SHORT",
     dayTop: "DAY TOP",
@@ -44,9 +59,8 @@ export type CardActions = {
   onOpen: (item: DigestItem) => void;
   onToggle: (itemId: string, flag: Flag) => void;
   onAddTodo: (item: DigestItem) => void;
-  /** "Olvasd itt" with no Library post yet: the link chat sends the item's URL (read-here spec 1).
-   *  `opener` gets the focus back when the chat closes. */
-  onReadHere: (item: DigestItem, opener: HTMLButtonElement) => void;
+  /** Save here: submits the item's URL to the Library, and answers its copy, or null when it didn't go in. */
+  onSaveHere: (item: DigestItem) => Promise<LibraryCopy | null>;
 };
 
 export type CardProps = {
@@ -55,8 +69,8 @@ export type CardProps = {
   hasTodo: boolean;
   language: Language;
   actions: CardActions;
-  /** The Library post already made from the item's URL (readHerePosts): "Olvasd itt" opens it. */
-  postId?: number;
+  /** The item's Library copy (readHerePosts): Read here opens the post, or says it is being made. */
+  library?: LibraryCopy;
   /** The reader's rating of the item, from the page's render (getRatings). */
   rating: RatingValue | null;
   /** The daily view's long text for the card (daily news spec N8); the weekly cards have none. */
@@ -78,8 +92,8 @@ export function StoryCard(props: CardProps) {
       {...cardFocus(item.id)}
       id={props.rank ? `daily-${props.rank}` : undefined}
       data-saved={state.saved || undefined}
-      // scroll-mt-20: the daily index jumps here, clear of the 64px sticky header.
-      className={`focus-ring story-card max-w-[900px] scroll-mt-20 border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+      // scroll-mt: the daily index jumps here, clear of the sticky band (up to three rows below a 72rem column; 64px from it).
+      className={`focus-ring story-card max-w-[900px] scroll-mt-44 border-2 @[72rem]:scroll-mt-20 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
       <div className="grid gap-4 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-5">
         {/* A row of meta on narrow screens, the 96px gutter from lg up. */}
@@ -112,8 +126,8 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
       data-saved={state.saved || undefined}
       className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClass} ${state.read ? "story-read" : ""}`}
     >
-      <div className="mb-6 flex items-start justify-between">
-        <span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
+      <div className="mb-4 flex items-start justify-between sm:mb-6">
+        <span className="font-display text-4xl text-signal sm:text-5xl">{String(rank).padStart(2, "0")}</span>
         <span className="border border-ink px-2 py-1 font-mono text-[11px]">{item.score}/100</span>
       </div>
       <CardText {...props} titleClassName="text-2xl leading-[1.02]" />
@@ -122,7 +136,7 @@ export function MustReadCard({ rank, ...props }: CardProps & { rank: number }) {
   );
 }
 
-function CardText({ item, language, actions, rank, brief, titleClassName }: CardProps & { titleClassName: string }) {
+function CardText({ item, language, rank, brief, titleClassName }: CardProps & { titleClassName: string }) {
   const t = copy[language];
   return (
     <>
@@ -132,21 +146,8 @@ function CardText({ item, language, actions, rank, brief, titleClassName }: Card
             {t.dayTop} · {item.dailyRank}.
           </p>
         )}
-        {/* The source is the meta row's link (2a spec D1), and the `o` shortcut's target (data-card-open). */}
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noreferrer"
-          data-card-open
-          onClick={() => actions.onOpen(item)}
-          onAuxClick={(event) => {
-            if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
-          }}
-          className="focus-ring inline-flex min-h-10 items-center gap-1 font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere] hover:underline"
-        >
-          {item.source} <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
-          <span className="sr-only">({t.open})</span>
-        </a>
+        {/* The source's name; the card's Original button opens it. */}
+        <span className="flex min-h-10 items-center font-mono text-[11px] tracking-[0.12em] text-signal [overflow-wrap:anywhere]">{item.source}</span>
       </div>
       <h2 className={`mt-3 font-display [overflow-wrap:anywhere] ${titleClassName}`}>{item.title[language]}</h2>
       <CardBody item={item} brief={brief} language={language} />
@@ -204,34 +205,29 @@ function CardBody({ item, brief, language }: { item: DigestItem; brief?: DailyBr
   );
 }
 
-/** [Olvasd itt] [👎 👍 ❤ 🔖 ☑] … [✓ Elolvastam] (2a spec D1): one primary action, one tool unit, the Read toggle
- *  last; the source link sits in the meta row above. */
-function CardFooter({ item, state, hasTodo, language, actions, postId, rating }: CardProps) {
+/** [Eredeti] [Olvasd itt] [👎 👍 ❤ 🔖 ☑] … [✓ Olvasott]: the two ways to read first, one tool unit, the Read toggle
+ *  last (2a spec D1; the 2026-11-01 review brought the original out of the meta row). */
+function CardFooter({ item, state, hasTodo, language, actions, library, rating }: CardProps) {
   const t = copy[language];
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
-      {/* Read-here spec 1: our own post when there is one; otherwise the chat sends the link, unless a submission would refuse it. */}
-      {/* prefetch off: 25 cards would each fetch a post page on every visit; the post skeleton covers the wait. */}
-      {postId !== undefined ? (
-        <Button asChild variant="brutal" className="min-h-10">
-          <Link href={`/library/${postId}`} prefetch={false} onClick={() => actions.onOpen(item)}>
-            <BookOpen /> {t.readHere} <PendingDot />
-          </Link>
-        </Button>
-      ) : (
-        parseSubmittedUrl(item.url) && (
-          <Button
-            variant="brutal"
-            className="min-h-10"
-            onClick={(event) => {
-              actions.onOpen(item);
-              actions.onReadHere(item, event.currentTarget);
-            }}
-          >
-            <BookOpen /> {t.readHere}
-          </Button>
-        )
-      )}
+      {/* The `o` shortcut's target (data-card-open). Opening is reading. */}
+      <Button asChild variant="brutal" className="min-h-10">
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noreferrer"
+          data-card-open
+          onClick={() => actions.onOpen(item)}
+          onAuxClick={(event) => {
+            if (event.button === 1) actions.onOpen(item); // a middle click opens a tab too
+          }}
+        >
+          <ExternalLink /> {t.original}
+          <span className="sr-only">({t.newTab})</span>
+        </a>
+      </Button>
+      <ReadHere item={item} language={language} actions={actions} library={library} />
       <CardToolbar
         itemId={item.id}
         saved={state.saved}
@@ -250,6 +246,68 @@ function CardFooter({ item, state, hasTodo, language, actions, postId, rating }:
         <Check /> {t.read}
       </Button>
     </div>
+  );
+}
+
+/** Read here, by the item's Library copy: the post; a note while one is made, or once none will be; else Save here,
+ *  which submits the URL and shows what came of it on the card. Nothing for a URL a submission would refuse. */
+function ReadHere({ item, language, actions, library }: Pick<CardProps, "item" | "language" | "actions" | "library">) {
+  const t = copy[language];
+  const [saved, setSaved] = useState<LibraryCopy | "saving" | undefined>(undefined);
+  // One region for the card's whole life: a region that mounts with its text is often not announced.
+  const [announced, setAnnounced] = useState("");
+  const shown = library ?? saved;
+  const live = (
+    <span aria-live="polite" className="sr-only">
+      {announced}
+    </span>
+  );
+  const note = (text: string) => (
+    <span className="inline-flex min-h-10 items-center gap-2 border-2 border-dashed border-ink/40 px-3 font-mono text-xs text-ink/60">
+      <BookOpen className="size-4" aria-hidden="true" /> {text}
+    </span>
+  );
+  let control: ReactNode;
+  if (typeof shown === "number") {
+    control = (
+      <Button asChild variant="brutal" className="min-h-10">
+        {/* prefetch off: 25 cards would each fetch a post page on every visit; the post skeleton covers the wait. */}
+        <Link href={`/library/${shown}`} prefetch={false} onClick={() => actions.onOpen(item)}>
+          <BookOpen /> {t.readHere} <PendingDot />
+        </Link>
+      </Button>
+    );
+  } else if (shown === "pending") {
+    control = note(t.preparing);
+  } else if (shown === "unavailable") {
+    control = note(t.unavailable);
+  } else if (parseSubmittedUrl(item.url)) {
+    control = (
+      <Button
+        variant="brutal"
+        className="min-h-10"
+        aria-disabled={shown === "saving"}
+        onClick={async (event) => {
+          if (shown === "saving") return;
+          // The button goes when the answer lands: the focus then moves to the card, so j/k go on from here.
+          const card = event.currentTarget.closest<HTMLElement>(CARD);
+          setSaved("saving");
+          const result = await actions.onSaveHere(item);
+          setSaved(result ?? undefined);
+          if (result === null) return;
+          setAnnounced(typeof result === "number" ? t.savedReady : result === "pending" ? t.preparing : t.unavailable);
+          requestAnimationFrame(() => card?.focus());
+        }}
+      >
+        <BookOpen /> {shown === "saving" ? t.saving : t.saveHere}
+      </Button>
+    );
+  }
+  return (
+    <>
+      {control}
+      {live}
+    </>
   );
 }
 

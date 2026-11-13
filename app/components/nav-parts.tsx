@@ -2,7 +2,7 @@
 
 import Link, { useLinkStatus } from "next/link";
 import type { ReactNode } from "react";
-import { Archive, BookOpen, Building2, FolderOpen, GitFork, Radar, Search, Sunset, type LucideIcon } from "lucide-react";
+import { BookOpen, Radar, Search, type LucideIcon } from "lucide-react";
 import type { NavId, NavItem } from "@/lib/nav";
 import { useLanguage } from "./language-context";
 
@@ -12,13 +12,8 @@ import { useLanguage } from "./language-context";
 
 export const navIcons: Record<NavId, LucideIcon> = {
   radar: Radar,
-  daily: Sunset,
-  companies: Building2,
-  library: BookOpen,
-  github: GitFork,
   search: Search,
-  archive: Archive,
-  collection: FolderOpen,
+  library: BookOpen,
 };
 
 /**
@@ -33,7 +28,7 @@ export function PendingDot({ className = "" }: { className?: string }) {
 
 /** A page link (aria-current when it is the active one) or, for the search slot, a button, holding the
  *  item's icon and label; `children` go after the label (the sidebar's ⌘K hint). `onClick` runs when
- *  the link is followed: the mobile "Több" sheet closes itself with it. A link carries the PendingDot:
+ *  the link is followed. A link carries the PendingDot:
  *  at the row's end, or with `dotOnIcon` (the rail, the bottom bar) on its icon's top-right corner. */
 export function NavEntry({ item, active, onSearch, onClick, className, iconClass, labelClass, dotOnIcon = false, children }: {
   item: NavItem;

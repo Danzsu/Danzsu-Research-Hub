@@ -2,6 +2,7 @@ import { BookOpen, FileText, FlaskConical, GitFork, MessageSquareQuote, PlayCirc
 import { LocalizedText } from "@/app/components/language-context";
 import { PendingDot } from "@/app/components/nav-parts";
 import { EmptyState } from "@/app/components/empty-state";
+import { LibraryTabs } from "@/app/components/library-tabs";
 import { PageHero } from "@/app/components/page-header";
 import { dislikedClass } from "@/app/components/rating-classes";
 import { RatingBadge } from "@/app/components/rating-control";
@@ -48,6 +49,7 @@ export function LibraryView({
     <main className="min-h-dvh bg-ink text-paper">
       <RefreshWhileProcessing active={open.some((source) => source.status === "pending")} />
       <PageHero eyebrow="MIRRORED SOURCES / KÖNYVTÁR" title="LIBRARY" lead={<LocalizedText value={copy.lead} />} aside={<SubmitForm preview={preview} />} />
+      <LibraryTabs current="posts" />
 
       <section className="mx-auto max-w-[1600px] px-4 py-10 @container sm:px-10">
         {open.length > 0 && (

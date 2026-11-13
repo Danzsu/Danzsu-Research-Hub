@@ -129,8 +129,17 @@ export async function readLimited(response: Response, limit: number, options: { 
   return Buffer.concat(chunks);
 }
 
-export const readText = async (response: Response, limit: number, options?: { truncate?: boolean }) =>
-  new TextDecoder().decode(await readLimited(response, limit, options));
+/** The body as text, in the charset the Content-Type names (a Hungarian page served as iso-8859-2 keeps its ő and ű);
+ *  UTF-8 when it names none or one the runtime doesn't know. */
+export async function readText(response: Response, limit: number, options?: { truncate?: boolean }) {
+  const bytes = await readLimited(response, limit, options);
+  const label = /charset\s*=\s*"?([\w.:-]+)/i.exec(response.headers.get("content-type") ?? "")?.[1];
+  try {
+    return new TextDecoder(label ?? "utf-8").decode(bytes);
+  } catch {
+    return new TextDecoder().decode(bytes);
+  }
+}
 
 /**
  * Parses a response body as JSON, returning it only if it's a plain object — never `null`, an array,

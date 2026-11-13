@@ -17,5 +17,5 @@ export default async function ArchivedIssuePage({ params }: { params: Promise<{ 
   if (!radar) notFound();
   // After the week, not beside it: both lookups need its items. Never cached, unlike a closed week itself.
   const [posts, ratings] = await Promise.all([readHerePosts(reader.db, radar.items), getRatings(reader.db, radarTargets(radar.items, radar.githubTop10))]);
-  return <DigestDashboard archived {...radar} seed={seed} posts={posts} ratings={ratings} />;
+  return <DigestDashboard archived fromArchive {...radar} seed={seed} posts={posts} ratings={ratings} />;
 }

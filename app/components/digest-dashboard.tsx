@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
@@ -15,9 +17,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import type { CurrentIssue, DailyBrief, DigestItem, GithubTopEntry } from "@/data/digest-types";
+import type { CurrentIssue, DailyBrief, DigestItem, GithubTopEntry, LibraryCopy } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
+import { httpTransport, memoryTransport } from "@/lib/link-chat";
 import { SHORT_MINUTES } from "@/lib/pipeline/daily-top";
 import { ratingKey, type Ratings } from "@/lib/ratings";
 import { repoStats } from "@/lib/repo-format";
@@ -25,11 +28,11 @@ import { EMPTY_ITEM_STATE, type Flag, type ReaderSource } from "@/lib/reader-sto
 import { usePanel } from "./app-shell";
 import { EmptyState } from "./empty-state";
 import { useLanguage } from "./language-context";
+import { PendingDot } from "./nav-parts";
 import { RepoCard } from "./repo-card";
 import { ReaderPanel } from "./reader-panel";
 import { focusedCardId, moveCardFocus, MustReadCard, openFocusedCard, StoryCard, type CardActions } from "./story-card";
 import { tabPastPanel } from "./tab-past-panel";
-import { useReadHere } from "./link-chat";
 import { isUndoToast, toasts } from "./undo-toast";
 import { useModelContextTools } from "./use-model-context-tools";
 import { useReaderState } from "./use-reader-state";
@@ -40,7 +43,7 @@ const copy = {
     live: "ÉLŐ KIADÁS",
     dailyList: "NAPI LISTA",
     archived: "LEZÁRT KIADÁS",
-    categories: "Kategóriák",
+    categories: "Nézetek",
     panel: "Haladás és to-do",
     updated: "Napi frissítés",
     schedule: "NAPI 13:00 UTC · ZÁRÁS VAS 24:00",
@@ -64,12 +67,13 @@ const copy = {
     companiesFeed: "A HÉT TÖBBI CÉGES HÍRE",
     emptyCompanies: "Ezen a héten még nincs céges hír, a napi futás tölti fel.",
     emptyCompaniesAll: "A hét minden céges híre fent, a napi Top 5-ben van.",
-    all: "Aktuális radar",
-    local: "Local LLM Lab",
-    research: "Kutatási radar",
+    all: "Heti",
+    daily: "Napi",
+    local: "Local LLM",
+    research: "Kutatás",
     companies: "AI cégek",
-    github: "GitHub Top 10",
-    saved: "Mentve későbbre",
+    github: "GitHub",
+    saved: "Mentett",
     mustRead: "TOP 3 · KÖTELEZŐ",
     feed: "A HÉT ÉLŐ ADATFOLYAMA",
     sample: "Ez a heti kiadás még üres — a napi automatikus futás tölti fel.",
@@ -77,6 +81,7 @@ const copy = {
     emptySaved: "Még nincs mentett hír. A kártyák Később gombjával gyűjtheted ide.",
     emptyCategory: "Ebben a kategóriában ezen a héten nincs hír.",
     emptyGithub: "Ezen a héten még nincs GitHub-lista, a napi futás tölti fel.",
+    allRepos: "Minden repó →",
     showAll: "Összes hír",
     close: "Bezárás",
   },
@@ -84,7 +89,7 @@ const copy = {
     live: "LIVE ISSUE",
     dailyList: "DAILY LIST",
     archived: "ARCHIVED ISSUE",
-    categories: "Categories",
+    categories: "Views",
     panel: "Progress & to-do",
     updated: "Daily refresh",
     schedule: "DAILY 13:00 UTC · FREEZE SUN 24:00",
@@ -107,12 +112,13 @@ const copy = {
     companiesFeed: "THE WEEK'S OTHER COMPANY NEWS",
     emptyCompanies: "No company news this week yet; the daily run fills it.",
     emptyCompaniesAll: "Every company story this week is up top, in the daily Top 5.",
-    all: "Current radar",
-    local: "Local LLM Lab",
-    research: "Research radar",
+    all: "Weekly",
+    daily: "Daily",
+    local: "Local LLM",
+    research: "Research",
     companies: "AI companies",
-    github: "GitHub Top 10",
-    saved: "Saved for later",
+    github: "GitHub",
+    saved: "Saved",
     mustRead: "TOP 3 · MUST READ",
     feed: "THE WEEK'S LIVE SIGNAL",
     sample: "This week's issue is still empty — the daily automated run fills it.",
@@ -120,19 +126,27 @@ const copy = {
     emptySaved: "Nothing saved yet. Collect stories here with the Later button on a card.",
     emptyCategory: "No story in this category this week.",
     emptyGithub: "No GitHub list this week yet; the daily run fills it.",
+    allRepos: "All repos →",
     showAll: "All stories",
     close: "Close",
   },
 } as const;
 
-const filters: { id: Filter; icon: LucideIcon }[] = [
-  { id: "all", icon: Radar },
+// The Radar's views, in the band beside the week (2026-11-01 review). A view with a `page` is a page of its own
+// for the current week; a closed week has no daily list or companies page, so there every chip filters it.
+const views: { id: Filter | "daily"; icon: LucideIcon; page?: string }[] = [
+  { id: "all", icon: Radar, page: "/" },
+  { id: "daily", icon: Sunset, page: "/daily" },
   { id: "local", icon: Zap },
   { id: "research", icon: FlaskConical },
-  { id: "companies", icon: Building2 },
+  { id: "companies", icon: Building2, page: "/companies" },
   { id: "github", icon: GitFork },
   { id: "saved", icon: Bookmark },
 ];
+const isFilter = (value: string | null): value is Filter => views.some((view) => view.id === value && view.id !== "daily");
+
+const chipClass =
+  "press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal aria-[current=page]:bg-signal";
 
 export function DigestDashboard(
   props: {
@@ -141,25 +155,33 @@ export function DigestDashboard(
     githubTop10: GithubTopEntry[];
     /** A closed week opened from /archive: same reading UI, no "live" framing. */
     archived?: boolean;
+    /** Opened from /archive: a past week has no daily list or companies page of its own, so every view chip filters
+     *  it. Not the same as `archived`, which the current week also is on a Monday until the run opens the new one. */
+    fromArchive?: boolean;
     /** /companies: the week's company news only, the latest day's Top 5 first, no category bar. */
     scope?: "companies" | "daily";
-    /** Item id → its Library post (readHerePosts): the cards' "Olvasd itt" opens it. */
-    posts?: Record<string, number>;
+    /** Item id → its Library copy (readHerePosts): a card's Read here opens the post, or says it is being made. */
+    posts?: Record<string, LibraryCopy>;
     /** The page's ratings by ratingKey (getRatings): the cards' and repos' initial values. */
     ratings?: Ratings;
     /** /daily (daily news spec N7): whether the list is today's, and each card's long text. */
     daily?: { today: boolean; late: boolean; briefs: Record<string, DailyBrief> };
   } & ReaderSource,
 ) {
-  const { issue, githubTop10, archived = false } = props;
+  const { issue, githubTop10, archived = false, fromArchive = false } = props;
   const companies = props.scope === "companies";
   const dailyView = props.scope === "daily";
+  // The weekly Radar and a closed week filter in place; /daily and /companies link their filter chips to the Radar.
+  const filtersHere = !companies && !dailyView;
   // Memoized: a fresh array each render would re-register the WebMCP tools (their effect keys on the ids).
   const items = useMemo(() => (companies ? props.items.filter((item) => item.category === "companies") : props.items), [companies, props.items]);
   const { language } = useLanguage();
-  const [filter, setFilter] = useState<Filter>("all");
+  // Another view's filter chip links here with ?filter=; on this page the chips then switch in place.
+  const requested = useSearchParams().get("filter");
+  const [filter, setFilter] = useState<Filter>(() => (isFilter(requested) ? requested : "all"));
   const { store, states, loadedStates, todos, syncing } = useReaderState(props);
-  const readHere = useReadHere();
+  // Save here sends the item's URL as a submission; the preview keeps it in memory, like its other writes.
+  const [transport] = useState(() => (props.preview ? memoryTransport([], props.preview.failWrites) : httpTransport));
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
   useModelContextTools(store, itemIds);
   const isMobile = useIsMobile();
@@ -184,7 +206,18 @@ export function DigestDashboard(
       }
     },
     onToggle: (itemId, flag) => store.toggleFlag(itemId, flag),
-    onReadHere: (item, opener) => readHere(item.url, opener),
+    async onSaveHere(item) {
+      try {
+        const { status, body } = await transport.submit(item.url, null);
+        if (status === 202 || (status === 409 && body.queued)) return "pending";
+        if (status === 409) return typeof body.postId === "number" ? body.postId : "unavailable";
+      } catch {
+        // Offline: the toast below.
+      }
+      // Signed out, refused or out of reach: nothing changed, so the button stays for another try.
+      toasts.show({ kind: "notSaved" });
+      return null;
+    },
     onAddTodo(item) {
       if (store.addTodo(item.title[language], item.id)) toasts.show({ kind: "todoAdded" });
     },
@@ -212,7 +245,7 @@ export function DigestDashboard(
     item,
     state: states[item.id] ?? EMPTY_ITEM_STATE,
     hasTodo: itemsWithTodo.has(item.id),
-    postId: props.posts?.[item.id],
+    library: props.posts?.[item.id],
     rating: props.ratings?.[ratingKey({ kind: "item", id: item.id })] ?? null,
     brief: props.daily?.briefs[item.id],
     language,
@@ -246,14 +279,41 @@ export function DigestDashboard(
 
   return (
     <div className="min-w-0 bg-cream text-ink @container">
-      <header className="radar-header sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink bg-cream px-4 sm:px-7">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      {/* One band: the week, its views and the panel pill. One row once the column is 72rem wide; narrower, the views
+          take a row of their own, wrapping from md (a mouse can't scroll a hidden scrollbar) and scrolling on a phone. */}
+      <header className="radar-header sticky top-0 z-20 flex flex-wrap items-center gap-x-3 border-b-2 border-ink bg-cream px-4 sm:px-7 @[72rem]:h-16 @[72rem]:flex-nowrap">
+        <div className="flex h-14 min-w-0 flex-1 items-center gap-2 sm:gap-3 @[72rem]:h-auto @[72rem]:flex-none">
           {!archived && <span className="live-pulse shrink-0" />}
           <div className="min-w-0">
             <p className="truncate font-mono text-[11px] tracking-[0.18em] text-signal">{archived ? t.archived : dailyView ? t.dailyList : t.live}</p>
-            <p className="font-display text-lg leading-none">{issue.label}</p>
+            <p className="whitespace-nowrap font-display text-lg leading-none">{issue.label}</p>
           </div>
         </div>
+        <nav aria-label={t.categories} className="order-last flex basis-full gap-2 overflow-x-auto pb-2 scrollbar-none md:flex-wrap md:overflow-visible @[72rem]:order-none @[72rem]:min-w-0 @[72rem]:flex-1 @[72rem]:flex-nowrap @[72rem]:basis-auto @[72rem]:pb-0">
+          {views
+            .filter((view) => !(fromArchive && view.id === "daily"))
+            .map(({ id, icon: Icon, page }) => {
+              const label = (
+                <>
+                  <Icon className="size-3.5" /> {t[id]}
+                </>
+              );
+              if (filtersHere && id !== "daily" && (fromArchive || !page || id === "all")) {
+                return (
+                  <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id as Filter)} className={chipClass}>
+                    {label}
+                  </button>
+                );
+              }
+              const current = (id === "daily" && dailyView) || (id === "companies" && companies);
+              return (
+                <Link key={id} href={page ?? `/?filter=${id}`} aria-current={current ? "page" : undefined} className={chipClass}>
+                  {label}
+                  <PendingDot />
+                </Link>
+              );
+            })}
+        </nav>
         {/* Non-modal, so the undo toast above it stays clickable, reachable by Tab and announced. */}
         <Sheet modal={false} open={panelLayer.open} onOpenChange={panelLayer.setOpen}>
           <SheetTrigger asChild>
@@ -293,27 +353,7 @@ export function DigestDashboard(
       </header>
 
       <div className="grid min-h-[calc(100dvh-4rem)] grid-cols-1 @[95rem]:grid-cols-[minmax(0,1fr)_330px]">
-        {/* The chip bar belongs to this column, so the panel beside it is not covered. */}
         <div className="min-w-0">
-          {!companies && !dailyView && (
-            <nav
-              aria-label={t.categories}
-              className="radar-chips sticky top-16 z-10 flex gap-2 overflow-x-auto border-b-2 border-ink bg-cream px-4 py-2 scrollbar-none sm:px-7"
-            >
-              {filters.map(({ id, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={filter === id}
-                  onClick={() => setFilter(id)}
-                  className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal"
-                >
-                  <Icon className="size-3.5" /> {t[id]}
-                </button>
-              ))}
-            </nav>
-          )}
-
           <main className="min-w-0 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
             <section className="relative overflow-hidden border-2 border-ink bg-ink px-5 py-6 text-paper sm:px-8 sm:py-9">
               <div className="signal-grid" aria-hidden="true" />
@@ -325,7 +365,8 @@ export function DigestDashboard(
                     <span>
                       {t.updated}: {issue.updated}
                     </span>
-                    <span>{t.schedule}</span>
+                    {/* The phone keeps one line: the update time says enough there. */}
+                    <span className="hidden sm:inline">{t.schedule}</span>
                   </div>
                   <h1 className="max-w-4xl font-display text-[clamp(2.6rem,15cqi,8rem)] leading-[0.77] tracking-[-0.07em]">
                     {dailyView ? t.dailyTitle : companies ? t.companiesTitle : "AI WEEKLY"}
@@ -366,6 +407,9 @@ export function DigestDashboard(
                 ) : (
                   <EmptyState tone="cream" icon={GitFork}>{t.emptyGithub}</EmptyState>
                 )}
+                <Link href="/github" className="focus-ring mt-4 inline-flex min-h-10 items-center font-mono text-xs underline hover:text-signal">
+                  {t.allRepos}
+                </Link>
               </section>
             ) : (
               <>

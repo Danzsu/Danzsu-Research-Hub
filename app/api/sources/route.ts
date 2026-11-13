@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 import { jsonError } from "@/lib/api";
 import { duplicateSource } from "@/lib/my-sources";
 import { MAX_ATTEMPTS, processSource } from "@/lib/pipeline/ingest";
-import { detectSource, parseSubmittedUrl } from "@/lib/pipeline/util";
+import { canonicalSubmittedUrl, detectSource } from "@/lib/pipeline/util";
 import { createAdminClient, getReader } from "@/lib/supabase/server";
 
 export const maxDuration = 300;
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   if (!reader) return jsonError(401, "unauthorized");
 
   const body = (await request.json().catch(() => ({}))) as { url?: unknown; note?: unknown };
-  const url = parseSubmittedUrl(String(body.url ?? ""));
+  const url = canonicalSubmittedUrl(String(body.url ?? ""));
   if (!url) return jsonError(400, "invalid_url");
   const note = String(body.note ?? "").trim().slice(0, 500) || null;
 

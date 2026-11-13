@@ -8,15 +8,16 @@ import type {
   DigestItem,
   GithubTopEntry,
   Language,
+  LibraryCopy,
   Localized,
 } from "@/data/digest-types";
 import { readBrief } from "@/lib/brief";
-import { itemSources } from "@/lib/my-sources";
+import { itemSources, libraryCopy } from "@/lib/my-sources";
 import { readOverrides } from "@/lib/overrides";
 import { toPost } from "@/lib/post-row";
 import { shownTitle, type Post } from "@/lib/post-view";
 import { budapestDay, budapestHour, DAILY_DUE_HOUR, DAILY_SIZE } from "@/lib/pipeline/daily-top";
-import { archiveLabel, githubRepo, inChunks, isClosedWeek, isoWeek, isoWeekMonday, MAX_ATTEMPTS, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
+import { archiveLabel, githubRepo, inChunks, isClosedWeek, isoWeek, isoWeekMonday, publishedLabel, weekItemPattern } from "@/lib/pipeline/util";
 import { RATING_FILTERS, ratingKey, ratingTargetId, type RatingFilter, type RatingKind, type RatingTarget, type RatingValue, type Ratings } from "@/lib/ratings";
 import { POST_STATE_PREFIX, readPostIds, type ReaderData, type ReaderSeed } from "@/lib/reader-store";
 import { createAdminClient, type Reader } from "@/lib/supabase/server";
@@ -99,7 +100,7 @@ export async function getRadar(db: SupabaseClient, issueId?: string): Promise<Ra
 }
 
 /** `late`: the list isn't today's and 18:00 has passed in Budapest (a failed or late run). */
-export type DailyData = { issue: CurrentIssue; today: boolean; late: boolean; items: DigestItem[]; briefs: Record<string, DailyBrief>; posts: Record<string, number> };
+export type DailyData = { issue: CurrentIssue; today: boolean; late: boolean; items: DigestItem[]; briefs: Record<string, DailyBrief>; posts: Record<string, LibraryCopy> };
 
 /**
  * The latest day's Top 10 (daily news spec N7) with each card's long text (N8) and its Library post. A failed
@@ -126,16 +127,17 @@ export async function getDaily(db: SupabaseClient, now = new Date()): Promise<Da
   };
   const sources = await itemSources(db, items, "url, status, attempts, posts(id, brief, summary, key_points, overrides)");
   const briefs: Record<string, DailyBrief> = {};
-  const posts: Record<string, number> = {};
+  const posts: Record<string, LibraryCopy> = {};
   for (const [id, source] of sources ?? []) {
     const post = source.posts as { id: number; brief: unknown; summary: Localized; key_points: Record<Language, string[]>; overrides: unknown } | null;
+    const copy = libraryCopy(source);
+    posts[id] = copy;
     if (post) {
-      posts[id] = post.id;
       const brief = readBrief(post.brief);
       briefs[id] = brief
         ? { kind: "brief", paragraphs: brief }
         : { kind: "post", summary: readOverrides(post.overrides).summary ?? post.summary, keyPoints: post.key_points };
-    } else if (source.status === "pending" && (source.attempts as number) < MAX_ATTEMPTS) {
+    } else if (copy === "pending") {
       briefs[id] = { kind: "pending" };
     }
   }

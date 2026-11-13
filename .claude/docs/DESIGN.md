@@ -220,7 +220,7 @@ The roles of the brand tokens:
 | --- | --- | --- |
 | ink | `#141414` | text, every 2px border, most offset shadows; the dark surfaces: the navigation, the Library and Archive pages, code blocks, the undo toast, the Radar hero |
 | paper | `#fbefca` | the body background; the card surface (story, must-read, repo, image frame, form cards); light text on ink |
-| cream | `#f8e8b4` | the working surface: the Radar column with its header and chip bar, `PageHero`, `StatusCard`, the post article, sheets and dialogs |
+| cream | `#f8e8b4` | the working surface: the Radar column with its band, `PageHero`, `StatusCard`, the post article, sheets and dialogs |
 | signal | `#f15f22` | the one accent: the `//` after titles, eyebrows, source labels and inline links, the active nav entry, the focus outline, the hover state (an 8px signal shadow, or a card that turns signal), the rank numerals, the progress bar, the live dot, the failed toast, the pressed chip |
 | cyan | `#59e1e8` | rare: only the Library's PROCESSING status and the `/// DAILY 18:00 → SUN FREEZE` caption on the Radar hero grid |
 
@@ -289,7 +289,7 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
   - Below `md` the app shell shows a fixed, five-slot bottom bar that honours `env(safe-area-inset-bottom)`, with the taiyaki raised 16px out of its centre slot; the content column's bottom padding clears both (Components → Page shell).
   - The iPhone's safe areas: `viewportFit: "cover"` (`app/layout.tsx`) turns the `env(safe-area-inset-*)` values on; without it they read 0. The bar, the bottom sheets and the toast clear the home indicator. In landscape the body pads to the side insets, its background clipped to its content, so the strip beside the notch shows the html's ink; the bar pads too. From `md` up the fixed elements (the corner taiyaki, the right-side sheets) don't add the side insets yet.
   - From `md` up, the desktop nav takes its place: a 256px sidebar (`w-64`) or a 56px icon rail (`w-14`).
-  - The Radar's categories are a sticky chip bar at every width.
+  - The Radar's views are chips in one sticky band with the week and the panel pill (2026-11-01 review): Heti, Napi and AI cégek are pages of the current week, Local LLM, Kutatás, GitHub and Mentett filter it in place (on /daily and /companies they link to the Radar with `?filter=`); a closed week filters with all of them. One row once the Radar's column is 72rem wide; narrower, the views take a row of their own, wrapping from `md` (a mouse can't scroll a hidden scrollbar) and scrolling sideways on a phone.
 - **The progress and to-do panel** is a bottom Sheet below `md`, a right Sheet from `md`, and a 330px column once the Radar's own column is 95rem wide (`@[95rem]`, R3 §2: the nav and the viewport decide together). It is non-modal, so the undo toast stays usable while it is open.
 - **Touch targets are at least 40px** (`min-h-10`, or `size-10 sm:size-8` for icon buttons, which may shrink to 32px from `sm` up).
 - **Use `dvh`, not `vh`.**
@@ -308,17 +308,17 @@ Display headings tighten both leading and tracking as they grow (`leading-[0.78]
 
 ```text
 +-----------+----------------------------------------------------+
-| (o) NEON  | * LIVE ISSUE  2026 / W39             [ 42% · 2 ]   |  header, sticky, cream
+| (o) NEON  | * LIVE 2026/W39 [Heti][Napi][Local]... [42% · 2]   |  one band, sticky, cream
 |     NEWS  +----------------------------------------------------+
-|     RADAR | [Current radar] [Local LLM Lab] [Research] ...     |  chip bar, sticky
+|     RADAR |                                                    |
 +-----------+  +----------------------------------------------+  |
 | # Radar   |  | AI WEEKLY//                    Weekly close  |  |  hero, ink
-|   Library |  +----------------------------------------------+  |
-|   Search  |  TOP 3 · MUST READ                                 |
-|   Archive |  +-01-----------+ +-02-----------+ +-03-----------+|  @3xl: three across
-|   GitHub  |  +--------------+ +--------------+ +--------------+|
+|   Search  |  +----------------------------------------------+  |
+|   Library |  TOP 3 · MUST READ                                 |
+|           |  +-01-----------+ +-02-----------+ +-03-----------+|  @3xl: three across
+|           |  +--------------+ +--------------+ +--------------+|
 +-----------+  THE WEEK'S LIVE SIGNAL                            |
-|   Archive |  +meta+-----------------------------------------+  |  story cards
+|           |  +meta+-----------------------------------------+  |  story cards
 | (D) user@ |  +----+-----------------------------------------+  |  account menu
 | <<        |                                                    |  collapse
 +-----------+----------------------------------------------------+
@@ -331,8 +331,8 @@ In the rail, the ink column shrinks to `w-14`: only the icons stay, each with it
 
 ```text
 +------------------------------+
-| * LIVE ISSUE 2026 / W39 [42%]|  header, sticky
-| [Current radar] [Local L... >|  chip bar, scrolls sideways
+| * LIVE ISSUE 2026 / W39 [42%]|  one band, sticky: the week and the pill,
+| [Heti] [Napi] [Local L...   >|  then the views, scrolling sideways
 |                              |
 |  AI WEEKLY//                 |  hero, ink
 |  TOP 3 · MUST READ           |
@@ -342,7 +342,7 @@ In the rail, the ink column shrinks to `w-14`: only the icons stay, each with it
 |                              |
 |   [ Marked read    UNDO ]    |  toast lane, above the bar
 +------------------------------+
-| Radar Napi [TY] Libr.  More  |  bottom bar, 5 x 64px, ink; [TY] the taiyaki, raised 16px
+| Radar Kere. [TY] Libr. Fiók  |  bottom bar, 5 x 64px, ink; [TY] the taiyaki, raised 16px
 +------------------------------+
 ```
 
@@ -369,8 +369,7 @@ Shadows are hard offsets with zero blur:
 - **One overlay at a time** (R3 §4): the Radar's reader panel and the link chat never show together; opening one closes the other (`createShellLayers`, `app-shell.tsx`, which both read through `PanelContext` and the chat's open state). The panel's column keeps `pb-24` at its foot, so the corner taiyaki covers no to-do.
 - **The `motion` library** (`motion/react`, pinned; `MotionConfig reducedMotion="user"` in the shell) runs the three motions CSS can't (2a spec D7): the rating press (the pressed button's icon alone mounts at 0.88 and springs back to 1 in 180ms, `rating-control.tsx`; a spring takes two keyframes only), the toast's enter and exit (`AnimatePresence` in `popLayout` mode, 160ms, `undo-toast.tsx`), and the taiyaki's turn when its panel opens (`link-chat.tsx`). Sheets and dialogs keep their Radix 160ms CSS animations. Nothing else animates on its own. Under reduced motion all three stand still: `reducedMotion="user"` stops the press and the turn, and the toast sets its own fade to 0ms (`useReducedMotionConfig`), since that setting leaves opacity alone.
 - **Layering.** From bottom to top:
-  - the chip bar, `z-10`, sticky under the header;
-  - the Radar header, `z-20`;
+  - the Radar band, `z-20`;
   - the desktop aside, `z-30`, so the rail's tooltips paint over both of those;
   - the mobile bottom bar and the desktop taiyaki button, `z-40` (an open non-modal sheet, such as the Radar's reader panel below `@[95rem]`, covers the button until it closes);
   - sheets (the link chat's panel among them), dialogs and their `bg-black/50` overlays, `z-50`;
@@ -392,7 +391,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
 
 ### Page shell
 
-`app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar and the taiyaki, and the refresh bar's provider, the "Olvasd itt" context around the page, the two taiyaki buttons, the link chat, the dialogs and the toast are mounted once:
+`app/components/app-shell.tsx` wraps every signed-in page. The desktop nav lays out the page beside itself, the page gets room for the fixed bottom bar and the taiyaki, and the refresh bar's provider, the two taiyaki buttons, the link chat, the dialogs and the toast are mounted once:
 
 ```tsx app/components/app-shell.tsx
     <LanguageProvider initial={language}>
@@ -401,7 +400,6 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
       {/* The preview's ratings stay in memory, like its other writes. */}
       <RatingsProvider send={chatPreview ? memorySend(chatPreview.failWrites) : postState}>
         <RefreshProvider>
-          <ReadHereContext value={readHere}>
             <PanelContext value={panel}>
             <DesktopNav email={email} onSearch={openSearch} onHelp={openHelp} mode={navMode} onToggle={toggleNav}>
               {/* Room for the fixed bottom bar and the taiyaki raised 16px above it, and from md for the corner taiyaki,
@@ -410,7 +408,6 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
               <div className="pb-[calc(5.25rem_+_env(safe-area-inset-bottom))] md:pb-0 md:[&>:last-child]:pb-24">{children}</div>
             </DesktopNav>
             </PanelContext>
-          </ReadHereContext>
           <MobileNav
             email={email}
             onSearch={openSearch}
@@ -435,10 +432,8 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
             onOpenChange={setChatOpen}
             opener={chatOpener}
             preview={chatPreview}
-            queuedLink={queuedLink}
-            onQueuedLinkTaken={() => setQueuedLink(null)}
           />
-          <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+          <SearchPalette open={searchOpen} onOpenChange={setSearchOpen} findHits={chatPreview ? findHitsInPreview : findHitsOnServer} />
           <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
           <UndoToast />
         </RefreshProvider>
@@ -475,9 +470,9 @@ The tooltip (`NavTooltip`):
 className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap border-2 border-ink bg-paper px-2 py-1 font-mono text-xs text-ink opacity-0 shadow-[3px_3px_0_var(--ink)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
 ```
 
-### Bottom bar and the "Több" sheet
+### Bottom bar and the "Fiók" sheet
 
-Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The slots are Radar, Napi, the taiyaki, Library and Több; Keresés sits in the "Több" sheet (it is a placeholder until search lands). The active slot, the open "Több", or "Több" on an AI cégek, GitHub repók, Archívum or Gyűjtemény page (`data-active`) turns signal:
+Below `md`, `app-shell.tsx` shows an ink bar with a 2px signal top rule and five 64px slots, the taiyaki raised in the middle one. The slots are the three sections (Radar, Keresés, the taiyaki, Library) and Fiók; the Radar's views and the Library's tabs live on their pages, not in the bar (2026-11-01 review). The active section's slot, or the open "Fiók", turns signal:
 
 ```tsx app/components/app-shell.tsx
 className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-signal bg-ink pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-paper md:hidden"
@@ -485,27 +480,20 @@ className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t-2 border-sign
 
 ```tsx app/components/app-shell.tsx
 const slotClass =
-  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[active]:text-signal data-[state=open]:text-signal";
+  "press-ink focus-ring flex min-h-16 flex-col items-center justify-center gap-1 font-mono text-[11px] aria-[current=page]:text-signal data-[state=open]:text-signal";
 ```
 
-"Több" is a cream bottom Sheet holding a display title with its `//`, AI cégek, Archívum and Gyűjtemény (the primary items marked `mobileMore` in `lib/nav.ts`), and the account rows (the language, the shortcuts help, sign out: `AccountRows`, `account-menu.tsx`). It opens with the focus on the first of them. The active entry is ink with a 2px signal bar and a `bg-signal/10` wash, like the sidebar's active entry but with ink text, because small signal text on cream is under 3:1 (Colors):
+"Fiók" is a cream bottom Sheet holding a display title with its `//` and the account rows (the language, the shortcuts help, sign out: `AccountRows`, `account-menu.tsx`):
 
 ```tsx app/components/app-shell.tsx
-        <SheetContent
-          side="bottom"
-          closeLabel={t.close}
-          // Radix skips links when it picks the first control, which would land on the language toggle.
-          onOpenAutoFocus={(event) => {
-            const first = moreList.current?.querySelector("a");
-            if (!first) return;
-            event.preventDefault();
-            first.focus();
-          }}
           className="max-h-[85dvh] gap-5 overflow-y-auto border-t-2 border-ink bg-cream p-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] text-ink"
-        >
 ```
 
 The Sheet's close button, and the one in dialogs, is a 40px square with a 2px ink border, paper turning signal on hover (`components/ui/sheet.tsx`, `dialog.tsx`). Shell dialogs are cream, with a signal shadow: `className="border-2 border-ink bg-cream text-ink shadow-[8px_8px_0_var(--signal)]"` (`shell-dialogs.tsx`).
+
+### Search
+
+The palette (`SearchPalette`, `shell-dialogs.tsx`) is a shell dialog: cream, a 2px ink frame and a signal shadow, with a paper field (`min-h-10`, 2px ink border), then the matches as rows divided by `divide-ink/15`: a mono kind and week line (`STORY`, `POST`, `REPO`) over a display title, each row a link that closes the dialog, and an underlined "All results →" link under them. The list is a polite live region. `/search` (`search-view.tsx`) is an ink page: the `PageHero`, a field and a Search button, then one 2px `border-paper/30` card per match with its signal kind line, a display title linking to the match, its snippet (`75ch`) and, for a story and a repo, an Original link in a new tab. A short query and an empty answer are `EmptyState` (`ink`).
 
 ### Link chat
 
@@ -580,10 +568,10 @@ In use (`app/(app)/library/library-view.tsx`):
         "icon-lg": "size-10",
 ```
 
-The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Olvasd itt button does (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
+The stock heights are under 40px, so every call site adds `min-h-10` or `size-10`, as the story card's Original and Olvasd itt buttons do (`story-card.tsx`), and a toggle shows its pressed state in ink (`pressedClass` in `rating-classes.ts`, which the rating group shares). From `sm` up, the story card's toggles, the panel's delete and its progress pill shrink below 40px only with a fine pointer (`sm:pointer-fine:`); a touch tablet keeps 40px:
 
 ```tsx app/components/story-card.tsx
-        <Button asChild variant="brutal" className="min-h-10">
+      <Button asChild variant="brutal" className="min-h-10">
 ```
 
 ```tsx app/components/rating-classes.ts
@@ -603,17 +591,17 @@ The keyboard focus style, defined as an `@utility` in `app/globals.css`:
 }
 ```
 
-Every custom interactive element carries it. On a signal-coloured control, override the colour with `--focus`, as the category chips do (`digest-dashboard.tsx`):
+Every custom interactive element carries it. On a signal-coloured control, override the colour with `--focus`, as the Radar's view chips do (`digest-dashboard.tsx`):
 
 ```tsx app/components/digest-dashboard.tsx
-className="press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal"
+  "press focus-ring [--focus:var(--ink)] flex min-h-10 shrink-0 items-center gap-1.5 border-2 border-ink bg-paper px-3 font-mono text-xs hover:shadow-[3px_3px_0_var(--signal)] aria-pressed:bg-signal aria-[current=page]:bg-signal";
 ```
 
 `Button` and `Input` keep shadcn's own 3px `ring/50` focus ring.
 
 ### Pressed state
 
-Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links, the sheets' close buttons and the "Több" entries carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show); a signal child of one (the logo's RADAR, a card's icon, an archive card's number) turns ink with it (`group-active:`), or it would vanish. The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
+Every control shows a press, and it needs no hover, so a tap shows it too, even under reduced motion, where only the colour changes: a control that is ink already (the `ink` Button variant, a switched-on toggle, a ticked box) presses to signal. The `signal` and `brutal` Button variants, the category chips, the chat's action links and the sheets' close buttons carry `press` (ink, for light surfaces); the sidebar, the bottom bar, the Library and archive cards and the filter chips carry `press-ink` (signal, because ink on ink wouldn't show); a signal child of one (the logo's RADAR, a card's icon, an archive card's number) turns ink with it (`group-active:`), or it would vanish. The language toggle and the full sign-out, which sit on both, carry `press-shift`, which only moves, with their own hover colours. The rules sit unlayered in `app/globals.css`, so they win over the utilities' hover and `aria-pressed` fills:
 
 ```css app/globals.css
 .press:active { background-color: var(--ink); color: var(--paper); transition-duration: 0ms; }
@@ -639,9 +627,9 @@ export function Tag({ tag }: { tag: string }) {
 `/daily` is `DigestDashboard` with `scope="daily"` (daily news spec N7): the weekly UI, reshaped for one day's Top 10.
 
 - **Header and hero:** the header reads NAPI LISTA / DAILY LIST over the day (`2026. 09. 24.`); the hero is "NAPI//" with its lead, then one mono line with the count ("5 hír · ebből 2 rövid") and, in signal, "Korábbi lista (…) — a mai 18:00-ra készül." when the list isn't today's. No category chips, no Top 3 grid, no archive box.
-- **The index:** a paper box with a 2px ink frame, one mono line per card (the rank in signal, the title, the score), each an anchor to its card (`#daily-N`). The cards carry `scroll-mt-20`, so a jump lands clear of the 64px sticky header.
+- **The index:** a paper box with a 2px ink frame, one mono line per card (the rank in signal, the title, the score), each an anchor to its card (`#daily-N`). The cards carry `scroll-mt-44` (`@[72rem]:scroll-mt-20`), so a jump lands clear of the sticky band: up to three rows below a 72rem column, 64px from it.
 - **The cards:** `StoryCard` with a `rank`: the rank in display type, signal, at the top of the meta gutter; a signal SHORT / RÖVID mark under the minutes for a read of at most 15 minutes; and the long text (`DailyBrief`) in place of the summary: the brief's paragraphs, or the post's summary and its FŐ PONTOK list, or the item's summary with "A részletes összefoglaló készül…" under it. Lines stop at `75ch`.
-- **The weekly mark:** on the Radar, a card ranked in a daily Top 10 shows a 1px ink-framed "NAP TOP · N." / "DAY TOP · N." above its source link; the daily page itself shows none.
+- **The weekly mark:** on the Radar, a card ranked in a daily Top 10 shows a 1px ink-framed "NAP TOP · N." / "DAY TOP · N." beside its source's name; the daily page itself shows none.
 - **Empty:** `EmptyState` with "Még nincs napi lista. Az első este 18:00-ra készül el."
 
 ### must-card and story-card
@@ -668,11 +656,11 @@ className={`focus-ring must-card border-2 border-ink bg-paper p-5 ${dislikedClas
 ```
 
 ```tsx app/components/story-card.tsx
-<span className="font-display text-5xl text-signal">{String(rank).padStart(2, "0")}</span>
+<span className="font-display text-4xl text-signal sm:text-5xl">{String(rank).padStart(2, "0")}</span>
 ```
 
 ```tsx app/components/story-card.tsx
-className={`focus-ring story-card max-w-[900px] scroll-mt-20 border-2 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
+className={`focus-ring story-card max-w-[900px] scroll-mt-44 border-2 @[72rem]:scroll-mt-20 border-ink bg-paper p-5 sm:p-6 ${dislikedClass} ${state.read ? "story-read" : ""}`}
 ```
 
 - **must-card** shows a rank numeral (`01` to `03`, or to `05` in the AI companies page's daily Top 5), a `score/100` chip and a `text-2xl` title. The Top 3 sit side by side from `@3xl` (`grid gap-4 @3xl:grid-cols-3`) and are aligned: the old stagger (`nth-child` offsets) was removed on 2026-09-26.
@@ -684,7 +672,7 @@ className={`focus-ring story-card max-w-[900px] scroll-mt-20 border-2 border-ink
   | 👎 | a dashed frame, nothing dimmer (`dislikedClass`, `rating-classes.ts`) | the card's `has-[[data-rating=down]]` |
   | Saved for later | a 4px signal bar on the left edge (`data-saved`, `.story-card[data-saved]::before`) | `globals.css` |
 
-- **story-card** has a 96px meta gutter from `lg`, the source as a link in its meta row (also the `o` shortcut's target, `data-card-open`), and one row of actions at the bottom (2a spec D1): Olvasd itt (`brutal`, the Library's `BookOpen` icon, with the pending dot when it is a link) as the one primary action, then the tool unit (`CardToolbar`, `card-toolbar.tsx`: 👎 👍 ❤, Later, to-do, one flex unit that wraps as a whole), and Read last on the right.
+- **story-card** has a 96px meta gutter from `lg`, the source's name in its meta row, and one row of actions at the bottom (2a spec D1, 2026-11-01 review): Eredeti / Original (`brutal`, `ExternalLink`, a new tab; the `o` shortcut's target, `data-card-open`) and Olvasd itt (`brutal`, `BookOpen`: the post's link with the pending dot; "Készül…" in a dashed box while a run makes the copy; else Mentsd ide, which submits the URL and shows what came of it), then the tool unit (`CardToolbar`, `card-toolbar.tsx`: 👎 👍 ❤, Later, to-do, one flex unit that wraps as a whole), and Read last on the right.
 - **Both** dim to 58% once read, and take focus for j/k (`tabIndex={-1}` plus `focus-ring`).
 
 ### `RatingControl` and the filter chips
@@ -697,7 +685,7 @@ export const dislikedClass = "has-[[data-rating=down]]:border-dashed";
 
 A Library card is one link, which can't hold a button, so it shows `RatingBadge` instead: the value's icon (the heart filled) with its name sr-only, and nothing when unrated.
 
-The filter chips (`FilterChips`, `app/components/filter-chips.tsx`) are the filter rows of the GitHub page and the collection: 40px links on ink with a `border-paper/30` frame and `press-ink`, the current one `aria-current="page"` with a signal border and text, each with its pending dot.
+The filter chips (`FilterChips`, `app/components/filter-chips.tsx`) are the filter rows of the GitHub page and the collection, and the Library's tabs (`LibraryTabs`, `library-tabs.tsx`: Posztok · Archívum · Gyűjtemény, under the hero of each of the three pages, since the archive and the collection left the menu): 40px links on ink with a `border-paper/30` frame and `press-ink`, the current one `aria-current="page"` with a signal border and text, each with its pending dot.
 
 ### Repo card
 
@@ -781,10 +769,10 @@ How they behave is in CLAUDE.md → App shell and navigation; their timing is in
     <div aria-hidden="true" className="refresh-bar pointer-events-none fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden">
 ```
 
-- **The skeletons** (`app/components/page-skeletons.tsx`) have one root each, the page's own surface, so the shell's `md:[&>:last-child]:pb-24` lands on it (Page shell). The bands (the Radar's header, chip bar and ink hero, `HeroBand`, the post's cream article) paint at once; the placeholders, the house `Skeleton` with `rounded-none`, `bg-paper/10` on ink and the default `bg-primary/10` on cream and paper, sit in `.skeleton-fill` groups. A `role="status"` line says "Betöltés…" / "Loading…" to assistive tech only. The Radar's root:
+- **The skeletons** (`app/components/page-skeletons.tsx`) have one root each, the page's own surface, so the shell's `md:[&>:last-child]:pb-24` lands on it (Page shell). The bands (the Radar's band and ink hero, `HeroBand`, the post's cream article) paint at once; the placeholders, the house `Skeleton` with `rounded-none`, `bg-paper/10` on ink and the default `bg-primary/10` on cream and paper, sit in `.skeleton-fill` groups. A `role="status"` line says "Betöltés…" / "Loading…" to assistive tech only. The Radar's root:
 
 ```tsx app/components/page-skeletons.tsx
-    <div className="min-h-dvh min-w-0 bg-cream text-ink" aria-busy="true">
+    <div className="min-h-dvh min-w-0 bg-cream text-ink @container" aria-busy="true">
 ```
 
 ### Progress bar and the reader panel

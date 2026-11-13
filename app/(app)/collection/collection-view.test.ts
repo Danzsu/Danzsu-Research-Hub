@@ -29,3 +29,9 @@ test("the collection lists the hearts by kind, each with its rating group presse
   assert.equal(view({ favorites: [] }).querySelectorAll("li").length, 0);
   assert.match(view({ favorites: [] }).body.textContent ?? "", /Még nincs kedvenced/);
 });
+
+// 2026-11-01 review. Kills the collection without the Library's tabs (it left the menu).
+test("the collection carries the Library's tabs, itself marked", () => {
+  const doc = view({ favorites: previewFavorites });
+  assert.equal(doc.querySelector('nav[aria-label="Könyvtár részei"] a[aria-current="page"]')?.getAttribute("href"), "/collection");
+});

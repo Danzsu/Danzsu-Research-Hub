@@ -508,7 +508,7 @@ test("getDaily gives each card the best long text there is", async () => {
       { url: urls[0], status: "done", posts: { id: 1, brief: { hu: ["B"], en: ["B"] }, summary: text("S"), key_points: { hu: [], en: [] }, overrides: {} } },
       { url: urls[1], status: "done", posts: { id: 2, brief: null, summary: text("S"), key_points: { hu: ["k"], en: ["k"] }, overrides: { summary: text("Mine") } } },
       { url: urls[2], status: "pending", attempts: 1, posts: null },
-      { url: urls[3], status: "failed", attempts: 1, posts: null },
+      { url: urls[3], status: "failed", attempts: 3, posts: null },
       // Polish 1, Review Focus 4: killed three times, it waits for no run any more.
       { url: urls[4], status: "pending", attempts: 3, posts: null },
     ],
@@ -519,7 +519,8 @@ test("getDaily gives each card the best long text there is", async () => {
     summary: { kind: "post", summary: text("Mine"), keyPoints: { hu: ["k"], en: ["k"] } },
     pending: { kind: "pending" },
   });
-  assert.deepEqual(daily.posts, { brief: 1, summary: 2 });
+  // 2026-11-01 review: the card's Read here says Preparing… for the pending one; the failed and the stuck get Save here.
+  assert.deepEqual(daily.posts, { brief: 1, summary: 2, pending: "pending", failed: "unavailable", stuck: "unavailable" });
 });
 
 // Spec N8. Kills a crash or a made-up day before the first list: no day, the current week, nothing to show.

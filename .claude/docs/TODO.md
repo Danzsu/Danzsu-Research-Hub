@@ -238,6 +238,16 @@
     - [x] a `/login` fejléce önmagára linkel (a nyilvános keret „Belépés” gombja) — elavult: a `/login` a landing-signin óta gomb nélkül (`signIn="none"`) használja a keretet;
     - [x] a súgó `Kbd`-je `text-xs`-t és `text-[11px]`-et is visel;
     - a `motion` csomagméret (`motion.*` vs `m` + `LazyMotion`) mérés nélkül: nyitott ötlet, előbb mérni kell.
+  - **Hibaaudit (2026-11-13), halasztva:**
+    - egy képnek csak a legnagyobb `srcset`-jelöltje próbálkozik: ha az 5 MB fölött van, a kisebbek nélkül „Image unavailable” lesz (`html-images.ts`, `images.ts`);
+    - a `urlKey` a régi, már tárolt sorokat csak a kulcson keresztül találja meg; a `sources.url` egyedisége a tárolt alakon marad, így egy régi, `utm_`-os sor és az új, tiszta alak két sor lehet;
+    - a dátum nélküli feed-bejegyzések minden futásban újra felkínálódnak, amíg el nem tárolódnak (a teszt szándékosan megtartja őket).
+  - **Navigáció (nav-reshape) záró reviewja (2026-11-13):**
+    - a Radar szekció-link `aria-current="page"`-et kap a `/daily`-n és a `/github`-on is, ahol nem az az oldal; `aria-current="true"` pontosabb lenne;
+    - a sávban a pill DOM-sorrendben a chipek után van, de mobilon felettük látszik (`order-last`): a Tab-sorrend eltér a látványtól;
+    - a `?filter=` az URL-ben marad, amikor az olvasó helyben vált chipet, így egy újratöltés a megérkezéskori szűrőt hozza vissza;
+    - a Library-kártya „Mentsd ide” után „Készül…” marad, amíg az oldal újra nem töltődik (nincs frissítés);
+    - a terv 5. pontja (kétsoros kártyalábléc 360 px-en) nincs meg, csak a sima `flex-wrap`.
   - **Sebesség és hibák (fix-speed) záró reviewja (2026-11-02):**
     - a lezárt elakadt forrás hibaszövege („No run finished it in 3 attempts.”) nyers angol mondat a chatben és a Library-ben, és teszt nem nézi;
     - a záró teszt nem bukik, ha a lezáró update-ből kimarad a `.eq("status", "pending")` őr; olcsó extra őr lehet a `.gte("attempts", MAX_ATTEMPTS)` is;

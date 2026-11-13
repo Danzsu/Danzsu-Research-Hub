@@ -40,10 +40,15 @@ test("the list skeletons' grid sits inside a container, not on it", () => {
   }
 });
 
-// Kills /companies painting the Radar's chip band: it has no category bar, so its hero would jump up.
-test("the companies skeleton is the Radar's without the chip band", () => {
-  const root = (Loading: ComponentType) =>
-    render(createElement(LanguageProvider, { initial: "en" } as ComponentProps<typeof LanguageProvider>, createElement(Loading))).body.firstElementChild;
-  const [radar, companies] = ["/", "/companies"].map((route) => root(loadings.find(([path]) => path === route)![1]));
-  assert.equal((radar?.children.length ?? 0) - (companies?.children.length ?? 0), 1);
+// 2026-11-01 review. Kills a Radar view's skeleton with a second band, or one that differs from the others: every
+// Radar view now has the one band of the week and its views, so the hero never jumps when the page lands.
+test("every Radar view's skeleton has the same one band", () => {
+  const shape = (route: string) => {
+    const Loading = loadings.find(([path]) => path === route)![1];
+    const root = render(createElement(LanguageProvider, { initial: "en" } as ComponentProps<typeof LanguageProvider>, createElement(Loading))).body.firstElementChild;
+    return [...(root?.children ?? [])].map((child) => child.className).join(" | ");
+  };
+  const radar = shape("/");
+  for (const route of ["/daily", "/companies", "/archive/[week]"]) assert.equal(shape(route), radar, route);
+  assert.equal(radar.split(" | ").filter((band) => band.includes("border-b-2")).length, 1);
 });
