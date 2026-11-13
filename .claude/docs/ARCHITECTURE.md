@@ -53,6 +53,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `translate.ts` and the model client, `llm.ts`;
   - `content.ts`, which turns DB rows into content types, and holds the two content caches;
   - reader state: `reader-store.ts`, `state.ts`, `feed.ts`, and the ratings store, `ratings.ts`;
+  - search: `search.ts` (the query tidy-up and `searchAll`, which calls the database's `search_all`);
   - the link chat: `link-chat.ts` (the message parser, the thread and its store, the HTTP and in-memory transports), `my-sources.ts` (the reader's own submissions and their retry), `source-kinds.ts` (the kind names, `SOURCE_KIND_LABELS`);
   - the shell's data: `nav.ts`, `nav-mode.ts`, `keymap.ts`, `undo-queue.ts`;
   - `media.ts` (the bucket and its key format), `public-paths.ts`, `api.ts` (`jsonError`, `postRoute`), `language.ts`;

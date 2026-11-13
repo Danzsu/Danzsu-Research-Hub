@@ -42,6 +42,8 @@ export type FakeIngestTables = {
   /** Forces every `db.rpc(...)` call to resolve with this error instead of succeeding — e.g.
    *  `pgError("42501", …)` for the `update_post_overrides` "not the submitter" case. */
   rpcError?: PostgrestErrorShape;
+  /** What every `db.rpc(...)` call answers as `data` (search_all's rows); null when unset. */
+  rpcData?: unknown;
   /** Rows any other table's select chain answers from, by table name: `issues`, `item_states`, `todos`,
    *  `archive_issues`, runDaily's recent-items lookup on `digest_items`, the Library list on `posts`
    *  (`getPosts`; see `tableQuery`). */
@@ -561,7 +563,7 @@ export function fakeDb(
 
   const rpc = async (name: string, args: Record<string, unknown> = {}) => {
     rpcCalls.push({ name, args });
-    return tables.rpcError ? { data: null, error: tables.rpcError } : { data: null, error: null };
+    return tables.rpcError ? { data: null, error: tables.rpcError } : { data: tables.rpcData ?? null, error: null };
   };
 
   return {

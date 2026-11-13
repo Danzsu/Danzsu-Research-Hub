@@ -16,7 +16,7 @@ import { AccountRows } from "./account-menu";
 import { NavEntry } from "./nav-parts";
 import { RatingsProvider } from "./rating-control";
 import { RefreshProvider } from "./refresh-bar";
-import { SearchSoon, ShortcutHelp } from "./shell-dialogs";
+import { findHitsInPreview, findHitsOnServer, SearchPalette, ShortcutHelp } from "./shell-dialogs";
 import { toasts, UndoToast } from "./undo-toast";
 import { useShortcuts } from "./use-shortcuts";
 
@@ -157,7 +157,7 @@ export function AppShell({
             opener={chatOpener}
             preview={chatPreview}
           />
-          <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+          <SearchPalette open={searchOpen} onOpenChange={setSearchOpen} findHits={chatPreview ? findHitsInPreview : findHitsOnServer} />
           <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
           <UndoToast />
         </RefreshProvider>

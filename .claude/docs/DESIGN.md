@@ -433,7 +433,7 @@ Use these instead of repeating class lists. Every excerpt below is copied verbat
             opener={chatOpener}
             preview={chatPreview}
           />
-          <SearchSoon open={searchOpen} onOpenChange={setSearchOpen} />
+          <SearchPalette open={searchOpen} onOpenChange={setSearchOpen} findHits={chatPreview ? findHitsInPreview : findHitsOnServer} />
           <ShortcutHelp open={helpOpen} onOpenChange={setHelpOpen} />
           <UndoToast />
         </RefreshProvider>
@@ -490,6 +490,10 @@ const slotClass =
 ```
 
 The Sheet's close button, and the one in dialogs, is a 40px square with a 2px ink border, paper turning signal on hover (`components/ui/sheet.tsx`, `dialog.tsx`). Shell dialogs are cream, with a signal shadow: `className="border-2 border-ink bg-cream text-ink shadow-[8px_8px_0_var(--signal)]"` (`shell-dialogs.tsx`).
+
+### Search
+
+The palette (`SearchPalette`, `shell-dialogs.tsx`) is a shell dialog: cream, a 2px ink frame and a signal shadow, with a paper field (`min-h-10`, 2px ink border), then the matches as rows divided by `divide-ink/15`: a mono kind and week line (`STORY`, `POST`, `REPO`) over a display title, each row a link that closes the dialog, and an underlined "All results →" link under them. The list is a polite live region. `/search` (`search-view.tsx`) is an ink page: the `PageHero`, a field and a Search button, then one 2px `border-paper/30` card per match with its signal kind line, a display title linking to the match, its snippet (`75ch`) and, for a story and a repo, an Original link in a new tab. A short query and an empty answer are `EmptyState` (`ink`).
 
 ### Link chat
 
