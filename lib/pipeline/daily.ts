@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod/v4";
-import { localizedSchema } from "../blocks.ts";
-import { digestTags, type DigestCategory } from "../../data/digest-types.ts";
+import { digestTags, inBoth, type DigestCategory } from "../../data/digest-types.ts";
 import { generate } from "../llm.ts";
 import { collectCandidates, collectRepos, type Candidate, type Repo } from "./collect.ts";
 import { decide } from "./decisions.ts";
@@ -25,9 +24,9 @@ const curatedSchema = z.object({
     z.object({
       index: z.int(),
       tags: z.array(z.enum(digestTags)).max(4),
-      title: localizedSchema,
-      summary: localizedSchema,
-      why: localizedSchema,
+      title: z.string(),
+      summary: z.string(),
+      why: z.string(),
     }),
   ),
   github: z.array(z.object({ index: z.int(), focus: z.string(), score: z.int().min(0).max(100) })),
@@ -83,12 +82,11 @@ export async function scoreCandidates(candidates: Candidate[], now: Date, judge:
 /** The curation prompt: numbered NEWS and REPOS listings the model answers with indices into. */
 export function curatePrompt(picked: Candidate[], repos: Repo[], covered: string[] = []): string {
   return `${AUDIENCE}
-You curate NEON NEWS RADAR, a bilingual (Hungarian/English) AI digest.
+You curate NEON NEWS RADAR, an AI digest. Write each text once, in the language of the story's own listing (usually English); never translate.
 
 PART 1 — news. Every numbered NEWS item below is already chosen, categorised and scored: write each one up and return all of them in "items".
 - tags: 1–4 from the allowed vocabulary only.
 - title: short, concrete headline. summary: 2–3 sentences on what it is. why: one sentence on why it matters to the reader.
-- Hungarian must be natural, idiomatic Hungarian — not a literal translation. Keep technical terms (LLM, fine-tuning, GGUF) as Hungarian engineers say them.
 - Use only facts present in the listing. Do not invent numbers or claims.
 - One story, one item: when several NEWS entries report the same story, keep the one from the primary source (the lab, company or author) and skip the rest.${covered.length ? "\n- Skip a story the ALREADY COVERED list below already told, unless it brings a substantial new development." : ""}
 
@@ -112,7 +110,7 @@ export function toDigestRows(curated: z.infer<typeof curatedSchema>, picked: Sco
     .map((item) => {
       const source = picked[item.index];
       return {
-        id: itemId(source.category, week, item.title.en, source.url),
+        id: itemId(source.category, week, item.title, source.url),
         issue_id: week.id,
         category: source.category,
         score: source.score,
@@ -121,9 +119,9 @@ export function toDigestRows(curated: z.infer<typeof curatedSchema>, picked: Sco
         source: source.source,
         url: source.url,
         tags: item.tags,
-        title: item.title,
-        summary: item.summary,
-        why: item.why,
+        title: inBoth(item.title),
+        summary: inBoth(item.summary),
+        why: inBoth(item.why),
       };
     });
   const top = curated.github

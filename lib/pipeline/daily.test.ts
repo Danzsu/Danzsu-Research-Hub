@@ -4,11 +4,12 @@ import type { Repo } from "./collect.ts";
 import { curatePrompt, runDaily, toDigestRows, type Scored } from "./daily.ts";
 import { fakeDb, pgError } from "./fake-db.ts";
 import { feeds } from "../../config/sources.ts";
-import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockFetch, withGeminiKey } from "./mock-fetch.ts";
+import { geminiPrompt, geminiResponse, mockFetch, withGeminiKey } from "./mock-fetch.ts";
 import { isoWeek } from "./util.ts";
 
 const week = isoWeek(new Date("2026-09-23T05:00:00Z"));
-const text = (en: string) => ({ hu: `${en} (hu)`, en });
+/** What a model-written text becomes in a row: the one original in both slots. */
+const both = (text: string) => ({ hu: text, en: text });
 
 const scored = { score: 80, readMinutes: 6, points: 0, weight: 1 };
 const picked: Scored[] = [
@@ -41,9 +42,9 @@ type Curated = Parameters<typeof toDigestRows>[0];
 const curatedItem = (index: number, title: string): Curated["items"][number] => ({
   index,
   tags: [],
-  title: text(title),
-  summary: text("Summary."),
-  why: text("Why."),
+  title,
+  summary: "Summary.",
+  why: "Why.",
 });
 
 test("toDigestRows keeps item ids forever stable: category, week, English title and source URL, nothing else", () => {
@@ -70,9 +71,9 @@ test("toDigestRows takes the URL, date and source from the listing, and the rest
     source: "arXiv cs.CL",
     url: "https://arxiv.org/abs/2609.00001",
     tags: [],
-    title: text("Title"),
-    summary: text("Summary."),
-    why: text("Why."),
+    title: both("Title"),
+    summary: both("Summary."),
+    why: both("Why."),
   });
 });
 
@@ -196,6 +197,13 @@ test("runDaily drops what Decision 1 calls a promotion, and what is judged irrel
 });
 
 // G1 spec 2. Kills the score dropped from the prompt (the model would answer without one and fail the schema).
+// Kills a curate prompt that still asks for Hungarian: content is never translated (2026-11-01 decision).
+test("curatePrompt asks for each text once, in the story's own language, and never for Hungarian", () => {
+  const prompt = curatePrompt(picked, repos.slice(0, 1));
+  assert.match(prompt, /never translate/);
+  assert.doesNotMatch(prompt, /Hungarian|bilingual/i);
+});
+
 test("curatePrompt asks for a 0–100 score on every repo, on the news' scale", () => {
   assert.match(curatePrompt([], repos), /"github" with a focus line of at most 8 English words and a score from 0 to 100/);
 });
