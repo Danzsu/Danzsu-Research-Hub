@@ -8,7 +8,7 @@ import { errorMessage } from "./pipeline/util.ts";
 
 export type Task =
   | "daily_shortlist" | "daily_curate" | "ingest_article" | "ingest_video"
-  | "ingest_pdf" | "ingest_cleanup" | "translate_post";
+  | "ingest_pdf" | "ingest_cleanup";
 type Provider = "gemini" | "groq";
 type Route = { provider: Provider; model: string };
 

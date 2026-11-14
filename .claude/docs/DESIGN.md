@@ -720,7 +720,7 @@ className="relative mx-auto block h-auto max-h-[80dvh] max-w-full object-contain
 
 ### ErrorLine
 
-`app/components/error-line.tsx`. A failed write, on a light surface: ink on a signal strip inside an always-mounted `role="alert"` region, so the region is in the accessibility tree before the error arrives; the strip shows only while there is one. The Library form, Translate, Save and Re-extract use it; a neutral status stays a `role="status"` line in `text-ink/70`:
+`app/components/error-line.tsx`. A failed write, on a light surface: ink on a signal strip inside an always-mounted `role="alert"` region, so the region is in the accessibility tree before the error arrives; the strip shows only while there is one. The Library form, Save and Re-extract use it; a neutral status stays a `role="status"` line in `text-ink/70`:
 
 ```tsx app/components/error-line.tsx
       {children ? <p className={`border-2 border-ink bg-signal px-3 py-2 font-mono text-xs text-ink ${className}`}>{children}</p> : null}

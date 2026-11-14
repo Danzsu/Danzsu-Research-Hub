@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assignIds, type BlockDraft } from "./blocks.ts";
 import { CLAIM_LEASE_MS } from "./pipeline/util.ts";
-import { parseTranslatedBlocks, readMinutes, toPost } from "./post-row.ts";
+import { readMinutes, toPost } from "./post-row.ts";
 
 const p = (text: string): BlockDraft => ({ type: "paragraph", content: [{ text }] });
 const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
@@ -26,18 +26,6 @@ test("readMinutes floors at 1 and rounds by word count for real text", () => {
 test("readMinutes boundary: 9 words is too few, 10 is enough", () => {
   assert.equal(readMinutes(assignIds([p(words(9))]), "article"), null);
   assert.equal(readMinutes(assignIds([p(words(10))]), "article"), 1);
-});
-
-test("parseTranslatedBlocks treats [] and unparseable jsonb as no translation", () => {
-  assert.equal(parseTranslatedBlocks([]), null);
-  assert.equal(parseTranslatedBlocks(null), null);
-  assert.equal(parseTranslatedBlocks("garbage"), null);
-  assert.equal(parseTranslatedBlocks([{ id: "x", type: "nope" }]), null);
-});
-
-test("parseTranslatedBlocks keeps a real translated body", () => {
-  const valid = assignIds([p("fordítás")]);
-  assert.deepEqual(parseTranslatedBlocks(valid), valid);
 });
 
 const postRow = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -80,7 +68,6 @@ test("toPost reads the submitter from the sources embed and defaults the optiona
   assert.deepEqual(listed.meta, {});
   assert.deepEqual(listed.hiddenBlocks, []);
   assert.deepEqual(listed.blocks, []);
-  assert.equal(listed.blocksHu, null);
   const full = toPost(postRow({ sources: { submitted_by: "user-1" }, hidden_blocks: ["b1", 5] }));
   assert.equal(full.submittedBy, "user-1");
   assert.deepEqual(full.hiddenBlocks, ["b1"]);

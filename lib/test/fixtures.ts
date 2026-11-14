@@ -21,7 +21,6 @@ export const testPost = (overrides: Partial<Post> = {}): Post => ({
   keyPoints: { hu: [], en: [] },
   tags: [],
   blocks: [],
-  blocksHu: null,
   meta: {},
   hiddenBlocks: [],
   submittedBy: "owner",

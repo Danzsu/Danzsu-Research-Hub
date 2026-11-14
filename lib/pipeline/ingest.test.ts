@@ -115,7 +115,6 @@ test("processSource() success: upserts blocks with mirrored meta and the generat
   const post = db.postUpserts[0];
   assert.ok(Array.isArray(post.blocks) && (post.blocks as unknown[]).length > 0);
   assert.equal((post.meta as { mirrored: boolean }).mirrored, true);
-  assert.equal(post.blocks_hu, null);
   assert.equal(typeof post.extracted_at, "string");
   assert.deepEqual(post.title, okSummary.title);
   assert.deepEqual(post.summary, okSummary.summary);
@@ -135,7 +134,6 @@ test("processSource(): the post upsert uses onConflict: source_id and writes exa
     [
       "author",
       "blocks",
-      "blocks_hu",
       "brief",
       "extracted_at",
       "key_points",

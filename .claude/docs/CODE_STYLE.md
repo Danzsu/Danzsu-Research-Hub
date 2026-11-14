@@ -10,7 +10,7 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
   - components and types are PascalCase (`StoryCard`, `DigestItem`);
   - functions and values are camelCase;
   - fixed values and shared tables are SCREAMING_SNAKE_CASE (`TITLE_MAX`, `REEXTRACT_COOLDOWN_MINUTES`, `NAV_ITEMS`, `SHORTCUTS`, `POST_ERRORS`, `MEDIA_BUCKET`).
-- **String codes are snake_case:** JSON error codes (`invalid_url`, `translation_stale`) and model tasks (`daily_curate`).
+- **String codes are snake_case:** JSON error codes (`invalid_url`, `not_failed`) and model tasks (`daily_curate`).
 - **Code identifiers, comments and model prompts are in English.** Only the UI copy is bilingual.
 
 ## File structure
@@ -37,7 +37,7 @@ This is how code is written here. Styling and CSS are covered in DESIGN.md, and 
 - **Parse untrusted input at the boundary** into a typed value or an explicit error, never a cast:
   - structured data goes through a `zod/v4` schema (import from `"zod/v4"`): model answers in `generate()`, stored JSON in `parseBlocks` and `readOverrides`, and the state action in `parseStateAction`;
   - everything else goes through a small parser: `parseSubmittedUrl`, `parseId`, `readNavMode`.
-- **Make a result map exhaustive by type,** so a new variant is a `tsc` error rather than a silent default. For example, `RESULT_STATUS: Record<Exclude<TranslateResult, "ok">, ErrorAnswer>` in the translate route.
+- **Make a result map exhaustive by type,** so a new variant is a `tsc` error rather than a silent default. For example, `POST_ERRORS` in `lib/api.ts`.
 
 ## React
 

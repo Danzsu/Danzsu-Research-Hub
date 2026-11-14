@@ -6,7 +6,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON N
 
 **Radar** is the weekly digest. Every morning a cron job collects AI news from RSS feeds, Hacker News and GitHub, lets a model pick and score what matters, and writes it into the current ISO week's issue. Readers see a top-3 must-read, a scored feed in four categories (local models, research, companies, GitHub), an **Original** button and a **Read here** button on every card (the latter opens the story as our own Library post), a GitHub top-10, an **AI companies** page (`/companies`: the latest daily run's five best company stories, then the week's other company news) and an archive of past weeks. Each reader's read, saved and to-do state is their own.
 
-**Library** is where members save links: articles, YouTube videos, arXiv papers, PDFs, GitHub repositories and X posts. Each link becomes a post. Its content is converted into typed blocks and its images are mirrored, so the post survives the original going dead. A model writes the title, summary and key points in both languages. The submitter can edit the title and summary, hide blocks, and re-extract the post; any reader can ask for a Hungarian translation of the body. The canonical source link is always shown. A taiyaki button on every page (the bottom-right corner on desktop, the middle of the bottom bar on phones) opens a small chat: drop a link with a note, watch it go from processing to done, and retry it if it failed.
+**Library** is where members save links: articles, YouTube videos, arXiv papers, PDFs, GitHub repositories and X posts. Each link becomes a post. Its content is converted into typed blocks and its images are mirrored, so the post survives the original going dead. A model writes the title, summary and key points in both languages. The submitter can edit the title and summary, hide blocks, and re-extract the post; the body stays in its original language. The canonical source link is always shown. A taiyaki button on every page (the bottom-right corner on desktop, the middle of the bottom bar on phones) opens a small chat: drop a link with a note, watch it go from processing to done, and retry it if it failed.
 
 | Layer | Choice |
 | --- | --- |
@@ -14,7 +14,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON N
 | Hosting and scheduler | Vercel, with Vercel Cron once a day |
 | Database, auth, files | Supabase: Postgres with RLS, magic-link and Google sign-in, a private Storage bucket |
 | Styling | Tailwind 4 (CSS-first) and vendored shadcn/ui on the unified `radix-ui` package |
-| Models | Gemini (Google AI Studio) for curation, summaries, video, PDF transcription and translation; Groq for the cheap shortlist and cleanup passes. Plain `fetch`, no SDKs |
+| Models | Gemini (Google AI Studio) for curation, summaries, video and PDF transcription; Groq for the cheap shortlist and cleanup passes. Plain `fetch`, no SDKs |
 
 ## How it works
 
@@ -38,7 +38,6 @@ flowchart TD
   end
   subgraph postPage["The post page, /library/[id]"]
     reextractRoute["POST /api/posts/[id]/reextract"]
-    translateRoute["POST /api/posts/[id]/translate"]
     editRoute["PATCH /api/posts/[id]"]
   end
   sourcesRoute -.->|"after()"| ingest["processSource"]
@@ -52,7 +51,6 @@ flowchart TD
   notes --> summarize["summarize, unless the extractor already did"]
   images --> summarize
   summarize --> posts[("posts")]
-  translateRoute -->|"translatePost writes blocks_hu"| posts
   editRoute -->|"update_post_overrides, as the reader"| posts
 ```
 
@@ -67,7 +65,7 @@ flowchart TD
 
 Every source ends up as the same block model ([`lib/blocks.ts`](lib/blocks.ts)): headings, paragraphs, lists, quotes, code, images, videos, chapters, repo cards and dividers. The page renders only these blocks, never raw HTML. Block ids come from their content, so a hidden block stays hidden after re-extraction as long as its content is unchanged. A re-extraction that fails leaves the post as it was, and the post page shows the error to the submitter until a later run succeeds.
 
-**Translation** ([`lib/translate.ts`](lib/translate.ts)) runs on demand from the post page. Only the text of the blocks goes to the model, in chunks; links, images and structure are copied from the original. A translation that finishes after the post was re-extracted is refused, and the reader is asked to retry.
+**No translation.** Content is shown in its original language, usually English; only the interface (menus, buttons, messages) switches between Hungarian and English. The `posts.blocks_hu` column stays in the database, and no code reads it.
 
 **Auth, RLS and the one reader write to posts.** Sign-in is a Supabase magic link or Google, and sign-ups are disabled, so the member list is whoever was invited. Every table has row-level security: readers may read content, insert sources, and touch only their own read, saved and to-do rows. The pipeline writes content with the secret key. The one exception is the submitter's edits: the `update_post_overrides` database function checks that the caller submitted the post and then writes only its `overrides` and `hidden_blocks` columns.
 
@@ -170,7 +168,7 @@ The shared project is already deployed. These steps are for a deployment of your
 
 1. **Vercel:** *Add New → Project*, import the repository. Next.js and pnpm are detected automatically.
 2. **Environment variables:** everything from the [Environment](#environment) table, with your own project's values, for Production and Preview. Tick Development too if you want a plain `vercel env pull` to work; otherwise pull with `--environment=production`. Environment changes take effect on the next deploy.
-3. **Cron and region:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 13 * * *` (13:00 UTC, so the day's Top 10 and its briefs are ready by 18:00 in Budapest), and `/api/cron/mirror` at 14, 15 and 16 UTC, which only works the Library's queue (the mirror's sources and any run a crash left behind). On Hobby each runs once a day, anywhere within its hour. With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry, translation and re-extraction routes may run for up to 300 s. `"regions": ["dub1"]` runs every function in Dublin, beside the shared Supabase project (`eu-west-1`), and `"fluid": true` turns on Fluid compute. Both override the dashboard's Function Region and Fluid Compute settings, and both take effect with the next deploy. Point `regions` at the region of your own Supabase project.
+3. **Cron and region:** [`vercel.json`](vercel.json) schedules `/api/cron/daily` at `0 13 * * *` (13:00 UTC, so the day's Top 10 and its briefs are ready by 18:00 in Budapest), and `/api/cron/mirror` at 14, 15 and 16 UTC, which only works the Library's queue (the mirror's sources and any run a crash left behind). On Hobby each runs once a day, anywhere within its hour. With `CRON_SECRET` set, Vercel sends it as the bearer token itself. The cron, submission, retry and re-extraction routes may run for up to 300 s. `"regions": ["dub1"]` runs every function in Dublin, beside the shared Supabase project (`eu-west-1`), and `"fluid": true` turns on Fluid compute. Both override the dashboard's Function Region and Fluid Compute settings, and both take effect with the next deploy. Point `regions` at the region of your own Supabase project.
 4. **Install command:** check that Vercel installs from `pnpm-lock.yaml` in frozen mode with pnpm 11, so the 7-day age gate applies. This is an open item in [TODO.md](.claude/docs/TODO.md).
 5. **Supabase:** set your project's Site URL to the deployment's domain, add that domain to the Redirect URLs, and send new invites. On the shared project, the Site URL is the production domain and changes only when that domain does (for example after renaming the Vercel project). Only the owner changes it, and never to localhost or a preview URL, because every member's magic link follows it.
 6. **First run:** the same `curl` against `https://<domain>/api/cron/daily`. The next morning, check *Vercel → Logs* and *Cron Jobs*.
@@ -186,15 +184,15 @@ Every signed-in page shares the app shell (`app/(app)/`): a sidebar on desktop (
 | [`app/`](app/) | `/login`, the public `/about` and `/privacy` pages, the error and 404 pages, the manifest, the app icon (`icon.png`, `apple-icon.png`), and the route group below |
 | [`app/(app)/`](<app/(app)/>) | The signed-in pages under one app shell: the Radar (`/`), the AI companies page (`/companies`), `/archive`, `/archive/[week]`, the GitHub repos page (`/github`), `/library`, `/library/[id]`, the collection of favourites (`/collection`), each with its loading skeleton |
 | [`app/components/`](app/components/) | The app shell (desktop nav, mobile bottom bar, dialogs, undo toast, the taiyaki link chat), the Radar dashboard and its cards, the rating group (`rating-control`), the card toolbar, the account menu, the filter chips, the empty state, the stat tile and the key badge, the title band, the language toggle, `post-blocks` (the block renderer), `page-skeletons` (each page shape's loading fallback) and `refresh-bar` (the top bar during a reader-started refresh) |
-| [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (translate, edit link) and editor (edit, hide, re-extract) |
-| [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, translate, re-extract, and the daily cron |
+| [`app/(app)/library/`](<app/(app)/library/>) | The Library list and submit form, and the post page (`post-article`) with its notices, toolbar (edit link) and editor (edit, hide, re-extract) |
+| [`app/api/`](app/api/) | JSON routes: reader state, link submission, your own submissions and their retry, post edit, re-extract, and the daily cron |
 | [`app/auth/`](app/auth/), [`proxy.ts`](proxy.ts) | Magic-link and Google sign-in, the callback and sign-out; the proxy refreshes the session and sends signed-out visitors to `/login`, and from the home to `/about` |
 | [`app/media/`](app/media/) | Serves mirrored images to signed-in readers |
 | [`app/dev/preview/`](app/dev/preview/) | The offline preview on fixtures (development only) |
 | [`config/`](config/) | The daily sources (`sources.ts`), the env template, and `README.md`: where every setting lives |
 | [`lib/pipeline/`](lib/pipeline/) | The daily run, the ingest pipeline, safe fetching, HTML to blocks, noise filtering, image mirroring, summaries |
 | [`lib/pipeline/extract/`](lib/pipeline/extract/) | One extractor per source kind, and the fallback chain |
-| [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, translation, the model client, content queries and their caches, the link chat's logic and your own submissions, the ratings store (`ratings`), the language cookie, and Supabase clients |
+| [`lib/`](lib/) | The block model, the post view, `post-row` (a posts row → `Post`), post edits, the model client, content queries and their caches, the link chat's logic and your own submissions, the ratings store (`ratings`), the language cookie, and Supabase clients |
 | [`lib/test/`](lib/test/) | The offline render harness for component tests, `doc-file.ts` (reads a guide under `.claude/docs/` for the doc tests), the route-handler stubs (`route-hooks.ts`), the sign-in routes' Supabase auth stub (`fake-auth.ts`), and a `Post` fixture (`testPost`) |
 | [`data/digest-types.ts`](data/digest-types.ts) | The Radar content contract and the tag vocabulary |
 | [`components/ui/`](components/ui/) | Vendored shadcn components (never `npx shadcn add`; see [DESIGN.md](.claude/docs/DESIGN.md#dos-and-donts)) |
@@ -304,7 +302,7 @@ npx tsc --noEmit && npm run lint && npm test && npm run build && npm run dup
 
 UI without live data: `npm run dev`, then open `/dev/preview` (development only). It renders every view on fixtures, including empty states and a `&fail=1` offline mode; Playwright checks run against it at 360, 768 and 1280 px.
 
-**What the tests don't cover:** the interactive UI, `proxy.ts` and the auth routes, real RLS policies, live model calls and live websites. Those are checked by hand in a browser (Playwright) against a deployment: sign in, the Radar's read, saved and to-do state, an archived week, one link per source kind, the post page (blocks, images, video and chapters), translation, editing, hiding, re-extraction and its 10-minute cooldown, a `noarchive` page, and no horizontal scroll at 360 and 1280 px.
+**What the tests don't cover:** the interactive UI, `proxy.ts` and the auth routes, real RLS policies, live model calls and live websites. Those are checked by hand in a browser (Playwright) against a deployment: sign in, the Radar's read, saved and to-do state, an archived week, one link per source kind, the post page (blocks, images, video and chapters), editing, hiding, re-extraction and its 10-minute cooldown, a `noarchive` page, and no horizontal scroll at 360 and 1280 px.
 
 ## Conventions
 

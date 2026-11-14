@@ -63,7 +63,7 @@ test("videoEmbedSrc: vimeo always sends dnt=1 and appends the start as a #t= has
 });
 
 test("withQuery merges updates over the current query, keeping every other param", () => {
-  assert.equal(withQuery({ text: "hu", hidden: "show" }, { t: "125" }), "?text=hu&hidden=show&t=125");
+  assert.equal(withQuery({ edit: "1", hidden: "show" }, { t: "125" }), "?hidden=show&t=125&edit=1");
   assert.equal(withQuery({ hidden: "old" }, { hidden: "show" }), "?hidden=show");
   assert.equal(withQuery({}, {}), "");
 });
@@ -75,8 +75,8 @@ test("withQuery keeps the edit key — the post editor depends on it surviving e
 
 test("withQuery drops keys outside its allowlist and drops empty values", () => {
   // A key not in PostQuery must never reach the URL, and "" must be treated as absent, not as a real value.
-  const dirty = { text: "hu", hidden: "", evil: "1" } as unknown as PostQuery;
-  assert.equal(withQuery({}, dirty), "?text=hu");
+  const dirty = { edit: "1", hidden: "", evil: "1" } as unknown as PostQuery;
+  assert.equal(withQuery({}, dirty), "?edit=1");
 });
 
 test("withQuery clears a key when the caller explicitly sets it to undefined", () => {

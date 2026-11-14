@@ -135,7 +135,7 @@ export async function processSource(db: SupabaseClient, id: number, options: { d
   try {
     const post = await buildPost(db, source, previous, options.deadline);
     const { error: saveError } = await db.from("posts").upsert(
-      { source_id: source.id, kind: source.kind, url: source.url, ...post, blocks_hu: null, extracted_at: new Date().toISOString() },
+      { source_id: source.id, kind: source.kind, url: source.url, ...post, extracted_at: new Date().toISOString() },
       { onConflict: "source_id" },
     );
     if (saveError) throw saveError;

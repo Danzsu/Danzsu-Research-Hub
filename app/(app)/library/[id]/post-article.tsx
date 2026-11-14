@@ -9,7 +9,6 @@ import { readMinutes } from "@/lib/post-row";
 import type { Post, PostQuery } from "@/lib/post-view";
 import type { RatingValue } from "@/lib/ratings";
 import { SOURCE_KIND_LABELS } from "@/lib/source-kinds";
-import { translatable } from "@/lib/translate";
 import { PostEditor } from "./post-editor";
 import { notices, PostNotices } from "./post-notices";
 import { PostToolbar } from "./post-toolbar";
@@ -25,8 +24,7 @@ const copy = {
 export function PostArticle({ post, language, query, canEdit, rating }: { post: Post; language: Language; query: PostQuery; canEdit: boolean; rating: RatingValue | null }) {
   const t = notices[language];
   const labels = copy[language];
-  const showingTranslation = query.text === "hu" && Boolean(post.blocksHu);
-  const blocks = showingTranslation ? post.blocksHu! : post.blocks;
+  const blocks = post.blocks;
   const minutes = readMinutes(post.blocks, post.kind);
   const start = Number.parseInt(query.t ?? "", 10);
   const videoStart = Number.isFinite(start) && start > 0 ? start : undefined;
@@ -51,10 +49,7 @@ export function PostArticle({ post, language, query, canEdit, rating }: { post: 
             <PostToolbar
               postId={post.id}
               language={language}
-              hasTranslation={Boolean(post.blocksHu)}
-              showingTranslation={showingTranslation}
               canEdit={canEdit}
-              hasTranslatable={translatable(post.blocks).length > 0}
               rating={rating}
             />
             {originalHref && (
@@ -86,7 +81,7 @@ export function PostArticle({ post, language, query, canEdit, rating }: { post: 
           </section>
         ) : (
           blocks.length > 0 && (
-            <section className="mt-12" lang={showingTranslation ? "hu" : undefined}>
+            <section className="mt-12">
               <PostBlocks
                 blocks={blocks}
                 language={language}

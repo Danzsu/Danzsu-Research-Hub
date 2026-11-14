@@ -50,9 +50,7 @@ export type ReextractResult =
  * an unexpired one, instead of silently starting a second `processSource` run.
  *
  * `extracted_at` doubles as the claim time: a run that goes on to fail still used up this window,
- * so a failed re-extraction can't be retried for another `REEXTRACT_COOLDOWN_MINUTES`. An in-flight
- * translation reading the old `extracted_at` becomes stale (409, `lib/translate.ts`) once this
- * claim lands; the reader's own retry heals it.
+ * so a failed re-extraction can't be retried for another `REEXTRACT_COOLDOWN_MINUTES`.
  */
 export async function requestReextract(admin: SupabaseClient, viewerId: string, postId: number, now: Date): Promise<ReextractResult> {
   const { data: post, error: selectError } = await admin
