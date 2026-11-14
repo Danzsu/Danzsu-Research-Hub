@@ -38,10 +38,9 @@ const { Progress } = await import("../../components/ui/progress.tsx");
 const { LibraryView } = await import("../(app)/library/library-view.tsx");
 const { ArchiveView } = await import("../(app)/archive/archive-view.tsx");
 const { CHAT_PANEL_ID, LinkChat, TaiyakiButton } = await import("./link-chat.tsx");
-const { RefreshBar, RefreshProvider } = await import("./refresh-bar.tsx");
+const { RefreshBar, RefreshProvider, useRefresh } = await import("./refresh-bar.tsx");
 const { RatingsProvider } = await import("./rating-control.tsx");
 const sendNothing = { send: async () => ({}) };
-const { PostToolbar } = await import("../(app)/library/[id]/post-toolbar.tsx");
 const { useReaderState } = await import("./use-reader-state.ts");
 
 const noop = () => {};
@@ -437,8 +436,8 @@ test("the refresh bar is absent at rest, in the shell too, and hidden from assis
 // Spec 2.3, like useLanguage. Kills a useRefresh that quietly does nothing without its provider: the
 // refresh would be lost, and the bar with it.
 test("useRefresh outside RefreshProvider throws, naming where the provider lives", () => {
-  const props = { postId: 7, language: "en", hasTranslation: false, showingTranslation: false, canEdit: false, hasTranslatable: true, rating: null } as const;
-  assert.throws(() => render(createElement(PostToolbar, props)), /RefreshProvider \(app\/components\/app-shell\.tsx\)/);
+  const Consumer = () => (useRefresh(), null);
+  assert.throws(() => render(createElement(Consumer)), /RefreshProvider \(app\/components\/app-shell\.tsx\)/);
 });
 
 // 2026-11-01 review. Kills Read here sending the reader through the chat: it is the post when there is one, a

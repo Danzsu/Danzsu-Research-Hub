@@ -34,7 +34,6 @@ export type Post = {
   keyPoints: Record<"hu" | "en", string[]>;
   tags: string[];
   blocks: Block[];
-  blocksHu: Block[] | null;
   meta: PostMeta;
   hiddenBlocks: string[];
   submittedBy: string | null;
@@ -143,8 +142,8 @@ export function isBlockVisible(blockId: string, hiddenSet: Set<string>, showHidd
 }
 
 /** The post page's own query params: kept as one shape so every in-page link (chapters, hidden-blocks) can carry all of them forward. */
-export type PostQuery = { text?: string; hidden?: string; t?: string; edit?: string };
-const POST_QUERY_KEYS: (keyof PostQuery)[] = ["text", "hidden", "t", "edit"];
+export type PostQuery = { hidden?: string; t?: string; edit?: string };
+const POST_QUERY_KEYS: (keyof PostQuery)[] = ["hidden", "t", "edit"];
 
 /** `current`, overlaid with `updates`, serialized back to a `?a=b&c=d` string (or `""`). */
 export function withQuery(current: PostQuery, updates: Partial<PostQuery>): string {

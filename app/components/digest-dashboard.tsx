@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import type { CurrentIssue, DailyBrief, DigestItem, GithubTopEntry, LibraryCopy } from "@/data/digest-types";
+import { originalText, type CurrentIssue, type DailyBrief, type DigestItem, type GithubTopEntry, type LibraryCopy } from "@/data/digest-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { addedDayLabel, dailyTop, feedItems, type Filter } from "@/lib/feed";
 import { httpTransport, memoryTransport } from "@/lib/link-chat";
@@ -219,7 +219,7 @@ export function DigestDashboard(
       return null;
     },
     onAddTodo(item) {
-      if (store.addTodo(item.title[language], item.id)) toasts.show({ kind: "todoAdded" });
+      if (store.addTodo(originalText(item.title), item.id)) toasts.show({ kind: "todoAdded" });
     },
   };
 
@@ -433,7 +433,7 @@ export function DigestDashboard(
                           <li key={item.id}>
                             <a href={`#daily-${index + 1}`} className="focus-ring flex min-h-10 items-center gap-3 hover:text-signal">
                               <span className="text-signal">{String(index + 1).padStart(2, "0")}</span>
-                              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{item.title[language]}</span>
+                              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{originalText(item.title)}</span>
                               <span className="text-ink/55">{item.score}</span>
                             </a>
                           </li>

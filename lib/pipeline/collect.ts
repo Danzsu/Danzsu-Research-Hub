@@ -11,6 +11,10 @@ export type Candidate = {
   snippet: string;
   publishedAt: string; // YYYY-MM-DD
   hint: DigestCategory;
+  /** What the source itself says about its popularity: Hacker News points, Hugging Face upvotes; 0 for a feed. */
+  points: number;
+  /** How far the source is trusted, 1 neutral (`weight` in config/sources.ts); ranks a story and picks between twins. */
+  weight: number;
 };
 
 export type Repo = { repo: string; focus: string; url: string; stars: number; language: string | null };
@@ -27,7 +31,7 @@ const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" }
 type FeedEntry = Record<string, unknown>;
 
 /** RSS 2.0 and Atom, the two shapes the feed list uses. An item whose title or link matches `exclude` is dropped. */
-export function parseFeed(body: string, feed: { name: string; hint: DigestCategory; exclude?: RegExp }, since: Date): Candidate[] {
+export function parseFeed(body: string, feed: { name: string; hint: DigestCategory; exclude?: RegExp; weight?: number }, since: Date): Candidate[] {
   const doc = xml.parse(body) as { rss?: { channel?: { item?: FeedEntry | FeedEntry[] } }; feed?: { entry?: FeedEntry | FeedEntry[] } };
   const entries = doc.rss ? list(doc.rss.channel?.item) : list(doc.feed?.entry);
 
@@ -47,6 +51,8 @@ export function parseFeed(body: string, feed: { name: string; hint: DigestCatego
       snippet: stripHtml(xmlText(entry.description ?? entry.summary ?? entry.content)).slice(0, 400),
       publishedAt: isoDate(published),
       hint: feed.hint,
+      points: 0,
+      weight: feed.weight ?? 1,
     }];
   });
 }
@@ -86,6 +92,8 @@ async function fromDailyPapers(since: Date, now: Date): Promise<Candidate[]> {
       snippet: stripHtml(entry.summary ?? "").slice(0, 400),
       publishedAt: entry.date,
       hint: "research",
+      points: entry.paper.upvotes,
+      weight: 1,
     }));
 }
 
@@ -109,6 +117,8 @@ async function fromHackerNews(since: Date): Promise<Candidate[]> {
         snippet: "",
         publishedAt: hit.created_at.slice(0, 10),
         hint: "companies",
+        points: hit.points,
+        weight: 0.8,
       }));
     }),
   );

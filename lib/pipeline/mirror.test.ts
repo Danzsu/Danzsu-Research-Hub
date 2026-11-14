@@ -38,6 +38,23 @@ test("queueMirrors queues the week's 85+ items and its Top 3 under the system ac
   ]);
 });
 
+// Kills the GitHub Top 10 left out of the mirror (its READMEs were never readable in the Library), another week's
+// repos taken, and a repo also on the Radar queued twice.
+test("queueMirrors also queues the week's GitHub Top 10 repositories, once each", async () => {
+  const repo = (url: string, issue = "2026-W40") => ({ issue_id: issue, url });
+  const db = fakeDb(undefined, {
+    rows: {
+      digest_items: [item("https://github.com/owner/tool", 90)],
+      github_top: [repo("https://github.com/owner/tool"), repo("https://github.com/owner/other#readme"), repo("https://github.com/old/repo", "2026-W39")],
+    },
+  });
+  assert.equal(await queueMirrors(db, "2026-W40", "system-user"), 2);
+  assert.deepEqual(db.sourceUpserts[0].values, [
+    { url: "https://github.com/owner/tool", kind: "github", submitted_by: "system-user" },
+    { url: "https://github.com/owner/other", kind: "github", submitted_by: "system-user" },
+  ]);
+});
+
 // Kills a member's own submission overwritten (ignoreDuplicates dropped), or counted as newly queued.
 test("queueMirrors leaves a URL already in sources alone, and counts only what it newly queued", async () => {
   const db = fakeDb(undefined, {

@@ -1,18 +1,20 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
-import type { Candidate, Repo } from "./collect.ts";
-import { curatePrompt, runDaily, toDigestRows } from "./daily.ts";
+import type { Repo } from "./collect.ts";
+import { curatePrompt, runDaily, toDigestRows, type Scored } from "./daily.ts";
 import { fakeDb, pgError } from "./fake-db.ts";
 import { feeds } from "../../config/sources.ts";
-import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockFetch, withGeminiKey } from "./mock-fetch.ts";
+import { geminiPrompt, geminiResponse, mockFetch, withGeminiKey } from "./mock-fetch.ts";
 import { isoWeek } from "./util.ts";
 
 const week = isoWeek(new Date("2026-09-23T05:00:00Z"));
-const text = (en: string) => ({ hu: `${en} (hu)`, en });
+/** What a model-written text becomes in a row: the one original in both slots. */
+const both = (text: string) => ({ hu: text, en: text });
 
-const picked: Candidate[] = [
-  { url: "https://blog.test/llama-4", title: "Llama 4 on a laptop", source: "Blog", snippet: "", publishedAt: "2026-09-22", hint: "local" },
-  { url: "https://arxiv.org/abs/2609.00001", title: "A paper", source: "arXiv cs.CL", snippet: "", publishedAt: "2026-09-21", hint: "research" },
+const scored = { score: 80, readMinutes: 6, points: 0, weight: 1 };
+const picked: Scored[] = [
+  { url: "https://blog.test/llama-4", title: "Llama 4 on a laptop", source: "Blog", snippet: "", publishedAt: "2026-09-22", hint: "local", category: "local", ...scored },
+  { url: "https://arxiv.org/abs/2609.00001", title: "A paper", source: "arXiv cs.CL", snippet: "", publishedAt: "2026-09-21", hint: "research", category: "research", ...scored },
 ];
 const repos: Repo[] = Array.from({ length: 12 }, (_, i) => ({ repo: `owner/repo-${i}`, focus: "", url: `https://github.com/owner/repo-${i}`, stars: 100 - i, language: i % 2 ? null : "Python" }));
 
@@ -20,16 +22,29 @@ const repos: Repo[] = Array.from({ length: 12 }, (_, i) => ({ repo: `owner/repo-
 const hnHits = (n: number) =>
   Array.from({ length: n }, (_, i) => ({ title: `Story ${i}`, url: `https://news.test/${i}`, created_at: "2026-09-22T08:00:00Z", points: 100, objectID: String(i) }));
 
+const DECISIONS_URL = "https://generativelanguage.googleapis.com/v1beta/decisions";
+
+/** Decision 1's answer to a request, built from its own questions: `relevance` is the score level (0–4) every item
+ *  gets, `promoted` the indices answered as promotions. */
+function decisionsResponse(init: RequestInit | undefined, { level = 3, promoted = [] as number[] } = {}) {
+  const { questions } = JSON.parse(String(init?.body)) as { questions: Record<string, { type: string }> };
+  const answers: Record<string, unknown> = {};
+  for (const key of Object.keys(questions)) {
+    const i = Number(key.slice(1));
+    if (key[0] === "r") answers[key] = { type: "score", score: level };
+    if (key[0] === "p") answers[key] = { type: "noul", noul: promoted.includes(i) ? 0.95 : 0.05 };
+    if (key[0] === "c") answers[key] = { type: "choice", choice: "local" };
+  }
+  return Response.json({ answers });
+}
+
 type Curated = Parameters<typeof toDigestRows>[0];
 const curatedItem = (index: number, title: string): Curated["items"][number] => ({
   index,
-  category: index === 0 ? "local" : "research",
-  score: 80,
-  readMinutes: 6,
   tags: [],
-  title: text(title),
-  summary: text("Summary."),
-  why: text("Why."),
+  title,
+  summary: "Summary.",
+  why: "Why.",
 });
 
 test("toDigestRows keeps item ids forever stable: category, week, English title and source URL, nothing else", () => {
@@ -56,9 +71,9 @@ test("toDigestRows takes the URL, date and source from the listing, and the rest
     source: "arXiv cs.CL",
     url: "https://arxiv.org/abs/2609.00001",
     tags: [],
-    title: text("Title"),
-    summary: text("Summary."),
-    why: text("Why."),
+    title: both("Title"),
+    summary: both("Summary."),
+    why: both("Why."),
   });
 });
 
@@ -95,6 +110,7 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
     if (url.startsWith("https://api.github.com/search/")) {
       return Response.json({ items: [{ full_name: "owner/tool", description: "A tool", html_url: "https://github.com/owner/tool", stargazers_count: 42, language: "Rust" }] });
     }
+    if (url === DECISIONS_URL) return decisionsResponse(init);
     if (url.startsWith("https://generativelanguage.googleapis.com/")) {
       prompt = geminiPrompt(init);
       return geminiResponse({ items: [curatedItem(0, "Fresh story")], github: [{ index: 0, focus: "A tool", score: 88 }] });
@@ -133,51 +149,61 @@ test("runDaily collects, curates and writes the week's issue, skipping URLs it a
   assert.deepEqual(db.rpcCalls, [{ name: "refresh_must_read", args: { p_issue: "2026-W39" } }]);
 });
 
-// W1: past 40 candidates the cheap shortlist runs before curation; when it fails, the first 40 go on.
-test("runDaily shortlists more than 40 candidates, and keeps the first 40 when the shortlist call fails", async (t) => {
+/** A run over `n` Hacker News stories, curated empty; reports what Decision 1 was asked and what the curation saw. */
+async function runOverStories(t: TestContext, n: number, decisions: (init: RequestInit | undefined) => Response | Promise<Response>) {
   withGeminiKey(t);
-  t.mock.method(console, "warn", () => {}); // the feeds' 404s and the failed shortlist
-  const hits = hnHits(45);
-  let prompt = "";
+  const warn = t.mock.method(console, "warn", () => {}); // the feeds' 404s
+  const hits = hnHits(n);
+  const seen = { decided: 0, prompt: "" };
   mockFetch(t, async (url, init) => {
     if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits });
+    if (url === DECISIONS_URL) {
+      seen.decided = Object.keys((JSON.parse(String(init?.body)) as { questions: object }).questions).length / 3;
+      return decisions(init);
+    }
     if (url.startsWith("https://generativelanguage.googleapis.com/")) {
-      if (geminiSchemaKeys(init).includes("keep")) return geminiText("not json");
-      prompt = geminiPrompt(init);
+      seen.prompt = geminiPrompt(init);
       return geminiResponse({ items: [], github: [] });
     }
     return new Response("", { status: 404 });
   });
   const db = fakeDb();
-
   const result = await runDaily(db, new Date("2026-09-23T05:00:00Z"));
+  return { db, result, seen, warn };
+}
 
-  assert.deepEqual([result.candidates, result.shortlisted], [45, 40]);
-  assert.deepEqual(db.tasks, ["daily_shortlist", "daily_curate"]);
-  assert.match(prompt, /\[39\] \(companies\) Story 39 —/);
-  assert.doesNotMatch(prompt, /Story 4[0-4] —/);
+// 2026-11-13. Kills the model judging every candidate of a busy day (the listing and the cost grow with it), and the
+// curation writing up more than a day's quota.
+test("runDaily has Decision 1 judge only the 60 best by rule score, and curates at most 25 of them", async (t) => {
+  const { result, seen, db } = await runOverStories(t, 70, (init) => decisionsResponse(init));
+  assert.deepEqual([result.candidates, seen.decided, result.shortlisted], [70, 60, 25]);
+  assert.deepEqual(db.tasks, ["daily_curate"], "no shortlist model any more");
+  assert.equal((seen.prompt.match(/^\[\d+\] \(/gm) ?? []).length, 25);
 });
 
-// W1 boundary: exactly 40 candidates must still skip the shortlist call (<=, not <).
-test("runDaily skips the shortlist call at exactly 40 candidates, curating all of them", async (t) => {
-  withGeminiKey(t);
-  t.mock.method(console, "warn", () => {}); // the feeds' 404s
-  const hits = hnHits(40);
-  mockFetch(t, async (url) => {
-    if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits });
-    if (url.startsWith("https://generativelanguage.googleapis.com/")) return geminiResponse({ items: [], github: [] });
-    return new Response("", { status: 404 });
-  });
-  const db = fakeDb();
+// Kills the day's run depending on Decision 1: a refused request must leave the rules to score, not fail the run.
+test("runDaily scores by the rules alone when Decision 1 fails, and says so", async (t) => {
+  const { result, warn } = await runOverStories(t, 5, () => new Response('{"error":{"code":"safety"}}', { status: 400 }));
+  assert.equal(result.shortlisted, 5);
+  assert.ok(warn.mock.calls.some((call) => /decisions failed, scoring by the rules alone/.test(String(call.arguments[0]))));
+});
 
-  const result = await runDaily(db, new Date("2026-09-23T05:00:00Z"));
-
-  assert.equal(result.candidates, 40);
-  assert.equal(result.shortlisted, 40);
-  assert.deepEqual(db.tasks, ["daily_curate"]); // exactly 40: the shortlist call itself never runs
+// Kills promotions reaching a card: Decision 1 says item 0 is a sign-up, so it never reaches the curation.
+test("runDaily drops what Decision 1 calls a promotion, and what is judged irrelevant", async (t) => {
+  const promoted = await runOverStories(t, 3, (init) => decisionsResponse(init, { promoted: [0, 1, 2] }));
+  assert.equal(promoted.result.shortlisted, 0);
+  const irrelevant = await runOverStories(t, 3, (init) => decisionsResponse(init, { level: 0 }));
+  assert.equal(irrelevant.result.shortlisted, 0);
 });
 
 // G1 spec 2. Kills the score dropped from the prompt (the model would answer without one and fail the schema).
+// Kills a curate prompt that still asks for Hungarian: content is never translated (2026-11-01 decision).
+test("curatePrompt asks for each text once, in the story's own language, and never for Hungarian", () => {
+  const prompt = curatePrompt(picked, repos.slice(0, 1));
+  assert.match(prompt, /never translate/);
+  assert.doesNotMatch(prompt, /Hungarian|bilingual/i);
+});
+
 test("curatePrompt asks for a 0–100 score on every repo, on the news' scale", () => {
   assert.match(curatePrompt([], repos), /"github" with a focus line of at most 8 English words and a score from 0 to 100/);
 });
@@ -186,8 +212,9 @@ test("curatePrompt asks for a 0–100 score on every repo, on the news' scale", 
 test("runDaily with no repos leaves the week's github_top rows alone", async (t) => {
   withGeminiKey(t);
   t.mock.method(console, "warn", () => {});
-  mockFetch(t, async (url) => {
+  mockFetch(t, async (url, init) => {
     if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits: hnHits(1) });
+    if (url === DECISIONS_URL) return decisionsResponse(init);
     if (url.startsWith("https://generativelanguage.googleapis.com/")) return geminiResponse({ items: [], github: [] });
     return new Response("", { status: 404 });
   });
@@ -209,8 +236,8 @@ test("curatePrompt lists what the last 14 days already covered, and asks for one
   assert.doesNotMatch(curatePrompt(picked, []), /ALREADY COVERED/);
 });
 
-/** A run whose model curates `items` from one feed item each, with the given scores and minutes. */
-async function dailyRun(t: TestContext, picks: { title: string; score: number; minutes: number }[], tables: Parameters<typeof fakeDb>[1] = {}, now = new Date("2026-09-23T14:00:00Z"), db = fakeDb(undefined, tables)) {
+/** A run whose model curates `items` from one feed item each (Decision 1 judges every one relevant). */
+async function dailyRun(t: TestContext, picks: { title: string }[], tables: Parameters<typeof fakeDb>[1] = {}, now = new Date("2026-09-23T14:00:00Z"), db = fakeDb(undefined, tables)) {
   withGeminiKey(t);
   t.mock.method(console, "warn", () => {});
   const rss = `<rss><channel>${picks.map((p, i) => `<item><title>${p.title}</title><link>https://blog.test/${i}</link><pubDate>Tue, 22 Sep 2026 09:00:00 GMT</pubDate></item>`).join("")}</channel></rss>`;
@@ -218,9 +245,10 @@ async function dailyRun(t: TestContext, picks: { title: string; score: number; m
   mockFetch(t, async (url, init) => {
     if (url === feeds[0].url) return new Response(rss);
     if (url.startsWith("https://hn.algolia.com/")) return Response.json({ hits: [] });
+    if (url === DECISIONS_URL) return decisionsResponse(init);
     if (url.startsWith("https://generativelanguage.googleapis.com/")) {
       prompt = geminiPrompt(init);
-      return geminiResponse({ items: picks.map((p, i) => ({ ...curatedItem(i, p.title), score: p.score, readMinutes: p.minutes })), github: [] });
+      return geminiResponse({ items: picks.map((p, i) => curatedItem(i, p.title)), github: [] });
     }
     return new Response("", { status: 404 });
   });
@@ -230,7 +258,7 @@ async function dailyRun(t: TestContext, picks: { title: string; score: number; m
 
 // Spec N3. Kills the recent lookup still asking for URLs only: the titles feed the ALREADY COVERED block.
 test("runDaily hands the model the titles stored in the last 14 days", async (t) => {
-  const { prompt } = await dailyRun(t, [{ title: "New", score: 80, minutes: 5 }], {
+  const { prompt } = await dailyRun(t, [{ title: "New" }], {
     rows: { digest_items: [{ url: "https://old.test/a", title: { hu: "Régi", en: "Old story" } }] },
   });
   assert.match(prompt(), /ALREADY COVERED[^\n]*\n- Old story\n/);
@@ -240,7 +268,7 @@ test("runDaily hands the model the titles stored in the last 14 days", async (t)
 // ago): the foreign key would fail the whole run. Only the rows written count.
 test("runDaily ranks only the items this run wrote", async (t) => {
   // Stored long ago: past the 14-day lookup, so the model sees it, but the upsert skips it.
-  const { db, result } = await dailyRun(t, [{ title: "Kept", score: 80, minutes: 5 }, { title: "Old", score: 99, minutes: 5 }], {
+  const { db, result } = await dailyRun(t, [{ title: "Kept" }, { title: "Old" }], {
     rows: { digest_items: [{ url: "https://blog.test/1", created_at: "2026-08-01T00:00:00Z" }] },
   });
   const top = db.upserts.find((u) => u.table === "daily_top")?.values as { item_id: string }[];
@@ -253,7 +281,7 @@ test("runDaily ranks only the items this run wrote", async (t) => {
 // first evening after a morning run, would rank only the few new items. Every item added since Budapest's
 // midnight competes; yesterday's don't.
 test("the day's Top 10 is picked from every item added today, whichever run added it", async (t) => {
-  const { db } = await dailyRun(t, [{ title: "Evening", score: 60, minutes: 30 }], {
+  const { db } = await dailyRun(t, [{ title: "Evening" }], {
     rows: {
       digest_items: [
         { id: "morning-best", url: "https://old.test/m", score: 95, read_minutes: 5, created_at: "2026-09-23T05:00:00Z" },
@@ -270,19 +298,19 @@ test("the day's Top 10 is picked from every item added today, whichever run adde
 // Polish 1, Review Focus 2. Kills the must-read refresh skipped when the daily list's write fails.
 test("a failed daily_top write still leaves the week's Top 3 refreshed", async (t) => {
   const db = fakeDb(undefined, { tableWriteErrors: { daily_top: pgError("08006", "down") } });
-  await assert.rejects(dailyRun(t, [{ title: "Story", score: 80, minutes: 5 }], {}, undefined, db));
+  await assert.rejects(dailyRun(t, [{ title: "Story" }], {}, undefined, db));
   assert.deepEqual(db.rpcCalls.map((call) => call.name), ["refresh_must_read"]);
 });
 
 // Polish final review. Kills the reverse trade: a failed refresh_must_read must not cost the day's list either.
 test("a failed refresh_must_read still writes the day's list, and the run still fails", async (t) => {
   const db = fakeDb(undefined, { rpcError: pgError("08006", "down") });
-  await assert.rejects(dailyRun(t, [{ title: "Story", score: 80, minutes: 5 }], {}, undefined, db));
+  await assert.rejects(dailyRun(t, [{ title: "Story" }], {}, undefined, db));
   assert.equal((db.upserts.find((u) => u.table === "daily_top")?.values as unknown[] | undefined)?.length, 1);
 });
 
 // Spec N6, Review Focus 3. Kills the day taken in UTC: a manual run at 00:30 in Budapest belongs to the new day.
 test("a run after midnight in Budapest writes the new day's list", async (t) => {
-  const { db } = await dailyRun(t, [{ title: "Late", score: 80, minutes: 5 }], {}, new Date("2026-09-23T22:30:00Z"));
+  const { db } = await dailyRun(t, [{ title: "Late" }], {}, new Date("2026-09-23T22:30:00Z"));
   assert.deepEqual(db.deletes.at(-1), { table: "daily_top", filters: [["day", "2026-09-24"], ["rank", 1, "gt"]] });
 });

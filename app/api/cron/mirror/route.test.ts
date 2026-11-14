@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { assignIds } from "../../../../lib/blocks.ts";
 import { fakeDb } from "../../../../lib/pipeline/fake-db.ts";
 import { mockFetch, TEST_HOST, withBudgetGone, withEnv } from "../../../../lib/pipeline/mock-fetch.ts";
 import { resetRoute, routeStub } from "../../../../lib/test/route-hooks.ts";
@@ -32,20 +33,32 @@ test("the mirror cron works the pending sources and says how many it took", asyn
   mockFetch(t, async () => new Response("", { status: 404 })); // the pending source's page
   onePendingSource();
   const response = await GET(cronRequest("Bearer s3cret"));
-  assert.deepEqual([response.status, await response.json()], [200, { processed: 1 }]);
+  assert.deepEqual([response.status, await response.json()], [200, { processed: 1, briefs: 0 }]);
   // Package A review #2. Kills the backstop dropped: a daily run killed at 300 s never applies its own
   // revalidation, and the current week would stay cached for up to an hour.
   assert.deepEqual(routeStub.revalidated, [["radar", { expire: 0 }]]);
 });
 
 // Kills the route's own deadline dropped (`retryPendingSources(db)`): with 181 s of its 300 s gone,
-// no source may start. Only two Date.now() calls happen on this path: the route's `start`, then the
-// start gate's check.
+// no source may start, and the brief call (which can take 2 × 120 s) is not begun either. Only three
+// Date.now() calls happen on this path: the route's `start`, the start gate's check, the brief gate's.
 test("the mirror cron forwards its own deadline: with 181 s of the 300 s gone, it starts nothing", async (t) => {
   resetRoute();
   withEnv(t, "CRON_SECRET", "s3cret");
-  onePendingSource();
+  // A Top 10 post that is waiting for its brief, so a brief call would be made if the gate let it.
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(new Date());
+  const text = assignIds([{ type: "paragraph", content: [{ text: "Article text with plenty of real content. ".repeat(30) }] }]);
+  const source = { id: 4, url: `${TEST_HOST}/gone`, kind: "article", note: null, attempts: 0 };
+  const db = fakeDb(undefined, {
+    source,
+    post: null,
+    pending: [source],
+    rows: { daily_top: [{ day, rank: 1, item_id: "i", digest_items: { url: "https://blog.test/a" } }] },
+    sources: [{ id: 9, url: "https://blog.test/a", posts: { id: 7, title: { hu: "", en: "T" }, brief: { hu: [], en: [] }, blocks: text } }],
+  });
+  routeStub.admin = db;
   withBudgetGone(t, 181_000);
   const response = await GET(cronRequest("Bearer s3cret"));
-  assert.deepEqual([response.status, await response.json()], [200, { processed: 0 }]);
+  assert.deepEqual([response.status, await response.json()], [200, { processed: 0, briefs: 0 }]);
+  assert.deepEqual(db.tasks, [], "no model task was even looked up");
 });

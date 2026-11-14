@@ -71,10 +71,10 @@ test("PostBlocks gives id=video, the ?t= start and autoplay to the first visible
 });
 
 test("PostBlocks carries the page's query into chapter links and the hidden-blocks link, dropping t from the latter", () => {
-  const doc = renderBlocks({ hidden: [vimeo.id], linkQuery: { text: "hu", t: "90" } });
-  assert.equal(doc.querySelector("nav a")!.getAttribute("href"), "?text=hu&t=30#video");
+  const doc = renderBlocks({ hidden: [vimeo.id], linkQuery: { edit: "1", t: "90" } });
+  assert.equal(doc.querySelector("nav a")!.getAttribute("href"), "?t=30&edit=1#video");
   const reveal = [...doc.querySelectorAll("a")].find((a) => a.textContent === "1 hidden block — show")!;
-  assert.equal(reveal.getAttribute("href"), "?text=hu&hidden=show");
+  assert.equal(reveal.getAttribute("href"), "?hidden=show&edit=1");
 });
 
 test("PostBlocks in controls mode keeps hidden blocks, and picks the primary video among them", () => {

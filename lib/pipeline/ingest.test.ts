@@ -13,8 +13,9 @@ import {
   SUMMARY_RESERVE_MS,
 } from "./ingest.ts";
 import { fakeDb, pgError } from "./fake-db.ts";
+import { toGenerated } from "./summary.ts";
 import { CLAIM_LEASE_MS } from "./util.ts";
-import { geminiPrompt, geminiResponse, geminiSchemaKeys, geminiText, mockDns, mockFetch, TEST_HOST, withGeminiKey, youtubeUrl } from "./mock-fetch.ts";
+import { geminiResponse, geminiSchemaKeys, geminiText, mockDns, mockFetch, TEST_HOST, withGeminiKey, youtubeUrl } from "./mock-fetch.ts";
 
 test("failureUpdate keeps a published post when re-extraction fails", () => {
   assert.deepEqual(failureUpdate(true, "fetch 404"), { error: "fetch 404" });
@@ -33,7 +34,9 @@ test("imageBudgetFor(): shrinks toward the deadline, floors at 0, and is capped 
 // --- processSource()/retryPendingSources() wiring: real extract/cleanup/images/summary modules,
 // against a fake `sources`/`posts`/storage db and a mocked global fetch (page + Gemini). ---
 
-const okSummary = { title: { hu: "Cím", en: "Title" }, summary: { hu: "Összegzés", en: "Summary" }, keyPoints: { hu: [], en: [] }, tags: [], brief: { hu: ["Bekezdés."], en: ["Paragraph."] } };
+/** What the model writes (once, in the source's language), and the row it becomes. */
+const modelSummary = { title: "Title", summary: "Summary", keyPoints: [], tags: [], brief: ["Paragraph."] };
+const okSummary = toGenerated(modelSummary);
 
 /** A never-attempted submission served from TEST_HOST. */
 const newSource = (id: number, kind = "article", path = "post") => ({ id, url: `${TEST_HOST}/${path}`, kind, note: null, attempts: 0 });
@@ -60,19 +63,16 @@ function assertExtractionFailedNotMirrored(post: Record<string, unknown>) {
   assert.equal((post.meta as { mirrored: boolean }).mirrored, false);
 }
 
-/** Whether a captured Gemini request is the ingest_cleanup call: its schema asks for `remove`. */
-const isCleanup = (init?: RequestInit) => geminiSchemaKeys(init).includes("remove");
-
-/** Serves `html` at TEST_HOST and routes every Gemini call to `cleanupOut` or `summaryOut` by the schema it asks for. */
-function articleGeminiHandler(html: string, cleanupOut: unknown, summaryOut: unknown = okSummary) {
-  return async (url: string, init?: RequestInit) => {
+/** Serves `html` at TEST_HOST; any Gemini call is answered with `summaryOut` (an ordinary article makes none). */
+function articleGeminiHandler(html: string, summaryOut: unknown = modelSummary) {
+  return async (url: string) => {
     if (url.startsWith(TEST_HOST)) return new Response(html, { headers: { "content-type": "text/html" } });
-    return geminiResponse(isCleanup(init) ? cleanupOut : summaryOut);
+    return geminiResponse(summaryOut);
   };
 }
 
 /** Serves a fake PDF at TEST_HOST and routes Gemini by whether the call carries `inline_data` (the pdf transcription vs. the later summarize()). */
-function pdfGeminiHandler(pdfOut: unknown, summaryOut: unknown = okSummary) {
+function pdfGeminiHandler(pdfOut: unknown, summaryOut: unknown = modelSummary) {
   return async (url: string, init?: RequestInit) => {
     if (url.startsWith(TEST_HOST)) return new Response("%PDF-1.4 fake", { headers: { "content-type": "application/pdf" } });
     const body = JSON.parse(String(init?.body)) as { contents: { parts: { inline_data?: unknown }[] }[] };
@@ -81,12 +81,19 @@ function pdfGeminiHandler(pdfOut: unknown, summaryOut: unknown = okSummary) {
   };
 }
 
-/** Runs processSource on a fresh article source against ARTICLE_HTML, with a cleanup that removes nothing. */
+/** Serves `html`, and a PNG for every `.png` it links. */
+async function pageWithPng(html: string) {
+  const png = await testPng();
+  const page = articleGeminiHandler(html);
+  return async (url: string) => (url.endsWith(".png") ? new Response(png, { headers: { "content-type": "image/png" } }) : page(url));
+}
+
+/** Runs processSource on a fresh article source against ARTICLE_HTML, with no model call. */
 async function processArticle(t: TestContext, id: number) {
   mockDns(t);
   withGeminiKey(t);
   const db = fakeDb(undefined, { source: newSource(id), post: null });
-  mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
+  mockFetch(t, articleGeminiHandler(ARTICLE_HTML));
   await processSource(db, id);
   return db;
 }
@@ -97,7 +104,7 @@ async function processArticle(t: TestContext, id: number) {
 const NOARCHIVE_IMG_URL = `${TEST_HOST}/gated.png`;
 const NOARCHIVE_HTML = `<!doctype html><html><head><title>Gated</title><meta name="robots" content="noarchive"></head><body><article><h1>Gated</h1><p>${"Body text that would normally be mirrored but must not be, since this page opted out. ".repeat(6)}</p><img src="${NOARCHIVE_IMG_URL}" alt="gated"></article></body></html>`;
 
-function noarchiveGeminiHandler(sectionsOut: unknown, onImageFetch: () => void, summaryOut: unknown = okSummary) {
+function noarchiveGeminiHandler(sectionsOut: unknown, onImageFetch: () => void, summaryOut: unknown = modelSummary) {
   return async (url: string, init?: RequestInit) => {
     if (url === NOARCHIVE_IMG_URL) {
       onImageFetch();
@@ -115,10 +122,11 @@ test("processSource() success: upserts blocks with mirrored meta and the generat
   const post = db.postUpserts[0];
   assert.ok(Array.isArray(post.blocks) && (post.blocks as unknown[]).length > 0);
   assert.equal((post.meta as { mirrored: boolean }).mirrored, true);
-  assert.equal(post.blocks_hu, null);
   assert.equal(typeof post.extracted_at, "string");
-  assert.deepEqual(post.title, okSummary.title);
-  assert.deepEqual(post.summary, okSummary.summary);
+  // An ordinary page is summarized by rule, never by a model: its title, and its lead as the summary.
+  assert.deepEqual(post.title, { hu: "A Title", en: "A Title" });
+  assert.match((post.summary as { en: string }).en, /^Paragraph 1 carries/);
+  assert.deepEqual(db.tasks, []);
 
   assert.ok(db.sourceUpdates.some((u) => u.status === "done" && u.error === null));
   // attempts is bumped before the post is upserted, not after
@@ -135,7 +143,6 @@ test("processSource(): the post upsert uses onConflict: source_id and writes exa
     [
       "author",
       "blocks",
-      "blocks_hu",
       "brief",
       "extracted_at",
       "key_points",
@@ -151,7 +158,7 @@ test("processSource(): the post upsert uses onConflict: source_id and writes exa
     ],
   );
   assert.ok(db.eqCalls.some((c) => c.table === "posts" && c.column === "source_id"));
-  assert.deepEqual(db.postUpserts[0].brief, okSummary.brief);
+  assert.deepEqual(db.postUpserts[0].brief, { hu: [], en: [] });
 });
 
 test("processSource(): attempts is bumped before any extraction fetch", async (t) => {
@@ -159,10 +166,10 @@ test("processSource(): attempts is bumped before any extraction fetch", async (t
   withGeminiKey(t);
   const source = newSource(3);
   const db = fakeDb(undefined, { source, post: null });
-  const handler = articleGeminiHandler(ARTICLE_HTML, { remove: [] });
-  mockFetch(t, (url, init) => {
+  const handler = articleGeminiHandler(ARTICLE_HTML);
+  mockFetch(t, (url) => {
     db.writes.push("fetch");
-    return handler(url, init);
+    return handler(url);
   });
   await processSource(db, source.id);
   assert.ok(db.writes.indexOf("sources.update") < db.writes.indexOf("fetch"));
@@ -180,10 +187,7 @@ test("processSource(): on success, storage.remove takes only unreferenced media 
   const source = newSource(5);
   // A stale object from an earlier version of this source's media, no longer referenced by anything.
   const db = fakeDb(undefined, { source, post: null, media: ["stale0123456789ab-640.avif"] });
-  const png = await testPng();
-  mockFetch(t, async (url, init) =>
-    url.endsWith(".png") ? new Response(png, { headers: { "content-type": "image/png" } }) : articleGeminiHandler(html, { remove: [] })(url, init),
-  );
+  mockFetch(t, await pageWithPng(html));
   await processSource(db, source.id);
   assert.deepEqual(db.removedMedia, ["5/stale0123456789ab-640.avif"]); // only the stale one
   const image = (db.postUpserts[0].blocks as { type: string; path?: string | null }[]).find((b) => b.type === "image");
@@ -201,12 +205,12 @@ test("processSource(): a previously mirrored image is reused by originalUrl inst
   ];
   const db = fakeDb(undefined, { source, post: { id: 1, blocks: previousBlocks }, media: ["cafef00dcafef00d-640.avif", "cafef00dcafef00d-1280.avif"] });
   let imageFetches = 0;
-  mockFetch(t, async (url, init) => {
+  mockFetch(t, async (url) => {
     if (url === imgUrl) {
       imageFetches++;
       return new Response(await testPng(), { headers: { "content-type": "image/png" } });
     }
-    return articleGeminiHandler(html, { remove: [] })(url, init);
+    return articleGeminiHandler(html)(url);
   });
   await processSource(db, source.id);
   assert.equal(imageFetches, 0); // reused by originalUrl, never re-downloaded
@@ -259,15 +263,9 @@ test("processSource(): a failure after an image upload removes the orphaned uplo
   withGeminiKey(t);
   const html = oneImageHtml(`${TEST_HOST}/pic.png`);
   const source = newSource(10);
-  const db = fakeDb(undefined, { source, post: null });
-  const png = await testPng();
-  mockFetch(t, async (url, init) =>
-    url.endsWith(".png")
-      ? new Response(png, { headers: { "content-type": "image/png" } })
-      : articleGeminiHandler(html, { remove: [] }, "not a valid summary")(url, init),
-  );
+  const db = fakeDb(undefined, { source, post: null, postUpsertError: new Error("posts down") });
+  mockFetch(t, await pageWithPng(html));
   await processSource(db, source.id);
-  assert.equal(db.postUpserts.length, 0); // the post itself was never saved — summarize() failed
   assert.ok(db.removedMedia.length > 0); // but the image it uploaded along the way did not stay orphaned
   const failureWrite = db.sourceUpdates.at(-1);
   assert.equal(failureWrite?.status, "failed");
@@ -283,7 +281,7 @@ test("processSource(): the failure-path media cleanup never re-runs once the pos
   // could come out is `saved` itself — Boolean(existing) alone would be false here.
   const source = newSource(11);
   const db = fakeDb(undefined, { source, post: null, storageError: true });
-  mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
+  mockFetch(t, articleGeminiHandler(ARTICLE_HTML));
   await processSource(db, source.id);
   assert.equal(db.postUpserts.length, 1); // the upsert itself succeeded
   assert.equal(db.writes.filter((w) => w === "storage.list").length, 1); // only the success-path attempt — no repeat from the catch
@@ -323,13 +321,12 @@ test("processSource(): the failure-path cleanup re-reads the current post right 
   ];
   const source = newSource(12);
   const db = fakeDb(undefined, { source, post: { id: 1, blocks: oldBlocks }, media: ["aaaaaaaaaaaaaaaa-640.avif", "bbbbbbbbbbbbbbbb-640.avif"] });
-  mockFetch(t, async (url, init) => {
-    if (url.startsWith(TEST_HOST)) return new Response(ARTICLE_HTML, { headers: { "content-type": "text/html" } });
-    if (isCleanup(init)) return geminiResponse({ remove: [] }); // cleanup: keep going
+  mockFetch(t, async (url) => {
+    if (url.startsWith(TEST_HOST)) return new Response(NOARCHIVE_HTML, { headers: { "content-type": "text/html" } });
     // Simulate a concurrent run publishing new media via its own real (write-through) upsert,
-    // right as our own summarize() call is about to fail this attempt.
+    // right as our own writeNotes() call is about to fail this attempt.
     await db.from("posts").upsert({ source_id: source.id, blocks: newBlocks }, { onConflict: "source_id" });
-    return geminiText("not a valid summary"); // summarize: fail this attempt
+    return geminiText("not valid notes"); // writeNotes: fail this attempt
   });
   await processSource(db, source.id);
   // The re-read at failure time sees newBlocks, not the start-of-run oldBlocks: the old image
@@ -392,7 +389,7 @@ test("processSource() youtube: an extractor-generated summary means summarize() 
   mockFetch(t, async (url) =>
     url.includes("/oembed")
       ? new Response(JSON.stringify({ title: "A Video", author_name: "A Channel" }))
-      : geminiResponse({ ...okSummary, chapters: [] }),
+      : geminiResponse({ ...modelSummary, chapters: [] }),
   );
   await processSource(db, source.id);
   assert.deepEqual(db.tasks, ["ingest_video"]); // no separate "ingest_article" summarize() call
@@ -410,7 +407,7 @@ test("processSource(): youtube's videoOnly fallback (Gemini fails) still gives m
     if (url.includes("/oembed")) return new Response(JSON.stringify({ title: "A video", author_name: "A Channel" }));
     geminiCalls++;
     // extractYoutube's own call fails (triggering the videoOnly fallback); the later summarize() call succeeds.
-    return geminiCalls === 1 ? geminiResponse("not an object") : geminiResponse(okSummary);
+    return geminiCalls === 1 ? geminiResponse("not an object") : geminiResponse(modelSummary);
   });
   await processSource(db, source.id);
   const post = db.postUpserts[0];
@@ -418,10 +415,7 @@ test("processSource(): youtube's videoOnly fallback (Gemini fails) still gives m
   assertExtractionFailedNotMirrored(post);
 });
 
-// Every source below has at least 4 blocks: under aiCleanup's own minimum, a removed
-// AI_CLEANUP_KINDS gate would hide behind that guard and these tests would pass for the wrong reason.
-
-test("processSource(): a pdf skips aiCleanup", async (t) => {
+test("processSource(): a pdf is transcribed by the model, then summarized by rule", async (t) => {
   withGeminiKey(t);
   const source = newSource(18, "pdf", "paper.pdf");
   const db = fakeDb(undefined, { source, post: null });
@@ -437,64 +431,20 @@ test("processSource(): a pdf skips aiCleanup", async (t) => {
     }),
   );
   await processSource(db, source.id);
-  assert.deepEqual(db.tasks, ["ingest_pdf", "ingest_article"]);
+  assert.deepEqual(db.tasks, ["ingest_pdf"]);
 });
 
-test("processSource(): an x post skips aiCleanup and stays mirrored", async (t) => {
+test("processSource(): an x post makes no model call and stays mirrored", async (t) => {
   withGeminiKey(t);
   const source = { id: 19, url: "https://x.com/someone/status/1", kind: "x", note: null, attempts: 0 };
   const db = fakeDb(undefined, { source, post: null });
   const tweetHtml = `<blockquote class="twitter-tweet"><p lang="en" dir="ltr">First line with enough text to count.<br><br>Second line with enough text to count.<br><br>Third line with enough text to count.<br><br>Fourth line with enough text to count.</p>&mdash; Someone (@someone) <a href="https://x.com/someone/status/1">January 1, 2025</a></blockquote>`;
   mockFetch(t, async (url) =>
-    url.includes("publish.twitter.com") ? new Response(JSON.stringify({ author_name: "Someone", html: tweetHtml })) : geminiResponse(okSummary),
+    url.includes("publish.twitter.com") ? new Response(JSON.stringify({ author_name: "Someone", html: tweetHtml })) : geminiResponse(modelSummary),
   );
   await processSource(db, source.id);
-  assert.deepEqual(db.tasks, ["ingest_article"]);
+  assert.deepEqual(db.tasks, []);
   assert.equal((db.postUpserts[0].meta as { mirrored: boolean }).mirrored, true); // unlike youtube, x stays mirrored on success
-});
-
-test("processSource(): an article runs aiCleanup exactly once, before the summary", async (t) => {
-  const db = await processArticle(t, 20);
-  assert.deepEqual(db.tasks, ["ingest_cleanup", "ingest_article"]);
-});
-
-test("processSource(): a failing ingest_cleanup call leaves the article's blocks unchanged instead of failing the whole post", async (t) => {
-  mockDns(t);
-  withGeminiKey(t);
-  const source = newSource(21);
-  const db = fakeDb(undefined, { source, post: null });
-  // Reuses articleGeminiHandler: a cleanupOut that doesn't match cleanupSchema fails the same way
-  // invalid JSON would (generate() throws, aiCleanup catches it and returns the blocks unchanged).
-  mockFetch(t, articleGeminiHandler(ARTICLE_HTML, "not a valid cleanup response"));
-  await processSource(db, source.id);
-  assert.ok(db.sourceUpdates.some((u) => u.status === "done"));
-  assert.equal(db.sourceUpdates.some((u) => u.status === "failed"), false);
-  assert.ok((db.postUpserts[0].blocks as unknown[]).length > 0);
-});
-
-test("processSource(): clips before cleaning, so the ingest_cleanup listing sent to the model stays bounded (listing size)", async (t) => {
-  mockDns(t);
-  withGeminiKey(t);
-  const tinyParagraphs = Array.from(
-    { length: 405 },
-    (_, i) => `<p>Item number ${i} has just enough unique words to count as its own block for this test to work as intended.</p>`,
-  ).join("");
-  const hugeHtml = `<!doctype html><html><head><title>Huge</title></head><body><article><h1>Huge</h1>${tinyParagraphs}</article></body></html>`;
-  const source = newSource(22, "article", "huge");
-  const db = fakeDb(undefined, { source, post: null });
-  let cleanupListingLines = 0;
-  mockFetch(t, async (url, init) => {
-    if (url.startsWith(TEST_HOST)) return new Response(hugeHtml, { headers: { "content-type": "text/html" } });
-    if (isCleanup(init)) {
-      cleanupListingLines = geminiPrompt(init).split("\n").filter((line) => /^[a-z0-9-]+ \[/.test(line)).length;
-      return geminiResponse({ remove: [] });
-    }
-    return geminiResponse(okSummary);
-  });
-  await processSource(db, source.id);
-  assert.ok(cleanupListingLines > 0);
-  assert.ok(cleanupListingLines <= 400); // the listing itself never exceeds the clip cap
-  assert.equal((db.postUpserts[0].meta as { clipped?: boolean }).clipped, true);
 });
 
 test("removeUnusedMedia() removes only storage paths no longer referenced by the blocks", async () => {
@@ -513,7 +463,7 @@ test("processSource(): extractionFailed keeps meta.mirrored false", async (t) =>
   const source = newSource(23, "article", "thin");
   const db = fakeDb(undefined, { source, post: null });
   const tinyHtml = `<!doctype html><html><head><title>Thin</title></head><body><p>too short</p></body></html>`;
-  mockFetch(t, async (url) => (url.includes("googleapis.com") ? geminiResponse(okSummary) : new Response(tinyHtml, { headers: { "content-type": "text/html" } })));
+  mockFetch(t, async (url) => (url.includes("googleapis.com") ? geminiResponse(modelSummary) : new Response(tinyHtml, { headers: { "content-type": "text/html" } })));
   await processSource(db, source.id);
   assertExtractionFailedNotMirrored(db.postUpserts[0]);
 });
@@ -544,7 +494,7 @@ test("processSource(): the image budget is computed after extraction, reflecting
   // "Computed at buildPost's start" would give a ~200ms budget, comfortably covering both waves
   // below. Computed after extraction (correct), the 150ms the page fetch takes eats into it first.
   const deadline = Date.now() + SUMMARY_RESERVE_MS + 200;
-  mockFetch(t, async (url, init) => {
+  mockFetch(t, async (url) => {
     if (url.endsWith(".png")) {
       await new Promise((resolve) => setTimeout(resolve, 100));
       return new Response(await testPng(), { headers: { "content-type": "image/png" } });
@@ -553,7 +503,7 @@ test("processSource(): the image budget is computed after extraction, reflecting
       await new Promise((resolve) => setTimeout(resolve, 150)); // the extraction fetch itself takes real time
       return new Response(html, { headers: { "content-type": "text/html" } });
     }
-    return articleGeminiHandler(html, { remove: [] })(url, init);
+    return articleGeminiHandler(html)(url);
   });
   await processSource(db, source.id, { deadline });
   const images = (db.postUpserts[0].blocks as { type: string; path?: string | null }[]).filter((b) => b.type === "image");
@@ -567,7 +517,7 @@ test("two processSource runs on one source at once: exactly one claims it and bu
   mockDns(t);
   withGeminiKey(t);
   const db = fakeDb(undefined, { source: newSource(40), post: null });
-  mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
+  mockFetch(t, articleGeminiHandler(ARTICLE_HTML));
   const results = await Promise.all([processSource(db, 40), processSource(db, 40)]);
   assert.deepEqual([...results].sort(), [false, true]);
   assert.equal(db.postUpserts.length, 1);
@@ -671,7 +621,7 @@ test("retryPendingSources(): forwards its deadline into processSource, so a tigh
       const realNow = Date.now;
       t.mock.method(Date, "now", () => (extractionDone ? realNow() + offsetAfterExtraction : realNow()));
     }
-    mockFetch(t, async (url, init) => {
+    mockFetch(t, async (url) => {
       if (url.endsWith(".png")) {
         await new Promise((resolve) => setTimeout(resolve, 150));
         return new Response(await testPng(), { headers: { "content-type": "image/png" } });
@@ -680,7 +630,7 @@ test("retryPendingSources(): forwards its deadline into processSource, so a tigh
         extractionDone = true; // simulates the extraction (plus cleanup) step having taken real time
         return new Response(html, { headers: { "content-type": "text/html" } });
       }
-      return articleGeminiHandler(html, { remove: [] })(url, init);
+      return articleGeminiHandler(html)(url);
     });
     const processed = await retryPendingSources(db, deadline);
     assert.equal(processed, 1); // the deadline cleared retryPendingSources' own start gate
@@ -702,7 +652,7 @@ test("retryPendingSources(): with plenty of time left, every pending source is p
   withGeminiKey(t);
   const sources = [newSource(1), newSource(2), newSource(3)];
   const db = fakeDb(undefined, { sources, post: null, pending: sources });
-  mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
+  mockFetch(t, articleGeminiHandler(ARTICLE_HTML));
   const processed = await retryPendingSources(db, Date.now() + 10 * 60_000);
   assert.equal(processed, 3);
   assert.equal(db.postUpserts.length, 3);
@@ -765,7 +715,7 @@ test("processSource(): a plain-object upsert error (PostgREST shape) is stored a
     post: null,
     postUpsertError: pgError("23505", "duplicate key value violates unique constraint"),
   });
-  mockFetch(t, articleGeminiHandler(ARTICLE_HTML, { remove: [] }));
+  mockFetch(t, articleGeminiHandler(ARTICLE_HTML));
   await processSource(db, source.id);
   assert.equal(db.postUpserts.length, 1); // the attempt was recorded even though it errored
   assert.deepEqual(db.sourceUpdates.at(-1), { status: "failed", error: "duplicate key value violates unique constraint", claimed_at: null });

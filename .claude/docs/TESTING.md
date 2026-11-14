@@ -4,7 +4,7 @@ Every test runs offline under plain `node --test` (README.md → Testing). This 
 
 ## Test layers
 
-1. **Unit tests on `lib/`.** Pure functions and whole pipeline runs (`processSource`, `runDaily`, `translatePost`, `generate()`) run under `node --test`, against the `fakeDb` stand-in and a mocked `fetch`.
+1. **Unit tests on `lib/`.** Pure functions and whole pipeline runs (`processSource`, `runDaily`, `generate()`) run under `node --test`, against the `fakeDb` stand-in and a mocked `fetch`.
 2. **The static render harness** (`lib/test/render.ts`). A component test renders a React element to static HTML with `renderToStaticMarkup` and queries the result as a linkedom `Document`. Hooks run once, and there are no effects, no events and no hydration, so clicks and state changes are invisible here. What it does catch: markup and ARIA contracts, crashes, and a render-phase loop ("Too many re-renders"). `app/components/shell.test.ts` smoke-renders every app-shell client component on the preview fixtures for exactly that. The harness is verified on Node 24.16 only; Node 22.13 is unverified.
 3. **The route-handler layer** (`lib/test/route-hooks.ts`, plus the `STUBS` map in `lib/test/tsx-hooks.ts`). A route handler runs as a plain function, with no Next.js server, against a stubbed session, admin client and `after()`.
 4. **The runtime smoke check on `/dev/preview`,** for UI work:

@@ -89,7 +89,7 @@ test("extractX wraps a network error (the oEmbed fetch itself rejects) as FetchE
 
 const videoOf = (result: { blocks: Block[] }) => result.blocks.find((b): b is Extract<Block, { type: "video" }> => b.type === "video");
 const chaptersOf = (result: { blocks: Block[] }) => result.blocks.find((b): b is Extract<Block, { type: "chapters" }> => b.type === "chapters");
-const noChapters = { title: { hu: "C", en: "T" }, summary: { hu: "Ö", en: "S" }, keyPoints: { hu: [], en: [] }, tags: [], brief: { hu: [], en: [] }, chapters: [] };
+const noChapters = { title: "T", summary: "S", keyPoints: [], tags: [], brief: [], chapters: [] };
 
 test("extractYoutube embeds the video and sorts chapters by seconds, keeping chapters out of `generated`", async (t) => {
   withGeminiKey(t);
@@ -97,11 +97,11 @@ test("extractYoutube embeds the video and sorts chapters by seconds, keeping cha
     url.includes("/oembed")
       ? new Response(JSON.stringify({ title: "How diffusion works", author_name: "A Channel" }))
       : geminiResponse({
-          title: { hu: "Cím", en: "Title" },
-          summary: { hu: "Összefoglaló", en: "Summary" },
-          keyPoints: { hu: ["pont"], en: ["point"] },
+          title: "Title",
+          summary: "Summary",
+          keyPoints: ["point"],
           tags: ["training"],
-          brief: { hu: [], en: [] },
+          brief: [],
           chapters: [
             { seconds: 90, title: "Details" }, // out of order on purpose
             { seconds: 0, title: "Intro" },
@@ -119,6 +119,9 @@ test("extractYoutube embeds the video and sorts chapters by seconds, keeping cha
   assert.equal(result.author, "A Channel");
   assert.ok(result.generated);
   assert.ok(!("chapters" in (result.generated as Record<string, unknown>)));
+  // Written once in the video's language, stored in both slots.
+  assert.deepEqual(result.generated.title, { hu: "Title", en: "Title" });
+  assert.deepEqual(result.generated.keyPoints, { hu: ["point"], en: ["point"] });
 });
 
 test("extractYoutube adds no chapters block when the model returns none", async (t) => {

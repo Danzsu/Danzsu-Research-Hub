@@ -26,6 +26,8 @@ test("parseFeed reads RSS 2.0 items: link, stripped title and snippet, the pubDa
       snippet: "A small model for laptops.",
       publishedAt: "2026-09-22",
       hint: "research",
+      points: 0,
+      weight: 1,
     },
   ]);
 });
@@ -90,7 +92,7 @@ test("parseFeed caps the snippet at 400 characters", () => {
   assert.equal(parseFeed(body, feed, since)[0].snippet.length, 400);
 });
 
-const candidate = (url: string, title = "A title"): Candidate => ({ url, title, source: "S", snippet: "", publishedAt: "2026-09-22", hint: "local" });
+const candidate = (url: string, title = "A title"): Candidate => ({ url, title, source: "S", snippet: "", publishedAt: "2026-09-22", hint: "local", points: 0, weight: 1 });
 
 test("dedupeCandidates keeps the first of each URL, ignoring a fragment and a trailing slash", () => {
   const kept = dedupeCandidates([
@@ -183,6 +185,8 @@ test("the Daily Papers come from the finished days since `since`, the most upvot
     snippet: "What it does.",
     publishedAt: "2026-09-22",
     hint: "research",
+    points: 40, // the upvotes are the popularity the rule score reads
+    weight: 1,
   });
   assert.equal(papers.some((c) => c.url.includes("evil")), false);
   assert.equal(papers.some((c) => c.url.endsWith("2609.00001")), false, "3 upvotes is below the 15th of the other day");

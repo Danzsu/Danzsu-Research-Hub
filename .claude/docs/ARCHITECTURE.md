@@ -20,7 +20,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
 - `app/(app)/` holds the signed-in pages (`/`, `/daily`, `/companies`, `/archive`, `/archive/[week]`, `/github`, `/library`, `/library/[id]`, `/collection`) under one layout, the app shell. The group name isn't part of the URL. `library/` has the list (`library-view`), the submit form and the post page. The post page's files are in `[id]/`: `post-article`, `post-toolbar`, `post-editor`, `post-notices` and `mark-post-read`. `archive/` has the archive list. `github/` is the GitHub page (`github-view`), one `repo-card` per repo. `collection/` is the collection of ❤ marks. Three more route groups hold one page each, `(radar)/` (`/`), `library/(list)/` and `archive/(list)/`, so that each page's `loading.tsx` wraps that page alone (CLAUDE.md → App shell and navigation). `companies/` is the AI companies page: `/` and it both render `current-week-page.tsx`, the current week's dashboard, the second with `scope="companies"`. `daily/` is the day's Top 10, the same dashboard with `scope="daily"` on `getDaily`.
 - The rest of `app/`, outside the group:
   - `login/` and `auth/` (login, google, callback, signout), and the public `about/` and `privacy/` pages (`public-page` frames them with the `brand-mark` logo, `sign-in-sheet` slides the sign-in up from its header, `sign-in-forms` is shared with `login/`, `lift-classes` is the taiyaki's cream button surface);
-  - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, translate, reextract), `cron/daily` and `cron/mirror`;
+  - `api/`: state, sources (with `sources/mine` and `sources/[id]/retry`), `posts/[id]` (PATCH, reextract), `cron/daily` and `cron/mirror`;
   - `media/[...path]/`, which serves the mirrored images to signed-in readers;
   - `dev/preview/`, the offline preview on fixtures;
   - the error, not-found and manifest files, and the app icon (`icon.png`, 512px, for the tab and the manifest; `apple-icon.png`, 180px on ink, for the iOS home screen);
@@ -38,9 +38,9 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - the hooks: `use-reader-state`, `use-shortcuts`, `use-model-context-tools`.
 - `components/ui/` holds vendored shadcn components on the unified `radix-ui` package. A few are hand-patched (CLAUDE.md → Hand-authored components). Most aren't used yet and are kept for the UI/UX milestones. `hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel and the link chat use it.
 - `lib/pipeline/` holds the two writers:
-  - the Radar: `daily.ts`, `collect.ts` (its sources come from `config/sources.ts`), `daily-top.ts` (the day's Top 10 and the Budapest date), and `mirror.ts`, which queues the week's best items and every daily Top 10 for the Library;
+  - the Radar: `daily.ts`, `collect.ts` (its sources come from `config/sources.ts`), `daily-top.ts` (the day's Top 10 and the Budapest date), and `mirror.ts`, which queues the week's best items, every daily Top 10 and the week's GitHub Top 10 for the Library;
   - the Library: `ingest.ts` (`processSource`, `retryPendingSources`), and `extract/` with one extractor per source kind, where `index.ts` holds the fallback chain;
-  - HTML to blocks: `html-to-blocks.ts`, plus `html-noise.ts` and `cleanup.ts` for the three noise layers;
+  - HTML to blocks: `html-to-blocks.ts`, plus `html-noise.ts` for the two noise layers, `quick-summary.ts` (the rule-based summary and tags) and `briefs.ts` (the Top 10's briefs, one model call);
   - images: `html-images.ts` and `images.ts` (mirroring);
   - `summary.ts`, the summaries and notes;
   - `fetch.ts` (`safeFetch`, `apiFetch`) and `util.ts` (ids, URL parsing and small shared helpers).
@@ -50,7 +50,7 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - `post-view.ts`, the page's `Post` and the renderer's helpers, zod-free because the browser gets it (`shownTitle` is the title readers see, `editPayload` the editor's save);
   - `post-row.ts`, server-only, which turns a post row into that `Post`;
   - the submitter's edits: `post-edit.ts`, `overrides.ts`;
-  - `translate.ts` and the model client, `llm.ts`;
+  - the model client, `llm.ts`;
   - `content.ts`, which turns DB rows into content types, and holds the two content caches;
   - reader state: `reader-store.ts`, `state.ts`, `feed.ts`, and the ratings store, `ratings.ts`;
   - search: `search.ts` (the query tidy-up and `searchAll`, which calls the database's `search_all`);
@@ -96,7 +96,7 @@ Breaking one of these is a bug even when every test passes.
   - the post page's `MarkPostRead` gets `preview`;
   - under `fail=1`, every write fails.
 
-  The preview post and chat-source ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Translate, Retry or a Library card link can't reach a real row. The preview isn't a sandbox, though: the app shell's own links and Sign out are the real ones, so with a local session they leave the preview for real pages, real data and a real sign-out.
+  The preview post and chat-source ids in `lib/fixtures.ts` are negative. `parseId` rejects them, so Retry or a Library card link can't reach a real row. The preview isn't a sandbox, though: the app shell's own links and Sign out are the real ones, so with a local session they leave the preview for real pages, real data and a real sign-out.
 - **`robots: noindex` and the invite gate are load-bearing, not cosmetic.** The Library mirrors other people's articles, and those two are what keep that defensible (README.md → Content and copyright). SECURITY.md covers how the gate is enforced. A `noarchive` page is never mirrored (CLAUDE.md → How content gets in, step 3).
 
 ## Boundaries
