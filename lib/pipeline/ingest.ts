@@ -1,19 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { limitBlocks, parseBlocks, type Block } from "../blocks.ts";
 import { MEDIA_BUCKET } from "../media.ts";
-import { aiCleanup } from "./cleanup.ts";
 import { extract } from "./extract/index.ts";
 import { IMAGE_BUDGET_MS, mirrorImages, unusedMediaPaths } from "./images.ts";
+import { quickSummary } from "./quick-summary.ts";
 import { summarize, writeNotes } from "./summary.ts";
 import { claimHeld, errorMessage, MAX_ATTEMPTS, type SourceKind } from "./util.ts";
 
 /** The runs a source gets before the queue gives up on it (a reader's "Újra" resets the count). */
 export { MAX_ATTEMPTS };
-
-// The cleanup prompt targets web-page chrome (nav, ads, share buttons); pdf (a Gemini
-// transcription), x (post text) and youtube (the video block) have none of that to strip,
-// and running the prompt on them risks dropping real content instead.
-const AI_CLEANUP_KINDS: ReadonlySet<SourceKind> = new Set(["article", "github", "arxiv"]);
 
 // retryPendingSources' own "don't start one more source" gate. A single model task's true worst
 // case is up to 2×120s (main route, then its one fallback — see retryPendingSources' own ponytail
@@ -76,16 +71,16 @@ async function buildPost(db: SupabaseClient, source: Source, previous: Block[], 
     blocks = await writeNotes(db, extracted);
     meta.mirrored = false;
   } else {
-    // Clip first, then clean: the listing sent to aiCleanup must never exceed the same cap.
     const limited = limitBlocks(extracted.blocks);
-    const cleaned = AI_CLEANUP_KINDS.has(source.kind) ? await aiCleanup(db, limited.blocks) : limited.blocks;
-    blocks = await mirrorImages(db, source.id, cleaned, previous, { budgetMs: imageBudgetFor(deadline) });
+    blocks = await mirrorImages(db, source.id, limited.blocks, previous, { budgetMs: imageBudgetFor(deadline) });
     // A YouTube video is embedded, not mirrored — never true for that kind, regardless of blocks.
     meta.mirrored = source.kind !== "youtube" && !extracted.meta.extractionFailed && blocks.length > 0;
     if (limited.clipped) meta.clipped = true;
   }
 
-  const generated = extracted.generated ?? (await summarize(db, extracted, note));
+  // No model for an ordinary page: its lead is the summary. A noarchive page's text is not ours to quote, so its
+  // summary is written like its notes; YouTube's was written with its chapters.
+  const generated = extracted.generated ?? (extracted.meta.noarchive ? await summarize(db, extracted, note) : quickSummary(extracted));
   return {
     title: generated.title,
     summary: generated.summary,

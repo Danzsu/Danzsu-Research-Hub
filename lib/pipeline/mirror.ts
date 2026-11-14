@@ -6,7 +6,8 @@ export const MIRROR_MIN_SCORE = 85;
 
 /**
  * The automatic Library mirror (spec 2): queues the week's best items, every one scoring at least
- * MIRROR_MIN_SCORE, the Top 3 and every day's Top 10 (daily news spec N5), as `pending` sources under the system account. A URL already in
+ * MIRROR_MIN_SCORE, the Top 3 and every day's Top 10 (daily news spec N5), and the week's GitHub Top 10 repositories (their
+ * READMEs, 2026-11-14), as `pending` sources under the system account. A URL already in
  * `sources` (a member's own submission, or an earlier day's mirror) is left as it is. The daily cron
  * calls it after runDaily; retryPendingSources works the queue there and in the mirror crons.
  * Answers how many sources it newly queued; 0, with one warning, without the account.
@@ -25,6 +26,12 @@ export async function queueMirrors(db: SupabaseClient, issueId: string, systemUs
     const inDailyTop = Array.isArray(item.daily_top) && item.daily_top.length > 0;
     if (item.score < MIRROR_MIN_SCORE && !item.must_read && !inDailyTop) continue;
     const url = canonicalSubmittedUrl(item.url as string);
+    if (url) rows.set(url.toString(), { url: url.toString(), kind: detectSource(url), submitted_by: systemUserId });
+  }
+  const { data: repos, error: reposError } = await db.from("github_top").select("url").eq("issue_id", issueId);
+  if (reposError) throw reposError;
+  for (const repo of repos ?? []) {
+    const url = canonicalSubmittedUrl(repo.url as string);
     if (url) rows.set(url.toString(), { url: url.toString(), kind: detectSource(url), submitted_by: systemUserId });
   }
   if (!rows.size) return 0;

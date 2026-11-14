@@ -14,7 +14,7 @@ A private, invite-only, bilingual (HU/EN) AI-research hub, published as **NEON N
 | Hosting and scheduler | Vercel, with Vercel Cron once a day |
 | Database, auth, files | Supabase: Postgres with RLS, magic-link and Google sign-in, a private Storage bucket |
 | Styling | Tailwind 4 (CSS-first) and vendored shadcn/ui on the unified `radix-ui` package |
-| Models | Gemini (Google AI Studio) for curation, summaries, video and PDF transcription; Groq for the cheap shortlist and cleanup passes. Plain `fetch`, no SDKs |
+| Models | Gemini (Google AI Studio) for curation, the Top 10 briefs, video and PDF transcription, and Gemini Decision 1 for the daily relevance judgement; no model writes an ordinary post. Plain `fetch`, no SDKs |
 
 ## How it works
 
@@ -47,7 +47,7 @@ flowchart TD
   ingest --> extract["extract: the kind's extractor, with noise layers 1 and 2"]
   extract --> noarchive{"noarchive?"}
   noarchive -->|yes| notes["writeNotes: notes in the model's own words"]
-  noarchive -->|no| limit["limitBlocks"] --> cleanup["aiCleanup: noise layer 3"] --> images["mirrorImages: media bucket"]
+  noarchive -->|no| limit["limitBlocks"] --> images["mirrorImages: media bucket"]
   notes --> summarize["summarize, unless the extractor already did"]
   images --> summarize
   summarize --> posts[("posts")]
@@ -59,9 +59,9 @@ flowchart TD
 **The block pipeline** ([`lib/pipeline/ingest.ts`](lib/pipeline/ingest.ts)) turns a submitted link into a post:
 
 1. **Extractors**, one per source kind in [`lib/pipeline/extract/`](lib/pipeline/extract/). When one fails, the fallback is the generic article extractor (for arXiv and GitHub only), then a metadata-only post with just the page's title and description. That last step fetches the page again, so a submission that gets that far fails when the page can't be reached, whatever its kind. For an article, an X post or a YouTube video, a fetch failure inside the extractor itself (an unreachable page, a video that doesn't exist) fails it straight away, with no fallback.
-2. **Noise filtering in three layers.** Layer 1 strips page chrome from the DOM (nav, ads, share widgets, cookie banners), and layer 2 drops leftover blocks (share links, newsletter prompts, duplicates). Both live in [`html-noise.ts`](lib/pipeline/html-noise.ts). Layer 3 asks a cheap model which blocks are not part of the article ([`cleanup.ts`](lib/pipeline/cleanup.ts)), for articles, GitHub READMEs and arXiv papers only.
+2. **Noise filtering in two layers.** Layer 1 strips page chrome from the DOM (nav, ads, share widgets, cookie banners), and layer 2 drops leftover blocks (share links, newsletter prompts, duplicates). Both live in [`html-noise.ts`](lib/pipeline/html-noise.ts). No model is involved.
 3. **Image mirroring** ([`images.ts`](lib/pipeline/images.ts)). Up to 30 images are downloaded and re-encoded to AVIF, or animated WebP, at 640 and 1280 px. They go into a private Storage bucket and are served by the `/media` route to signed-in readers only.
-4. **Summary or notes.** A model writes the bilingual title, summary, key points and tags. A page that asks not to be archived (`noarchive`) gets no mirrored text at all, only notes in the model's own words.
+4. **Summary or notes.** No model writes an ordinary post's summary: [`quick-summary.ts`](lib/pipeline/quick-summary.ts) takes the page's title and first sentences, and matches tags by keyword. A page that asks not to be archived (`noarchive`) gets no mirrored text at all, only notes in the model's own words. The day's Top 10 are the exception: [`briefs.ts`](lib/pipeline/briefs.ts) writes their 2–3 minute briefs in one model call after the mirror runs.
 
 Every source ends up as the same block model ([`lib/blocks.ts`](lib/blocks.ts)): headings, paragraphs, lists, quotes, code, images, videos, chapters, repo cards and dividers. The page renders only these blocks, never raw HTML. Block ids come from their content, so a hidden block stays hidden after re-extraction as long as its content is unchanged. A re-extraction that fails leaves the post as it was, and the post page shows the error to the submitter until a later run succeeds.
 
@@ -307,7 +307,7 @@ UI without live data: `npm run dev`, then open `/dev/preview` (development only)
 ## Conventions
 
 - **Design language.** Hard corners (`--radius` is 0), system fonts only, hard offset shadows, one fixed theme, and everything fits 360 px with at least 40 px touch targets. The full rules: [DESIGN.md](.claude/docs/DESIGN.md).
-- **Bilingual.** Every UI string should exist in Hungarian and English, in the component's copy object; the reader's choice is the `lang` cookie. Model output that readers see (titles, summaries, key points) is written in both languages. Code, comments and prompts are English.
+- **Bilingual.** Every UI string should exist in Hungarian and English, in the component's copy object; the reader's choice is the `lang` cookie. Content is never translated: model output that readers see (titles, summaries, briefs) is written once, in the source's own language. Code, comments and prompts are English.
 - **No duplication.** Search before writing a helper, and reuse the shared ones listed in [CODE_STYLE.md](.claude/docs/CODE_STYLE.md#no-duplication). `npm run dup` (jscpd) fails above 1% duplication.
 - **Relative imports in `lib/`,** with the `.ts` extension, so `node --test` can load the files without a bundler. The three exceptions are the Next-only server modules `lib/content.ts`, `lib/language.ts` and `lib/supabase/server.ts`, which use `@/`. Tests never load `lib/supabase/server.ts` or `lib/language.ts`; the state route's test loads `lib/content.ts`.
 - **Commits** follow Conventional Commits, with lowercase, imperative subjects.

@@ -38,9 +38,9 @@ Two Supabase keys split the trust. Pages and reader API routes act as the signed
   - the hooks: `use-reader-state`, `use-shortcuts`, `use-model-context-tools`.
 - `components/ui/` holds vendored shadcn components on the unified `radix-ui` package. A few are hand-patched (CLAUDE.md → Hand-authored components). Most aren't used yet and are kept for the UI/UX milestones. `hooks/use-mobile.ts` is their `md` breakpoint hook, and the Radar's to-do panel and the link chat use it.
 - `lib/pipeline/` holds the two writers:
-  - the Radar: `daily.ts`, `collect.ts` (its sources come from `config/sources.ts`), `daily-top.ts` (the day's Top 10 and the Budapest date), and `mirror.ts`, which queues the week's best items and every daily Top 10 for the Library;
+  - the Radar: `daily.ts`, `collect.ts` (its sources come from `config/sources.ts`), `daily-top.ts` (the day's Top 10 and the Budapest date), and `mirror.ts`, which queues the week's best items, every daily Top 10 and the week's GitHub Top 10 for the Library;
   - the Library: `ingest.ts` (`processSource`, `retryPendingSources`), and `extract/` with one extractor per source kind, where `index.ts` holds the fallback chain;
-  - HTML to blocks: `html-to-blocks.ts`, plus `html-noise.ts` and `cleanup.ts` for the three noise layers;
+  - HTML to blocks: `html-to-blocks.ts`, plus `html-noise.ts` for the two noise layers, `quick-summary.ts` (the rule-based summary and tags) and `briefs.ts` (the Top 10's briefs, one model call);
   - images: `html-images.ts` and `images.ts` (mirroring);
   - `summary.ts`, the summaries and notes;
   - `fetch.ts` (`safeFetch`, `apiFetch`) and `util.ts` (ids, URL parsing and small shared helpers).

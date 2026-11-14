@@ -315,7 +315,7 @@ function project(row: Record<string, unknown> | null, columns: string): Record<s
  * pipeline wiring (`processSource`, `retryPendingSources`) without a Supabase connection.
  * `model_settings`: `from().select().eq().maybeSingle()` resolves to a fixed `route`; `.tasks` records
  * every value queried via `.eq("task", value)`, so a test can assert which task (`ingest_video`,
- * `ingest_cleanup`, …) a call actually asked for, and how many times.
+ * `ingest_article`, …) a call actually asked for, and how many times.
  * `sources`/`posts`/storage: fixed by `tables` (all optional — omit what a test never queries).
  * Select filters (`eq`, `neq`, `lt`) are applied to the fixture rows, and a column the fixture never
  * set passes every filter; a null filter value, or a null row value, never passes (SQL's own rule —

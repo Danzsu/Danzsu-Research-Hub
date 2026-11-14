@@ -2,7 +2,7 @@ import { z } from "zod/v4";
 import { assignIds, type BlockDraft } from "../../blocks.ts";
 import { generate } from "../../llm.ts";
 import { apiFetch, cancelBody, FetchError, readJsonObject } from "../fetch.ts";
-import { SUMMARY_INSTRUCTIONS, summarySchema } from "../summary.ts";
+import { SUMMARY_INSTRUCTIONS, summarySchema, toGenerated } from "../summary.ts";
 import { errorMessage, youtubeId } from "../util.ts";
 import type { Extracted, Extractor } from "./types.ts";
 
@@ -82,6 +82,6 @@ export const extractYoutube: Extractor = async (db, url, note) => {
     publishedAt: null,
     meta: { videoId: id },
     text: "",
-    generated: rest,
+    generated: toGenerated(rest),
   };
 };
