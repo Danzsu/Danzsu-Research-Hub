@@ -191,6 +191,16 @@ export async function runDaily(db: SupabaseClient, now = new Date()) {
  * a re-run, a run after a failed one, or the first evening after a morning run ranks the whole day, and the list
  * only improves. Answers how many it ranked.
  */
+/**
+ * Whether today's (Budapest) Top 10 is written: a retry round (`?retry=1`) has nothing to do then. A failed lookup
+ * answers false, so the retry runs rather than skip a day that may have failed.
+ */
+export async function hasDailyTop(db: SupabaseClient, now = new Date()): Promise<boolean> {
+  const { data, error } = await db.from("daily_top").select("rank").eq("day", budapestDay(now)).limit(1);
+  if (error) console.warn("daily_top lookup failed, retrying the run", error);
+  return Boolean(data?.length);
+}
+
 async function writeDailyTop(db: SupabaseClient, now: Date): Promise<number> {
   const day = budapestDay(now);
   const { data, error } = await db

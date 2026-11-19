@@ -8,8 +8,8 @@ import { resetRoute, routeStub } from "../../../../lib/test/route-hooks.ts";
 
 const { GET } = await import("./route.ts");
 
-const cronRequest = (authorization?: string) =>
-  new Request("http://localhost/api/cron/daily", { headers: authorization ? { authorization } : {} }) as Parameters<typeof GET>[0];
+const cronRequest = (authorization?: string, query = "") =>
+  new Request(`http://localhost/api/cron/daily${query}`, { headers: authorization ? { authorization } : {} }) as Parameters<typeof GET>[0];
 
 /** A good run's network: the model curates nothing, the Daily Papers, Hacker News and GitHub answer empty, every feed 404s. */
 async function goodRunFetch(url: string): Promise<Response> {
@@ -81,7 +81,7 @@ test("a good cron run answers the digest and drops the archive list's cache at o
 
   const response = await GET(cronRequest("Bearer s3cret"));
 
-  assert.deepEqual([response.status, await response.json()], [200, { issue: isoWeek(new Date()).id, candidates: 0, shortlisted: 0, inserted: 0, repos: 0, daily: 0, mirrored: 0, retriedSources: 0 }]);
+  assert.deepEqual([response.status, await response.json()], [200, { issue: isoWeek(new Date()).id, candidates: 0, shortlisted: 0, inserted: 0, repos: 0, daily: 0, mirrored: 0, retriedSources: 0, briefs: 0 }]);
   assert.deepEqual(routeStub.revalidated, [["archive", { expire: 0 }], ["radar", { expire: 0 }]]);
   assert.equal(warn.mock.callCount(), feeds.length); // each feed's 404
 });
@@ -122,4 +122,30 @@ test("a failing mirror queue is logged once, and the digest still answers 200 wi
   assert.equal((await response.json()).mirrored, 0);
   assert.equal(error.mock.callCount(), 1);
   assert.equal(warn.mock.callCount(), feeds.length); // each feed's 404, and nothing else
+});
+
+// 2026-11-19 stopgap. Kills a retry round that runs again after a good day (a second curate call, more items, a
+// reshuffled Top 10) and one that skips a day whose run failed.
+test("a retry round skips a day whose Top 10 is written, and runs the day again when it is missing", async (t) => {
+  resetRoute();
+  withEnv(t, "CRON_SECRET", "s3cret");
+  withEnv(t, "RADAR_MIRROR_USER_ID", "system-user");
+  withGeminiKey(t);
+  t.mock.method(console, "warn", () => {});
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(new Date());
+  let modelCalls = 0;
+  mockFetch(t, async (url) => {
+    if (url.startsWith("https://generativelanguage.googleapis.com/")) modelCalls++;
+    return goodRunFetch(url);
+  });
+
+  routeStub.admin = fakeDb(undefined, { pending: [], rows: { daily_top: [{ day, rank: 1, item_id: "x" }] } });
+  const skipped = await GET(cronRequest("Bearer s3cret", "?retry=1"));
+  assert.deepEqual([skipped.status, await skipped.json()], [200, { skipped: "already_ran" }]);
+  assert.equal(modelCalls, 0);
+
+  routeStub.admin = fakeDb(undefined, { pending: [], rows: { daily_top: [{ day: "2000-01-01", rank: 1, item_id: "x" }] } });
+  const ran = await GET(cronRequest("Bearer s3cret", "?retry=1"));
+  assert.equal(ran.status, 200);
+  assert.equal((await ran.json()).issue, isoWeek(new Date()).id);
 });

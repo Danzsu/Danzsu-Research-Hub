@@ -6,6 +6,8 @@
     { "path": "/api/cron/daily", "schedule": "0 13 * * *" },
     { "path": "/api/cron/mirror", "schedule": "0 14 * * *" },
     { "path": "/api/cron/mirror", "schedule": "0 15 * * *" },
-    { "path": "/api/cron/mirror", "schedule": "0 16 * * *" }
+    { "path": "/api/cron/mirror", "schedule": "0 16 * * *" },
+    { "path": "/api/cron/daily?retry=1", "schedule": "0 17 * * *" },
+    { "path": "/api/cron/daily?retry=1", "schedule": "0 21 * * *" }
   ]
 }

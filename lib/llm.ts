@@ -22,6 +22,34 @@ function jsonSchema(schema: z.ZodType) {
   return json;
 }
 
+/** A provider's refusal, with what the retry rule reads: the status and the body. */
+class ProviderError extends Error {
+  readonly status: number;
+  readonly body: string;
+  constructor(status: number, body: string, host: string) {
+    super(`${host} ${status}: ${body.slice(0, 300)}`);
+    this.status = status;
+    this.body = body;
+  }
+}
+
+/** The waits between attempts on one route while its provider is busy (503) or rate-limits (429). Tests zero them. */
+export const retryDelaysMs = [10_000, 30_000];
+/** An attempt slower than this was not a quick refusal: a retry would not fit the run's 300 s. */
+const QUICK_FAILURE_MS = 30_000;
+/** A spent balance or a daily quota does not come back within a run. */
+const NOT_TRANSIENT = /credit|billing|prepay|per day/i;
+
+function transient(error: unknown): error is ProviderError {
+  return error instanceof ProviderError && (error.status === 503 || error.status === 429) && !NOT_TRANSIENT.test(error.body);
+}
+
+/** The wait before the next attempt: the provider's own "retry in Ns" when it gives one (at most a minute), else `fallback`. */
+export function retryWaitMs(body: string, fallback: number): number {
+  const asked = /retry in (\d+(?:\.\d+)?)s/i.exec(body);
+  return asked ? Math.min(Number(asked[1]) * 1000 + 500, 60_000) : fallback;
+}
+
 async function post(url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
   const response = await fetch(url, {
     method: "POST",
@@ -30,7 +58,7 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
     signal: AbortSignal.timeout(120_000),
   });
   if (!response.ok) {
-    throw new Error(`${new URL(url).hostname} ${response.status}: ${(await response.text()).slice(0, 300)}`);
+    throw new ProviderError(response.status, await response.text(), new URL(url).hostname);
   }
   return response.json();
 }
@@ -99,7 +127,8 @@ async function routesFor(db: SupabaseClient, task: Task): Promise<Route[]> {
 
 /**
  * Runs `task` on its configured model, then on its fallback. A route whose API
- * key is missing is skipped, so a Groq-less setup simply uses the fallback.
+ * key is missing is skipped, so a Groq-less setup simply uses the fallback. A quick 503 or 429
+ * (a busy or rate-limiting provider) is retried on the same route after `retryDelaysMs`.
  */
 export async function generate<T extends z.ZodType>(
   db: SupabaseClient,
@@ -118,13 +147,23 @@ export async function generate<T extends z.ZodType>(
       errors.push(`${route.provider}/${route.model}: skipped, only Gemini reads video and PDF input`);
       continue;
     }
-    try {
-      return route.provider === "gemini"
-        ? await gemini(route.model, schema, prompt, options)
-        : await groq(route.model, schema, prompt);
-    } catch (error) {
-      errors.push(`${route.provider}/${route.model}: ${errorMessage(error)}`);
-      console.warn(`${task}: ${errors.at(-1)}`);
+    for (let attempt = 0; ; attempt++) {
+      const started = Date.now();
+      try {
+        return route.provider === "gemini"
+          ? await gemini(route.model, schema, prompt, options)
+          : await groq(route.model, schema, prompt);
+      } catch (error) {
+        if (attempt < retryDelaysMs.length && transient(error) && Date.now() - started < QUICK_FAILURE_MS) {
+          const wait = retryWaitMs(error.body, retryDelaysMs[attempt]);
+          console.warn(`${task}: ${route.provider}/${route.model} answered ${error.status}, retrying in ${Math.round(wait / 1000)} s`);
+          await new Promise((resolve) => setTimeout(resolve, wait));
+          continue;
+        }
+        errors.push(`${route.provider}/${route.model}: ${errorMessage(error)}`);
+        console.warn(`${task}: ${errors.at(-1)}`);
+        break;
+      }
     }
   }
   throw new Error(`${task} failed — ${errors.join("; ")}`);
